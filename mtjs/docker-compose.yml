@@ -1,0 +1,17 @@
+
+
+
+services:
+  mtjs:
+    container_name: stz
+#    image: st
+    image: akakist/mtjs
+
+    env_file:
+      - .env
+    network_mode: "host"
+    volumes:
+      - ./dist:/dist
+    entrypoint: ["/usr/local/bin/mtjs", "/dist/t_http.js"]
+
+
