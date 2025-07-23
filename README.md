@@ -22,7 +22,7 @@ Two threads were used, with per-thread results shown in the table:
 
 | Software                | Requests per Second (RPS) |
 |-------------------------|---------------------------|
-| MTJS JS Runtime        | 240342.56 * 2             |
+| MTJS                    | 240342.56 * 2             |
 | uServer                 | 222193.68 * 2              |
 | Go                      | 211944.02 * 2             |
 | Boost.Asio              | 91792.11 * 2              |
@@ -69,6 +69,13 @@ To replicate the benchmarks, use `Apache Benchmark`:
 ab -n 1000000 -k -c 100 http://127.0.0.1:6012/
 ```
 Ensure the server is running (port 6012).
+
+## Binary
+Binary executable was built on ubuntu in static mode. Then it copied to alpine lightweight image. You can extract file from image on your disk.
+```
+docker create --name temp_container akakist/mtjs
+docker cp temp_container:/usr/local/bin/mtjs ./mtjs
+```
 
 ## Discussion and Feedback
 Join the discussion on Telegram: [t.me/storjsrun](https://t.me/storjsrun)
