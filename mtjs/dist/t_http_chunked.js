@@ -13,8 +13,8 @@ try {
         }
     });
     serv.listen(6012);
-    // mtjs.asyncExecute("dd if=/dev/urandom bs=1K count=10000 |   curl -X POST     -H \"Transfer-Encoding: chunked\" -H \"Content-Type: application/octet-stream\"     --data-binary @- http://localhost:6012/")
-    mtjs.asyncExecute("curl -X POST     -H \"Transfer-Encoding: chunked\" -H \"Content-Type: application/octet-stream\"     --data-binary @/tmp/z http://localhost:6012/")
+    mtjs.asyncExecute("dd if=/dev/urandom bs=1K count=10000 |   curl -X POST     -H \"Transfer-Encoding: chunked\" -H \"Content-Type: application/octet-stream\"     --data-binary @- http://localhost:6012/")
+        //mtjs.asyncExecute("curl -X POST     -H \"Transfer-Encoding: chunked\" -H \"Content-Type: application/octet-stream\"     --data-binary @/tmp/z http://localhost:6012/")
         .finally(() => serv.stop());
 }
 catch (e) {
