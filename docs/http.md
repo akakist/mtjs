@@ -50,5 +50,13 @@ catch (e) {
 ```
 What does the code do? It starts a web server, and a stream of random bytes is sent to it using curl.
 
+## websocket
+
 WebSocket support is not yet complete, but it will work similarly. A stream is set up upon receiving the HTTP header, and subsequent operations work with that stream.
+
+## streaming
+
+When a request has `Transfer-Encoding: chunked`, the `request.is_chunked` flag is immediately set. In this case, a stream must be assigned to the request to receive the data. You can set `mtjs.stream.EventEmitterStream`, and the chunks will arrive in the emitter's callbacks.
+
+Accordingly, if you use `send` and `write` in the response, it will produce chunked output. If you use only `end`, the response will include a `Content-Length` header.
 
