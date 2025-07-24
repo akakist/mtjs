@@ -1,32 +1,17 @@
-# Общая структура JS
+# General JS Structure
 
-Мы используем под капотом quickjs. За счет того, что в нем не используется c++, он имеет хорошую скорость.
+We use QuickJS under the hood. Since it doesn't rely on C++, it offers good performance.
 
-Мы используем tsc компилятор из node.js.
-Поэтому нужно, чтобы он понимал что и как, а результат *.js мог скушать quickjs.
-Получилось удобнее всего обойтись без модулей, а на старте расположить весь функционал в JSValue.
-Стандартные вещи типа таймера размещаются в global_object. Все наше специфичное - в обьекте mtjs.
+We use the TypeScript compiler (tsc) from Node.js. Therefore, it needs to understand what and how to compile, so the resulting *.js files can be consumed by QuickJS. The most convenient approach was to avoid modules and place all functionality in `JSValue` at startup. Standard features like timers are placed in the `global_object`. All our specific functionality is in the `mtjs` object.
 
-Цель  рантайма - сделать скоростной движок для бекендов и запихать под капот нужные фичи.
-Все делается в одном static билде. Почему?
-Дело в том, что когда софт обновляется кусками, нужно отслеживать каждое обновление и смотреть код с позиции обеспечения безопасности.
-Многие помнят как не так давно подломали блокчейн Solana. Там использовался метод внедрения закладки в opensource проект, который автоматически апдейтился.
+The goal of the runtime is to create a high-speed engine for backends and incorporate the necessary features under the hood. Everything is done in a single static build. Why? The reason is that when software is updated in parts, each update must be tracked, and the code must be reviewed from a security perspective. Many remember how the Solana blockchain was recently compromised. It was attacked through a method that involved injecting a backdoor into an open-source project that was automatically updated.
 
-Статик билд не нужно постоянно апдейтить. Eго нужно заменять осторожно, сначала все вытестив, поскольку что-то может поменяться.
+A static build doesn't need constant updates. It must be replaced carefully, after thorough testing, as something might change.
 
-Под капотом MTJS используется фреймворк megatron. Он написан на c++, приближенном в чистому С. За счет этого достигается высокая скорость.
-Код пока не выкладывается, поскольку нестандартный стиль на c++ вызывает хейт со стороны адептов современного эффективного c++.
-Мы не пользуемся boost и всеми конструкциями, перекочевавшими из него в стандарт, типа std::shared_ptr. Вместо std::shared_ptr используется самописный intrusive ptr. Что интересно, на конструкторе наш ptr в 3 раза быстрее std::shared_ptr, плюс не нужны костыли типа std::enable_shared_from_this.
-Эффективность кода на стандартном   C++  хорошо демонстрируется примером сервера на boost.asio. Он примерно в 2.5 раза тормознее нашего js.
-Тормоза от стандартных фич хорошо видны и в сравнении с userver. Он все равно тормознее mtjs примерно на 7%, хотя команда Яндекса прикладывает титанические усилия по его ускорению. Они в последнее время  даже победили  GO с "net/http".
+Under the hood, MTJS uses the Megatron framework. It is written in C++ close to pure C, achieving high performance. The code is not yet released, as the non-standard C++ style tends to attract criticism from advocates of modern, efficient C++. We avoid using Boost and constructs that migrated from it to the standard, like `std::shared_ptr`. Instead of `std::shared_ptr`, we use a custom intrusive pointer. Interestingly, our pointer is three times faster than `std::shared_ptr` in construction, and it doesn't require workarounds like `std::enable_shared_from_this`. The efficiency of standard C++ code is well demonstrated by the example of a server using Boost.Asio, which is about 2.5 times slower than our JS. The slowdown from standard features is also evident when compared to userver. It is still about 7% slower than MTJS, despite the Yandex team's tremendous efforts to optimize it. Recently, they even outperformed Go's `net/http`.
 
+Some might argue that V8 provides more efficient JS execution compared to QuickJS. However, this is debatable, as access to objects within a scope is still done by their names. You can experiment with the code by adding logic inside HTTP request handling and observe how the speed changes. I tried it, and it looks very promising.
 
-Кто-то скажет, что V8 дает более эффективное исполнение js  по сравнению с quckjs. Однако это спорный вопрос, поскольку в любом случае доступ к обьектам внутри scope идет по их именам.
-Можно поиграться с кодом, добавив какую-то логику внутри обработки http запроса и посмотреть как именится скорость. Я пробовал - все выглядит очень неплохо.
+To facilitate interaction between hosts, we implemented an RPC system from Megatron under the hood. RPC makes it very easy to send events between hosts and can replace the use of message brokers like RabbitMQ. An event can pass through multiple hosts, and the route it takes is stored within the event. You can simply issue a reply somewhere, and it will return to the original sender. Using a message broker is inherently slower than having it embedded within the application, as there is no network latency between the application and the broker.
 
-Для организации взаимодействия между хостами мы сделали под капотом RPC от мегатрона.
-RPC позволяет очень просто посылать события между хостами и может заменить использование брокеров сообщений типа rabbitMQ.
-Событие может проходить несколько хостов и пройденный маршрут запоминается внутри события. Можно просто сделать где-то reply и оно вернется тому, кто послал его первым.
-Использование брокера сообщений заведомо тормознее, чем если он встроен внутри приложения, поскольку нет задержки по сети между приложением и брокером.
-
-Для привлечения внимания mtjs в качестве средства для разработки embedded, мы сделали телнет. Довольно просто сделать управление приложением через телнет консоль в стиле cisco routers, что сейчас является стандартом для разного рода маршрутизаторов.
+To attract attention to MTJS as a tool for embedded development, we implemented Telnet. It's quite easy to create application management via a Telnet console in the style of Cisco routers, which is currently a standard for various types of routers.

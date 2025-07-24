@@ -28,12 +28,6 @@ try {
         serv.stop();
         rpc.stop();
     });
-
-    mtjs.asyncExecute("ab -n 1000000 -k  -c 100   http://127.0.0.1:6012/").then((data) => {
-        console.log("ab done");
-        serv.stop();
-        rpc.stop();
-    });
 }
 catch (r) {
     console.log("error in server " + r);

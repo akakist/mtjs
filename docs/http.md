@@ -1,5 +1,6 @@
 # http 
-http сделан в простейшей нотации в стике  node.js http module.
+
+The HTTP module is implemented in a simple notation styled after the Node.js HTTP module.
 
 ```typescript
 #!/usr/local/bin/mtjs
@@ -21,9 +22,7 @@ try{
 catch(e){console.log("error in server "+e);}
 ```
 
-При разборе хттп запроса определяется тип запроса, в случае `Transfer-Encoding: chunked` выставляется флаг, что запрос is_chunked. Eсли вебсокет, то is_websocket.
-В случае если запрос чанкед, то источник данных - стрим, соответственно выход идет тоже в стрим.
-Установка стрима делается при обработке первоначального запроса, все последуюшие данные пишутся в стрим.
+When parsing an HTTP request, the request type is determined. If Transfer-Encoding: chunked is present, the is_chunked flag is set. If it's a WebSocket, the is_websocket flag is set. For chunked requests, the data source is a stream, and the output is also written to a stream. The stream is set up during the initial request processing, and all subsequent data is written to the stream.
 
 ```typescript
 #!/usr/local/bin/mtjs
@@ -49,8 +48,7 @@ catch (e) {
 }
 
 ```
-Что делает код? Запускается вебсервер и на него курлом льем поток рандомных байтов.
+What does the code do? It starts a web server, and a stream of random bytes is sent to it using curl.
 
-С вебсокетом пока не доделано, но будет примерно также. Выставляем стрим на приход http заголовка и потом работает только с ним.
-
+WebSocket support is not yet complete, but it will work similarly. A stream is set up upon receiving the HTTP header, and subsequent operations work with that stream.
 
