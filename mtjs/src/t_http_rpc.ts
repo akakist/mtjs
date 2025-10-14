@@ -1,5 +1,22 @@
 #!/usr/local/bin/mtjs
+/*
+This example:
 
+Listens for RPC on port 8099
+
+Starts a web server on port 6012
+
+For incoming HTTP requests, it stores the HTTP response context in a map
+
+Makes an RPC request to port 8099
+
+Receives the response from RPC
+
+Completes the HTTP request with the response
+
+This demonstrates distributed data collection from remote nodes to respond to HTTP requests.
+
+*/
 try{
     const http = mtjs.http;
     const rpc = mtjs.rpc;

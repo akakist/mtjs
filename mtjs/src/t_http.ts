@@ -1,4 +1,7 @@
 #!/usr/local/bin/mtjs
+/*
+This example listens on port 6012 and runs ab (Apache Bench) to load it with requests.
+*/
 
 try{
     const http=mtjs.http;

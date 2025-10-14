@@ -1,5 +1,8 @@
 #!/usr/local/bin/mtjs
 "use strict";
+/*
+This example shows the use of a timer.
+*/
 try {
     const t2 = setInterval((a, b) => {
         console.log("intervalled " + a + "  " + b + t2.toString());

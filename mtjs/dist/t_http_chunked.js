@@ -1,5 +1,9 @@
 #!/usr/local/bin/mtjs
 "use strict";
+/*
+This example listens on HTTP port 6012 and initiates a file upload from /tmp/z using curl. Demonstrates chunked transfer encoding.
+
+*/
 try {
     const serv = mtjs.http.createServer((req, res) => {
         if (req.is_chunked) {

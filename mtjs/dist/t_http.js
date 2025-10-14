@@ -1,5 +1,8 @@
 #!/usr/local/bin/mtjs
 "use strict";
+/*
+This example listens on port 6012 and runs ab (Apache Bench) to load it with requests.
+*/
 try {
     const http = mtjs.http;
     const serv = http.createServer((req, res) => {

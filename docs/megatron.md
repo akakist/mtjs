@@ -19,4 +19,4 @@ The main benefits of Megatron have already been integrated into MTJS. One of its
 
 ## P2P Service for IM
 
-Each user (mobile app) has an uplink—a node in the cloud. The connection to the uplink is short-lived, only when the app is active. Another user also has an uplink. Information about uplinks for each user is broadcast across the cloud, and each node maintains a database mapping `userId` to `uplinkAddr`. When an uplink receives a message addressed to another user, it finds the recipient’s uplink address, forwards the message directly, and the recipient’s uplink stores it, delivering it to the user when they connect.
+Each user (mobile app) has an uplink node in the cloud. The connection to the uplink is short-lived, only when the app is active. Another user also has an uplink. Information about uplinks for each user is broadcast across the cloud, and each node maintains a database mapping `userId` to `uplinkAddr`. When an uplink receives a message addressed to another user, it finds the recipient’s uplink address, forwards the message directly, and the recipient’s uplink stores it, delivering it to the user when they connect.

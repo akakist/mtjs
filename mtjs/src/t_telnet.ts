@@ -1,4 +1,13 @@
 #!/usr/local/bin/mtjs
+/*
+This is an example of demonstrating telnet; it includes a string calculator.
+Note: Inside the runtime, C-style regexps are used, so they have a simplified syntax and are not compatible with JS regexps.
+Commands:
+ls - show the list of commands.
+You can navigate to a directory by typing its name in the console, e.g., type t1.
+Inside t1, write expressions like 44*33.
+You will receive the result.
+*/
 
 try{
     const telnet=mtjs.telnet;

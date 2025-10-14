@@ -1,5 +1,7 @@
 #!/usr/local/bin/mtjs
-
+/*
+This example shows the use of a timer.
+*/
 try{
 
 
