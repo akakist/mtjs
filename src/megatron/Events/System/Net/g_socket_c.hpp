@@ -1,0 +1,16 @@
+GG(genum_Socket);
+GG(genum_socket_Accepted);
+GG(genum_socket_AddToConnectTCP);
+GG(genum_socket_AddToListenTCP);
+GG(genum_socket_Connected);
+GG(genum_socket_ConnectFailed);
+GG(genum_socket_Disaccepted);
+GG(genum_socket_Disconnected);
+GG(genum_socket_NotifyBindAddress);
+GG(genum_socket_NotifyOutBufferEmpty);
+GG(genum_socket_StreamRead);
+GG(genum_socket_UdpAssoc);
+GG(genum_socket_UdpAssocRSP);
+GG(genum_socket_UdpPacketIncoming);
+GG(genum_socket_Write);
+GG(genum_Socks5);

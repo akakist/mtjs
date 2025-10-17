@@ -1,0 +1,784 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CLISH_MODULE xmlns="/XMLSchema" 
+          xmlns:xsi="/XMLSchema-instance" 
+ xsi:schemaLocation="/XMLSchema
+                     /XMLSchema/clish.xsd">
+ 	<!--=======================================================-->
+
+    <VIEW name="root-view"
+        prompt="${HOSTNAME}# ">
+        <!--===================================================-->
+        <!-- -->
+        <COMMAND name="configure"
+                 help="Enter configuration mode">
+        </COMMAND>
+        <!--===================================================-->
+        
+        <COMMAND name="configure terminal"
+                 help="Enter configuration mode for terminal"
+                 view="config-view">
+        </COMMAND>
+        <!--===================================================-->        
+        
+        <COMMAND name="clear"
+                 help="Reset functions">
+        </COMMAND>         
+        <!--===================================================-->
+        <COMMAND name="clear mac-address-table"
+                 help="MAC forwarding table">
+                 <ACTION>
+                    /scp/swprog -cmatd_addr
+                 </ACTION>
+        </COMMAND>         
+        <!--===================================================-->
+        <COMMAND name="clear mac-address-table address"
+                 help="Clear swtich MAC address table">
+				<PARAM name="address"
+                   help="H.H.H  48 bit mac address"
+                   ptype="MAC_ADDR"/>                                  
+                 <ACTION>
+                    /scp/swprog -cmatd_addr ${address}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="clear mac-address-table interface"
+                 help="interface keyword">
+        </COMMAND>
+        <!--===================================================-->
+        
+        <COMMAND name="clear mac-address-table interface FastEthernet"
+                 help="FastEthernet IEEE 802.3">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="IF_ID"/>
+                 <ACTION>
+                    /scp/swprog -cmatd_fa ${if_id}
+                  </ACTION>
+        </COMMAND>
+        <!--===================================================-->        
+        <COMMAND name="clear mac-address-table interface GigabitEthernet"
+                 help="GigabitEthernet IEEE 802.3z">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="GB_IF_ID"/>
+                 <ACTION>
+                    /scp/swprog -cmatd_gi ${if_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="clear mac-address-table vlan"
+                 help="VLAN keyword">
+				<PARAM name="vlan_id"
+                   help="enter vlan id"
+                   ptype="VLAN_ID"/>
+                 <ACTION>
+                    /scp/swprog -cmatd_vlan ${vlan_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->         
+        <COMMAND name="clear counters"
+                 help="Clear counters keyword">
+        </COMMAND>
+        <!--===================================================-->  
+        <COMMAND name="clear counters FastEthernet"
+                 help="FastEthernet IEEE 802.3">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="IF_ID"/>
+                 <ACTION>
+                    /scp/swprog -clr_cnt_fa ${if_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->        
+        <COMMAND name="clear counters GigabitEthernet"
+                 help="GigabitEthernet IEEE 802.3z">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="GB_IF_ID"/>
+                 <ACTION>
+                    /scp/swprog -clr_cnt_gi ${if_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="reload"
+                 help="Halt and perform a cold restart">
+                 <ACTION>
+                    /scp/swprog -reboot
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="ping"
+            help="Ping">
+            <PARAM name="dest"
+        	help="Host name or IP address"
+                ptype="IP_ADDR" />
+            <ACTION>ping ${dest} -c 4</ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show"
+                 help="Show running system information">
+        </COMMAND>         
+        <!--===================================================-->
+        <COMMAND name="show clock"
+                 help="Display the system clock">
+                 <ACTION>
+                    date
+                 </ACTION>
+        </COMMAND>                 
+        <!--===================================================--><!--echo "type show interface ?\r\n"--> 
+        <COMMAND name="show interface"
+                 help="Interface status and configuration">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show interface FastEthernet"
+                 help="FastEthernet IEEE 802.3">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="IF_ID"/>
+                 <ACTION>
+                    /scp/swprog -sh_int_fa ${if_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show interface GigabitEthernet"
+                 help="FastEthernet IEEE 802.3">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="GB_IF_ID"/>
+                 <ACTION>
+                    /scp/swprog -sh_int_gi ${if_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show interface status"
+                 help="Show interface line status">
+                 <ACTION>
+                    /scp/swprog -sh_int_stat
+                 </ACTION>
+        </COMMAND>         
+        <!--===================================================-->
+        <COMMAND name="show mac-address-table"
+                 help="MAC forwarding table">
+                 <ACTION>
+                    /scp/swprog -smat_addr
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->            
+        <COMMAND name="show mac-address-table |"
+                 help="Output modifiers">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show mac-address-table | include"
+                 help="Include lines that match">
+                 <PARAM name="LINE"
+                        help="Regular Expression"
+                       ptype="STRING"/>
+                <ACTION>
+		    /scp/swprog -smat_addr | grep ${LINE}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show mac-address-table | begin"
+                 help="Begin with the line that matches">
+                 <PARAM name="LINE"
+                        help="Regular Expression"
+                       ptype="STRING"/>
+                <ACTION>
+            	    /scp/swprog -smat_addr | sed -n '/${LINE}/,$p'
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show mac-address-table | exclude"
+                 help="Exclude lines that match">
+                 <PARAM name="LINE"
+                        help="Regular Expression"
+                       ptype="STRING"/>
+                <ACTION>
+                    /scp/swprog -smat_addr | grep -v ${LINE}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show mac-address-table aging-time"
+                 help="aging-time keyword">
+                 <ACTION>/scp/swprog -smat_ag_time </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show mac-address-table count"
+                 help="count keyword">
+                 <ACTION>
+                    /scp/swprog -smat_cnt
+                 </ACTION>
+        </COMMAND>         
+        <!--===================================================-->
+        <COMMAND name="show mac-address-table count vlan"
+                 help="vlan keyword">
+				<PARAM name="vlanid"
+                   help="enter vlan id value"
+                   ptype="VLAN_ID"/>
+                 <ACTION>/scp/swprog -smat_cnt_vlan ${vlanid}</ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show mac-address-table address"
+                 help="address keyword">
+				<PARAM name="address"
+                   help="H.H.H  48 bit mac address"
+                   ptype="MAC_ADDR"/>
+                 <ACTION>
+                    /scp/swprog -smat_addr ${address}
+                </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show mac-address-table interface"
+                 help="interface keyword">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show mac-address-table interface FastEthernet"
+                 help="FastEthernet IEEE 802.3">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="IF_ID"/>
+                <PARAM name="|"
+                    help="Output modifiers"
+                    value="|"
+                    ptype="STRING"
+                    mode="subcommand"
+                    optional="true">
+        	       <PARAM name="sel_type"
+                    help="Select type"
+	                ptype="STRING"
+	                mode="switch">
+                        <PARAM name="include"
+                               help="Include lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+
+                        <PARAM name="exclude"
+                               help="Exclude lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                               
+                        <PARAM name="begin"
+                               help="Begin with the line that matches"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                    </PARAM>
+                
+                    <PARAM name="LINE"
+                        help="Regular Expression"
+                        ptype="STRING"
+                    />    
+                </PARAM>
+                 
+                <ACTION>
+                    if test "x${sel_type}" = "xinclude"
+                    then
+                        /scp/swprog -smat_fa ${if_id} | grep ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xexclude"
+                    then
+                        /scp/swprog -smat_fa ${if_id} | grep -v ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xbegin"
+                    then
+                        /scp/swprog -smat_fa ${if_id} | sed -n '/${LINE}/,$p'
+                    fi
+                    
+                    if test "x${sel_type}" = "x"
+                    then 
+                        /scp/swprog -smat_fa ${if_id}
+                    fi
+                </ACTION>
+        </COMMAND>
+        <!--===================================================-->        
+        <COMMAND name="show mac-address-table interface GigabitEthernet"
+                 help="GigabitEthernet IEEE 802.3z">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="GB_IF_ID"/>
+                   
+                <PARAM name="|"
+                    help="Output modifiers"
+                    value="|"
+                    ptype="STRING"
+                    mode="subcommand"
+                    optional="true">
+        	       <PARAM name="sel_type"
+                    help="Select type"
+	                ptype="STRING"
+	                mode="switch">
+                        <PARAM name="include"
+                               help="Include lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+
+                        <PARAM name="exclude"
+                               help="Exclude lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                               
+                        <PARAM name="begin"
+                               help="Begin with the line that matches"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                    </PARAM>
+                
+                    <PARAM name="LINE"
+                        help="Regular Expression"
+                        ptype="STRING"
+                    />    
+                </PARAM>
+                 
+                <ACTION>
+                    if test "x${sel_type}" = "xinclude"
+                    then
+                        /scp/swprog -smat_gi ${if_id} | grep ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xexclude"
+                    then
+                        /scp/swprog -smat_gi ${if_id} | grep -v ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xbegin"
+                    then
+                        /scp/swprog -smat_gi ${if_id} | sed -n '/${LINE}/,$p'
+                    fi
+                    
+                    if test "x${sel_type}" = "x"
+                    then 
+                        /scp/swprog -smat_gi ${if_id}
+                    fi
+                </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show mac-address-table vlan"
+                 help="VLAN keyword">
+            <PARAM name="vlan_id"
+                   help="enter vlan id"
+                   ptype="VLAN_ID"/>
+                   
+            <PARAM name="|"
+                    help="Output modifiers"
+                    value="|"
+                    ptype="STRING"
+                    mode="subcommand"
+                    optional="true">
+        	       <PARAM name="sel_type"
+                    help="Select type"
+	                ptype="STRING"
+	                mode="switch">
+                        <PARAM name="include"
+                               help="Include lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+
+                        <PARAM name="exclude"
+                               help="Exclude lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                               
+                        <PARAM name="begin"
+                               help="Begin with the line that matches"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                    </PARAM>
+                
+                    <PARAM name="LINE"
+                        help="Regular Expression"
+                        ptype="STRING"
+                    />    
+                </PARAM>
+                 
+                <ACTION>
+                    if test "x${sel_type}" = "xinclude"
+                    then
+                        /scp/swprog -smat_vlan ${vlan_id} | grep ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xexclude"
+                    then
+                        /scp/swprog -smat_vlan ${vlan_id} | grep -v ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xbegin"
+                    then
+                        /scp/swprog -smat_vlan ${vlan_id} | sed -n '/${LINE}/,$p'
+                    fi
+                    
+                    if test "x${sel_type}" = "x"
+                    then 
+                        /scp/swprog -smat_vlan ${vlan_id}
+                    fi
+                </ACTION>
+        
+        </COMMAND>
+        <!--===================================================--> 
+
+        <COMMAND name="show port-security"
+                 help="Show secure port information">
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show port-security address"
+                 help="Show secure address">
+                 <ACTION>
+                    /scp/swprog -sh_port_sec_addr
+		</ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show port-security interface"
+                 help="Show secure interface">
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show port-security interface FastEthernet"
+                 help="FastEthernet IEEE 802.3">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="IF_ID"/>
+                 <ACTION>
+                    /scp/swprog -sh_port_sec_fa ${if_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->        
+        <COMMAND name="show port-security interface GigabitEthernet"
+                 help="GigabitEthernet IEEE 802.3z">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="GB_IF_ID"/>
+                 <ACTION>
+                    /scp/swprog -sh_port_sec_gi ${if_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show running-config"
+                 help="Current operating configuration">
+                 <ACTION>
+                    /scp/swprog -sh_run_conf
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show running-config interface"
+                 help="Current operating configuration">
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show running-config |"
+                 help="Output modifiers">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show running-config | include"
+                 help="Include lines that match">
+                 <PARAM name="LINE"
+                        help="Regular Expression"
+                       ptype="STRING"/>
+                <ACTION>
+		    /scp/swprog -sh_run_conf | grep ${LINE}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show running-config | begin"
+                 help="Begin with the line that matches">
+                 <PARAM name="LINE"
+                        help="Regular Expression"
+                       ptype="STRING"/>
+                <ACTION>
+            	    /scp/swprog -sh_run_conf | sed -n '/${LINE}/,$p'
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="show running-config | exclude"
+                 help="Exclude lines that match">
+                 <PARAM name="LINE"
+                        help="Regular Expression"
+                       ptype="STRING"/>
+                <ACTION>
+                    /scp/swprog -sh_run_conf | grep -v ${LINE}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show running-config interface FastEthernet"
+                 help="Current operating configuration">
+                 <PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="IF_ID"/>
+                 
+                 <PARAM name="|"
+                    help="Output modifiers"
+                    value="|"
+                    ptype="STRING"
+                    mode="subcommand"
+                    optional="true">
+        	       <PARAM name="sel_type"
+                    help="Select type"
+	                ptype="STRING"
+	                mode="switch">
+                        <PARAM name="include"
+                               help="Include lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+
+                        <PARAM name="exclude"
+                               help="Exclude lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                               
+                        <PARAM name="begin"
+                               help="Begin with the line that matches"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                    </PARAM>
+                
+                    <PARAM name="LINE"
+                        help="Regular Expression"
+                        ptype="STRING"
+                    />    
+                </PARAM>
+                 
+                <ACTION>
+                    if test "x${sel_type}" = "xinclude"
+                    then
+                        /scp/swprog -sh_run_conf 0 ${if_id} | grep ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xexclude"
+                    then
+                        /scp/swprog -sh_run_conf 0 ${if_id} | grep -v ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xbegin"
+                    then
+                        /scp/swprog -sh_run_conf 0 ${if_id} | sed -n '/${LINE}/,$p'
+                    fi
+                    
+                    if test "x${sel_type}" = "x"
+                    then 
+                        /scp/swprog -sh_run_conf 0 ${if_id}
+                    fi
+                </ACTION>  
+                   
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show running-config interface GigabitEthernet"
+                 help="Current operating configuration">
+                 <PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="GB_IF_ID"/>
+                 
+                 <PARAM name="|"
+                    help="Output modifiers"
+                    value="|"
+                    ptype="STRING"
+                    mode="subcommand"
+                    optional="true">
+        	       <PARAM name="sel_type"
+                    help="Select type"
+	                ptype="STRING"
+	                mode="switch">
+                        <PARAM name="include"
+                               help="Include lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+
+                        <PARAM name="exclude"
+                               help="Exclude lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                               
+                        <PARAM name="begin"
+                               help="Begin with the line that matches"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                    </PARAM>
+                
+                    <PARAM name="LINE"
+                        help="Regular Expression"
+                        ptype="STRING"
+                    />    
+                </PARAM>
+                 
+                <ACTION>
+                    if test "x${sel_type}" = "xinclude"
+                    then
+                        /scp/swprog -sh_run_conf 1 ${if_id} | grep ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xexclude"
+                    then
+                        /scp/swprog -sh_run_conf 1 ${if_id} | grep -v ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xbegin"
+                    then
+                        /scp/swprog -sh_run_conf 1 ${if_id} | sed -n '/${LINE}/,$p'
+                    fi
+                    
+                    if test "x${sel_type}" = "x"
+                    then 
+                        /scp/swprog -sh_run_conf 1 ${if_id}
+                    fi
+                </ACTION>    
+                
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show running-config interface Vlan"
+                 help="Current operating configuration">
+                 <PARAM name="vlan_id"
+                   help="enter vlan id"
+                   ptype="VLAN_ID"/>
+                   
+                 <PARAM name="|"
+                    help="Output modifiers"
+                    value="|"
+                    ptype="STRING"
+                    mode="subcommand"
+                    optional="true">
+        	       <PARAM name="sel_type"
+                    help="Select type"
+	                ptype="STRING"
+	                mode="switch">
+                        <PARAM name="include"
+                               help="Include lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+
+                        <PARAM name="exclude"
+                               help="Exclude lines that match"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                               
+                        <PARAM name="begin"
+                               help="Begin with the line that matches"
+                               ptype="STRING"
+                               mode="subcommand"/>
+                    </PARAM>
+                
+                    <PARAM name="LINE"
+                        help="Regular Expression"
+                        ptype="STRING"
+                    />    
+                </PARAM>
+                 
+                <ACTION>
+                    if test "x${sel_type}" = "xinclude"
+                    then
+                        /scp/swprog -sh_run_conf 2 ${if_id} | grep ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xexclude"
+                    then
+                        /scp/swprog -sh_run_conf 2 ${if_id} | grep -v ${LINE}
+                    fi
+                    
+                    if test "x${sel_type}" = "xbegin"
+                    then
+                        /scp/swprog -sh_run_conf 2 ${if_id} | sed -n '/${LINE}/,$p'
+                    fi
+                    
+                    if test "x${sel_type}" = "x"
+                    then 
+                        /scp/swprog -sh_run_conf 2 ${if_id}
+                    fi
+                </ACTION>     
+
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="show version"
+                 help="System hardware and software status">
+                 <ACTION>
+                    /scp/sh_ver
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+
+        <COMMAND name="show vlan"
+                 help="System hardware and software status">
+                 <ACTION>
+                    /scp/swprog -sh_vlan
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================--> 				
+
+        <COMMAND name="test"
+                 help="Test subsystems, memory, and interfaces">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="test cable-diagnostics"
+                 help="Test subsystems and interfaces">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="test cable-diagnostics interface"
+                 help="Test subsystems and interfaces">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="test cable-diagnostics interface FastEthernet"
+                 help="FastEthernet IEEE 802.3">
+		<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="IF_ID"/>
+                 <ACTION>
+                    /scp/swprog -tst_cab_fa ${if_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="test cable-diagnostics interface GigabitEthernet"
+                 help="GigabitEthernet IEEE 802.3z">
+				<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="GB_IF_ID"/>
+                 <ACTION>
+                    /scp/swprog -tst_cab_gi ${if_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+	<COMMAND name="copy"
+	     help="Copy configuration to ...">
+	</COMMAND>
+	<!--=======================================================--> 
+	<COMMAND name="copy running-config"
+			 help="Copy configuration to ...">
+	</COMMAND>
+	<!--=======================================================-->
+	<COMMAND name="copy running-config startup-config"
+			 help="Write running configuration to memory">
+		<ACTION>
+		    /scp/copy_rs
+		</ACTION>
+	</COMMAND>
+	 <!--===================================================-->
+	<COMMAND name="update_fw"
+		 help="Update FirmWare on Switch">
+                <PARAM name="protocol"
+	        	help="transfer protocol subcommand"
+	                ptype="STRING"
+	                mode="switch">
+
+	                <PARAM name="ftp"
+	                       help="ftp protocol"
+	                       ptype="STRING"
+	                       mode="subcommand"/>
+
+	                <PARAM name="tftp"
+	                       help="tftp protocol"
+	                       ptype="STRING"
+	                       mode="subcommand"/>
+                </PARAM>
+                
+	        <PARAM name="conn_string"
+	               help="enter server connection string (exmpl: ftp://user:pass@IP_Addr), or IP only for tftp"
+	               ptype="STRING"/>
+	
+	 	<PARAM name="filename"
+	               help="enter filename"
+                       ptype="STRING"/>
+
+		<ACTION>/scp/update_fw ${protocol} ${conn_string} ${filename}</ACTION>
+        </COMMAND>
+        <!--=======================================================--> 
+        <COMMAND name="exit"
+                 help="Exit from the EXEC">
+            <ACTION builtin="clish_close"/>
+        </COMMAND>
+        <!--===================================================-->
+    </VIEW>
+ 	<!--=======================================================-->    
+</CLISH_MODULE>

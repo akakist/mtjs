@@ -1,0 +1,8 @@
+genum_Timer,
+genum_timerResetAlarm,
+genum_timerSetAlarm,
+genum_timerSetTimer,
+genum_timerStopAlarm,
+genum_timerStopTimer,
+genum_timerTickAlarm,
+genum_timerTickTimer,

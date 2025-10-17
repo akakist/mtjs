@@ -1,0 +1,18 @@
+#pragma once
+#include "GG.h"
+enum genum
+{
+	#include "Events/g_mt.hpp"
+	#include "test/g_test.hpp"
+};
+#include <stdio.h>
+inline const char* __gen_string123(int n){
+switch(n){
+
+	#include "Events/g_mt_c.hpp"
+	#include "test/g_test_c.hpp"
+
+default: return "undef";
+}
+return "undef";
+}

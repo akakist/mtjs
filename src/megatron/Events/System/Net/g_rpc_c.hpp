@@ -1,0 +1,17 @@
+GG(genum_ObjectProxyPolled);
+GG(genum_ObjectProxyThreaded);
+GG(genum_RPC);
+GG(genum_rpcAccepted);
+GG(genum_rpcBinded);
+GG(genum_rpcConnected);
+GG(genum_rpcConnectFailed);
+GG(genum_rpcDisaccepted);
+GG(genum_rpcDisconnected);
+GG(genum_rpcIncomingOnAcceptor);
+GG(genum_rpcIncomingOnConnector);
+GG(genum_rpc_NotifyOutBufferEmpty);
+GG(genum_rpcPassPacket);
+GG(genum_rpcSendPacket);
+GG(genum_rpcSubscribeNotifications);
+GG(genum_rpcUnsubscribeNotifications);
+GG(genum_rpc_DoListen);

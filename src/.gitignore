@@ -1,0 +1,5 @@
+build/
+
+CMakePresets.json
+../conf/mtjs
+.vscode
