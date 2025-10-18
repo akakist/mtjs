@@ -3,7 +3,6 @@ add_library(core-ssl SHARED
     ssl.cpp
     ssl_reg.cpp
     st_rsa_impl.cpp
-rsa-pub_512_1387663237.h
 st_rsa_impl.h
 )
 
