@@ -47,7 +47,7 @@ JSValue js_execute_async(JSContext *ctx, JSValueConst this_val, int argc, JSValu
         if(!JS_IsString(argv[0]))
             return JS_ThrowTypeError(ctx, "if(!JS_IsString(ctx,argv[0]))");
 
-        JSScope scope(ctx);
+        JSScope <10,10> scope(ctx);
 
         REF_getter<execute_task> task=new execute_task(op->listener);
 
@@ -58,7 +58,7 @@ JSValue js_execute_async(JSContext *ctx, JSValueConst this_val, int argc, JSValu
             return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
         }
 
-        task->cmd = scope.toStdString(argv[0]);// JS_ToCString(ctx, argv[0]);
+        task->cmd = scope.toStdStringView(argv[0]);// JS_ToCString(ctx, argv[0]);
 
         op->async_deque->push(task.get());
 
@@ -85,7 +85,7 @@ void execute_task::execute()
 void execute_task::finalize(JSContext* ctx)
 {
     MUTEX_INSPECTOR;
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(rv==0)
     {
         auto ret=JS_Call(ctx, promise_data[0], JS_UNDEFINED, 0, nullptr);

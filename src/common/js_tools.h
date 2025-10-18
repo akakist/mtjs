@@ -10,13 +10,12 @@ namespace qjs
     inline  std::string print_exception_stack(JSContext *ctx, const JSValueConst& exception)
     {
         MUTEX_INSPECTOR;
-        JSScope scope(ctx);
+        JSScope <10,10> scope(ctx);
         JSValue stack = JS_GetPropertyStr(ctx, exception, "stack");
         scope.addValue(stack);
         std::string out;
-        auto s=scope.toCString(stack);
-        if(s)
-            out+=(std::string)s+"\n";
+        auto s=scope.toStdStringView(stack);
+        out+=(std::string)s+"\n";
 
         return out;
     }
@@ -26,7 +25,7 @@ namespace qjs
     {
         MUTEX_INSPECTOR;
 
-        JSScope scope(c);
+        JSScope <10,10> scope(c);
         if (JS_IsException(v)) {
             logErr2("checkForException mark msg: %s",msg);
 
@@ -34,7 +33,7 @@ namespace qjs
             scope.addValue(exception);
             if (JS_IsException(exception))
             {
-                auto message = scope.toStdString(exception);
+                std::string message = (std::string)scope.toStdStringView(exception);
                 logErr2("[%s] exception %s",msg,message.c_str());
             }
 
@@ -127,7 +126,7 @@ namespace qjs
     }
     inline bool checkAndPrintException(JSContext* ctx, JSValue value, const char* where)
     {
-        JSScope scope(ctx);
+        JSScope <10,10> scope(ctx);
         if(!JS_IsException(value)) return false;
         JSValue exc = JS_GetException(ctx);
         scope.addValue(exc);
@@ -135,10 +134,10 @@ namespace qjs
         scope.addValue(stack_val);
         if(!JS_IsUndefined(stack_val))
         {
-            auto stack=scope.toStdString(stack_val);
+            std::string stack(scope.toStdStringView(stack_val));
             printf("stack: %s\n",stack.c_str());
         }
-        auto msg=scope.toStdString(exc);
+        std::string msg(scope.toStdStringView(exc));
         printf("msg: %s\n",msg.c_str());
         return true;
     }

@@ -25,7 +25,7 @@ struct RPCContext {
 static JSValue js_rpc_sendTo(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(op==NULL)
     {
         printf("if(op==NULL)\n");
@@ -45,11 +45,11 @@ static JSValue js_rpc_sendTo(JSContext *ctx, JSValueConst this_val, int argc, JS
         return JS_ThrowTypeError(ctx, "sendTo expects an object params");
     }
 
-    auto dstAddr = scope.toStdString(argv[0]);
+    auto dstAddr = scope.toStdStringView(argv[0]);
     if (dstAddr.empty()) {
         return JS_ThrowTypeError(ctx, "dstAddr must not be empty");
     }
-    auto method = scope.toStdString(argv[1]);
+    auto method = scope.toStdStringView(argv[1]);
     if (method.empty()) {
         return JS_ThrowTypeError(ctx, "method must not be empty");
     }
@@ -57,7 +57,9 @@ static JSValue js_rpc_sendTo(JSContext *ctx, JSValueConst this_val, int argc, JS
     qjs::convert_js_value_to_json(ctx,argv[2],params);
 
 
-    op->broadcaster->sendEvent(dstAddr,ServiceEnum::mtjs, new mtjsEvent::mtjsRpcREQ(std::move(method), std::move(params),op->listener->serviceId));
+    op->broadcaster->sendEvent(std::string(dstAddr),ServiceEnum::mtjs, 
+        new mtjsEvent::mtjsRpcREQ(std::string(method), std::string(params),op->listener->serviceId)
+    );
 
     op->rpcBlockExit=true; // Блокируем выход, пока слушаем RPC
 
@@ -84,7 +86,7 @@ static JSValue js_rpc_listen(JSContext *ctx, JSValueConst this_val, int argc, JS
 {
 
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(op==NULL)
     {
         printf("if(op==NULL)\n");
@@ -117,19 +119,19 @@ static JSValue js_rpc_listen(JSContext *ctx, JSValueConst this_val, int argc, JS
             scope.addValue(cert_val);
             if(JS_IsString(cert_val))
             {
-                sec.cert_pn=scope.toStdString(cert_val);
+                sec.cert_pn=scope.toStdStringView(cert_val);
             }
             JSValue key_val = JS_GetPropertyStr(ctx, argv[0], "ssl_key");
             scope.addValue(key_val);
             if(JS_IsString(key_val))
             {
-                sec.key_pn = scope.toStdString(key_val);
+                sec.key_pn = scope.toStdStringView(key_val);
             }
         }
     }
 
     if (!JS_IsUndefined(ip_val)) {
-        auto ip= scope.toStdString(ip_val);
+        std::string ip(scope.toStdStringView(ip_val));
         msockaddr_in sa;
         sa.init(ip);
         printf("RPC listening port %s\n", ip.c_str());
@@ -145,7 +147,7 @@ static JSValue js_rpc_on_server(JSContext *ctx, JSValueConst this_val, int argc,
 {
 
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(op==NULL)
     {
         printf("if(op==NULL)\n");
@@ -166,9 +168,9 @@ static JSValue js_rpc_on_server(JSContext *ctx, JSValueConst this_val, int argc,
         return JS_ThrowTypeError(ctx, "callback must be a function");
     }
 
-    auto method = scope.toStdString(argv[0]);
+    auto method = scope.toStdStringView(argv[0]);
 
-    op->rpc_on_srv_callbacks.insert({method,JHolder(ctx, argv[1])});
+    op->rpc_on_srv_callbacks.insert({std::string(method),JHolder(ctx, argv[1])});
 
     return JS_UNDEFINED;
 }
@@ -176,7 +178,7 @@ static JSValue js_rpc_on_client(JSContext *ctx, JSValueConst this_val, int argc,
 {
 
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
-    JSScope scope(ctx);
+    JSScope<10,10> scope(ctx);
     if(op==NULL)
     {
         printf("if(op==NULL)\n");
@@ -197,9 +199,9 @@ static JSValue js_rpc_on_client(JSContext *ctx, JSValueConst this_val, int argc,
         return JS_ThrowTypeError(ctx, "callback must be a function");
     }
 
-    auto method = scope.toStdString(argv[0]);
+    auto method = scope.toStdStringView(argv[0]);
 
-    op->rpc_on_cli_callbacks.insert({method,JHolder(ctx, argv[1])});
+    op->rpc_on_cli_callbacks.insert({std::string (method),JHolder(ctx, argv[1])});
 
     return JS_UNDEFINED;
 }

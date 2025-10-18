@@ -1,9 +1,15 @@
 declare global 
 {
 
-    interface mtjsHttpRequest {
-    readonly url: string;
-    readonly method: string;
+  interface mtjsHttpRequest {
+    GET:number;
+    POST:number;
+    PUT: number;
+    DELETE: number;
+
+    parseURI(): Object;
+    parseHeaders(): Object;
+    readonly method: number;
     readonly content: string;
     readonly headers: Object;
     readonly is_chunked: boolean;

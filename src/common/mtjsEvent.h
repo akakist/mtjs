@@ -91,7 +91,7 @@ namespace mtjsEvent
         {
             return nullptr;
         }
-        EmitterData(const std::string&  _cmd, const std::string& _data, const REF_getter<EventEmitter> & _emitter)
+        EmitterData(const std::string&  _cmd, const std::string_view& _data, const REF_getter<EventEmitter> & _emitter)
             :NoPacked(mtjsEventEnum::EmitterData),cmd(_cmd),data(_data),emitter(_emitter) {}
 
         std::string cmd;

@@ -279,6 +279,7 @@ void print_token(const char* p, const HTTP::token& t)
     }
 }
 #include <iostream>
+#include "sv.h"
 void HTTP::Request::parse(const char *req, int reqsize)
 {
     while(parse_data.cur_pos<reqsize && ! parse_data.done_header)
@@ -307,6 +308,7 @@ void HTTP::Request::parse(const char *req, int reqsize)
                 else if(!memcmp(m,"DELETE",6)) parse_data.method=HTTP::METHOD_DELETE;
                 else throw CommonError("wrong method");
                 parse_data.uri=parse_data.line0tk[1];
+                auto p=tosv_h(parse_data.uri);
                 parse_data.http_version=parse_data.line0tk[2];
             }
         }

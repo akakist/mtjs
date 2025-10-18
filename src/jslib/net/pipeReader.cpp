@@ -27,8 +27,8 @@ struct c_pipe_async_reader_buf: public async_task
         FILE *pipe=popen(path.c_str(),"r");
         if(!pipe)
         {
-            stream->write("error", "popen failed "+path);
             errstr= (std::string)"popen failed "+path+" "+ strerror(errno);
+            stream->write("error", errstr.data(),errstr.size());
             rv=-1;
             return;
         }
@@ -37,17 +37,16 @@ struct c_pipe_async_reader_buf: public async_task
         int r=0;
         while ((r = fread(buf, 1, sizeof(buf), pipe)) > 0)
         {
-            std::string ret(buf, r);
-            stream->write("data", ret);
+            stream->write("data", buf,r);
         }
-        stream->write("end", "");
+        stream->write("end", NULL,0);
         fclose(pipe);
         rv=0;
     }
 
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope <10,10> scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -81,12 +80,12 @@ static JSValue js_read_pipe_buf(JSContext *ctx, JSValueConst this_val,
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if (argc < 2 || !JS_IsString(argv[0]) || !js_IsStream(ctx, argv[1])) {
         return JS_ThrowTypeError(ctx, "Expected (string path, stream)");
     }
 
-    std::string _path = scope.toStdString(argv[0]);
+    auto _path = scope.toStdStringView(argv[0]);
 
     auto s=js_get_stream_CPP(ctx, argv[1]);
     if(!s.valid())
@@ -126,8 +125,9 @@ struct c_pipe_async_reader_lines: public async_task
         FILE *pipe=popen(path.c_str(),"r");
         if(!pipe)
         {
-            stream->write("error", "popen failed "+path);
+
             errstr= (std::string)"popen failed "+path+" "+ strerror(errno);
+            stream->write("error", errstr.data(),errstr.size());
             rv=-1;
             return;
         }
@@ -136,29 +136,20 @@ struct c_pipe_async_reader_lines: public async_task
         size_t len = 0;
 
         while (getline(&line, &len, pipe) != -1) {
-            stream->write("data", line);
+            stream->write("data", line,len);
         }
-        stream->write("end", "");
+        stream->write("end", NULL,0);
 
         free(line);
         fclose(pipe);
 
 
-        // char buf[1024*64];
-        // int r=0;
-        // while ((r = fread(buf, 1, sizeof(buf), pipe)) > 0)
-        // {
-        //     std::string ret(buf, r);
-        //     stream->write(PKT_DATA, ret);
-        // }
-        // stream->write(PKT_END, "");
-        // fclose(pipe);
         rv=0;
     }
 
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope <10,10> scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -192,12 +183,12 @@ static JSValue js_read_pipe_lines(JSContext *ctx, JSValueConst this_val,
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if (argc < 2 || !JS_IsString(argv[0]) || !js_IsStream(ctx, argv[1])) {
         return JS_ThrowTypeError(ctx, "Expected (string path, stream)");
     }
 
-    auto _path =scope.toStdString(argv[0]);
+    auto _path =scope.toStdStringView(argv[0]);
     auto stream=js_get_stream_CPP(ctx, argv[1]);
     if(!stream.valid())
     {
@@ -239,16 +230,16 @@ struct c_stdin_async_reader_lines: public async_task
         std::string line;
         logErr2("begin getlines");
         while (std::getline(std::cin, line)) {
-            stream->write("data", line);
+            stream->write("data", line.data(),line.size());
         }
-        stream->write("end", "");
+        stream->write("end", NULL,0);
 
         rv=0;
     }
 
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope <10,10> scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -282,7 +273,7 @@ static JSValue js_read_stdin_lines(JSContext *ctx, JSValueConst this_val,
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if (argc < 1  || !js_IsStream(ctx, argv[0])) {
         return JS_ThrowTypeError(ctx, "Expected stream");
     }

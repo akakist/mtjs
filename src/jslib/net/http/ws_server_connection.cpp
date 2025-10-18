@@ -26,7 +26,7 @@ static JSValue js_ws_server_connection_on(JSContext *ctx, JSValueConst this_val,
         int argc, JSValueConst *argv)
 
 {
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     JS_WS_server_connection* conn = static_cast<JS_WS_server_connection*>(JS_GetOpaque2(ctx, this_val, js_ws_server_connection_class_id));
     if(conn==NULL)
         return JS_ThrowInternalError(ctx,"if(conn==NULL)");
@@ -38,8 +38,8 @@ static JSValue js_ws_server_connection_on(JSContext *ctx, JSValueConst this_val,
         return JS_ThrowInternalError(ctx,"if(!JS_IsFunction(ctx,argv[1]))");
 
 
-    auto key=scope.toStdString(argv[0]);
-    conn->emitter->on(key,argv[1]);
+    auto key=scope.toStdStringView(argv[0]);
+    conn->emitter->on(std::string(key),argv[1]);
 
 
     return JS_UNDEFINED;
@@ -50,15 +50,15 @@ static JSValue js_ws_server_connection_send(JSContext *ctx, JSValueConst this_va
         int argc, JSValueConst *argv)
 
 {
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     JS_WS_server_connection* conn = static_cast<JS_WS_server_connection*>(JS_GetOpaque2(ctx, this_val, js_ws_server_connection_class_id));
     if(conn==NULL)
         return JS_ThrowInternalError(ctx,"if(conn==NULL)");
     if(argc!=1)
         return JS_ThrowInternalError(ctx,"if(argc!=1)");
-    auto msg=scope.toStdString(argv[0]);
+    auto msg=scope.toStdStringView(argv[0]);
 
-    conn->broadcaster->sendEvent(ServiceEnum::HTTP, new httpEvent::WSWrite(conn->req,msg,conn->listener));
+    conn->broadcaster->sendEvent(ServiceEnum::HTTP, new httpEvent::WSWrite(conn->req,std::string(msg),conn->listener));
 
 
     return JS_UNDEFINED;

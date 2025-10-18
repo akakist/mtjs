@@ -131,7 +131,7 @@ bool megatron::findProcess(const char* _process)
         QStringList() << "/NH");
     tasklist.waitForFinished();
     QString output = tasklist.readAllStandardOutput();
-    std::vector<std::string> v=splitString("\n\r",output.toStdString());
+    std::vector<std::string> v=splitString("\n\r",output.toStdStringView());
     std::map<std::string,std::set<size_t> > procs;
     for(size_t i=0; i<v.size(); i++)
     {

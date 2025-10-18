@@ -50,7 +50,7 @@ static JSValue js_set_header(JSContext *ctx, JSValueConst this_val, int argc, JS
     if(!req)
         return JS_ThrowInternalError(ctx, "[js_write] if(!req)");
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(argc==2)
     {
         MUTEX_INSPECTOR;
@@ -58,9 +58,9 @@ static JSValue js_set_header(JSContext *ctx, JSValueConst this_val, int argc, JS
 
         if(!JS_IsString(argv[1])) return JS_ThrowTypeError(ctx, "[js_set_header] if(!JS_IsString(ctx,argv[1]))");
 
-        auto key=scope.toStdString(argv[0]);
-        auto val=scope.toStdString(argv[1]);
-        req->respP->resp.setHeader(key,val);
+        auto key=scope.toStdStringView(argv[0]);
+        auto val=scope.toStdStringView(argv[1]);
+        req->respP->resp.setHeader(std::string( key),std::string(val));
 
     }
     else if(argc==1)
@@ -86,8 +86,8 @@ static JSValue js_set_header(JSContext *ctx, JSValueConst this_val, int argc, JS
             if(JS_IsString(val))
             {
                 size_t val_len;
-                auto val_str=scope.toStdString(val);
-                req->respP->resp.setHeader(key,val_str);
+                auto val_str=scope.toStdStringView(val);
+                req->respP->resp.setHeader(std::string(key),std::string(val_str));
             }
         }
         js_free(ctx, tab);
@@ -107,7 +107,7 @@ static JSValue js_end(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
 
     req->status_set_allowed=false;
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
 
     bool chunked=req->respP->resp.is_chunked;
 
@@ -121,7 +121,7 @@ static JSValue js_end(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
     {
         if(JS_IsString(argv[i]))
         {
-            auto s=scope.toStdString(argv[i]);
+            auto s=scope.toStdStringView(argv[i]);
             bufz+=s;
 
         }
@@ -172,14 +172,14 @@ static JSValue js_send(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
     }
 
     req->status_set_allowed=false;
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     std::string bufz;
     for(int i=0; i<argc; i++)
     {
         std::string buf;
         if(JS_IsString(argv[i]))
         {
-            auto s=scope.toStdString(argv[i]);
+            auto s=scope.toStdStringView(argv[i]);
             bufz+=s;
         }
         else if(JS_IsObject(argv[i]))
@@ -218,6 +218,9 @@ static JSValue js_status(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     return JS_UNDEFINED;
 }
 
+#include "quickjs.h"
+#include <string_view>
+#include <vector>
 
 
 static const JSCFunctionListEntry js_response_proto_funcs[] = {

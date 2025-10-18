@@ -59,7 +59,7 @@ struct c_js_fs_access: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -87,14 +87,14 @@ JSValue js_fs_access(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc!=1)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.acsess requires (path)");
     }
 
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     REF_getter<c_js_fs_access> f=new c_js_fs_access(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -143,7 +143,7 @@ struct c_js_fs_appendFile: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -172,15 +172,15 @@ JSValue js_fs_appendFile(JSContext *ctx, JSValueConst this_val, int argc, JSValu
 
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc!=2)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.appendFile requires (path, string)");
     }
 
-    auto path=scope.toStdString(argv[0]);
-    auto buf=scope.toStdString(argv[1]);
+    auto path=scope.toStdStringView(argv[0]);
+    auto buf=scope.toStdStringView(argv[1]);
     REF_getter<c_js_fs_appendFile> f=new c_js_fs_appendFile(op->listener);
     f->path=path;
     f->buf=buf;
@@ -216,7 +216,7 @@ struct c_js_fs_chmod: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -245,7 +245,7 @@ JSValue js_fs_chmod(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(argc!=2)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
@@ -257,7 +257,7 @@ JSValue js_fs_chmod(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
         return JS_ThrowSyntaxError(ctx,"invalid mode");
     }
 
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     REF_getter<c_js_fs_chmod> f=new c_js_fs_chmod(op->listener);
     f->path=path;
     f->mode=mode;
@@ -293,7 +293,7 @@ struct c_js_fs_chown: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope <10,10> scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -321,7 +321,7 @@ JSValue js_fs_chown(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(argc!=3)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
@@ -338,7 +338,7 @@ JSValue js_fs_chown(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
         return JS_ThrowSyntaxError(ctx,"invalid mode");
     }
 
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     REF_getter<c_js_fs_chown> f=new c_js_fs_chown(op->listener);
     f->path=path;
     f->uid=uid;
@@ -411,7 +411,7 @@ struct c_js_fs_copyFile: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope <10,10> scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -439,15 +439,15 @@ JSValue js_fs_copyFile(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(argc!=2)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path mode)");
     }
 
-    auto src=scope.toStdString(argv[0]);
-    auto dst=scope.toStdString(argv[1]);
+    auto src=scope.toStdStringView(argv[0]);
+    auto dst=scope.toStdStringView(argv[1]);
     REF_getter<c_js_fs_copyFile> f=new c_js_fs_copyFile(op->listener);
     f->src=src;
     f->dst=dst;
@@ -482,7 +482,7 @@ struct c_js_fs_mkdir: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope <10,10> scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -510,7 +510,7 @@ JSValue js_fs_mkdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(argc!=2)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
@@ -524,7 +524,7 @@ JSValue js_fs_mkdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
     }
     m.emplace(mode);
 
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     REF_getter<c_js_fs_mkdir> f=new c_js_fs_mkdir(op->listener);
     f->path=path;
     f->mode=m;
@@ -565,7 +565,7 @@ struct c_js_fs_mkdtemp: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope <10,10> scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -599,13 +599,13 @@ JSValue js_fs_mkdtemp(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
 
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10> scope(ctx);
     if(argc!=1)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     REF_getter<c_js_fs_mkdtemp> f=new c_js_fs_mkdtemp(op->listener);
     f->path=path;
     f->path+="XXXXXX";
@@ -660,7 +660,7 @@ struct filehandle_readFile: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10> scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -693,13 +693,13 @@ JSValue js_fs_readFile(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10> scope(ctx);
     if(argc!=1)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     REF_getter<filehandle_readFile> f=new filehandle_readFile(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -744,7 +744,7 @@ struct filehandle_readdir: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -788,13 +788,13 @@ JSValue js_fs_readdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc!=1)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     REF_getter<filehandle_readdir> f=new filehandle_readdir(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -828,7 +828,7 @@ struct filehandle_rmdir: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -857,13 +857,13 @@ JSValue js_fs_rmdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc!=1)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     REF_getter<filehandle_rmdir> f=new filehandle_rmdir(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -897,7 +897,7 @@ struct filehandle_rename: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -928,14 +928,14 @@ JSValue js_fs_rename(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc!=2)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.rename requires (path1, path2)");
     }
-    auto path1=scope.toStdString(argv[0]);
-    auto path2=scope.toStdString(argv[2]);
+    auto path1=scope.toStdStringView(argv[0]);
+    auto path2=scope.toStdStringView(argv[2]);
     REF_getter<filehandle_rename> f=new filehandle_rename(op->listener);
     f->path1=path1;
     f->path2=path2;
@@ -969,7 +969,7 @@ struct filehandle_unlink: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -999,13 +999,13 @@ JSValue js_fs_unlink(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc!=1)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     REF_getter<filehandle_unlink> f=new filehandle_unlink(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -1041,7 +1041,7 @@ struct filehandle_stat: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -1090,13 +1090,13 @@ JSValue js_fs_stat(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc!=1)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     REF_getter<filehandle_stat> f=new filehandle_stat(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -1130,7 +1130,7 @@ struct filehandle_symlink: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -1161,14 +1161,14 @@ JSValue js_fs_symlink(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc!=2)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
-    auto path1=scope.toStdString(argv[0]);
-    auto path2=scope.toStdString(argv[1]);
+    auto path1=scope.toStdStringView(argv[0]);
+    auto path2=scope.toStdStringView(argv[1]);
     REF_getter<filehandle_symlink> f=new filehandle_symlink(op->listener);
     f->path1=path1;
     f->path1=path1;
@@ -1202,7 +1202,7 @@ struct filehandle_truncate: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -1231,13 +1231,13 @@ JSValue js_fs_truncate(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc!=2)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     int64_t length=0;
     if(JS_ToInt64(ctx, &length, argv[1]))
     {
@@ -1283,7 +1283,7 @@ struct filehandle_utimes: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -1316,13 +1316,13 @@ JSValue js_fs_utimes(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc!=3)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.utimes requires (path, atime, mtime)");
     }
-    auto  path=scope.toStdString(argv[0]);
+    auto  path=scope.toStdStringView(argv[0]);
 
     int64_t a=0,m=0;
     if(JS_ToInt64(ctx,&a,argv[1])||JS_ToInt64(ctx,&m,argv[2]))
@@ -1372,7 +1372,7 @@ struct filehandle_writeFile: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -1405,15 +1405,15 @@ JSValue js_fs_writeFile(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if(argc<2)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.writeFile requires (path, data)");
     }
-    auto path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
 
-    auto body=scope.toStdString(argv[1]);
+    auto body=scope.toStdStringView(argv[1]);
 
     REF_getter<filehandle_writeFile> f=new filehandle_writeFile(op->listener);
     f->body=body;
@@ -1449,7 +1449,7 @@ struct filehandle_open: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(fd<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -1488,13 +1488,13 @@ JSValue js_fs_open(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
-    JSScope scope(ctx);
+    JSScope<10,10> scope(ctx);
     if(argc<2)
     {
         fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.open requires (path, flags[, mode])");
     }
-    std::string path=scope.toStdString(argv[0]);
+    auto path=scope.toStdStringView(argv[0]);
     uint32_t fl=0;
     if(JS_ToUint32(ctx,&fl,argv[1]))
     {
@@ -1555,7 +1555,7 @@ struct filehandle_read: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -1645,7 +1645,7 @@ struct filehandle_write: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10>  scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
@@ -1680,7 +1680,7 @@ JSValue js_filehandle_write(JSContext *ctx, JSValueConst this_val, int argc, JSV
     if(!op) return JS_ThrowReferenceError(ctx, "!op");
 
 
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     FileHandleData* fhd = (FileHandleData*)JS_GetOpaque(this_val, js_file_handle_class_id);
     if(!fhd || fhd->closed)
     {
@@ -1691,7 +1691,7 @@ JSValue js_filehandle_write(JSContext *ctx, JSValueConst this_val, int argc, JSV
     if(argc>0)
     {
         if(JS_IsString(argv[0]))
-            buf=scope.toStdString(argv[0]);
+            buf=scope.toStdStringView(argv[0]);
         else return JS_ThrowSyntaxError(ctx, "argv[0] must be String");
     }
     int64_t pz=-1;
@@ -1737,7 +1737,7 @@ struct filehandle_close: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        JSScope scope(ctx);
+        JSScope<10,10> scope(ctx);
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);

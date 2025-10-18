@@ -20,6 +20,7 @@
 #include "common/timers.h"
 #include "Events/Tools/webHandlerEvent.h"
 #include "malloc_debug.h"
+#include "sv.h"
 extern "C"
 {
 }
@@ -264,7 +265,7 @@ bool MTJS::Service::TickAlarm(const timerEvent::TickAlarm* e)
     MUTEX_INSPECTOR;
     if(e->tid==Timers::TIMER_TIMER)
     {
-        JSScope scope(js_ctx);
+        JSScope <10,10> scope(js_ctx);
         TimerTask* t=(TimerTask*)e->cookie.get();
         JSValue global_obj = JS_GetGlobalObject(js_ctx);
         scope.addValue(global_obj);
@@ -306,7 +307,7 @@ void MTJS::Service::executePending()
 bool  MTJS::Service::TickTimer(const timerEvent::TickTimer*e)
 {
     MUTEX_INSPECTOR;
-    JSScope scope(js_ctx);
+    JSScope <10,10> scope(js_ctx);
     if(e->tid==Timers::TIMER_INTERVAL)
     {
         TimerTask* t=(TimerTask*)e->cookie.get();
@@ -334,7 +335,7 @@ bool  MTJS::Service::TickTimer(const timerEvent::TickTimer*e)
 
 JSValue loadModule(JSContext* ctx, const std::string& moduleCode)
 {
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     JSValue module1 = JS_Eval(ctx, moduleCode.c_str(), moduleCode.size(), "<module>", JS_EVAL_TYPE_MODULE | JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
 
 
@@ -349,17 +350,17 @@ JSValue loadModule(JSContext* ctx, const std::string& moduleCode)
     {
         JSValue exc_obj = JS_GetException(ctx);
         scope.addValue(exc_obj);
-        auto message =scope.toStdString(exc_obj);//  scope.JS_ToCString(ctx, exc_obj);
-        JSValue stack_val = JS_GetPropertyStr(ctx, exc_obj, "stack");  // Получаем свойство stack
-        std::string stack = JS_IsUndefined(stack_val) ? "No stack available" : scope.toStdString(stack_val);
+        auto message(scope.toStdStringView(exc_obj));
+        JSValue stack_val = JS_GetPropertyStr(ctx, exc_obj, "stack"); 
+        auto stack = JS_IsUndefined(stack_val) ? "No stack available" : scope.toStdStringView(stack_val);
 
         if(stack.size())
         {
-            fprintf(stderr, "Stack trace:\n%s\n", stack.c_str());
+            fprintf(stderr, "Stack trace:\n" SV_FMT "\n", SV_ARG(stack));
         }
         if(message.size())
         {
-            fprintf(stderr, "[loadModule] Runtime error: %s\n", message.c_str());
+            fprintf(stderr, "[loadModule] Runtime error: " SV_FMT "\n", SV_ARG(message));
         }
     }
     return module1;
@@ -409,7 +410,7 @@ JSValue create_uint8array(JSContext *ctx, const char *data, size_t len) {
 bool MTJS::Service::EmitterData(const mtjsEvent::EmitterData*e)
 {
 
-    JSScope scope(js_ctx);
+    JSScope <10,10> scope(js_ctx);
     auto sValue = create_uint8array(js_ctx,e->data.data(),e->data.size());
     scope.addValue(sValue);
 
@@ -422,7 +423,7 @@ bool MTJS::Service::CommandEntered(const telnetEvent::CommandEntered* e)
 {
     if(opaque.telnet_callback.has_value())
     {
-        JSScope scope(js_ctx);
+        JSScope <10,10> scope(js_ctx);
         JSValue telnetCallback = opaque.telnet_callback->listener;
         if(JS_IsFunction(js_ctx, telnetCallback))
         {

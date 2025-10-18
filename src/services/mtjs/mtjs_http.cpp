@@ -10,7 +10,7 @@ bool MTJS::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
     MUTEX_INSPECTOR;
     REF_getter<HTTP_ResponseP> resp=new HTTP_ResponseP(e->req);
 
-    JSScope scope(js_ctx);
+    JSScope <10,10> scope(js_ctx);
 
     if(!e->esi->server_name_.has_value())
         throw CommonError("if(!e->esi->server_name_.has_value())");
@@ -98,10 +98,10 @@ bool MTJS::Service::RequestChunkReceived(const httpEvent::RequestChunkReceived* 
 {
     MUTEX_INSPECTOR;
 
-    JSScope scope(js_ctx);
+    // JSScope <10,10> scope(js_ctx);
 
 
-    e->req->reader->write("data",e->buf);
+    e->req->reader->write("data",e->buf.data(),e->buf.size());
 
     return true;
 }
@@ -114,11 +114,11 @@ bool MTJS::Service::RequestStartChunking(const httpEvent::RequestStartChunking* 
 bool MTJS::Service::RequestChunkingCompleted(const httpEvent::RequestChunkingCompleted* e)
 {
 
-    JSScope scope(js_ctx);
+    // JSScope<10,10> scope(js_ctx);
     if(!e->req->reader.valid())
         throw CommonError("chunked request, you must specify stream");
 
-    e->req->reader->write("end","");
+    e->req->reader->write("end",NULL,0);
 
     return true;
 }

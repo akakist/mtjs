@@ -36,7 +36,7 @@ struct ConstReadableStringStream: public Stream
     {
         return buf.size();
     }
-    void write(const std::string& cmd, const std::string & s) final
+    void write(const std::string& cmd, const char* buf, size_t sz) final
     {
         throw CommonError("cannot write to string buffer");
     }
@@ -67,20 +67,20 @@ struct WriteableStringStream: public Stream
     {
         DBG(iUtils->mem_remove_ptr("WriteableStringStream",this));
     }
-    void write(const std::string& cmd, const std::string & s) final
+    void write(const std::string& cmd, const char *xbuf, size_t sz) final
     {
         if(piped.valid())
         {
-            piped->write(cmd,s);
+            piped->write(cmd,xbuf,sz);
             return;
         }
         {
             M_LOCKC(mutex);
             if(cmd=="data")
-                buf.push_back(s);
+                buf.push_back(std::string(xbuf,sz));
             else if(cmd=="end")
             {
-                buf.push_back(s);
+                buf.push_back(std::string(xbuf,sz));
                 streamEnded=true;
             }
             else {
@@ -171,7 +171,7 @@ struct FileReadableStream: public Stream
     {
         throw CommonError("FileReadableStream: content length not available");
     }
-    void write(const std::string& cmd, const std::string & s) final
+    void write(const std::string& cmd, const char *, size_t) final
     {
         throw CommonError("invalid call %s ",__func__);
     }
@@ -196,11 +196,11 @@ struct FileWriteableStream: public Stream
 
         DBG(iUtils->mem_remove_ptr("FileWriteableStream",this));
     }
-    void write(const std::string& cmd, const std::string & s) final
+    void write(const std::string& cmd, const char* buf, size_t sz) final
     {
         if(cmd=="data")
         {
-            fwrite(s.data(),1,s.size(),fp);
+            fwrite(buf,1,sz,fp);
         }
         else if(cmd=="end")
         {
@@ -241,10 +241,10 @@ struct EventEmitterStream: public Stream
     {
         DBG(iUtils->mem_remove_ptr("EventEmitterStream",this));
     }
-    void write(const std::string& cmd, const std::string & s) final
+    void write(const std::string& cmd, const char *buf, size_t sz) final
     {
 
-        listener->listenToEvent(new mtjsEvent::EmitterData(cmd,s,emitter));
+        listener->listenToEvent(new mtjsEvent::EmitterData(cmd,std::string(buf,sz),emitter));
 
     }
     bool rd_hasContentLength() final
@@ -300,7 +300,7 @@ static JSValue js_WriteableStringStream_ctor(JSContext *ctx,
 {
     JSValue obj = JS_UNDEFINED;
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(argc!=0) return JS_ThrowSyntaxError(ctx, "no params required");
 
     JSStreamData *s;
@@ -330,13 +330,13 @@ static JSValue js_ConstReadableStringStream_ctor(JSContext *ctx,
     JSStreamData *s;
     JSValue obj = JS_UNDEFINED;
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
 
     std::string str;
     for(int i=0; i<argc; i++)
     {
         if(!JS_IsString(argv[i])) return JS_ThrowSyntaxError(ctx,"param i must be string");
-        str+=scope.toStdString(argv[i]);
+        str+=scope.toStdStringView(argv[i]);
 
 
     }
@@ -364,7 +364,7 @@ static JSValue js_FileReadableStream_ctor(JSContext *ctx, JSValueConst new_targe
     JSStreamData *s;
     JSValue obj = JS_UNDEFINED;
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
 
     if(argc!=1)
         return JS_ThrowSyntaxError(ctx,"ctor 1 param - filename");
@@ -372,7 +372,7 @@ static JSValue js_FileReadableStream_ctor(JSContext *ctx, JSValueConst new_targe
     std::string str;
 
     if(!JS_IsString(argv[0])) return JS_ThrowSyntaxError(ctx,"param i must be string");
-    str=scope.toStdString(argv[0]);
+    str=scope.toStdStringView(argv[0]);
 
     s = new JSStreamData;
     if (!s)
@@ -395,7 +395,7 @@ static JSValue js_FileReadableStream_ctor(JSContext *ctx, JSValueConst new_targe
 static JSValue js_FileWriteableStream_ctor(JSContext *ctx, JSValueConst new_target, int argc, JSValueConst *argv)
 {
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
 
     if(argc!=1)
         return JS_ThrowSyntaxError(ctx,"ctor 1 param - filename");
@@ -403,7 +403,7 @@ static JSValue js_FileWriteableStream_ctor(JSContext *ctx, JSValueConst new_targ
     std::string str;
 
     if(!JS_IsString(argv[0])) return JS_ThrowSyntaxError(ctx,"param i must be string");
-    str=scope.toStdString(argv[0]);
+    str=scope.toStdStringView(argv[0]);
 
     JSStreamData *s;
     s = new JSStreamData;
@@ -429,7 +429,7 @@ static JSValue js_EventEmitterStream_ctor(JSContext *ctx, JSValueConst new_targe
     mtjs_opaque *op=(mtjs_opaque *) JS_GetContextOpaque(ctx);
     if(!op) return JS_ThrowSyntaxError(ctx,"EventEmitterStream: no mtjs_opaque");
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
 
     if(argc!=0)
         return JS_ThrowSyntaxError(ctx,"ctor 0 param ");
@@ -460,14 +460,14 @@ static JSValue js_EventEmitterStream_ctor(JSContext *ctx, JSValueConst new_targe
 static JSValue js_stream_write(JSContext *ctx, JSValueConst this_val,
                                int argc, JSValueConst *argv)
 {
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     JSStreamData *s = (JSStreamData *) JS_GetOpaque2(ctx, this_val, js_stream_class_id);
     if (!s) return JS_EXCEPTION;
     for(int i=0; i<argc; i++)
     {
         if(!JS_IsString(argv[i])) return JS_ThrowSyntaxError(ctx, "param must be string");
-        auto str=scope.toStdString(argv[i]);
-        s->stream->write("data",str);
+        auto str=scope.toStdStringView(argv[i]);
+        s->stream->write("data",str.data(),str.size());
     }
 
     return JS_UNDEFINED;
@@ -475,13 +475,13 @@ static JSValue js_stream_write(JSContext *ctx, JSValueConst this_val,
 static JSValue js_stream_on(JSContext *ctx, JSValueConst this_val,
                             int argc, JSValueConst *argv)
 {
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     JSStreamData *s = (JSStreamData *) JS_GetOpaque2(ctx, this_val, js_stream_class_id);
     if (!s) return JS_EXCEPTION;
     if(argc!=2) return JS_ThrowSyntaxError(ctx, "on event name and callback required");
     if(!JS_IsString(argv[0])) return JS_ThrowSyntaxError(ctx, "event name must be string");
     if(!JS_IsFunction(ctx, argv[1])) return JS_ThrowSyntaxError(ctx, "callback must be function");
-    auto eventName=scope.toStdString(argv[0]);
+    auto eventName=scope.toStdStringView(argv[0]);
     JSValue callback=argv[1];
     EventEmitterStream *emitterStream=dynamic_cast<EventEmitterStream *>(s->stream.get());
     if(!emitterStream)
@@ -496,7 +496,7 @@ static JSValue js_stream_on(JSContext *ctx, JSValueConst this_val,
     {
         return JS_ThrowTypeError(ctx, "EventEmitterStream has no listener");
     }
-    emitterStream->emitter->on(eventName,callback);
+    emitterStream->emitter->on(std::string(eventName),callback);
 
     return JS_UNDEFINED;
 }
@@ -504,23 +504,23 @@ static JSValue js_stream_on(JSContext *ctx, JSValueConst this_val,
 static JSValue js_stream_end(JSContext *ctx, JSValueConst this_val,
                              int argc, JSValueConst *argv)
 {
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     JSStreamData *s = (JSStreamData *) JS_GetOpaque2(ctx, this_val, js_stream_class_id);
     if (!s) return JS_EXCEPTION;
     for(int i=0; i<argc; i++)
     {
         if(!JS_IsString(argv[i])) return JS_ThrowSyntaxError(ctx, "param must be string");
-        auto str=scope.toStdString(argv[i]);
-        s->stream->write("data",str);
+        auto str=scope.toStdStringView(argv[i]);
+        s->stream->write("data",str.data(),str.size());
 
     }
-    s->stream->write("end","");
+    s->stream->write("end",NULL,0);
     return JS_UNDEFINED;
 }
 static JSValue js_stream_read(JSContext *ctx, JSValueConst this_val,
                               int argc, JSValueConst *argv)
 {
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     JSStreamData *s = (JSStreamData *) JS_GetOpaque2(ctx, this_val, js_stream_class_id);
 
 

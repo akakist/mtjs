@@ -5,7 +5,7 @@ static JSValue js_telnet_register_command(JSContext *ctx, JSValueConst this_val,
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op)return JS_EXCEPTION;
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(argc!=3)
         return JS_ThrowSyntaxError(ctx, "required 4 params");
     for(int i=0; i<argc; i++)
@@ -14,9 +14,9 @@ static JSValue js_telnet_register_command(JSContext *ctx, JSValueConst this_val,
             return JS_ThrowSyntaxError(ctx,"argv %d must be string",i);
     }
     op->broadcaster->sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand(
-                                   scope.toStdString(argv[0]),
-                                   scope.toStdString(argv[1]),
-                                   scope.toStdString(argv[2]),
+                                   std::string(scope.toStdStringView(argv[0])),
+                                   std::string(scope.toStdStringView(argv[1])),
+                                   std::string(scope.toStdStringView(argv[2])),
                                    op->listener
                                ));
     return JS_UNDEFINED;
@@ -25,7 +25,7 @@ static JSValue js_telnet_set_callback(JSContext *ctx, JSValueConst this_val, int
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op)return JS_EXCEPTION;
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(argc!=1)
         return JS_ThrowSyntaxError(ctx, "required 1 params");
     if(!JS_IsFunction(ctx,argv[0]))
@@ -37,19 +37,19 @@ static JSValue js_telnet_listen(JSContext *ctx, JSValueConst this_val, int argc,
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(!op)return JS_EXCEPTION;
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if(argc!=2)
         return JS_ThrowSyntaxError(ctx, "required 2 params");
     if(!JS_IsString(argv[0]))
         return JS_ThrowTypeError(ctx,"arg 0 must be string addr like localhost:4444");
     if(!JS_IsString(argv[1]))
         return JS_ThrowTypeError(ctx,"arg 1 must be string device name");
-    auto addr=scope.toStdString(argv[0]);
-    auto dn=scope.toStdString(argv[1]);
+    auto addr=scope.toStdStringView(argv[0]);
+    auto dn=scope.toStdStringView(argv[1]);
     //op->telnet_callback.emplace(JHolder(ctx,argv[0]));
     msockaddr_in sa;
-    sa.init(addr);
-    op->broadcaster->sendEvent(ServiceEnum::Telnet,new telnetEvent::DoListen(sa,dn,op->listener));
+    sa.init(std::string(addr));
+    op->broadcaster->sendEvent(ServiceEnum::Telnet,new telnetEvent::DoListen(sa,std::string(dn),op->listener));
     return JS_UNDEFINED;
 }
 

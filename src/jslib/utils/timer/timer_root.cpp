@@ -10,7 +10,7 @@ static uint64_t idGen=0;
 static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueConst *argv, bool isInterval)
 {
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    JSScope scope(ctx); // Используем JSScope для управления временными JSValue
+    JSScope <10,10> scope(ctx); 
 
     if (argc < 1) {
         logErr2("if(argc<1)");
@@ -81,7 +81,7 @@ static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueC
 static JSValue js_clearCommon(JSContext *ctx, JSValueConst val, int argc, JSValueConst *argv, bool isInterval)
 {
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    JSScope scope(ctx); // JSScope для последовательности
+    JSScope <10,10> scope(ctx); 
 
     if (argc < 1) {
         logErr2("if(argc<1)");

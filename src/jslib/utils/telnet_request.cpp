@@ -65,7 +65,7 @@ static JSValue js_request_get_path(JSContext* ctx, JSValueConst this_val)
 JSValue js_telnet_request_print(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
 {
     XTRY;
-    JSScope scope(ctx);
+    JSScope<10,10> scope(ctx);
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(op==NULL)
     {
@@ -83,7 +83,7 @@ JSValue js_telnet_request_print(JSContext* ctx, JSValueConst this_val, int argc,
         if(JS_IsString(argv[i]))
         {
 
-            buf+=scope.toStdString(argv[i]);
+            buf+=scope.toStdStringView(argv[i]);
 
         }
         else if(JS_IsObject(argv[i]))
@@ -100,7 +100,7 @@ JSValue js_telnet_request_print(JSContext* ctx, JSValueConst this_val, int argc,
                 fprintf(stderr, "Error converting number to string\n");
                 return JS_ThrowTypeError(ctx,"Error converting number to string");
             }
-            buf+=scope.toStdString(str_val);
+            buf+=scope.toStdStringView(str_val);
         }
         else
             return JS_ThrowSyntaxError(ctx,"invalid print object");

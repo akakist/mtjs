@@ -14,7 +14,7 @@ struct Stream: public Refcountable
     virtual bool rd_hasContentLength()=0;
     virtual size_t rd_contentLength()=0;
 
-    virtual void write(const std::string& cmd,const  std::string & s)=0;
+    virtual void write(const std::string& cmd,const  char* buf, size_t bufsiz)=0;
 
     // virtual ~Stream()=default;
     Stream(const char* name):classname(name) {

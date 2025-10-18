@@ -39,7 +39,7 @@ static JSValue js_http_server_listen(JSContext *ctx, JSValueConst this_val,
     MUTEX_INSPECTOR;
     JS_HttpServer* js_server = static_cast<JS_HttpServer*>(JS_GetOpaque(this_val, js_http_server_class_id));
     // logErr2("js_http_server_listen %p",js_server);
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     int port=0;
     std::string ip="0.0.0.0";
     if(argc==1)
@@ -52,10 +52,10 @@ static JSValue js_http_server_listen(JSContext *ctx, JSValueConst this_val,
     }
     else if(argc==2)
     {
-        const char * s=scope.toCString(argv[0]);
-        if(!s)
-            return JS_ThrowTypeError(ctx, "wrong number in arguments2");
-        ip=s;
+        // const char * s=scope.toCString(argv[0]);
+        // if(!s)
+        //     return JS_ThrowTypeError(ctx, "wrong number in arguments2");
+        ip=scope.toStdStringView(argv[0]);
 
         if(JS_ToInt32(ctx, &port, argv[0]))
         {

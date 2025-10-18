@@ -14,7 +14,7 @@ struct EventEmitter: public Refcountable
     int maxListeners=10;
     std::map<std::string, std::set<JHolder>> m_listeners;
     JSContext* ctx;
-    JSScope scope;
+    JSScope<10,10>  scope;
     const char *comment;
     EventEmitter(JSContext* _ctx, const char* _comment) : ctx(_ctx), scope(_ctx), comment(_comment)
     {

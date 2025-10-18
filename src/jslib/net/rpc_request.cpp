@@ -73,7 +73,7 @@ static JSValue js_request_get_params(JSContext* ctx, JSValueConst this_val)
 JSValue js_rpc_request_reply(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
 {
     XTRY;
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(op==NULL)
     {
@@ -93,7 +93,7 @@ JSValue js_rpc_request_reply(JSContext* ctx, JSValueConst this_val, int argc, JS
     if (!JS_IsObject(argv[1]))
         return JS_ThrowTypeError(ctx, "reply expects an object params");
 
-    auto method = scope.toStdString(argv[0]);
+    auto method = scope.toStdStringView(argv[0]);
     if (method.empty())
         return JS_ThrowTypeError(ctx, "method must not be empty");
 
@@ -101,8 +101,8 @@ JSValue js_rpc_request_reply(JSContext* ctx, JSValueConst this_val, int argc, JS
     qjs::convert_js_value_to_json(ctx, argv[1],params);
 
     op->broadcaster->passEvent(new mtjsEvent::mtjsRpcRSP(
-                                   std::move(method),
-                                   std::move(params),
+                                   std::string(method),
+                                   std::string(params),
                                    poppedFrontRoute(req->req->route)
                                ));
 
@@ -116,7 +116,7 @@ JSValue js_rpc_request_reply(JSContext* ctx, JSValueConst this_val, int argc, JS
 JSValue js_rpc_request_sendTo(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
 {
     XTRY;
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
     if(op==NULL)
     {
@@ -139,19 +139,19 @@ JSValue js_rpc_request_sendTo(JSContext* ctx, JSValueConst this_val, int argc, J
     if (!JS_IsObject(argv[2]))
         return JS_ThrowTypeError(ctx, "reply expects an object params");
 
-    auto addr = scope.toStdString(argv[0]);
+    auto addr = scope.toStdStringView(argv[0]);
     if (addr.empty())
         return JS_ThrowTypeError(ctx, "address must not be empty");
-    auto method = scope.toStdString(argv[1]);
+    auto method = scope.toStdStringView(argv[1]);
     if (method.empty())
         return JS_ThrowTypeError(ctx, "method must not be empty");
 
     std::string params;
     qjs::convert_js_value_to_json(ctx, argv[2],params);
 
-    op->broadcaster->sendEvent(addr,ServiceEnum::mtjs, new mtjsEvent::mtjsRpcREQ(
-                                   std::move(method),
-                                   std::move(params),
+    op->broadcaster->sendEvent(std::string(addr),ServiceEnum::mtjs, new mtjsEvent::mtjsRpcREQ(
+                                   std::string(method),
+                                   std::string(params),
                                    req->req->route
                                ));
 

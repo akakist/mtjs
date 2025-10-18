@@ -109,6 +109,10 @@ namespace HTTP
         {
             return  tosv_h(parse_data.uri);
         }
+        std::string_view headers()
+        {
+            return  header_content;
+        }
         std::string_view tosv_h(const token& t)
         {
             return {&header_content[t.pz],t.len};

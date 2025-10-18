@@ -72,7 +72,7 @@ bool MTJS::Service::on_startService(const systemEvent::startService*)
     js_ctx=JS_NewContext(js_rt);
     if(!js_ctx) throw CommonError("if(!js_ctx)");
 
-    JSScope scope(js_ctx);
+    JSScope <10,10> scope(js_ctx);
     JSValue mtjs_obj = JS_NewObject(js_ctx);
 
     js_init_module_std(js_ctx, "std");

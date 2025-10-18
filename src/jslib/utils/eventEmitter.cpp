@@ -27,7 +27,7 @@ static JSValue js_point_ctor(JSContext *ctx,
 {
     //
 
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
 
     JSValue proto;
     proto = JS_GetPropertyStr(ctx, new_target, "prototype");
@@ -70,19 +70,19 @@ static JSValue js_on(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     JSEventEmitterData *s = (JSEventEmitterData *)JS_GetOpaque2(ctx, this_val, js_event_emitter_class_id);
     if (!s)
         return JS_EXCEPTION;
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     if (argc < 2) return JS_ThrowTypeError(ctx, "on(eventName, ...callback)");
     if (!JS_IsString(argv[0]))
         return JS_ThrowTypeError(ctx, "eventName must be a string");
 
-    auto eventName=scope.toStdString(argv[0]);
+    auto eventName=scope.toStdStringView(argv[0]);
     if (eventName.empty()) return JS_ThrowTypeError(ctx, "eventName must not be empty");
 
     for(int i=1; i<argc; i++)
     {
         if (!JS_IsFunction(ctx, argv[i]))
             return JS_ThrowTypeError(ctx, "callback must be a function");
-        s->emitter->on(eventName, argv[i]);
+        s->emitter->on(std::string(eventName), argv[i]);
     }
 
     return JS_DupValue(ctx, this_val);
@@ -94,14 +94,14 @@ static JSValue js_emit(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
     JSEventEmitterData *s = (JSEventEmitterData *)JS_GetOpaque2(ctx, this_val, js_event_emitter_class_id);
     if (!s)
         return JS_ThrowInternalError(ctx, "emit: if(!s)");
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if (argc < 2) return JS_ThrowTypeError(ctx, "emit(eventName, ...args)");
     if (!JS_IsString(argv[0])) return JS_ThrowTypeError(ctx, "eventName must be a string");
-    auto eventName=scope.toStdString(argv[0]);
+    auto eventName=scope.toStdStringView(argv[0]);
     if (eventName.empty()) return JS_ThrowTypeError(ctx, "eventName must not be empty");
 
     int cnt=0;
-    cnt+=s->emitter->emit(eventName,argc-1, &argv[1]);
+    cnt+=s->emitter->emit(std::string(eventName),argc-1, &argv[1]);
 
     return JS_NewBool(ctx, cnt>0);
 }
@@ -121,14 +121,14 @@ static JSValue js_get_listeners(JSContext *ctx, JSValueConst this_val, int argc,
     JSEventEmitterData *s = (JSEventEmitterData *)JS_GetOpaque2(ctx, this_val, js_event_emitter_class_id);
     if (!s)
         return JS_ThrowInternalError(ctx, "js_get_listeners: if(!s)");
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     if (argc != 1) return JS_ThrowTypeError(ctx, "js_get_listeners argc must be 1");
 
     if (!JS_IsString(argv[0])) return JS_ThrowTypeError(ctx, "eventName must be a string");
-    auto eventName=scope.toStdString(argv[0]);
+    auto eventName=scope.toStdStringView(argv[0]);
     if (eventName.empty()) return JS_ThrowTypeError(ctx, "eventName must not be empty");
 
-    auto listeners=s->emitter->listeners(eventName);
+    auto listeners=s->emitter->listeners(std::string(eventName));
 
     JSValue arr = vectorToJSArray(ctx, listeners);
 

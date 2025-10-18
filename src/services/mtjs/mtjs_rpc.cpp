@@ -8,7 +8,7 @@ bool MTJS::Service::mtjsRpcREQ(const mtjsEvent::mtjsRpcREQ* e, const REF_getter<
 {
     XTRY;
 
-    JSScope scope(js_ctx);
+    JSScope <10,10> scope(js_ctx);
     auto it=opaque.rpc_on_srv_callbacks.find(e->method);
     if(it==opaque.rpc_on_srv_callbacks.end())
     {
@@ -27,7 +27,7 @@ bool MTJS::Service::mtjsRpcREQ(const mtjsEvent::mtjsRpcREQ* e, const REF_getter<
 bool MTJS::Service::mtjsRpcRSP(const mtjsEvent::mtjsRpcRSP*e, const REF_getter<epoll_socket_info>& esi)
 {
     XTRY;
-    JSScope scope(js_ctx);
+    JSScope <10,10> scope(js_ctx);
     if(e->route.size())
     {
         passEvent(e);

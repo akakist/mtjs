@@ -31,7 +31,7 @@ static void js_mysql_finalizer(JSRuntime *rt, JSValue val) {
 
 static JSValue js_mysql_ctor(JSContext *ctx, JSValueConst new_target, int argc, JSValueConst *argv)
 {
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     JSValue obj = JS_UNDEFINED;
 
     if(!JS_IsObject(argv[0])) {
@@ -51,19 +51,19 @@ static JSValue js_mysql_ctor(JSContext *ctx, JSValueConst new_target, int argc, 
     scope.addValue(portVal);
     std::string socket,host,user,pass,db,port;
 
-    if(JS_IsString(hostVal) )  host = scope.toStdString(hostVal);
+    if(JS_IsString(hostVal) )  host = scope.toStdStringView(hostVal);
     else host="NULL";
 
-    if(JS_IsString(portVal) )  port = scope.toStdString(portVal);
+    if(JS_IsString(portVal) )  port = scope.toStdStringView(portVal);
     else port="NULL";
 
-    if(JS_IsString(userVal) )  user = scope.toStdString(userVal);
+    if(JS_IsString(userVal) )  user = scope.toStdStringView(userVal);
     else user="NULL";
 
-    if(JS_IsString(passVal) )  pass = scope.toStdString(passVal);
+    if(JS_IsString(passVal) )  pass = scope.toStdStringView(passVal);
     else pass="NULL";
 
-    if(JS_IsString(socketVal) )  socket = scope.toStdString(socketVal);
+    if(JS_IsString(socketVal) )  socket = scope.toStdStringView(socketVal);
     else socket="NULL";
     MYSQL *conn = mysql_init(NULL);
     if (!conn) return JS_ThrowReferenceError(ctx,"mysql_init failed");
@@ -110,7 +110,7 @@ static JSValue js_mysql_ctor(JSContext *ctx, JSValueConst new_target, int argc, 
 }
 static JSValue js_mysql_connect(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    JSScope scope(ctx);
+    JSScope<10,10>  scope(ctx);
     JSValue obj = JS_UNDEFINED;
 
     if(!JS_IsObject(argv[0])) {
@@ -131,7 +131,7 @@ static JSValue js_mysql_connect(JSContext *ctx, JSValueConst this_val, int argc,
     std::string socket,host,user,pass,db;
     uint32_t port=0;
 
-    if(JS_IsString(hostVal) )  host = scope.toStdString(hostVal);
+    if(JS_IsString(hostVal) )  host = scope.toStdStringView(hostVal);
     else host="NULL";
 
     if(JS_IsNumber(portVal) )
@@ -140,16 +140,16 @@ static JSValue js_mysql_connect(JSContext *ctx, JSValueConst this_val, int argc,
 
     }
 
-    if(JS_IsString(userVal) )  user = scope.toStdString(userVal);
+    if(JS_IsString(userVal) )  user = scope.toStdStringView(userVal);
     else user="NULL";
 
-    if(JS_IsString(passVal) )  pass = scope.toStdString(passVal);
+    if(JS_IsString(passVal) )  pass = scope.toStdStringView(passVal);
     else pass="NULL";
 
-    if(JS_IsString(dbVal) )  db = scope.toStdString(dbVal);
+    if(JS_IsString(dbVal) )  db = scope.toStdStringView(dbVal);
     else db="NULL";
 
-    if(JS_IsString(socketVal) )  socket = scope.toStdString(socketVal);
+    if(JS_IsString(socketVal) )  socket = scope.toStdStringView(socketVal);
     else socket="NULL";
     MYSQL *conn = mysql_init(NULL);
     if (!conn) return JS_ThrowReferenceError(ctx,"mysql_init failed");
@@ -178,12 +178,12 @@ static JSValue js_mysql_connect(JSContext *ctx, JSValueConst this_val, int argc,
 
 static JSValue js_mysql_query(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
 
     MySQLConnection *s = (MySQLConnection *)JS_GetOpaque2(ctx, this_val, js_mysql_class_id);
     if (!s) return JS_EXCEPTION;
 
-    auto  query = scope.toStdString(argv[0]);
+    std::string  query(scope.toStdStringView(argv[0]));
 
     if (mysql_query(s->conn, query.c_str())) {
         JS_ThrowInternalError(ctx, "Query failed: %s", mysql_error(s->conn));
@@ -245,7 +245,7 @@ static int js_init_mysql(JSContext *ctx, JSValue global)
 int js_init_module_mysql(JSContext *ctx)
 {
     JSValue global = JS_GetGlobalObject(ctx);
-    JSScope scope(ctx);
+    JSScope <10,10> scope(ctx);
     scope.addValue(global);
     // return
     js_init_mysql(ctx, global);
