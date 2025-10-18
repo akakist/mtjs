@@ -24,7 +24,7 @@ public:
             {
                 strings_[stringgs_n++]=str;    
             }
-            else throw CommonError("!if(stringgs_n<S1)");
+            else throw CommonError("!if(stringgs_n<S1)"+_DMI());
                 
             return std::string_view(str,len);
         }
@@ -37,7 +37,7 @@ public:
         {
             values_[values_n++]=val;
         }
-        else throw CommonError("!if(values_n<S2)");
+        else throw CommonError("!if(values_n<S2)"+_DMI());
     }
 private:
     JSContext* ctx_;

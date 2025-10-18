@@ -124,7 +124,7 @@ void epoll_socket_info::close(const char* reason)
 
 epoll_socket_info::~epoll_socket_info()
 {
-    DBG(logErr2("~epoll_socket_info()"));
+    // DBG(logErr2("~epoll_socket_info()"));
 
     try {
 
@@ -212,7 +212,7 @@ int socketBuffersOut::send(const SOCKET_fd &fd, epoll_socket_info* esi)
             {
                 if(res==container_.size())
                 {
-                    DBG(logErr2("container_.clear();"));
+                    // DBG(logErr2("container_.clear();"));
                     container_.clear();
                 }
                 else
@@ -260,7 +260,7 @@ epoll_socket_info::epoll_socket_info(const int &_socketType, const STREAMTYPE &_
 #endif
 
 {
-    DBG(logErr2("epoll_socket_info()"));
+    // DBG(logErr2("epoll_socket_info()"));
     if(secure_context.valid())
     {
         ssl=secure_context->issl->SSL_new(secure_context->sslctx);

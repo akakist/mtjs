@@ -17,12 +17,12 @@ public:
     {
         DBG(iUtils->mem_add_ptr("JS_RPC_Request",this));
 
-        DBG(logErr2("JS_RPC_Request()"));
+        // DBG(logErr2("JS_RPC_Request()"));
     }
     ~JS_RPC_Request()
     {
         DBG(iUtils->mem_remove_ptr("JS_RPC_Request",this));
-        DBG(logErr2("~JS_RPC_Request()"));
+        // DBG(logErr2("~JS_RPC_Request()"));
 
     }
 

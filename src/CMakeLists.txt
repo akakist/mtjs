@@ -157,8 +157,8 @@ include_directories(system /usr/local/include quickjs)
 include_directories(${CMAKE_BINARY_DIR} common)
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fPIC -O3 -march=native  -DNDEBUG")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O3 -march=native  -DNDEBUG")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fPIC -O3 -march=native  -DNDEBUG ")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O3 -march=native  -DNDEBUG ")
 #№-flto -fomit-frame-pointer
 # set(CMAKE_BUILD_TYPE Release)
 # set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")

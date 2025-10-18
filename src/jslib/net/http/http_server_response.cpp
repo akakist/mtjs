@@ -4,6 +4,7 @@
 #include "http_server_response.h"
 #include "common/jsscope.h"
 #include "common/js_tools.h"
+#include "malloc_debug.h"
 
 static JSClassID js_response_class_id;
 
@@ -18,12 +19,12 @@ public:
     JS_HTTP_Response(const REF_getter<HTTP_ResponseP>& r) : respP(r) {
         DBG(iUtils->mem_add_ptr("JS_HTTP_Response",this));
 
-        DBG(logErr2("JS_HTTP_Response()"));
+        // DBG(logErr2("JS_HTTP_Response()"));
     }
     ~JS_HTTP_Response()
     {
         DBG(iUtils->mem_remove_ptr("JS_HTTP_Response",this));
-        DBG(logErr2("~JS_HTTP_Response()"));
+        // DBG(logErr2("~JS_HTTP_Response()"));
 
     }
 };

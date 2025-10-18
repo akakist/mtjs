@@ -16,6 +16,7 @@
 #include <dirent.h>
 #include <utime.h>
 #include <stdint.h>
+#include "malloc_debug.h"
 
 
 JSClassID js_file_handle_class_id = 0;
@@ -34,7 +35,7 @@ static void file_handle_finalizer(JSRuntime *rt, JSValue val)
     {
         if(!fhd->closed && fhd->fd >= 0)
             close(fhd->fd);
-        free(fhd);
+            delete fhd;
     }
 }
 
@@ -1465,7 +1466,7 @@ struct filehandle_open: public async_task
         }
         else
         {
-            FileHandleData *fhd = new FileHandleData;
+            FileHandleData *fhd =new FileHandleData;
             fhd->fd = fd;
             fhd->closed = 0;
             JS_SetOpaque(fhObj, fhd);
@@ -1876,7 +1877,6 @@ void js_init_fs(JSContext *ctx, JSValue mtjs_obj)
 {
     register_fh_class(ctx);
     JSValue m = JS_NewObject(ctx);
-
     JS_SetPropertyFunctionList(ctx, m, fs_funcs, sizeof(fs_funcs)/sizeof(JSCFunctionListEntry));
     JS_SetPropertyStr(ctx, mtjs_obj, "fs", m);
 

@@ -90,7 +90,8 @@ bool Oscar::Service::on_StreamRead(const socketEvent::StreamRead* evt)
                                 XTRY;
                                 if(b.remains()<len)
                                 {
-                                    logErr2("if(b.remains()<len)");
+                                    
+                                    // logErr2("if(b.remains()<len)");
                                     return true;
                                 }
 

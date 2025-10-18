@@ -4,6 +4,8 @@
 #include "timeout.h"
 #include "common/jsscope.h"
 #include "common/timers.h"
+#include "malloc_debug.h"
+
 extern JSClassID js_timeout_class_id;
 
 static uint64_t idGen=0;

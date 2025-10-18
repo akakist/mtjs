@@ -2,6 +2,7 @@
 #include <math.h>
 #include "jsscope.h"
 #include "eventEmitter.h"
+#include "malloc_debug.h"
 
 #define countof(x) (sizeof(x) / sizeof((x)[0]))
 

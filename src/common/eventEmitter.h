@@ -14,9 +14,8 @@ struct EventEmitter: public Refcountable
     int maxListeners=10;
     std::map<std::string, std::set<JHolder>> m_listeners;
     JSContext* ctx;
-    JSScope<10,10>  scope;
     const char *comment;
-    EventEmitter(JSContext* _ctx, const char* _comment) : ctx(_ctx), scope(_ctx), comment(_comment)
+    EventEmitter(JSContext* _ctx, const char* _comment) : ctx(_ctx),  comment(_comment)
     {
         MUTEX_INSPECTOR;
         DBG(iUtils->mem_add_ptr("EventEmitter",this));
@@ -34,8 +33,8 @@ struct EventEmitter: public Refcountable
                 for (const auto& listener : it->second) {
                     res++;
                     auto ret=JS_Call(ctx, listener.listener, JS_UNDEFINED, argc, argv);
-                    scope.addValue(ret);
                     qjs::checkForException(ctx,ret,"EventEmitter:emit::JSCall");
+                    JS_FreeValue(ctx, ret);
                 }
             }
             else

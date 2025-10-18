@@ -3,6 +3,7 @@
 #include "common/js_tools.h"
 #include "mtjs_opaque.h"
 #include "Events/Tools/telnetEvent.h"
+#include "malloc_debug.h"
 
 static JSClassID js_telnet_request_class_id;
 

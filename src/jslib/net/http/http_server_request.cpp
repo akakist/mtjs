@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 #include "httpUrlParser.h"
+#include "malloc_debug.h"
 static JSClassID js_request_class_id;
 
 class JS_HTTP_Request {
@@ -19,12 +20,12 @@ public:
     {
         DBG(iUtils->mem_add_ptr("JS_HTTP_Request",this));
 
-        DBG(logErr2("JS_HTTP_Request()"));
+        // DBG(logErr2("JS_HTTP_Request()"));
     }
     ~JS_HTTP_Request()
     {
         DBG(iUtils->mem_remove_ptr("JS_HTTP_Request",this));
-        DBG(logErr2("~JS_HTTP_Request()"));
+        // DBG(logErr2("~JS_HTTP_Request()"));
 
     }
 
@@ -123,27 +124,6 @@ static JSValue js_is_websocket(JSContext* ctx, JSValueConst this_val/*, int magi
     return JS_NewBool(ctx,req->req->isWebSocket);
 }
 
-static JSValue js_request_get_headers(JSContext* ctx, JSValueConst this_val/*, int magic*/)
-{
-    MUTEX_INSPECTOR;
-
-    JS_HTTP_Request* req = static_cast<JS_HTTP_Request*>(JS_GetOpaque2(ctx, this_val, js_request_class_id));
-    if (!req) return JS_EXCEPTION;
-    JSValue js_row = JS_NewObject(ctx);
-    DBG(memctl_add_object(js_row, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
-
-    int i=0;
-    // for(auto& z: req->req->headers)
-    {
-        // JS_DefinePropertyValueStr(ctx, js_row, z.first.c_str(), JS_NewStringLen(ctx,z.second.data(),z.second.size()), JS_PROP_C_W_E);
-    }
-
-    return js_row;
-}
-
-// Макросы для удобства с string_view в printf
-//#define SV_FMT "%.*s"
-//#define SV_ARG(sv) static_cast<int>((sv).size()), (sv).data()
 #include "sv.h"
 
 #include "quickjs.h"

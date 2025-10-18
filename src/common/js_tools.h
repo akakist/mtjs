@@ -13,8 +13,9 @@ namespace qjs
         JSScope <10,10> scope(ctx);
         JSValue stack = JS_GetPropertyStr(ctx, exception, "stack");
         scope.addValue(stack);
-        std::string out;
         auto s=scope.toStdStringView(stack);
+        // JS_FreeValue(ctx,stack);
+        std::string out;
         out+=(std::string)s+"\n";
 
         return out;
@@ -40,7 +41,7 @@ namespace qjs
 
             auto p=print_exception_stack(c,v);
             logErr2("stack %s",p.c_str());
-            throw CommonError("checkForException");
+            // throw CommonError("checkForException");
 
         }
 

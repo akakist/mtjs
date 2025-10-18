@@ -4,6 +4,7 @@
 #include "malloc_debug.h"
 #include "mtjsEvent.h"
 #include "epoll_socket_info.h"
+#include "malloc_debug.h"
 
 static JSClassID js_rpc_response_class_id;
 
@@ -16,12 +17,12 @@ public:
     {
         DBG(iUtils->mem_add_ptr("JS_RPC_response",this));
 
-        DBG(logErr2("JS_RPC_response()"));
+        // DBG(logErr2("JS_RPC_response()"));
     }
     ~JS_RPC_response()
     {
         DBG(iUtils->mem_remove_ptr("JS_RPC_response",this));
-        DBG(logErr2("~JS_RPC_response()"));
+        // DBG(logErr2("~JS_RPC_response()"));
 
     }
 
@@ -46,9 +47,11 @@ static JSValue js_response_get_peer_name(JSContext* ctx, JSValueConst this_val)
 {
     MUTEX_INSPECTOR;
     XTRY;
+    JSScope<10,10> scope(ctx);
     JS_RPC_response* req = static_cast<JS_RPC_response*>(JS_GetOpaque2(ctx, this_val, js_rpc_response_class_id));
     if (!req) return JS_EXCEPTION;
     auto nm=JS_NewObject(ctx);
+    scope.addValue(nm);
     DBG(memctl_add_object(nm, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
     auto host=req->esi->remote_name().getStringAddr();
     auto port=req->esi->remote_name().port();
