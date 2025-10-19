@@ -47,17 +47,20 @@ struct op_deque: public Refcountable
         stop();
 
     }
-    void deinit()
-    {
-        MUTEX_INSPECTOR;
-        m_isTerminating=true;
-        m_cond.broadcast();
-    }
 
     bool empty()
     {
         M_LOCKC(m_mutex);
         return container.size()==0 && counter==0;
+
+
+    }
+    void clear()
+    {
+        {
+            M_LOCKC(m_mutex);
+            container.clear();
+        }
 
     }
     void push(const REF_getter<async_task> & e)
@@ -75,6 +78,7 @@ struct op_deque: public Refcountable
         M_LOCKC(m_mutex);
         while(1)
         {
+
             if(m_isTerminating)
                 return nullptr;
             if(!container.size())
@@ -103,6 +107,7 @@ struct op_deque: public Refcountable
     {
         MUTEX_INSPECTOR;
         m_isTerminating=true;
+        clear();
         m_cond.broadcast();
     }
 

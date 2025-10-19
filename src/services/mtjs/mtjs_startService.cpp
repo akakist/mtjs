@@ -60,10 +60,93 @@ std::string loadFile(const std::string& filename)
 }
 
 #include "quickjs-libc.h"
+#include <assert.h>
+std::set<void*> allocs;
+static void *js_trace_malloc(JSMallocState *s, size_t size)
+{
+    void *ptr;
+
+    /* Do not allocate zero bytes: behavior is platform dependent */
+    assert(size != 0);
+
+    ptr = malloc(size);
+    allocs.insert(ptr);
+    return ptr;
+}
+static void js_trace_free(JSMallocState *s, void *ptr)
+{
+    if (!ptr)
+        return;
+    allocs.erase(ptr);
+    free(ptr);
+}
+static void *js_trace_realloc(JSMallocState *s, void *ptr, size_t size)
+{
+    size_t old_size;
+
+    if (!ptr) {
+        if (size == 0)
+            return NULL;
+        return js_trace_malloc(s, size);
+    }
+    if (size == 0) {
+        allocs.erase(ptr);
+        free(ptr);
+        return NULL;
+    }
+    void *ptr2 = realloc(ptr, size);
+    if(ptr!=ptr2)
+    {
+        allocs.erase(ptr);
+        allocs.insert(ptr2);
+    }
+    return ptr2;
+}
+#include <malloc.h>
+static size_t js_trace_malloc_usable_size(const void *ptr)
+{
+#if defined(__APPLE__)
+    return malloc_size(ptr);
+#elif defined(_WIN32)
+    return _msize((void *)ptr);
+#elif defined(EMSCRIPTEN)
+    return 0;
+#elif defined(__linux__) || defined(__GLIBC__)
+    return malloc_usable_size((void *)ptr);
+#else
+    /* change this to `return 0;` if compilation fails */
+    return malloc_usable_size((void *)ptr);
+#endif
+}
+
+static const JSMallocFunctions trace_mf = {
+    js_trace_malloc,
+    js_trace_free,
+    js_trace_realloc,
+    js_trace_malloc_usable_size,
+};
+struct trace_malloc_data {
+    uint8_t *base;
+};
+static void js_trace_malloc_init(struct trace_malloc_data *s)
+{
+    free(s->base = (uint8_t *)malloc(8));
+}
+
+struct trace_malloc_data trace_data = { NULL };
+
+bool trace_memory=false;
 
 bool MTJS::Service::on_startService(const systemEvent::startService*)
 {
-    js_rt=JS_NewRuntime();
+
+    if (trace_memory) {
+        js_trace_malloc_init(&trace_data);
+        js_rt = JS_NewRuntime2(&trace_mf, &trace_data);
+    } else {
+        js_rt = JS_NewRuntime();
+    }
+
     if(!js_rt) throw CommonError("if(!js_rt)");
     js_std_init_handlers(js_rt);
 

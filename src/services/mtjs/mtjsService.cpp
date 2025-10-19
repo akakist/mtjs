@@ -29,7 +29,7 @@ extern "C"
 void* thread_worker(void *p)
 {
     mtjs_opaque *op=(mtjs_opaque *)p;
-    while(!op->async_deque->m_isTerminating)
+    while(!op->async_deque->m_isTerminating && !iUtils->isTerminating())
     {
         auto x= op->async_deque->pop();
         // for(auto x:d)
@@ -42,7 +42,7 @@ void* thread_worker(void *p)
         }
         else
         {
-            logErr2("!thread_worker %p", p);
+            // logErr2("!thread_worker %p", p);
             return NULL;
         }
 
@@ -256,6 +256,13 @@ void MTJS::Service::checkForExit()
         return;
     if(!opaque.async_deque->empty())
         return;
+    // JS_FreeContext(js_ctx);
+    // JS_FreeValue(_modul)
+    // JS_FreeRuntime(js_rt);
+    // dump_memory_usage(js_rt);
+    // iUtils->setTerminate(0);
+    // deinit();
+    stop();
     exit(0);
 }
 
@@ -338,10 +345,11 @@ JSValue loadModule(JSContext* ctx, const std::string& moduleCode)
     JSScope <10,10> scope(ctx);
     JSValue module1 = JS_Eval(ctx, moduleCode.c_str(), moduleCode.size(), "<module>", JS_EVAL_TYPE_MODULE | JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
 
-
+    // scope.addValue(module1);
     if(qjs::checkAndPrintException(ctx, module1, "loadModule"))
         return module1;
 
+        // #ifdef KALL
     JSValue ret = JS_EvalFunction(ctx, module1);
     scope.addValue(ret);
     if(qjs::checkAndPrintException(ctx, ret, "loadModule")) return ret;
@@ -363,6 +371,7 @@ JSValue loadModule(JSContext* ctx, const std::string& moduleCode)
             fprintf(stderr, "[loadModule] Runtime error: " SV_FMT "\n", SV_ARG(message));
         }
     }
+    // #endif
     return module1;
 }
 
@@ -372,11 +381,11 @@ bool MTJS::Service::Eval(const mtjsEvent::Eval* e)
     module__ = loadModule(js_ctx, e->js);
 
 
-    JSModuleDef* moduleDef = (JSModuleDef*)JS_VALUE_GET_PTR(module__);
-    if(moduleDef == NULL) return false;
+    // JSModuleDef* moduleDef = (JSModuleDef*)JS_VALUE_GET_PTR(module__);
+    // if(moduleDef == NULL) return false;
 
-    moduleNamespace__ = JS_GetModuleNamespace(js_ctx, moduleDef);
-    if(JS_IsUndefined(moduleNamespace__)) throw CommonError("Не удалось загрузить модуль!");
+    // moduleNamespace__ = JS_GetModuleNamespace(js_ctx, moduleDef);
+    // if(JS_IsUndefined(moduleNamespace__)) throw CommonError("Не удалось загрузить модуль!");
 
 
     executePending();

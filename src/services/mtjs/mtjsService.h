@@ -30,6 +30,7 @@ extern "C"
     JSModuleDef *js_init_module_http(JSContext *ctx, const char *module_name);
 }
 
+extern std::set<void*> allocs;
 
 namespace MTJS
 {
@@ -80,30 +81,25 @@ namespace MTJS
     private:
         int ticks_request_limit;
     public:
-        void deinit()
+        void stop()
         {
-            // releaseFetch(js_rt);
-            DBG(printf("mtjs deinit\n"));
-
-
-            opaque.async_deque->deinit();
+            opaque.async_deque->stop();
             for(auto& t:thread_pool)
             {
                 pthread_join(t,NULL);
             }
-
-
-            DBG(dump_memory_usage(js_rt));
-
-
-
-
+            thread_pool.clear();
             rconf=nullptr;
-            opaque.rcf=nullptr;
-            ListenerBuffered1Thread::deinit();
+            opaque.clear();
             JS_FreeContext(js_ctx);
-            DBG(JS_FreeRuntime(js_rt));
-            DBG(printf("JS_FreeRuntime(js_rt);\n"));
+            JS_FreeRuntime(js_rt);
+            // printf("allocs sz %ld\n",allocs.size());
+
+        }
+        void deinit()
+        {
+            ListenerBuffered1Thread::deinit();
+            stop();
         }
 
         Service(const SERVICE_id &svs, const std::string&  nm,IInstance* ifa);
@@ -118,7 +114,7 @@ namespace MTJS
         JSRuntime* js_rt=nullptr;
         JSContext * js_ctx=nullptr;
         JSValue module__=JS_UNDEFINED;
-        JSValue moduleNamespace__=JS_UNDEFINED;
+        // JSValue moduleNamespace__=JS_UNDEFINED;
 
         mtjs_opaque opaque;
 

@@ -31,7 +31,7 @@ ${OPENSSL_LIBRARIES}
   )
 
 else()
-target_link_libraries(mtjs -static  -Wl,--start-group
+target_link_libraries(mtjs  -Wl,--start-group
      mtjsmoduleS mtjscommon    zmysql jsnet  wxutils  qjsl megatron-main   zsingle megatron-core 
       ${linuxlib} yyjson
 
