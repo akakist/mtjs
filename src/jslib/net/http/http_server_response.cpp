@@ -102,7 +102,6 @@ static JSValue js_set_header(JSContext *ctx, JSValueConst this_val, int argc, JS
 static JSValue js_end(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     MUTEX_INSPECTOR;
-
     JS_HTTP_Response* req = static_cast<JS_HTTP_Response*>(JS_GetOpaque2(ctx, this_val, js_response_class_id));
     if(!req) return JS_ThrowInternalError(ctx, "[js_end] if(!req)");
 
@@ -114,7 +113,7 @@ static JSValue js_end(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
 
     if(req->respP->resp.request->esi->closed())
     {
-        return JS_ThrowReferenceError(ctx, "[end] attempt write to  closed socket");
+        return JS_UNDEFINED;//(ctx, "[end] attempt write to  closed socket");
     }
 
     std::string bufz;

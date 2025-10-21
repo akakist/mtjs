@@ -137,7 +137,10 @@ void SocketIO::Service::handle_accepted1(const SOCKET_fd &neu_fd,const REF_gette
             int i = 1;
             if(setsockopt(CONTAINER(neu_fd),SOL_SOCKET,SO_REUSEADDR,(char *)&i,sizeof(i)))
             {
-                throw CommonError("if(setsockopt(CONTAINER(neu_fd),SOL_SOCKET,SO_REUSEADDR,(char *)&i,sizeof(i)))");
+                close(CONTAINER(neu_fd));
+                logErr2("close broken socket");
+                return;
+                // throw CommonError("if(setsockopt(CONTAINER(neu_fd),SOL_SOCKET,SO_REUSEADDR,(char *)&i,sizeof(i)))");
 
             }
         }
@@ -163,7 +166,9 @@ void SocketIO::Service::handle_accepted1(const SOCKET_fd &neu_fd,const REF_gette
             l_.l_linger=(u_short)5;
             if (::setsockopt(CONTAINER(neu_fd),SOL_SOCKET,SO_LINGER,(char*)&l_, sizeof(l_))!=0)
             {
-                logErr2("setsockopt: linger: errno %d",errno);
+                logErr2("setsockopt: close bad socket errno %d",errno);
+                close(CONTAINER(neu_fd));
+                return;
             }
 // #endif
 

@@ -116,6 +116,7 @@ bool HTTP::Service::on_DoListen(const httpEvent::DoListen* e)
 bool HTTP::Service::on_startService(const systemEvent::startService*)
 {
     MUTEX_INSPECTOR;
+    printf("@@@ %s\n",__FUNCTION__);
     socketListener=dynamic_cast<ListenerBase*>(iInstance->getServiceOrCreate(ServiceEnum::Socket));
     if(!socketListener)
         throw CommonError("if(!socketListener)");
@@ -482,6 +483,11 @@ bool HTTP::Service::on_StreamRead(const socketEvent::StreamRead* evt)
     MUTEX_INSPECTOR;
 
     REF_getter<HTTP::Request> W=getData(evt->esi.get());
+
+
+    // printf("in %s\n",evt->esi->inBuffer_._mx_data.c_str());
+    // fflush(stdout);
+    // fflush(stderr);
 
     if(W->isWebSocket)
     {

@@ -120,7 +120,7 @@ void ListenerBuffered1Thread::listenToEvent(const REF_getter<Event::Base>& e)
 
     if(!m_container.valid())
     {
-        logErr2("if(!m_container.valid())");
+        // logErr2("if(!m_container.valid()) %s",listenerName_.c_str());
         return;
     }
     XTRY;

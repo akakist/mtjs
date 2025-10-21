@@ -49,7 +49,7 @@ namespace HTTP
 #define LINE0TKSIZE 10
     enum CONN_TYPE
     {
-        CONN_UNKNOWN, CONN_CLOSE, CONN_KEEP_ALIVE, CONN_UPGRADE
+        CONN_CLOSE, CONN_KEEP_ALIVE, CONN_UPGRADE,CONN_UNKNOWN
     };
     struct header_params_
     {
@@ -58,7 +58,7 @@ namespace HTTP
         token ACCEPT;
         token ACCEPT_LANGUAGE;
         token ACCEPT_ENCODING;
-        CONN_TYPE CONNECTION;
+        CONN_TYPE CONNECTION=HTTP::CONN_CLOSE;
         token CONTENT_TYPE;
         token UPGRADE;
         int CONTENT_LENGTH;

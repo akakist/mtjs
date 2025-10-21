@@ -504,17 +504,25 @@ static JSValue js_stream_on(JSContext *ctx, JSValueConst this_val,
 static JSValue js_stream_end(JSContext *ctx, JSValueConst this_val,
                              int argc, JSValueConst *argv)
 {
+
     JSScope <10,10> scope(ctx);
     JSStreamData *s = (JSStreamData *) JS_GetOpaque2(ctx, this_val, js_stream_class_id);
-    if (!s) return JS_EXCEPTION;
+    if (!s)
+    {
+       return JS_EXCEPTION;
+    }
     for(int i=0; i<argc; i++)
     {
-        if(!JS_IsString(argv[i])) return JS_ThrowSyntaxError(ctx, "param must be string");
+        if(!JS_IsString(argv[i]))
+        {
+            return JS_ThrowSyntaxError(ctx, "param must be string");
+        } 
         auto str=scope.toStdStringView(argv[i]);
         s->stream->write("data",str.data(),str.size());
 
     }
     s->stream->write("end",NULL,0);
+
     return JS_UNDEFINED;
 }
 static JSValue js_stream_read(JSContext *ctx, JSValueConst this_val,

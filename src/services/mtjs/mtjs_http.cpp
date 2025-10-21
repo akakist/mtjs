@@ -65,6 +65,7 @@ bool MTJS::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
 
 
                 scope.addValue(func_result);
+                
                 DBG(memctl_add_object(func_result,"JS_Call"));
 
 

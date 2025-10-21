@@ -81,39 +81,6 @@ const char* HTTP::get_name_of_http_code(int code)
     }
     return "Wrong CODE";
 }
-// std::string HTTP::make_http_header()
-// {
-//     std::map<std::string,std::string> pr;
-//     return make_http_header(200,pr);
-// }
-
-// std::string HTTP::make_http_header(const int code)
-// {
-//     std::map<std::string,std::string> pr;
-//     return make_http_header(code,pr);
-// }
-
-// std::string HTTP::make_http_header(std::map<std::string,std::string> &pr)
-// {
-//     return make_http_header(200,pr);
-// }
-// std::string HTTP::make_http_header(const int code,std::map<std::string,std::string> &pr)
-// {
-//     std::string a("HTTP/1.1 ");
-//     std::string res=get_name_of_http_code(code);
-//     a+=std::to_string(code)+" "+res+"\r\n";
-//     if(!pr.count(("Server")))
-//         a+="Server: servak\r\n";
-//     if (!pr.count("Connection"))
-//     {
-//         pr["Connection"]="close";
-//     }
-//     for (auto& i:pr)
-//     {
-//         a+=i.first+": "+i.second+"\r\n";
-//     }
-//     return a;
-// }
 std::string HTTP::Response::build_html_response()
 {
     std::stringstream ret;
@@ -214,7 +181,9 @@ constexpr std::string_view _UPGRADE="Upgrade";
 constexpr std::string_view _Sec_WebSocket_Key="Sec-WebSocket-Key";
 constexpr std::string_view _Sec_WebSocket_Version="Sec-WebSocket-Version";
 constexpr std::string_view _Keep_Alive="Keep-Alive";
+constexpr std::string_view _keep_alive="keep-alive";
 constexpr std::string_view _Close="Close";
+constexpr std::string_view _close="close";
 constexpr std::string_view _Expect="Expect";
 
 
@@ -374,11 +343,11 @@ void HTTP::Request::parse(const char *req, int reqsize)
                     case CONNECTION:
                     {
                         std::string_view v(&req[value.pz],value.len);
-                        if(v==_Close)
+                        if(v==_Keep_Alive)
                         {
-                            parse_data.header_params.CONNECTION=HTTP::CONN_CLOSE;
+                            parse_data.header_params.CONNECTION=HTTP::CONN_KEEP_ALIVE;
                         }
-                        else if(v==_Keep_Alive)
+                        else if(v==_keep_alive)
                         {
                             parse_data.header_params.CONNECTION=HTTP::CONN_KEEP_ALIVE;
                         }
@@ -386,7 +355,8 @@ void HTTP::Request::parse(const char *req, int reqsize)
                         {
                             parse_data.header_params.CONNECTION=HTTP::CONN_UPGRADE;
                         }
-                        else throw CommonError("Unknown connection type %s",std::string(v).c_str());
+                        else parse_data.header_params.CONNECTION=HTTP::CONN_CLOSE;
+                        // else throw CommonError("Unknown connection type %s",std::string(v).c_str());
 
                     }
                     break;
