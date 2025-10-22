@@ -6,6 +6,7 @@
 #include "Events/System/timerEvent.h"
 #include "Events/DFS/referrerEvent.h"
 #include "Events/DFS/capsEvent.h"
+#include "Events/Tools/webHandlerEvent.h"
 #include "CapsAlgorithm.h"
 #include "timerHelper.h"
 struct ServiceNode;

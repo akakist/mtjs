@@ -314,9 +314,6 @@ static JSValue js_WriteableStringStream_ctor(JSContext *ctx,
         return JS_EXCEPTION;
     scope.addValue(proto);
     obj = JS_NewObjectProtoClass(ctx, proto, js_stream_class_id);
-    DBG(memctl_add_object(obj, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
-
-    // scope.addValue(obj);
     if (JS_IsException(obj))
         return JS_EXCEPTION;
     JS_SetOpaque(obj, s);
@@ -351,7 +348,6 @@ static JSValue js_ConstReadableStringStream_ctor(JSContext *ctx,
     if (JS_IsException(proto))
         return JS_EXCEPTION;
     obj = JS_NewObjectProtoClass(ctx, proto, js_stream_class_id);
-    DBG(memctl_add_object(obj, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     // scope.addValue(obj);
     if (JS_IsException(obj))
@@ -384,7 +380,6 @@ static JSValue js_FileReadableStream_ctor(JSContext *ctx, JSValueConst new_targe
     if (JS_IsException(proto))
         return JS_EXCEPTION;
     obj = JS_NewObjectProtoClass(ctx, proto, js_stream_class_id);
-    DBG(memctl_add_object(obj, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     // scope.addValue(obj);
     if (JS_IsException(obj))
@@ -416,7 +411,6 @@ static JSValue js_FileWriteableStream_ctor(JSContext *ctx, JSValueConst new_targ
     if (JS_IsException(proto))
         return JS_EXCEPTION;
     JSValue obj = JS_NewObjectProtoClass(ctx, proto, js_stream_class_id);
-    DBG(memctl_add_object(obj, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     // scope.addValue(obj);
     if (JS_IsException(obj))
@@ -447,7 +441,6 @@ static JSValue js_EventEmitterStream_ctor(JSContext *ctx, JSValueConst new_targe
     if (JS_IsException(proto))
         return JS_EXCEPTION;
     JSValue obj = JS_NewObjectProtoClass(ctx, proto, js_stream_class_id);
-    DBG(memctl_add_object(obj, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     // scope.addValue(obj);
     if (JS_IsException(obj))

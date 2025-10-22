@@ -75,13 +75,6 @@ public:
     {
         increfcount ();
     }
-#ifdef KALL
-    REF_getter (REF_getter < T > &&bcg) noexcept
-    {
-        ___ptr=bcg.___ptr;
-        bcg.___ptr=nullptr;
-    }
-#endif
     ~REF_getter ()
     {
         if(___ptr)

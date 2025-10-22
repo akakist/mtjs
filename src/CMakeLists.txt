@@ -196,7 +196,7 @@ CONFIGURE_FILE( "${PROJECT_SOURCE_DIR}/version.h.in"
 SET(CAPS_IP "x.testquant.com")
 SET(PORT 10100)
 add_definitions()
-#-DDEBUG  -DMUTEX_INSPECTOR_DEBUG
+#-DDEBUG  -DMUTEX_INSPECTOR_DEBUG -DWEBDUMP
 
     add_definitions(  -DCURL_POLL_ADD=5)
 

@@ -47,7 +47,6 @@ static JSValue js_createServer(JSContext *ctx, JSValueConst this_val,
 
     JS_HttpServer* srv = new JS_HttpServer(ctx, op->listener,op->broadcaster,op->rcf);
     JSValue jsSrv = JS_NewObjectClass(ctx,js_http_server_class_id);
-    DBG(memctl_add_object(jsSrv, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(jsSrv)) {
         logErr2("if (JS_IsException(jsReq)) {");

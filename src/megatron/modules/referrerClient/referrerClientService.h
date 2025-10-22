@@ -12,6 +12,7 @@
 #include "Events/System/Net/rpcEvent.h"
 #include "Events/System/timerEvent.h"
 #include "Events/DFS/referrerEvent.h"
+#include "Events/Tools/webHandlerEvent.h"
 
 
 

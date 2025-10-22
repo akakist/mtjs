@@ -52,8 +52,6 @@ JSValue js_execute_async(JSContext *ctx, JSValueConst this_val, int argc, JSValu
         REF_getter<execute_task> task=new execute_task(op->listener);
 
         JSValue promise = JS_NewPromiseCapability(ctx, task->promise_data);
-        DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
-
         if (JS_IsException(promise)) {
             return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
         }
@@ -92,7 +90,6 @@ void execute_task::finalize(JSContext* ctx)
         scope.addValue(ret);
     } else {
         JSValue str=JS_NewString(ctx, error_str.c_str());
-        DBG(memctl_add_object(str, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
         scope.addValue(str);
         auto ret=JS_Call(ctx, promise_data[1], JS_UNDEFINED, 1, &str);

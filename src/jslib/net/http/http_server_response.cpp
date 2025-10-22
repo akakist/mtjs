@@ -180,7 +180,7 @@ static JSValue js_send(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
         if(JS_IsString(argv[i]))
         {
             auto s=scope.toStdStringView(argv[i]);
-            bufz+=s;
+            bufz.append(s);
         }
         else if(JS_IsObject(argv[i]))
         {
@@ -248,7 +248,6 @@ JSValue js_http_response_new(JSContext *ctx, const REF_getter<HTTP_ResponseP>& r
     MUTEX_INSPECTOR;
     JS_HTTP_Response* rsp = new JS_HTTP_Response(resp);
     JSValue jsRsp = JS_NewObjectClass(ctx,::js_response_class_id);
-    DBG(memctl_add_object(jsRsp, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     qjs::checkForException(ctx,jsRsp,"RequestIncoming: JS_NewObjectClass");
 

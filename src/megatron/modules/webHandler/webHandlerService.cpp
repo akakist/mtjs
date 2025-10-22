@@ -6,6 +6,8 @@
 #include "webHandlerService.h"
 
 #include <Events/System/Net/httpEvent.h>
+#include "Events/Tools/webHandlerEvent.h"
+
 #include "mutexInspector.h"
 #include "version_mega.h"
 #include "events_webHandler.hpp"
@@ -68,13 +70,15 @@ bool WebHandler::Service::on_RegisterDirectory(const webHandlerEvent::RegisterDi
     n->addChild(new WebHandler::Node(n,v[v.size()-1],e->displayName));
     return true;
 }
-
+#include "httpUrlParser.h"
 bool WebHandler::Service::on_RequestIncoming(const httpEvent::RequestIncoming* e)
 {
-    DBG(logErr2("%s",e->req->url.c_str()));
-    if(e->req->url()=="/webdump")
+    URIParser parser(e->req->uri());
+
+    // DBG(logErr2("%s",e->req->url.c_str()));
+    if(parser.path()=="/webdump")
     {
-        std::string ps=iUtils->hex2bin(e->req->params["p"]);
+        std::string ps=iUtils->hex2bin((std::string)parser.params_["p"]);
         WebDumpable *d;
         if(sizeof(d)!=ps.size()) throw CommonError("sizeof(d)!=ps.size()");
         memcpy(&d,ps.data(),ps.size());
@@ -84,7 +88,7 @@ bool WebHandler::Service::on_RequestIncoming(const httpEvent::RequestIncoming* e
         return true;
     }
 
-    REF_getter<WebHandler::Node> N=root->getByPath(e->req->url);
+    REF_getter<WebHandler::Node> N=root->getByPath((std::string)parser.path());
     if(!N.valid())
     {
         DBG(logErr2("!N valid"));
@@ -93,7 +97,7 @@ bool WebHandler::Service::on_RequestIncoming(const httpEvent::RequestIncoming* e
             std::string out;
             std::string url;
             {
-                url=e->req->url;
+                url=parser.path();
             }
             {
                 out.append("url "+url+" Not found");

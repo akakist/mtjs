@@ -38,9 +38,6 @@ static JSValue js_point_ctor(JSContext *ctx,
     // goto fail;
     JSValue obj = JS_UNDEFINED;
     obj = JS_NewObjectProtoClass(ctx, proto, js_event_emitter_class_id);
-    DBG(memctl_add_object(obj, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
-
-    DBG(memctl_add_object(obj,"JS_NewObjectProtoClass event emitter"));
     if (JS_IsException(obj))
         return obj;
     JSEventEmitterData *s;
@@ -56,7 +53,6 @@ JSValue new_event_emitter(JSContext *ctx,const REF_getter<EventEmitter>& emitter
 {
     JSEventEmitterData *s;
     JSValue obj = JS_NewObjectClass(ctx, js_event_emitter_class_id);
-    DBG(memctl_add_object(obj,"JS_NewObjectClass new_event_emitter"));
     if (JS_IsException(obj))
         return obj;
     s = new JSEventEmitterData;
@@ -108,7 +104,6 @@ static JSValue js_emit(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
 }
 static JSValue vectorToJSArray(JSContext *ctx, const std::vector<JSValue> &vec) {
     JSValue jsArray = JS_NewArray(ctx);  // Создаём новый JS-массив
-    DBG(memctl_add_object(jsArray,"vectorToJSArray"));
 
     for (size_t i = 0; i < vec.size(); ++i) {
         // Устанавливаем элемент в массив (индекс, значение)

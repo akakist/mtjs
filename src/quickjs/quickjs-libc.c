@@ -361,10 +361,6 @@ static JSValue js_printf_internal(JSContext *ctx,
             res = JS_NewInt32(ctx, len);
         } else {
             res = JS_NewStringLen(ctx, (char *)dbuf.buf, dbuf.size);
-            #ifdef DEBUG
-            memctl_add_object(res,"JS_NewStringLen");
-            #endif
-
         }
     }
     dbuf_free(&dbuf);
@@ -463,10 +459,6 @@ static JSValue js_std_loadFile(JSContext *ctx, JSValueConst this_val,
     if (!buf)
         return JS_NULL;
     ret = JS_NewStringLen(ctx, (char *)buf, buf_len);
-#ifdef DEBUG
-                    memctl_add_object(ret,"JS_NewStringLen");
-#endif
-
     
     js_free(ctx, buf);
     return ret;

@@ -322,36 +322,13 @@ std::string HTTP::Service::WebSocket_makeFrame(WebSocketFrameType frame_type, un
 }
 bool HTTP::Service::handleChunkedBuffer(const socketEvent::StreamRead* evt, const REF_getter<HTTP::Request>& W)
 {
-// logErr2("handleChunkedBuffer");
-    {
-
-        XTRY;
-        // passEvent
-        // W_LOCK(evt->esi->inBuffer_.lk);
-        // {
-        //     M_LOCK(W->mx_chunked.lk);
-        //     // logErr2("BF evt->esi->inBuffer_._mx_data size %d",evt->esi->inBuffer_._mx_data.size());
-        //     W->mx_chunked.chunked_buffer_raw.append(evt->esi->inBuffer_._mx_data);
-        //     // logErr2("AF evt->esi->inBuffer_._mx_data size %d",evt->esi->inBuffer_._mx_data.size());
-        //     // logErr2("W->mx_chunked.chunked_buffer_raw size %d",W->mx_chunked.chunked_buffer_raw.size());
-        //     evt->esi->inBuffer_._mx_data.clear();
-        // }
-        XPASS;
-    }
-    // data.clear();
-    // M_LOCK(W->mx_chunked.lk);
     auto& data=W->post_content;
 
     int i=0;
     while(1)
     {
         XTRY;
-        // pz
-        // std::string::size_type pz=W->mx_chunked.chunked_buffer_pos;
-
-        // std::string_view dd(data);
         auto pz=data.find("\r\n",0);
-        // logErr2("pz %d",pz);
 
 
         if(pz==std::string::npos)
@@ -361,7 +338,6 @@ bool HTTP::Service::handleChunkedBuffer(const socketEvent::StreamRead* evt, cons
         if(pz==0)
         {
             XTRY;
-            // logErr2("REQUEST finihed compeletely");
             passEvent(new httpEvent::RequestChunkingCompleted(W,W->esi,W->chunkId,evt->route));
             return true;
             XPASS;
@@ -369,9 +345,7 @@ bool HTTP::Service::handleChunkedBuffer(const socketEvent::StreamRead* evt, cons
 
 
         std::string len_buf=data.substr(0,pz);
-        // logErr2("len buf %s",len_buf.c_str());
         auto chunk_size = std::stoul(len_buf, NULL, 16);
-        // logErr2("chunk_size %d",chunk_size);
         if(chunk_size==0)
         {
             passEvent(new httpEvent::RequestChunkingCompleted(W,W->esi,W->chunkId,evt->route));
@@ -380,17 +354,10 @@ bool HTTP::Service::handleChunkedBuffer(const socketEvent::StreamRead* evt, cons
 
         pz=pz+2; /// + crtlf after number
 
-        // logErr2("pz before chunk %d",pz);
-        // if()
         size_t payload_size=chunk_size+pz+2;
         if(data.size()>=payload_size)
         {
-            // auto chunk=;
             auto chunk=data.substr(pz,chunk_size);
-            // logErr2("W->mx_chunked.ready_buffer.size %d",W->mx_chunked.ready_buffer.size());
-
-            // W->
-            // logErr2("data.size()-(pz+chunk_size) %d",data.size()-(pz+chunk_size+2));
             if(data.size()==payload_size)
                 data.clear();
             else
@@ -399,79 +366,8 @@ bool HTTP::Service::handleChunkedBuffer(const socketEvent::StreamRead* evt, cons
         }
         else
         {
-            // logErr2("!if(data.size()>=chunk_size+pz) %d %d",data.size(),chunk_size+pz);
             return true;
         }
-
-
-
-        // size_t rest=data.size()-pz;
-        // if(rest<value+2)
-        // {
-        //     data=data.substr(W->mx_chunked.chunked_buffer_pos);
-        //     W->mx_chunked.chunked_buffer_pos=0;
-        //     return true;
-        // }
-#ifdef KALL
-        else
-        {
-            XTRY;
-            // if(value>0)
-            {
-                XTRY;
-                if(value>0)
-                {
-                    // W->postContent+=data.substr(pz,value);
-                    {
-                        // M_LOCK(W->mx_chunked.lk);
-                        auto dt=data.substr(pz,value);
-                        // logErr2("pz %d, value %d",pz,value);
-                        // logErr2("dt.size() %d",dt.size());
-                        // W->mx_chunked.readden_cnt+=dt.size();
-                        W->mx_chunked.ready_buffer+=dt;
-                    }
-                    // W->chunked_buffer_out+=data.substr(pz,value),evt->route);
-                    passEvent(new httpEvent::RequestChunkReceived(W,W->esi,W->chunkId++, evt->route));
-                    logErr2("RequestChunkReceived");
-                }
-                else if(value==0)
-                {
-                    if(data.substr(pz)=="\r\n")
-                    {
-
-                        logErr2("COMPLETE POST");
-                        passEvent(new httpEvent::RequestChunkingCompleted(W,W->esi,W->chunkId,evt->route));
-                        return true;
-                    }
-
-                }
-                auto s=data.substr(pz+value,2);
-                if(s!="\r\n")
-                {
-                    throw CommonError("bad chunked postfix");
-                }
-                pz+=value+2;
-                W->mx_chunked.chunked_buffer_pos=pz;
-                if(data.size()>=pz+2)
-                {
-                    if(data.substr(pz,2)=="\r\n")
-                    {
-
-                        logErr2("POST finihed compeletely");
-                        passEvent(new httpEvent::RequestChunkingCompleted(W,W->esi,W->chunkId,evt->route));
-                        return true;
-                    }
-
-
-                }
-                else {
-                }
-                XPASS;
-            }
-            continue;
-            XPASS;
-        }
-#endif
 
         XPASS;
     }
@@ -483,12 +379,6 @@ bool HTTP::Service::on_StreamRead(const socketEvent::StreamRead* evt)
     MUTEX_INSPECTOR;
 
     REF_getter<HTTP::Request> W=getData(evt->esi.get());
-
-
-    // printf("in %s\n",evt->esi->inBuffer_._mx_data.c_str());
-    // fflush(stdout);
-    // fflush(stderr);
-
     if(W->isWebSocket)
     {
         {
@@ -543,12 +433,9 @@ bool HTTP::Service::on_StreamRead(const socketEvent::StreamRead* evt)
 
 
     W->m_last_io_time=time(NULL);
-    // if (W->parse_state.count(1)==0)
     {
-        std::string head;
         {
             W_LOCK(evt->esi->inBuffer_.lk);
-            // auto &data=evt->esi->inBuffer_._mx_data;
             if(!W->parse_data.done_header)
             {
                 if(W->header_content.empty())
@@ -564,7 +451,6 @@ bool HTTP::Service::on_StreamRead(const socketEvent::StreamRead* evt)
             }
             else
             {
-                // logErr2("recvd for post_content %d bytes",evt->esi->inBuffer_._mx_data.size());
                 if(W->post_content.empty())
                 {
                     W->post_content=std::move(evt->esi->inBuffer_._mx_data);
@@ -586,31 +472,6 @@ bool HTTP::Service::on_StreamRead(const socketEvent::StreamRead* evt)
         if(!W->parse_data.done_header)
             return true;
 
-#ifdef __PARSE_COOKIE
-        if (W->parse_data.header_params.COOKIE.pz)
-        {
-            std::string cookie= {&W->in_buffer[W->parse_data.header_params.COOKIE.pz],W->parse_data.header_params.COOKIE.len};
-            std::deque <std::string> v = splitStr("; ", cookie);
-            for (unsigned int i = 0; i < v.size(); i++)
-            {
-                std::string q = v[i];
-                if (q == " ")
-                {
-                    continue;
-                }
-                size_t z;
-                z = q.find("=", 0);
-                if (z == std::string::npos)
-                {
-                    continue;
-                }
-                std::string k=q.substr(0, z);
-                std::string v=q.substr(z + 1, q.size() - z - 1);
-                W->in_cookies[k] = v;
-            }
-        }
-#endif
-        // && W->parse_data.header_params.CONTENT_LENGTH
         if (W->parse_data.method == HTTP::METHOD_POST && W->parse_data.post_start)
         {
             if(!W->chunked)
@@ -641,7 +502,6 @@ bool HTTP::Service::on_StreamRead(const socketEvent::StreamRead* evt)
                     }
 
                     auto key=W->tosv_h(W->parse_data.header_params.Sec_WebSocket_Key);
-                    // std::string str;
                     std::stringstream o;
                     o <<  "HTTP/1.1 101 Switching Protocols\r\n"
                       << "Upgrade: websocket\r\n"
@@ -649,7 +509,6 @@ bool HTTP::Service::on_StreamRead(const socketEvent::StreamRead* evt)
                     auto ka=calc_key_answer(std::string(key));
                     o << "Sec-WebSocket-Accept: " << ka  << "\r\n";
                     o << "\r\n";
-                    // printf("write: %s\n",str.c_str());
                     W->isWebSocket=true;
                     evt->esi->write_(o.str());
                 }
@@ -676,30 +535,12 @@ bool HTTP::Service::on_StreamRead(const socketEvent::StreamRead* evt)
 
     }
 
-// logErr2("KALL");
-    // if (W->parse_state.count(2)==0)
     {
-        // logErr2("parse state 2");
         if (W->parse_data.method == HTTP::METHOD_POST)
         {
-            // if(!W->chunked)
-            // {
-            //     auto te=W->headers.find("Transfer-Encoding");
-            //     if(te!=W->headers.end())
-            //     {
-            //         if (te->second=="chunked")
-            //         W->chunked=true;
-            //     }
-            // }
-            // logErr2("W->chunked %d",W->chunked);
-            // auto te=W->headers.find("Transfer-Encoding");
-            // if(te!=W->headers.end())
             if(W->chunked)
             {
                 handleChunkedBuffer(evt,W);
-            }
-            else
-            {
             }
             std::string_view ct(W->tosv_h(W->parse_data.header_params.CONTENT_TYPE));
             if (ct.find("application/x-www-form-urlencoded", 0) != std::string_view::npos)
@@ -710,20 +551,6 @@ bool HTTP::Service::on_StreamRead(const socketEvent::StreamRead* evt)
                 {
                     return true;
                 }
-                {
-                    // W_LOCK(evt->esi->inBuffer_.lk);
-                    // if(evt->esi->inBuffer_._mx_data.size()==clen)
-                    // {
-                    //     W->postContent=std::move(evt->esi->inBuffer_._mx_data);
-                    //     evt->esi->inBuffer_._mx_data.clear();
-                    // }
-                    // else
-                    // {
-                    //     W->postContent=evt->esi->inBuffer_._mx_data.substr(0,clen);
-                    //     evt->esi->inBuffer_._mx_data=evt->esi->inBuffer_._mx_data.substr(clen);
-                    // }
-                }
-                // W->split_params(W->postContent);
             }
             else if (W->parse_data.header_params.CONTENT_TYPE.pz)
             {
@@ -1122,7 +949,7 @@ std::string datef(const time_t &__t)
     time_t last_modified;
     {
         M_LOCK(lastModified);
-        auto url=W->url();
+        auto url=W->uri();
         if(lastModified.container.count(url))
             last_modified=lastModified.container[url];
         else

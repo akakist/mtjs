@@ -105,7 +105,7 @@ bool RPC::Service::on_PacketOnAcceptor(const oscarEvent::PacketOnAcceptor*E)
             {
                 return true;
             }
-            Route r=e->route.pop_front();
+            Route r=e->route.pop_back();
             if(r.type==Route::LOCALSERVICE)
             {
                 sendEvent(r.localServiceRoute.id,new rpcEvent::IncomingOnAcceptor(E->esi,e));
@@ -127,10 +127,10 @@ bool RPC::Service::on_PacketOnAcceptor(const oscarEvent::PacketOnAcceptor*E)
             }
             Route r1(Route::REMOTEADDR);
             r1.remoteAddrRoute.addr=E->esi->id_;
-            e->route.push_front(r1);
+            e->route.push_back(r1);
             Route r2(Route::LOCALSERVICE);
             r2.localServiceRoute.id=dst;
-            e->route.push_front(r2);
+            e->route.push_back(r2);
             sendEvent(dst,new rpcEvent::IncomingOnAcceptor(E->esi,e));
         }
     }
@@ -169,7 +169,7 @@ bool RPC::Service::on_PacketOnConnector(const oscarEvent::PacketOnConnector* E)
             }
 
 
-            Route r=e->route.pop_front();
+            Route r=e->route.pop_back();
             if(r.type==Route::LOCALSERVICE)
             {
                 if(!E->esi->request_for_connect_.has_value())
@@ -198,10 +198,10 @@ bool RPC::Service::on_PacketOnConnector(const oscarEvent::PacketOnConnector* E)
 
             Route r1(Route::REMOTEADDR);
             r1.remoteAddrRoute.addr=E->esi->id_;
-            e->route.push_front(r1);
+            e->route.push_back(r1);
             Route r2(Route::LOCALSERVICE);
             r2.localServiceRoute.id=dst;
-            e->route.push_front(r2);
+            e->route.push_back(r2);
             if(!E->esi->request_for_connect_.has_value())
                 throw CommonError("if(!E->esi->request_for_connect.valid())");
             {

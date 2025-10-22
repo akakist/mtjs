@@ -59,7 +59,6 @@ static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueC
     op->rcf->timers.timers_refed.insert({t->timerId, t});
 
     JSValue jsTimeout = JS_NewObjectClass(ctx, js_timeout_class_id);
-    DBG(memctl_add_object(jsTimeout, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     // scope.addValue(jsTimeout);
     Timeout* timeout = new Timeout(t, op->rcf);

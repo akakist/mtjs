@@ -52,7 +52,6 @@ static JSValue js_response_get_peer_name(JSContext* ctx, JSValueConst this_val)
     if (!req) return JS_EXCEPTION;
     auto nm=JS_NewObject(ctx);
     scope.addValue(nm);
-    DBG(memctl_add_object(nm, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
     auto host=req->esi->remote_name().getStringAddr();
     auto port=req->esi->remote_name().port();
     JS_DefinePropertyValueStr(ctx, nm, "host", JS_NewStringLen(ctx, host.data(), host.size()), JS_PROP_C_W_E);
@@ -98,7 +97,6 @@ JSValue js_rpc_response_new(JSContext *ctx, const REF_getter<mtjsEvent::mtjsRpcR
 
     JS_RPC_response* req = new JS_RPC_response(response,esi);
     JSValue jsReq = JS_NewObjectClass(ctx,::js_rpc_response_class_id);
-    DBG(memctl_add_object(jsReq, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     qjs::checkForException(ctx,jsReq,"ResponseIncoming: JS_NewObjectClass");
     JS_SetOpaque(jsReq, req);

@@ -102,10 +102,8 @@ namespace HTTP
     public:
         void parse(const char* req, int reqsize);
         http_header_parse_data parse_data;
-        // std::map<std::string,std::string> params_;
-        // std::map<std::string,std::vector<std::string> > v_params_;/** for multiple select */
 
-        std::string_view url()
+        std::string_view uri()
         {
             return  tosv_h(parse_data.uri);
         }
@@ -124,28 +122,18 @@ namespace HTTP
         // std::string_view postContent;
         bool chunked=false;
 
-        // std::string in_buffer;
         std::string header_content;
         std::string post_content;
 
         Request(const REF_getter<epoll_socket_info>& _esi);
-        // void split_params(const std::string & s);
 
 
-        // std::set<int> parse_state;
         time_t m_last_io_time;
         bool websocket_established=false;
 
-        /// for chunked transfer
-        // bool waiting_cr_after_chunk=false;
         REF_getter<Stream> reader=nullptr;
         struct _mx_buffer
         {
-            // std::string::size_type chunked_buffer_pos=0;
-            // std::string chunked_buffer_raw;
-            // std::string ready_buffer;
-            // size_t readden_cnt=0;
-            // Mutex lk;
         };
         _mx_buffer mx_chunked;
         int chunkId=0;

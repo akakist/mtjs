@@ -4,17 +4,17 @@
 #include <utility>
 
 #include <string_view>
-#include <vector>
+#include <map>
 #include <utility>
 
 class URIParser {
-private:
+public:
     std::string_view full_uri_;
     std::string_view path_;
     std::string_view query_;
     std::string_view fragment_;
     
-    std::vector<std::pair<std::string_view, std::string_view>> params_;
+    std::map<std::string_view, std::string_view> params_;
 
 public:
     URIParser() = default;
@@ -107,13 +107,10 @@ private:
             if (!pair.empty()) {
                 size_t eq_pos = pair.find('=');
                 if (eq_pos != std::string_view::npos) {
-                    params_.emplace_back(
-                        pair.substr(0, eq_pos),
-                        pair.substr(eq_pos + 1)
-                    );
+                    params_[pair.substr(0, eq_pos)]=pair.substr(eq_pos + 1);
                 } else {
                     // Параметр без значения
-                    params_.emplace_back(pair, std::string_view());
+                    params_[pair]=std::string_view();
                 }
             }
             

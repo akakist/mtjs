@@ -146,7 +146,6 @@ JSValue js_telnet_request_new(JSContext *ctx, const REF_getter<telnetEvent::Comm
 
     JS_telnet_Request* req = new JS_telnet_Request(request);
     JSValue jsReq = JS_NewObjectClass(ctx,::js_telnet_request_class_id);
-    DBG(memctl_add_object(jsReq, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     qjs::checkForException(ctx,jsReq,"RequestIncoming: JS_NewObjectClass");
     JS_SetOpaque(jsReq, req);

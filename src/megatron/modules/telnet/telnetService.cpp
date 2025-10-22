@@ -1284,10 +1284,10 @@ std::string Telnet::Node::path()
 {
     std::deque<std::string> d;
     Node *n=this;
-    d.push_front(this->name);
+    d.push_back(this->name);
     while(n->parent)
     {
-        d.push_front(n->parent->name);
+        d.push_back(n->parent->name);
         n=n->parent;
     }
     if(d.empty()) return "/";
@@ -1332,7 +1332,7 @@ void Telnet::CommandEntries::registerCommand(const std::deque<std::string> &d, c
         if(!n.valid()) throw CommonError("cannot find subdir '%s'",i.c_str());
     }
     route_t r=dst;
-    r.pop_front();
+    r.pop_back();
     REF_getter<_Command> C(new _Command(r,cmd,help));
     n->addCommand(cmd,C);
 }

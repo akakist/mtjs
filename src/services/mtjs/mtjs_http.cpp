@@ -34,13 +34,11 @@ bool MTJS::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
 
                 JSValue jsReq=js_http_request_new(js_ctx, e->req);
                 scope.addValue(jsReq);
-                DBG(memctl_add_object(jsReq,"js_http_request_new"));
 
 
 
                 JSValue jsRsp=js_http_response_new(js_ctx, resp);
                 scope.addValue(jsRsp);
-                DBG(memctl_add_object(jsRsp,"js_http_response_new"));
 
 
                 JSValue argv[] = { jsReq,jsRsp};
@@ -62,13 +60,8 @@ bool MTJS::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
 
                 JSValue func_result = JS_Call(js_ctx, serv_conf_http->callback, global_obj, argc, argv);
 
-
-
                 scope.addValue(func_result);
                 
-                DBG(memctl_add_object(func_result,"JS_Call"));
-
-
                 qjs::checkForException(js_ctx,func_result,"RequestIncoming: JS_Call");
 
                 if(e->req->chunked && !e->req->reader.valid())

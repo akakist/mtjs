@@ -8,6 +8,11 @@
 #include <string_view>
 #include <vector>
 #include "httpUrlParser.h"
+#include "sv.h"
+
+#include "quickjs.h"
+#include "httpHeadersParser.h"
+
 #include "malloc_debug.h"
 static JSClassID js_request_class_id;
 
@@ -55,8 +60,8 @@ static JSValue js_request_get_url(JSContext* ctx, JSValueConst this_val/*, int m
     MUTEX_INSPECTOR;
     JS_HTTP_Request* req = static_cast<JS_HTTP_Request*>(JS_GetOpaque2(ctx, this_val, js_request_class_id));
     if (!req) return JS_EXCEPTION;
-    auto url=req->req->url();
-    return JS_NewStringLen(ctx, url.data(),url.size());
+    auto uri=req->req->uri();
+    return JS_NewStringLen(ctx, uri.data(),uri.size());
 }
 
 static JSValue js_request_get_method(JSContext* ctx, JSValueConst this_val/*, int magic*/)
@@ -124,10 +129,6 @@ static JSValue js_is_websocket(JSContext* ctx, JSValueConst this_val/*, int magi
     return JS_NewBool(ctx,req->req->isWebSocket);
 }
 
-#include "sv.h"
-
-#include "quickjs.h"
-#include "httpHeadersParser.h"
 static JSValue js_parse_headers_simple(JSContext* ctx, JSValueConst this_val,
                                       int argc, JSValueConst* argv) {
     
@@ -164,17 +165,11 @@ static JSValue js_parse_uri_no_malloc(JSContext* ctx, JSValueConst this_val,
     if (!req) return JS_EXCEPTION;
 
 
-    auto url=req->req->url();
+    auto uri=req->req->uri();
     
-    // const char* url_cstr = JS_ToCString(ctx, argv[0]);
-    // if (!url_cstr) {
-    //     return JS_EXCEPTION;
-    // }
-    
-    // std::string_view url(url_cstr);
     URIParser parser;
     
-    if (!parser.parse(url)) {
+    if (!parser.parse(uri)) {
         return JS_ThrowTypeError(ctx, "Failed to parse URL");
     }
     
@@ -187,11 +182,9 @@ static JSValue js_parse_uri_no_malloc(JSContext* ctx, JSValueConst this_val,
     // Заполняем параметры
     for (const auto& [key, value] : parser.params()) {
         JSAtom atom_key = JS_NewAtomLen(ctx, key.data(), key.size());
-        // JSValue js_key = JS_NewStringLen(ctx, key.data(), key.size());
         JSValue js_value = JS_NewStringLen(ctx, value.data(), value.size());
         JS_SetProperty(ctx, params_obj, atom_key, js_value);
         JS_FreeAtom(ctx, atom_key);
-        // JS_FreeValue(ctx, js_value);
     }
     
     // Заполняем свойства основного объекта
@@ -213,10 +206,8 @@ static const JSCFunctionListEntry js_request_proto_funcs[] = {
     JS_CFUNC_DEF("parseURI", 0, js_parse_uri_no_malloc),
     JS_CFUNC_DEF("parseHeaders", 0, js_parse_headers_simple),
 
-    // JS_CGETSET_DEF("url", js_request_get_url, NULL),
     JS_CGETSET_DEF("method", js_request_get_method, NULL),
     JS_CGETSET_DEF("content", js_request_get_content, NULL),
-    // JS_CGETSET_DEF("headers", js_request_get_headers, NULL),
     JS_CGETSET_DEF("stream",  js_request_get_stream,js_request_set_stream),
     JS_CGETSET_DEF("is_chunked",  js_is_chunked,NULL),
     JS_CGETSET_DEF("is_websocket",  js_is_websocket,NULL),
@@ -242,7 +233,6 @@ JSValue js_http_request_new(JSContext *ctx, const REF_getter<HTTP::Request>& req
 
     JS_HTTP_Request* req = new JS_HTTP_Request(ctx, request);
     JSValue jsReq = JS_NewObjectClass(ctx,::js_request_class_id);
-    DBG(memctl_add_object(jsReq, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     qjs::checkForException(ctx,jsReq,"RequestIncoming: JS_NewObjectClass");
     JS_SetOpaque(jsReq, req);

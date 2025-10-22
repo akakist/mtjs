@@ -1,9 +1,9 @@
-#include "route_t.h"
 #include "IUtils.h"
 #include "objectHandler.h"
 #include "mutexInspector.h"
 #include "listenerBase.h"
 #include "commonError.h"
+#include "route_t.h"
 std::string Route::dump()const
 {
     std::string r;
@@ -163,37 +163,37 @@ route_t::route_t(const SERVICE_id& id)
 
     Route r(Route::LOCALSERVICE);
     r.localServiceRoute.id=id;
-    m_container.push_front(r);
+    m_container.push_back(r);
 }
 route_t::route_t(ListenerBase* id)
 {
     Route r(Route::LISTENER);
     r.listenerRoute.id=id;
-    m_container.push_front(r);
+    m_container.push_back(r);
 }
 route_t::route_t(ObjectHandlerPolled* id)
 {
     Route r(Route::OBJECTHANDLER_POLLED);
     r.objectHandlerRoutePolled.addr_=id;
-    m_container.push_front(r);
+    m_container.push_back(r);
 }
 route_t::route_t(ObjectHandlerThreaded* id)
 {
     Route r(Route::OBJECTHANDLER_THREADED);
     r.objectHandlerRouteThreaded.addr_=id;
-    m_container.push_front(r);
+    m_container.push_back(r);
 }
 route_t::route_t(const std::string &javaCookie,ObjectHandlerPolled* id)
 {
     {
         Route r(Route::LOCALSERVICE);
         r.localServiceRoute.id=atoi(javaCookie.c_str());
-        m_container.push_front(r);
+        m_container.push_back(r);
     }
     {
         Route r(Route::OBJECTHANDLER_POLLED);
         r.objectHandlerRoutePolled.addr_=id;
-        m_container.push_front(r);
+        m_container.push_back(r);
     }
 
 }
@@ -202,42 +202,17 @@ route_t::route_t(const std::string &javaCookie,ObjectHandlerThreaded* id)
     {
         Route r(Route::LOCALSERVICE);
         r.localServiceRoute.id=atoi(javaCookie.c_str());
-        m_container.push_front(r);
+        m_container.push_back(r);
     }
     {
         Route r(Route::OBJECTHANDLER_THREADED);
         r.objectHandlerRouteThreaded.addr_=id;
-        m_container.push_front(r);
+        m_container.push_back(r);
     }
 }
 
 
-void route_t::push_front(const Route& v)
-{
 
-    XTRY;
-    m_container.push_front(v);
-    XPASS;
-}
-void route_t::push_front(const route_t& r)
-{
-    if(r.m_container.size()!=1)
-        throw CommonError("if(r.m_container.size()!=1)");
-    m_container.push_front(r.m_container[0]);
-}
-
-Route route_t::pop_front()
-{
-    MUTEX_INSPECTOR;
-
-    XTRY;
-    if(m_container.size()==0) throw CommonError("route_t::pop_front: m_container.size()==0 %s",_DMI().c_str());
-
-    Route r=*m_container.begin();
-    m_container.pop_front();
-    return r;
-    XPASS;
-}
 size_t route_t::size()const
 {
     return m_container.size();
@@ -264,6 +239,7 @@ void route_t::unpack(inBuffer&o)
         XPASS;
 
     }
+    // m_container.reserve(sz);
     for(size_t i=0; i<sz; i++)
     {
         XTRY;
@@ -275,6 +251,7 @@ void route_t::unpack(inBuffer&o)
             type=(Route::RouteType)t;
             XPASS;
         }
+
         switch(type)
         {
         case Route::LISTENER:

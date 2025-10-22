@@ -35,7 +35,7 @@ void CInstance::passEvent(const REF_getter<Event::Base>&e)
 
     if(m_terminating)return;
     XTRY;
-    Route r=e->route.pop_front();
+    Route r=e->route.pop_back();
     switch(r.type)
     {
     case Route::LOCALSERVICE:
@@ -55,14 +55,14 @@ void CInstance::passEvent(const REF_getter<Event::Base>&e)
     case Route::OBJECTHANDLER_POLLED:
     {
         MUTEX_INSPECTOR;
-        e->route.push_front(r);
+        e->route.push_back(r);
         forwardEvent(ServiceEnum::ObjectProxyPolled,e);
         break;
     }
     case Route::OBJECTHANDLER_THREADED:
     {
         MUTEX_INSPECTOR;
-        e->route.push_front(r);
+        e->route.push_back(r);
         forwardEvent(ServiceEnum::ObjectProxyThreaded,e);
         break;
     }
@@ -91,7 +91,7 @@ void CInstance::sendEvent(const SERVICE_id& svs,  const REF_getter<Event::Base>&
     XTRY;
     Route r(Route::LOCALSERVICE);
     r.localServiceRoute.id=svs;
-    e->route.push_front(r);
+    e->route.push_back(r);
     forwardEvent(svs,e);
     XPASS;
 }
@@ -138,7 +138,7 @@ void CInstance::sendEvent(ListenerBase *l,  const REF_getter<Event::Base>&e)
 //    if(m_terminating)return;
     Route r(Route::LISTENER);
     r.listenerRoute.id=l;
-    e->route.push_front(r);
+    e->route.push_back(r);
     l->listenToEvent(e);
 }
 UnknownBase* CInstance::getServiceNoCreate(const SERVICE_id& svs)

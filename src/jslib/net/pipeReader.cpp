@@ -50,7 +50,6 @@ struct c_pipe_async_reader_buf: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -97,7 +96,6 @@ static JSValue js_read_pipe_buf(JSContext *ctx, JSValueConst this_val,
     f->path=_path;
     f->stream=s;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -153,7 +151,6 @@ struct c_pipe_async_reader_lines: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -199,7 +196,6 @@ static JSValue js_read_pipe_lines(JSContext *ctx, JSValueConst this_val,
     f->path=_path;
     f->stream=stream;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -243,7 +239,6 @@ struct c_stdin_async_reader_lines: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -286,7 +281,6 @@ static JSValue js_read_stdin_lines(JSContext *ctx, JSValueConst this_val,
     REF_getter<c_stdin_async_reader_lines> task=new c_stdin_async_reader_lines(op->listener);
     task->stream=stream;
     JSValue promise = JS_NewPromiseCapability(ctx, task->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -300,7 +294,6 @@ static JSValue js_read_stdin_lines(JSContext *ctx, JSValueConst this_val,
 void js_register_pipe_reader( JSContext *ctx,JSValue & mtjs_obj)
 {
     JSValue pipeObj = JS_NewObject(ctx);
-    DBG(memctl_add_object(pipeObj, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     JS_SetPropertyStr(ctx, pipeObj, "read_lines", JS_NewCFunction(ctx, js_read_pipe_lines, "read_lines", 2));
     JS_SetPropertyStr(ctx, pipeObj, "read", JS_NewCFunction(ctx, js_read_pipe_buf, "read", 2));
@@ -312,11 +305,9 @@ int js_init_stdin_reader_global(JSContext *ctx,JSValue & mtjs_obj)
 {
 
     JSValue stdinObj = JS_NewObject(ctx);
-    DBG(memctl_add_object(stdinObj, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
 
     JSValue js_read_stdin_lines_f = JS_NewCFunction(ctx, js_read_stdin_lines, "read_lines", 1);
-    DBG(memctl_add_object(js_read_stdin_lines_f, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     JS_SetPropertyStr(ctx, stdinObj, "read_lines", js_read_stdin_lines_f);
 

@@ -85,7 +85,7 @@ inline bool UuidIsCyclic(const std::vector<msockaddr_in>&uuid)
 inline route_t poppedFrontRoute(const route_t&r)
 {
     route_t rt=r;
-    rt.pop_front();
+    rt.pop_back();
     return rt;
 }
 template <class T>

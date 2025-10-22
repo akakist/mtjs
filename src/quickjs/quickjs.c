@@ -1729,9 +1729,6 @@ static void *js_def_malloc(JSMallocState *s, size_t size)
         return NULL;
 
     ptr = malloc(size);
-    #ifdef DEBUG
-    memctl_add_malloc(ptr,"js_def_malloc");
-    #endif
     if (!ptr)
         return NULL;
 
@@ -1748,9 +1745,6 @@ static void js_def_free(JSMallocState *s, void *ptr)
     s->malloc_count--;
     s->malloc_size -= js_def_malloc_usable_size(ptr) + MALLOC_OVERHEAD;
     free(ptr);
-    #ifdef DEBUG
-    memctl_remove_malloc(ptr);
-    #endif
 }
 
 static void *js_def_realloc(JSMallocState *s, void *ptr, size_t size)
@@ -1777,10 +1771,6 @@ static void *js_def_realloc(JSMallocState *s, void *ptr, size_t size)
     ptr = realloc(ptr, size);
     if (!ptr)
         return NULL;
-
-    #ifdef DEBUG
-    memctl_add_realloc(old_p,ptr);
-    #endif
 
     s->malloc_size += js_def_malloc_usable_size(ptr) - old_size;
     return ptr;
@@ -6747,9 +6737,6 @@ JSValue __attribute__((format(printf, 2, 3))) JS_ThrowTypeError(JSContext *ctx, 
 
     va_start(ap, fmt);
     val = JS_ThrowError(ctx, JS_TYPE_ERROR, fmt, ap);
-    #ifdef DEBUG
-    memctl_add_object(val,"JS_ThrowTypeError");
-    #endif
     va_end(ap);
     return val;
 }
@@ -6808,9 +6795,6 @@ JSValue __attribute__((format(printf, 2, 3))) JS_ThrowReferenceError(JSContext *
 
     va_start(ap, fmt);
     val = JS_ThrowError(ctx, JS_REFERENCE_ERROR, fmt, ap);
-    #ifdef DEBUG
-    memctl_add_object(val,"JS_ThrowReferenceError");
-    #endif
     va_end(ap);
     return val;
 }
@@ -6822,9 +6806,6 @@ JSValue __attribute__((format(printf, 2, 3))) JS_ThrowRangeError(JSContext *ctx,
 
     va_start(ap, fmt);
     val = JS_ThrowError(ctx, JS_RANGE_ERROR, fmt, ap);
-    #ifdef DEBUG
-    memctl_add_object(val,"JS_ThrowRangeError");
-    #endif
     va_end(ap);
     return val;
 }
@@ -6836,9 +6817,6 @@ JSValue __attribute__((format(printf, 2, 3))) JS_ThrowInternalError(JSContext *c
 
     va_start(ap, fmt);
     val = JS_ThrowError(ctx, JS_INTERNAL_ERROR, fmt, ap);
-    #ifdef DEBUG
-    memctl_add_object(val,"JS_ThrowInternalError");
-    #endif
     va_end(ap);
     return val;
 }
@@ -18792,10 +18770,7 @@ JSValue JS_Call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj,
     JSValue r=
      JS_CallInternal(ctx, func_obj, this_obj, JS_UNDEFINED,
                            argc, (JSValue *)argv, JS_CALL_FLAG_COPY_ARGV);
-    #ifdef DEBUG                       
-     memctl_add_object(r, "JS_Call");
-    #endif
-        return r;
+    return r;
 }
 
 static JSValue JS_CallFree(JSContext *ctx, JSValue func_obj, JSValueConst this_obj,

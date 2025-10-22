@@ -253,7 +253,7 @@ bool Timer::Service::on_SetTimer(const timerEvent::SetTimer* ev)
     if(!a.valid())
         return true;
     route_t r=ev->route;
-    r.pop_front();
+    r.pop_back();
     REF_getter<task> t=new task(task::TYPE_TIMER,ev->tid,ev->data,ev->cookie,r,ev->delay_secs);
     a->add(t);
 
@@ -281,7 +281,7 @@ bool Timer::Service::on_SetAlarm(const timerEvent::SetAlarm* ev)
         return true;
 
     route_t r=ev->route;
-    r.pop_front();
+    r.pop_back();
     REF_getter<task> t=new task(task::TYPE_ALARM,ev->tid,ev->data,ev->cookie,r,ev->delay_secs);
     a->add(t);
     auto tb=getNow();
@@ -306,7 +306,7 @@ bool Timer::Service::on_StopTimer(const timerEvent::StopTimer* ev)
     if(!a.valid())
         return true;
     route_t r=ev->route;
-    r.pop_front();
+    r.pop_back();
     REF_getter<task> t=new task(task::TYPE_TIMER,ev->tid,ev->data,new refbuffer,r,0);
     a->remove(t);
     XPASS;
@@ -323,7 +323,7 @@ bool Timer::Service::on_ResetAlarm(const timerEvent::ResetAlarm* ev)
     if(!a.valid())
         return true;
     route_t r=ev->route;
-    r.pop_front();
+    r.pop_back();
     REF_getter<task> t=new task(task::TYPE_ALARM,ev->tid,ev->data,ev->cookie,r,ev->delay_secs);
     a->replace(t);
     auto tb=getNow();
@@ -347,7 +347,7 @@ bool Timer::Service::on_StopAlarm(const timerEvent::StopAlarm* ev)
     if(!a.valid())
         return true;
     route_t r=ev->route;
-    r.pop_front();
+    r.pop_back();
     REF_getter<task> t=new task(task::TYPE_ALARM,ev->tid,ev->data,new refbuffer,r,0);
     a->remove(t);
     XPASS;

@@ -28,7 +28,7 @@ bool ObjectProxy::Threaded::handleEvent(const REF_getter<Event::Base>& e)
     {
         logErr2("wrong event route %s",iUtils->genum_name(e->id));
     }
-    Route r= e.get()->route.pop_front();
+    Route r= e.get()->route.pop_back();
     if(r.type==Route::OBJECTHANDLER_THREADED)
     {
         {
@@ -99,7 +99,7 @@ bool ObjectProxy::Polled::handleEvent(const REF_getter<Event::Base>& e)
         rpcEvent::IncomingOnConnector* ez=static_cast<rpcEvent::IncomingOnConnector*>(e.get());
         e->route=ez->e->route;
     }
-    Route r=((Event::Base*)e.get())->route.pop_front();
+    Route r=((Event::Base*)e.get())->route.pop_back();
     if(r.type==Route::OBJECTHANDLER_POLLED)
     {
         {
@@ -153,7 +153,7 @@ void ObjectProxy::Polled::sendObjectRequest(const msockaddr_in& addr, const SERV
     XTRY;
     Route r(Route::LOCALSERVICE);
     r.localServiceRoute.id=ListenerBase::serviceId;
-    e->route.push_front(r);
+    e->route.push_back(r);
     sendEvent(addr,dst,e);
     XPASS;
 }
@@ -162,7 +162,7 @@ void ObjectProxy::Polled::sendObjectRequest(const SERVICE_id& dst, const REF_get
     XTRY;
     Route r(Route::LOCALSERVICE);
     r.localServiceRoute.id=ListenerBase::serviceId;
-    e->route.push_front(r);
+    e->route.push_back(r);
     sendEvent(dst,e);
     XPASS;
 }
@@ -171,7 +171,7 @@ void ObjectProxy::Threaded::sendObjectRequest(const msockaddr_in& addr, const SE
     XTRY;
     Route r(Route::LOCALSERVICE);
     r.localServiceRoute.id=ListenerBase::serviceId;
-    e->route.push_front(r);
+    e->route.push_back(r);
     sendEvent(addr,dst,e);
     XPASS;
 }
@@ -180,7 +180,7 @@ void ObjectProxy::Threaded::sendObjectRequest(const SERVICE_id& dst, const REF_g
     XTRY;
     Route r(Route::LOCALSERVICE);
     r.localServiceRoute.id=ListenerBase::serviceId;
-    e->route.push_front(r);
+    e->route.push_back(r);
     sendEvent(dst,e);
     XPASS;
 }

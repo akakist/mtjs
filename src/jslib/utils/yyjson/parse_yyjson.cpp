@@ -18,7 +18,6 @@ JSValue parse_yyjson(JSContext *ctx, const char *json_str, size_t len)
 
     yyjson_val *root = yyjson_doc_get_root(doc);
     JSValue result = convert_yyjson_to_js(ctx, root);
-    DBG(memctl_add_object(result,"convert_yyjson_to_js"));
     yyjson_doc_free(doc);
     // DBG(iUtils->mem_remove_ptr("yyjson",doc));
     return result;
@@ -49,7 +48,6 @@ JSValue convert_yyjson_to_js(JSContext *ctx, yyjson_val *val)
             size_t idx, max;
             yyjson_val *item;
             JSValue arr = JS_NewArray(ctx);
-                                            DBG(memctl_add_object(arr, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             yyjson_arr_foreach(val, idx, max, item) {
                 JS_SetPropertyUint32(ctx, arr, idx, convert_yyjson_to_js(ctx, item));
@@ -58,8 +56,6 @@ JSValue convert_yyjson_to_js(JSContext *ctx, yyjson_val *val)
         }
         case YYJSON_TYPE_OBJ: {
             JSValue obj = JS_NewObject(ctx);
-                                            DBG(memctl_add_object(obj, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
-
             yyjson_val *key, *value;
             size_t idx, max;
             yyjson_obj_foreach(val, idx, max, key, value) {

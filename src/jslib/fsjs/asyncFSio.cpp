@@ -64,7 +64,6 @@ struct c_js_fs_access: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -99,7 +98,6 @@ JSValue js_fs_access(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     REF_getter<c_js_fs_access> f=new c_js_fs_access(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -148,7 +146,6 @@ struct c_js_fs_appendFile: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -186,7 +183,6 @@ JSValue js_fs_appendFile(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     f->path=path;
     f->buf=buf;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -221,12 +217,12 @@ struct c_js_fs_chmod: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
-
             scope.addValue(r);
+
             JS_DefinePropertyValueStr(ctx, r, "message",
                                       JS_NewString(ctx, errstr.c_str()),
                                       JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
+            
             auto ret=JS_Call(ctx, promise_data[1], JS_UNDEFINED, 1, &r);
             scope.addValue(ret);
 
@@ -263,7 +259,6 @@ JSValue js_fs_chmod(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
     f->path=path;
     f->mode=mode;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -298,7 +293,6 @@ struct c_js_fs_chown: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -345,7 +339,6 @@ JSValue js_fs_chown(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
     f->uid=uid;
     f->gid=gid;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -416,8 +409,6 @@ struct c_js_fs_copyFile: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
-
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
                                       JS_NewString(ctx, errstr.c_str()),
@@ -453,7 +444,6 @@ JSValue js_fs_copyFile(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
     f->src=src;
     f->dst=dst;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -487,7 +477,6 @@ struct c_js_fs_mkdir: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -530,7 +519,6 @@ JSValue js_fs_mkdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
     f->path=path;
     f->mode=m;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -570,8 +558,6 @@ struct c_js_fs_mkdtemp: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
-
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
                                       JS_NewString(ctx, errstr.c_str()),
@@ -583,10 +569,8 @@ struct c_js_fs_mkdtemp: public async_task
         else
         {
             JSValue z=JS_NewStringLen(ctx, ret.data(),ret.size());
-            DBG(memctl_add_object(z, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             auto res=JS_Call(ctx, promise_data[0], JS_UNDEFINED, 1, &z);
-            DBG(memctl_add_object(res, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(res);
         }
@@ -611,7 +595,6 @@ JSValue js_fs_mkdtemp(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
     f->path=path;
     f->path+="XXXXXX";
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -665,7 +648,6 @@ struct filehandle_readFile: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -678,10 +660,8 @@ struct filehandle_readFile: public async_task
         else
         {
             JSValue z=JS_NewStringLen(ctx, ret.data(),ret.size());
-            DBG(memctl_add_object(z, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             auto res=JS_Call(ctx, promise_data[0], JS_UNDEFINED, 1, &z);
-            DBG(memctl_add_object(res, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(res);
         }
@@ -704,7 +684,6 @@ JSValue js_fs_readFile(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
     REF_getter<filehandle_readFile> f=new filehandle_readFile(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -749,14 +728,12 @@ struct filehandle_readdir: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
                                       JS_NewString(ctx, errstr.c_str()),
                                       JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
             auto ret=JS_Call(ctx, promise_data[1], JS_UNDEFINED, 1, &r);
-            DBG(memctl_add_object(ret, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(ret);
 
@@ -764,18 +741,15 @@ struct filehandle_readdir: public async_task
         else
         {
             JSValue arr = JS_NewArray(ctx);
-            DBG(memctl_add_object(arr, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(arr);
             for(int i = 0; i < res.size(); i++)
             {
                 JSValue s = JS_NewString(ctx, res[i].c_str());
-                DBG(memctl_add_object(s, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
                 JS_SetPropertyUint32(ctx, arr, (uint32_t)i, s);
             }
             auto res=JS_Call(ctx, promise_data[0], JS_UNDEFINED, 1, &arr);
-            DBG(memctl_add_object(res, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(res);
         }
@@ -799,7 +773,6 @@ JSValue js_fs_readdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
     REF_getter<filehandle_readdir> f=new filehandle_readdir(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -833,7 +806,6 @@ struct filehandle_rmdir: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -868,7 +840,6 @@ JSValue js_fs_rmdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
     REF_getter<filehandle_rmdir> f=new filehandle_rmdir(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -902,7 +873,6 @@ struct filehandle_rename: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -916,7 +886,6 @@ struct filehandle_rename: public async_task
         {
             JSValue z=JS_UNDEFINED;
             auto res=JS_Call(ctx, promise_data[0], JS_UNDEFINED, 1, &z);
-            DBG(memctl_add_object(res, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(res);
         }
@@ -936,12 +905,11 @@ JSValue js_fs_rename(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
         return JS_ThrowTypeError(ctx,"fs.rename requires (path1, path2)");
     }
     auto path1=scope.toStdStringView(argv[0]);
-    auto path2=scope.toStdStringView(argv[2]);
+    auto path2=scope.toStdStringView(argv[1]);
     REF_getter<filehandle_rename> f=new filehandle_rename(op->listener);
     f->path1=path1;
     f->path2=path2;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -974,7 +942,6 @@ struct filehandle_unlink: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -1010,7 +977,6 @@ JSValue js_fs_unlink(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     REF_getter<filehandle_unlink> f=new filehandle_unlink(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -1046,7 +1012,6 @@ struct filehandle_stat: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -1059,7 +1024,6 @@ struct filehandle_stat: public async_task
         else
         {
             JSValue obj = JS_NewObject(ctx);
-            DBG(memctl_add_object(obj, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(obj);
             JS_DefinePropertyValueStr(ctx, obj, "dev", JS_NewInt64(ctx, st.st_dev), JS_PROP_C_W_E);
@@ -1101,7 +1065,6 @@ JSValue js_fs_stat(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
     REF_getter<filehandle_stat> f=new filehandle_stat(op->listener);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -1135,7 +1098,6 @@ struct filehandle_symlink: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -1149,7 +1111,6 @@ struct filehandle_symlink: public async_task
         {
             JSValue z=JS_UNDEFINED;
             auto res=JS_Call(ctx, promise_data[0], JS_UNDEFINED, 1, &z);
-            DBG(memctl_add_object(res, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(res);
         }
@@ -1172,9 +1133,8 @@ JSValue js_fs_symlink(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
     auto path2=scope.toStdStringView(argv[1]);
     REF_getter<filehandle_symlink> f=new filehandle_symlink(op->listener);
     f->path1=path1;
-    f->path1=path1;
+    f->path2=path2;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -1207,7 +1167,6 @@ struct filehandle_truncate: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -1249,7 +1208,6 @@ JSValue js_fs_truncate(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
     f->path=path;
     f->size=length;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -1288,7 +1246,6 @@ struct filehandle_utimes: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -1337,7 +1294,6 @@ JSValue js_fs_utimes(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     f->a=a;
     f->m=m;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -1377,7 +1333,6 @@ struct filehandle_writeFile: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -1420,7 +1375,6 @@ JSValue js_fs_writeFile(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     f->body=body;
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -1454,7 +1408,6 @@ struct filehandle_open: public async_task
         if(fd<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -1492,14 +1445,12 @@ JSValue js_fs_open(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
     JSScope<10,10> scope(ctx);
     if(argc<2)
     {
-        fprintf(stderr, "[%s] => not enough args => EXIT\n", __func__);
         return JS_ThrowTypeError(ctx,"fs.open requires (path, flags[, mode])");
     }
     auto path=scope.toStdStringView(argv[0]);
     uint32_t fl=0;
     if(JS_ToUint32(ctx,&fl,argv[1]))
     {
-        fprintf(stderr, "[%s] => parse flags => EXIT\n", __func__);
         return JS_EXCEPTION;
     }
     uint32_t mode=0;
@@ -1507,7 +1458,6 @@ JSValue js_fs_open(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
     {
         if(JS_ToUint32(ctx,&mode,argv[2]))
         {
-            fprintf(stderr, "[%s] => parse mode => EXIT\n", __func__);
             return JS_EXCEPTION;
         }
 
@@ -1519,7 +1469,6 @@ JSValue js_fs_open(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
     JSValue fh = JS_NewObjectClass(ctx,js_file_handle_class_id);
     f->fhObj=fh;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -1560,7 +1509,6 @@ struct filehandle_read: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -1573,7 +1521,6 @@ struct filehandle_read: public async_task
         else
         {
             JSValue r = JS_NewStringLen(ctx,buf.data(),buf.size());
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             auto ret=JS_Call(ctx, promise_data[0], JS_UNDEFINED, 1, &r);
@@ -1616,7 +1563,6 @@ JSValue js_filehandle_read(JSContext *ctx, JSValueConst this_val, int argc, JSVa
     fr->pz=pz;
 
     JSValue promise = JS_NewPromiseCapability(ctx, fr->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -1650,7 +1596,6 @@ struct filehandle_write: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -1685,7 +1630,6 @@ JSValue js_filehandle_write(JSContext *ctx, JSValueConst this_val, int argc, JSV
     FileHandleData* fhd = (FileHandleData*)JS_GetOpaque(this_val, js_file_handle_class_id);
     if(!fhd || fhd->closed)
     {
-        fprintf(stderr, "[js_filehandle_write] => filehandle invalid or closed => EXIT\n");
         return JS_ThrowTypeError(ctx, "FileHandle closed or invalid");
     }
     std::string buf;
@@ -1708,7 +1652,6 @@ JSValue js_filehandle_write(JSContext *ctx, JSValueConst this_val, int argc, JSV
     fw->fd=fhd->fd;
 
     JSValue promise = JS_NewPromiseCapability(ctx, fw->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
@@ -1742,7 +1685,6 @@ struct filehandle_close: public async_task
         if(rv<0)
         {
             JSValue r=JS_NewError(ctx);
-            DBG(memctl_add_object(r, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
             scope.addValue(r);
             JS_DefinePropertyValueStr(ctx, r, "message",
@@ -1779,7 +1721,6 @@ JSValue js_filehandle_close(JSContext *ctx, JSValueConst this_val, int argc, JSV
     REF_getter<filehandle_close> fc=new filehandle_close(op->listener);
     fc->fd=fhd->fd;
     JSValue promise = JS_NewPromiseCapability(ctx, fc->promise_data);
-    DBG(memctl_add_object(promise, (std::string(__FILE__+std::to_string(__LINE__))).c_str()));
 
     if (JS_IsException(promise)) {
         return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");

@@ -442,7 +442,6 @@ HTTP::Request::Request(const REF_getter<epoll_socket_info>& _esi)
 void HTTP::Response::make_response(const std::string& str)
 {
 
-    // logErr2("@@ %s",__PRETTY_FUNCTION__);
     if(is_chunked)
         throw CommonError("if(is_chunked)");
 
@@ -453,12 +452,10 @@ void HTTP::Response::make_response(const std::string& str)
 
     if( request->parse_data.header_params.CONNECTION==HTTP::CONN_KEEP_ALIVE)
     {
-        // logErr2("request->esi->write_(s);");
         request->esi->write_(s);
     }
     else
     {
-        // logErr2("request->esi->write_and_close(s);");
         request->esi->write_and_close(s);
     }
 
@@ -492,22 +489,14 @@ void HTTP::Response::send_chunked(const std::string& str)
 
 void HTTP::Response::end_chunked()
 {
-    // int socketId=CONTAINER(request->esi->id_);
     if(!is_chunked)
         throw CommonError("if(!is_chunked)");
     if(content.size())
         throw CommonError("if(content.size())");
     {
-        // if(content.size())
         {
 
-            // auto cc=std::move(content);
-            // content.clear();
-            char buf[100];
-            snprintf(buf,sizeof(buf),"0\r\n\r\n");
-            // auto s=buf;
-            // logErr2("end:chunked:ka%d CS sid(%d) %s",request->connection==HTTP::Request::KEEPALIVE,socketId,dline(s).c_str());
-            // request->connection==HTTP::Request::KEEPALIVE &&
+            std::string buf="0\r\n\r\n";
             if( request->parse_data.header_params.CONNECTION==HTTP::CONN_KEEP_ALIVE)
             {
                 request->esi->write_(buf);
@@ -516,52 +505,8 @@ void HTTP::Response::end_chunked()
             {
                 request->esi->write_and_close(buf);
             }
-
-            // content.clear();
         }
-        // else
-        // {
-        //     std::string s="0\r\n\r\n";
-        //     // logErr2("end:chunked:ka%d !content.size sid(%d) %s",request->connection==HTTP::Request::KEEPALIVE, socketId,dline(s).c_str());
-        //     // printf("end:chunked:ka%d %s",request->connection==HTTP::Request::KEEPALIVE,s.c_str());
-        //     if(request->connection==HTTP::Request::KEEPALIVE && !is_chunked)
-        //     {
-        //         logErr2("write_ %s",s.c_str());
-        //         request->esi->write_(s);
-        //     }
-        //     else
-        //     {
-        //         logErr2("write_and_close %s",s.c_str());
-        //         request->esi->write_and_close(s);
-        //     }
-
-        // }
-        // logErr2("content after clear '%s'",content.c_str());
-        // std::string s="0\r\n\r\n";
-        // request->esi->write_(s);
-
-
-
     }
-    // else
-    // {
-    //     // logErr2("w cl content %s",content.c_str());
-
-    //     std::string out = build_html_response();
-    //     // logErr2("end:content:ka%d %s",request->connection==HTTP::Request::CONN::KEEPALIVE, out.c_str());
-    //     if(request->connection==HTTP::Request::CONN::KEEPALIVE && !is_chunked)
-    //     {
-    //         request->esi->write_(out);
-    //     }
-    //     else
-    //     {
-    //         request->esi->write_and_close(out);
-
-    //     }
-
-    //     content.clear();
-    //     // logErr2("content after clear %s",content.c_str());
-    // }
 
 }
 

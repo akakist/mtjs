@@ -1,4 +1,6 @@
 #pragma once
+#include "mutexInspector.h"
+#include "commonError.h"
 #include "ioBuffer.h"
 #include "SERVICE_id.h"
 #include "REF.h"
@@ -86,9 +88,10 @@ public:
 class route_t
 {
 
-    std::deque<Route> m_container;
+    std::vector<Route> m_container;
 public:
-    route_t() {}
+    route_t() {
+    }
     std::string dump() const;
     route_t(const SERVICE_id& id);
     route_t(ObjectHandlerPolled* id);
@@ -97,9 +100,25 @@ public:
     route_t(const std::string &javaCookie,ObjectHandlerPolled* id);
     route_t(const std::string &javaCookie,ObjectHandlerThreaded* id);
 
-    void push_front(const Route& v);
-    void push_front(const route_t& r);
-    Route pop_front();
+    inline void push_back(const Route& v)
+    {
+        m_container.push_back(v);
+    }
+    inline void push_back(const route_t& r)
+    {
+        if(r.m_container.size()!=1)
+            throw std::runtime_error("if(r.m_container.size()!=1)");
+        m_container.push_back(r.m_container[0]);
+    }
+    inline Route pop_back()
+    {
+        if(m_container.size()==0) throw std::runtime_error("route_t::pop_front: m_container.size()==0");
+
+        Route r=*m_container.rbegin();
+        m_container.pop_back();
+        return r;
+    }
+
     size_t size()const ;
     void pack(outBuffer&o) const;
     void unpack(inBuffer&o);

@@ -128,7 +128,6 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base>& e)
 {
     XTRY;
     auto& ID = e->id;
-    // DBG(logErr2("handleEvent %s %s %d", iUtils->genum_name(ID), __func__, __LINE__));
 
     switch(ID)
     {
@@ -186,8 +185,6 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base>& e)
         {
         case mtjsEventEnum::mtjsRpcREQ:
         {
-            // auto req=E->e->get<mtjsEvent::mtjsRpcREQ>();
-            // auto esi=E->esi;
             return mtjsRpcREQ((mtjsEvent::mtjsRpcREQ*)E->e.get(),E->esi);
         }
         case mtjsEventEnum::mtjsRpcRSP:
@@ -228,11 +225,6 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base>& e)
         logErr2("unhandled event %s",iUtils->genum_name(e->id));
         return false;
     }
-
-
-
-
-
     XPASS;
     return false;
 }
@@ -256,12 +248,6 @@ void MTJS::Service::checkForExit()
         return;
     if(!opaque.async_deque->empty())
         return;
-    // JS_FreeContext(js_ctx);
-    // JS_FreeValue(_modul)
-    // JS_FreeRuntime(js_rt);
-    // dump_memory_usage(js_rt);
-    // iUtils->setTerminate(0);
-    // deinit();
     stop();
     exit(0);
 }
@@ -279,12 +265,7 @@ bool MTJS::Service::TickAlarm(const timerEvent::TickAlarm* e)
 
 
         JSValue func_result = JS_Call(js_ctx, t->cb, global_obj, t->fargs.size(), t->fargs.data());
-
         scope.addValue(func_result);
-        DBG(memctl_add_object(func_result,"JS_Call tickAlarm"));
-
-
-
         auto id=std::stoll(e->data->container);
         logErr2("TickAlarm: %lld",id);
         rconf->timers.timers_refed.erase(id);
@@ -323,7 +304,6 @@ bool  MTJS::Service::TickTimer(const timerEvent::TickTimer*e)
         scope.addValue(global_obj);
 
         JSValue func_result = JS_Call(js_ctx, t->cb, global_obj, t->fargs.size(), t->fargs.data());
-        DBG(memctl_add_object(func_result,"JS_Call tickTimer"));
 
         scope.addValue(func_result);
         qjs::checkForException(js_ctx, func_result,"TickTimer: JS_Call");
@@ -345,11 +325,9 @@ JSValue loadModule(JSContext* ctx, const std::string& moduleCode)
     JSScope <10,10> scope(ctx);
     JSValue module1 = JS_Eval(ctx, moduleCode.c_str(), moduleCode.size(), "<module>", JS_EVAL_TYPE_MODULE | JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
 
-    // scope.addValue(module1);
     if(qjs::checkAndPrintException(ctx, module1, "loadModule"))
         return module1;
 
-        // #ifdef KALL
     JSValue ret = JS_EvalFunction(ctx, module1);
     scope.addValue(ret);
     if(qjs::checkAndPrintException(ctx, ret, "loadModule")) return ret;
@@ -379,14 +357,6 @@ JSValue loadModule(JSContext* ctx, const std::string& moduleCode)
 bool MTJS::Service::Eval(const mtjsEvent::Eval* e)
 {
     module__ = loadModule(js_ctx, e->js);
-
-
-    // JSModuleDef* moduleDef = (JSModuleDef*)JS_VALUE_GET_PTR(module__);
-    // if(moduleDef == NULL) return false;
-
-    // moduleNamespace__ = JS_GetModuleNamespace(js_ctx, moduleDef);
-    // if(JS_IsUndefined(moduleNamespace__)) throw CommonError("Не удалось загрузить модуль!");
-
 
     executePending();
     checkForExit();
