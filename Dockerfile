@@ -19,9 +19,9 @@ COPY ./src /root/src
 
 RUN cd /root/src && mkdir build1 && cd build1 && cmake .. && make install -j 6  && ldconfig  && rm -r /root/src /opt && strip /usr/local/bin/mtjs
 
-FROM alpine:latest
+FROM alpine:3.19
 
 COPY --from=builder /usr/local/bin/mtjs  /usr/local/bin/mtjs
-COPY ./mtjs /mtjs
+COPY ./src/js/mtjs /mtjs
 RUN apk add --no-cache apache2-utils busybox-extras curl
 #ENV PATH=/usr/local/bin:$PATH

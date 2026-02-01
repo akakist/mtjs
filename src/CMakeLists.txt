@@ -31,15 +31,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
 
 include(FetchContent)
 
-FetchContent_Declare(
-    yyjson
-    URL https://github.com/ibireme/yyjson/archive/refs/tags/0.8.0.tar.gz
-)
-FetchContent_MakeAvailable(yyjson)
-
-include_directories(${yyjson_SOURCE_DIR}/src)
-message (STATUS "yyjson dir " ${yyjson_INCLUDE_DIRS})
-message (STATUS "yyjson d2ir " ${yyjson_SOURCE_DIR})
 
 find_package(PkgConfig REQUIRED)
 
@@ -182,9 +173,9 @@ if (APPLE)
       SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE) 
 endif () 
 
-CONFIGURE_FILE( "${PROJECT_SOURCE_DIR}/genum.hpp.in"
-                "${CMAKE_BINARY_DIR}/genum.hpp"
-                NEWLINE_STYLE UNIX )
+#CONFIGURE_FILE( "${PROJECT_SOURCE_DIR}/genum.hpp.in"
+#                "${CMAKE_BINARY_DIR}/genum.hpp"
+#                NEWLINE_STYLE UNIX )
 
 FILE(READ version.txt VERSION)
 
@@ -196,7 +187,8 @@ CONFIGURE_FILE( "${PROJECT_SOURCE_DIR}/version.h.in"
 SET(CAPS_IP "x.testquant.com")
 SET(PORT 10100)
 add_definitions()
-#-DDEBUG  -DMUTEX_INSPECTOR_DEBUG -DWEBDUMP
+#-DDEBUG  -DMUTEX_INSPECTOR_DEBUG 
+#-DDEBUG  -DMUTEX_INSPECTOR_DEBUG -DWEBDUMP -DDEBUG  -DMUTEX_INSPECTOR_DEBUG
 
     add_definitions(  -DCURL_POLL_ADD=5)
 
@@ -219,12 +211,10 @@ SET(CACHE_TARGET_DIR ${PROJECT_BASE_DIR}/cache)
 
 ADD_SUBDIRECTORY(megatron)
 
-ADD_SUBDIRECTORY(services)
-ADD_SUBDIRECTORY(quickjs)
-#ADD_SUBDIRECTORY(test)
-ADD_SUBDIRECTORY(jslib)
-ADD_SUBDIRECTORY(mono)
-ADD_SUBDIRECTORY(common)
+#ADD_SUBDIRECTORY(xpp)
+ADD_SUBDIRECTORY(js)
+#ADD_SUBDIRECTORY(svs)
+#ADD_SUBDIRECTORY(bc)
 
 
 
