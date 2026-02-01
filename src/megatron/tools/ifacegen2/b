@@ -1,1 +1,0 @@
- c++ crmak-lib.cpp ifacegen2.cpp -o ifacegen2.debug.exe

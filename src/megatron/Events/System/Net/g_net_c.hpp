@@ -1,6 +1,0 @@
-#include "g_http_c.hpp"
-#include "g_jsonref_c.hpp"
-#include "g_oscar_c.hpp"
-#include "g_rpc_c.hpp"
-#include "g_socket_c.hpp"
-#include "g_wsc_c.hpp"

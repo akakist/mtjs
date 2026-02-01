@@ -1,41 +1,21 @@
-Server Side Public License (SSPL)
-Version 1.0, October 2018
+MIT License
 
-Copyright (c) 2025 Белялов Сергей
-All rights reserved.
+Copyright (c) 2026 Sergey Belyalov
 
-This Source Code Form is subject to the terms of the Server Side Public License
-(SSPL), v. 1.0. If a copy of the SSPL was not distributed with this
-file, You can obtain one at https://www.mongodb.com/licensing/server-side-public-license
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-ПРОГРАММА ПРЕДОСТАВЛЯЕТСЯ «КАК ЕСТЬ», БЕЗ КАКИХ-ЛИБО ГАРАНТИЙ, ЯВНО ВЫРАЖЕННЫХ ИЛИ
-ПОДРАЗУМЕВАЕМЫХ, ВКЛЮЧАЯ, НО НЕ ОГРАНИЧИВАЯСЬ ГАРАНТИЯМИ ТОВАРНОЙ ПРИГОДНОСТИ,
-СООТВЕТСТВИЯ ПО ЕГО КОНКРЕТНОМУ НАЗНАЧЕНИЮ И ОТСУТСТВИЯ НАРУШЕНИЙ ПРАВ. НИ В КАКОМ
-СЛУЧАЕ АВТОРЫ ИЛИ ПРАВООБЛАДАТЕЛИ НЕ НЕСУТ ОТВЕТСТВЕННОСТИ ПО ИСКАМ О ВОЗМЕЩЕНИИ
-УЩЕРБА, ИЛИ ИНЫМ ТРЕБОВАНИЯМ, В ТОМ ЧИСЛЕ, ПРИ ДЕЙСТВИИ КОНТРАКТА, ДЕЛИКТЕ ИЛИ ИНОЙ
-СИТУАЦИИ, ВОЗНИКШИМ ИЗ-ЗА ИСПОЛЬЗОВАНИЯ ПРОГРАММЫ ИЛИ ИНЫХ ДЕЙСТВИЙ С ПРОГРАММОЙ.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-ОСНОВНЫЕ УСЛОВИЯ SSPL:
-
-1. Вы можете использовать Программу бесплатно для:
-   - Внутреннего использования
-   - Разработки и тестирования
-   - Открытых проектов с исходным кодом
-
-2. Вы НЕ МОЖЕТЕ предлагать Программу как сервис третьим лицам без коммерческой лицензии.
-   Это включает, но не ограничивается:
-   - Хостинг-провайдеров
-   - Облачные платформы (AWS, Google Cloud, Azure, etc.)
-   - SaaS-сервисы
-   - Любую форму предоставления Программы как услуги
-
-3. Если вы предлагаете функциональность Программы как сервис, вы ДОЛЖНЫ:
-   - Выпустить под SSPL всю исходную кодевую базу любой программы,
-     которую вы делаете доступной через данную услугу
-   - ИЛИ приобрести коммерческую лицензию у правообладателя
-
-ПОЛНЫЙ ТЕКСТ SSPL ДОСТУПЕН ПО АДРЕСУ:
-https://www.mongodb.com/licensing/server-side-public-license
-
-ДЛЯ КОММЕРЧЕСКОГО ИСПОЛЬЗОВАНИЯ:
-Обращайтесь для получения коммерческой лицензии: akakist@gmail.com
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

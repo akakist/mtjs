@@ -1,7 +1,0 @@
-genum_WebSocketClient,
-genum_wscConnect,
-genum_wscSend,
-genum_wscReceived,
-genum_wscConnected,
-genum_wscDisconnected,
-genum_wscConnectFailed,
