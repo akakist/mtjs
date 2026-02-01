@@ -1,9 +1,0 @@
-*.a
-.obj/
-examples/fib.so
-examples/hello
-examples/hello_module
-examples/point.so
-examples/test_fib
-qjsc
-run-test262
