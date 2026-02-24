@@ -76,7 +76,7 @@ static JSValue js_request_get_content(JSContext* ctx, JSValueConst this_val/*, i
     if (!req) return JS_EXCEPTION;
     if(req->req->is_chunked)
         return JS_ThrowReferenceError(ctx, "cannot read content in chunked request");
-    return JS_NewStringLen(ctx, req->req->post_content.data(),req->req->post_content.size());
+    return JS_NewStringLen(ctx, req->req->body->container.data(),req->req->body->container.size());
 }
 
 static JSValue js_request_get_stream(JSContext* ctx, JSValueConst this_val/*, int magic*/)
