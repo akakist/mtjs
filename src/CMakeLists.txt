@@ -31,6 +31,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
 
 include(FetchContent)
 
+FetchContent_Declare(
+    yyjson
+    URL https://github.com/ibireme/yyjson/archive/refs/tags/0.8.0.tar.gz
+)
+FetchContent_MakeAvailable(yyjson)
+
 
 find_package(PkgConfig REQUIRED)
 
@@ -213,7 +219,7 @@ ADD_SUBDIRECTORY(megatron)
 
 #ADD_SUBDIRECTORY(xpp)
 ADD_SUBDIRECTORY(js)
-#ADD_SUBDIRECTORY(svs)
+ADD_SUBDIRECTORY(quickjs)
 #ADD_SUBDIRECTORY(bc)
 
 
