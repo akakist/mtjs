@@ -11,17 +11,17 @@
 #include "sv.h"
 
 #include "quickjs.h"
-#include "httpHeadersParser.h"
+// #include "httpHeadersParser.h"
 
 
 static JSClassID js_request_class_id;
 
 class JS_HTTP_Request {
 public:
-    REF_getter<HTTP::Request> req;
+    REF_getter<HttpContext> req;
 
 
-    JS_HTTP_Request(JSContext *ctx, const REF_getter<HTTP::Request>& r) : req(r)
+    JS_HTTP_Request(JSContext *ctx, const REF_getter<HttpContext>& r) : req(r)
     {
     }
     ~JS_HTTP_Request()
@@ -54,7 +54,7 @@ static JSValue js_request_get_url(JSContext* ctx, JSValueConst this_val/*, int m
     MUTEX_INSPECTOR;
     JS_HTTP_Request* req = static_cast<JS_HTTP_Request*>(JS_GetOpaque2(ctx, this_val, js_request_class_id));
     if (!req) return JS_EXCEPTION;
-    auto uri=req->req->uri();
+    auto uri=req->req->url;
     return JS_NewStringLen(ctx, uri.data(),uri.size());
 }
 
@@ -64,8 +64,8 @@ static JSValue js_request_get_method(JSContext* ctx, JSValueConst this_val/*, in
     JS_HTTP_Request* req = static_cast<JS_HTTP_Request*>(JS_GetOpaque2(ctx, this_val, js_request_class_id));
     if (!req) return JS_EXCEPTION;
 
-    auto &m=req->req->parse_data.method;
-    return JS_NewInt32(ctx, m);
+    auto &m=req->req->method;
+    return JS_NewStringLen(ctx, m.data(),m.size());
 }
 
 static JSValue js_request_get_content(JSContext* ctx, JSValueConst this_val/*, int magic*/)
@@ -74,7 +74,7 @@ static JSValue js_request_get_content(JSContext* ctx, JSValueConst this_val/*, i
     MUTEX_INSPECTOR;
     JS_HTTP_Request* req = static_cast<JS_HTTP_Request*>(JS_GetOpaque2(ctx, this_val, js_request_class_id));
     if (!req) return JS_EXCEPTION;
-    if(req->req->chunked)
+    if(req->req->is_chunked)
         return JS_ThrowReferenceError(ctx, "cannot read content in chunked request");
     return JS_NewStringLen(ctx, req->req->post_content.data(),req->req->post_content.size());
 }
@@ -95,13 +95,13 @@ static JSValue js_request_set_stream(JSContext* ctx, JSValueConst this_val, JSVa
     {
         return JS_ThrowReferenceError(ctx, "val must be stream");
     }
-    if(!req->req->chunked)
+    if(!req->req->is_chunked)
         return JS_ThrowReferenceError(ctx, "stream not allowed because request is not chunked");
 
-    if(req->req->reader.valid())
+    if(req->req->getReader().valid())
         return JS_ThrowReferenceError(ctx, "stream already assigned");
 
-    req->req->reader=js_get_stream_CPP(ctx,val);
+    req->req->setReader(js_get_stream_CPP(ctx,val));
 
     return JS_UNDEFINED;
 }
@@ -112,7 +112,7 @@ static JSValue js_is_chunked(JSContext* ctx, JSValueConst this_val/*, int magic*
 
     JS_HTTP_Request* req = static_cast<JS_HTTP_Request*>(JS_GetOpaque2(ctx, this_val, js_request_class_id));
     if (!req) return JS_EXCEPTION;
-    return JS_NewBool(ctx,req->req->chunked);
+    return JS_NewBool(ctx,req->req->is_chunked);
 }
 static JSValue js_is_websocket(JSContext* ctx, JSValueConst this_val/*, int magic*/)
 {
@@ -131,17 +131,15 @@ static JSValue js_parse_headers_simple(JSContext* ctx, JSValueConst this_val,
     if (!req) return JS_EXCEPTION;
 
 
-    auto headers=req->req->headers();
+    auto & headers=req->req->headers;
 
     
-    SimpleHeadersParser parser;
-    parser.parse(headers);
     
     // Создаем объект
     JSValue headers_obj = JS_NewObject(ctx);
     
     // Заполняем заголовки
-    for (const auto& [key, value] : parser.headers()) {
+    for (const auto& [key, value] : headers) {
         JSAtom atom = JS_NewAtomLen(ctx, key.data(),key.size());
         JSValue js_value = JS_NewStringLen(ctx, value.data(),value.size());
         JS_SetProperty(ctx, headers_obj, atom, js_value);
@@ -159,7 +157,7 @@ static JSValue js_parse_uri_no_malloc(JSContext* ctx, JSValueConst this_val,
     if (!req) return JS_EXCEPTION;
 
 
-    auto uri=req->req->uri();
+    auto uri=req->req->url;
     
     URIParser parser;
     
@@ -221,7 +219,7 @@ void register_http_request_class(JSContext* ctx)
 }
 
 
-JSValue js_http_request_new(JSContext *ctx, const REF_getter<HTTP::Request>& request)
+JSValue js_http_request_new(JSContext *ctx, const REF_getter<HttpContext>& request)
 {
     MUTEX_INSPECTOR;
 

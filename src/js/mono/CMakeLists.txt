@@ -22,7 +22,7 @@ endif()
 
 if(APPLE)
 target_link_libraries(mtjs  
-     mtjsmoduleS mtjscommon    jsnet  jsutils  quickjs megatron-main   zsingle megatron-core   ${linuxlib}  ssh quickjs
+     mtjsmoduleS mtjscommon    jsnet  jsutils  quickjs megatron-main   zsingle megatron-core   ${linuxlib}  yyjson ssh
 
 #curl  
 ${OPENSSL_LIBRARIES}
@@ -32,8 +32,8 @@ ${OPENSSL_LIBRARIES}
 
 else()
 target_link_libraries(mtjs  -Wl,--start-group
-     mtjsmoduleS mtjscommon    zmysql jsnet  jsutils  quickjs megatron-main   zsingle megatron-core 
-      ${linuxlib}
+     mtjsmoduleS mtjscommon     jsnet  jsutils  quickjs megatron-main   zsingle megatron-core 
+      ${linuxlib} yyjson
 
 #curl  psl idn2 unistring nghttp2
 ssl crypto

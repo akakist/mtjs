@@ -64,7 +64,7 @@ bool MTJS::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
                 
                 qjs::checkForException(js_ctx,func_result,"RequestIncoming: JS_Call");
 
-                if(e->req->chunked && !e->req->reader.valid())
+                if(e->req->is_chunked && !e->req->getReader().valid())
                 {
                     logErr2("request chunked - you must define input stream");
                 }
@@ -91,28 +91,35 @@ bool MTJS::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
 bool MTJS::Service::RequestChunkReceived(const httpEvent::RequestChunkReceived* e)
 {
     MUTEX_INSPECTOR;
-
+    // logErr2("RequestChunkReceived chunkId %lu, buf size %lu",e->chunkId,e->buf.size());
     // JSScope <10,10> scope(js_ctx);
 
+    // logErr2("writing chunk to stream %p",e->req->getReader().get());
+    if(!e->req->getReader().valid())
+    {
+        throw CommonError("stream not defined for chunked request");
+        return false;
+    }
 
-    e->req->reader->write("data",e->buf.data(),e->buf.size());
+    e->req->getReader()->write("data",e->buf->container.data(),e->buf->container.size());
 
     return true;
 }
 bool MTJS::Service::RequestStartChunking(const httpEvent::RequestStartChunking* e)
 {
 
-    return false;
+    logErr2("RequestStartChunking %s",__func__);
+    return true;
 
 }
 bool MTJS::Service::RequestChunkingCompleted(const httpEvent::RequestChunkingCompleted* e)
 {
 
     // JSScope<10,10> scope(js_ctx);
-    if(!e->req->reader.valid())
+    if(!e->req->getReader().valid())
         throw CommonError("chunked request, you must specify stream");
 
-    e->req->reader->write("end",NULL,0);
+    e->req->getReader()->write("end",NULL,0);
 
     return true;
 }

@@ -32,7 +32,7 @@ set(linuxlib
 )
 endif()
 if(APPLE)
-target_link_libraries(mtjsmodule   jsnet jsutils mtjscommon  quickjs megatron-core    pthread curl   ${linuxlib}   )
+target_link_libraries(mtjsmodule   jsnet jsutils mtjscommon  quickjs megatron-core    pthread curl   ${linuxlib} yyjson  )
 else()
 target_link_libraries( mtjsmodule
 #"LINKER:--start-group"
@@ -40,7 +40,7 @@ target_link_libraries( mtjsmodule
 			   jsnet jsutils mtjscommon  quickjs megatron-core    
 			"-Wl,--end-group" 
 #			"LINKER:--end-group"
-			pthread   ${linuxlib} 
+			pthread   ${linuxlib} yyjson 
 			)
 endif()
 

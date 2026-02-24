@@ -73,7 +73,7 @@ int mainMTJS(int argc, char** argv )
 
 
 #ifdef __linux__
-        registerMysqlModule(NULL);
+        // registerMysqlModule(NULL);
 #endif
 
         std::string mtjs_STACK_SIZE="8388608";
