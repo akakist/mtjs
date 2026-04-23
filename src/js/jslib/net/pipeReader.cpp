@@ -1,6 +1,6 @@
 #include "quickjs.h"
 #include "common/jsscope.h"
-#include "common/mtjs_opaque.h"
+#include "mtjs_opaque.h"
 #include <iostream>
 
 #include "stream.h"
@@ -92,7 +92,7 @@ static JSValue js_read_pipe_buf(JSContext *ctx, JSValueConst this_val,
         return JS_ThrowTypeError(ctx, "Expected (string path, stream)");
     }
 
-    REF_getter<c_pipe_async_reader_buf> f=new c_pipe_async_reader_buf(op->listener);
+    REF_getter<c_pipe_async_reader_buf> f=new c_pipe_async_reader_buf(op->listener_);
     f->path=_path;
     f->stream=s;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -192,7 +192,7 @@ static JSValue js_read_pipe_lines(JSContext *ctx, JSValueConst this_val,
         return JS_ThrowTypeError(ctx, "Expected (string path, stream)");
     }
 
-    REF_getter<c_pipe_async_reader_lines> f=new c_pipe_async_reader_lines(op->listener);
+    REF_getter<c_pipe_async_reader_lines> f=new c_pipe_async_reader_lines(op->listener_);
     f->path=_path;
     f->stream=stream;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -278,7 +278,7 @@ static JSValue js_read_stdin_lines(JSContext *ctx, JSValueConst this_val,
     {
         return JS_ThrowTypeError(ctx, "Expected stream");
     }
-    REF_getter<c_stdin_async_reader_lines> task=new c_stdin_async_reader_lines(op->listener);
+    REF_getter<c_stdin_async_reader_lines> task=new c_stdin_async_reader_lines(op->listener_);
     task->stream=stream;
     JSValue promise = JS_NewPromiseCapability(ctx, task->promise_data);
 

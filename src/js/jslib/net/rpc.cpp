@@ -57,9 +57,9 @@ static JSValue js_rpc_sendTo(JSContext *ctx, JSValueConst this_val, int argc, JS
     qjs::convert_js_value_to_json(ctx,argv[2],params);
 
 
-    op->broadcaster->sendEvent(std::string(dstAddr),ServiceEnum::mtjs, 
-        new mtjsEvent::mtjsRpcREQ(std::string(method), std::string(params),op->listener->serviceId)
-    );
+    op->broadcaster->sendEvent(std::string(dstAddr),ServiceEnum::mtjs,
+                               new mtjsEvent::mtjsRpcREQ(std::string(method), std::string(params),op->listener_->serviceId)
+                              );
 
     op->rpcBlockExit=true; // Блокируем выход, пока слушаем RPC
 

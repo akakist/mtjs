@@ -1,0 +1,41 @@
+#!/usr/local/bin/bcjs
+import * as std from "std";
+import { sleep } from "os";
+// import { RequestType } from "./types/bcjs";
+const node = "127.0.0.1:2301";
+let sk = std.getenv('u_root_ed_sk');
+console.log("zaza1");
+async function exec() {
+    // while(true)
+    // {
+    //     bcjs.tx_subscribe(node, (params)=>{
+    //         console.log("tx report from js:", JSON.stringify(params));
+    //     });
+    //     const ui=await bcjs.get_user_info(node, { sk: sk , timeout: 1 })
+    //     const nonce=ui.nonce;
+    //     console.log(ui);
+    //     const rsp=await bcjs.mint(node, { sk:sk, amount:"2000", timeout:4, nonce: nonce })
+    //     console.log(rsp);
+    //     sleep(1000);
+    // }
+    console.log("zaza3");
+    bcjs.tx_subscribe(node, (params) => {
+        console.log("tx report from js:", JSON.stringify(params));
+    });
+    console.log("zaza4");
+    const ui = await bcjs.get_user_info(node, { sk: sk, timeout: 1 });
+    console.log("ui " + ui);
+    // return;
+    console.log("zaza5");
+    const res = await bcjs.tx_submit(node, ui.nonce, sk, 1000, [{ type: "register_nick", nick: "Sergey" }]);
+    console.log("res" + res);
+    console.log("zaza6");
+}
+console.log("zaza2");
+try {
+    exec().then((e) => console.log("yhen " + e)).catch((e) => { console.log("exc1 " + e); });
+}
+catch (e) {
+    console.log("exc2 " + e);
+}
+sleep(1000000);

@@ -1,5 +1,5 @@
 #include "quickjs.h"
-#include "mtjs_opaque.h"
+#include "common/mtjs_opaque.h"
 #include "Events/Tools/telnetEvent.h"
 static JSValue js_telnet_register_command(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
@@ -17,7 +17,7 @@ static JSValue js_telnet_register_command(JSContext *ctx, JSValueConst this_val,
                                    std::string(scope.toStdStringView(argv[0])),
                                    std::string(scope.toStdStringView(argv[1])),
                                    std::string(scope.toStdStringView(argv[2])),
-                                   op->listener
+                                   op->listener_
                                ));
     return JS_UNDEFINED;
 }
@@ -49,7 +49,7 @@ static JSValue js_telnet_listen(JSContext *ctx, JSValueConst this_val, int argc,
     //op->telnet_callback.emplace(JHolder(ctx,argv[0]));
     msockaddr_in sa;
     sa.init(std::string(addr));
-    op->broadcaster->sendEvent(ServiceEnum::Telnet,new telnetEvent::DoListen(sa,std::string(dn),op->listener));
+    op->broadcaster->sendEvent(ServiceEnum::Telnet,new telnetEvent::DoListen(sa,std::string(dn),op->listener_));
     return JS_UNDEFINED;
 }
 

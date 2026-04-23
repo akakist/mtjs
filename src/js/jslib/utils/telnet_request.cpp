@@ -101,7 +101,7 @@ JSValue js_telnet_request_print(JSContext* ctx, JSValueConst this_val, int argc,
             return JS_ThrowSyntaxError(ctx,"invalid print object");
 
     }
-    op->broadcaster->sendEvent(ServiceEnum::Telnet,new telnetEvent::Reply(req->req->socketId,buf,op->listener));
+    op->broadcaster->sendEvent(ServiceEnum::Telnet,new telnetEvent::Reply(req->req->socketId,buf,op->listener_));
     return JS_UNDEFINED;
     XPASS;
 

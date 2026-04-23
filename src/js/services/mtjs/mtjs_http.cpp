@@ -61,7 +61,7 @@ bool MTJS::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
                 JSValue func_result = JS_Call(js_ctx, serv_conf_http->callback, global_obj, argc, argv);
 
                 scope.addValue(func_result);
-                
+
                 qjs::checkForException(js_ctx,func_result,"RequestIncoming: JS_Call");
 
                 if(e->req->is_chunked && !e->req->getReader().valid())
@@ -91,15 +91,9 @@ bool MTJS::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
 bool MTJS::Service::RequestChunkReceived(const httpEvent::RequestChunkReceived* e)
 {
     MUTEX_INSPECTOR;
-    // logErr2("RequestChunkReceived chunkId %lu, buf size %lu",e->chunkId,e->buf.size());
+
     // JSScope <10,10> scope(js_ctx);
 
-    // logErr2("writing chunk to stream %p",e->req->getReader().get());
-    if(!e->req->getReader().valid())
-    {
-        throw CommonError("stream not defined for chunked request");
-        return false;
-    }
 
     e->req->getReader()->write("data",e->buf->container.data(),e->buf->container.size());
 
@@ -108,8 +102,7 @@ bool MTJS::Service::RequestChunkReceived(const httpEvent::RequestChunkReceived* 
 bool MTJS::Service::RequestStartChunking(const httpEvent::RequestStartChunking* e)
 {
 
-    logErr2("RequestStartChunking %s",__func__);
-    return true;
+    return false;
 
 }
 bool MTJS::Service::RequestChunkingCompleted(const httpEvent::RequestChunkingCompleted* e)

@@ -19,6 +19,7 @@
 #include "common/jsscope.h"
 #include "common/timers.h"
 #include "Events/Tools/webHandlerEvent.h"
+#include "errcodes.h"
 
 #include "sv.h"
 extern "C"
@@ -169,6 +170,11 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base>& e)
         return EmitterData((const mtjsEvent::EmitterData*)e.get());
     case telnetEventEnum::CommandEntered :
         return CommandEntered((const telnetEvent::CommandEntered*)e.get());
+    case bcEventEnum::ClientMsgReply :
+        return ClientMsgReply((const bcEvent::ClientMsgReply*)e.get());
+
+    case bcEventEnum::ClientTxSubscribeRSP :
+        return ClientTxSubscribeRSP((const bcEvent::ClientTxSubscribeRSP*)e.get());
 
 #ifdef WEBDUMP
     case webHandlerEventEnum::RequestIncoming :
@@ -184,13 +190,14 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base>& e)
         switch (IDC)
         {
         case mtjsEventEnum::mtjsRpcREQ:
-        {
             return mtjsRpcREQ((mtjsEvent::mtjsRpcREQ*)E->e.get(),E->esi);
-        }
         case mtjsEventEnum::mtjsRpcRSP:
-        {
             return mtjsRpcRSP((mtjsEvent::mtjsRpcRSP*)E->e.get(),E->esi);
-        }
+        case bcEventEnum::ClientMsgReply :
+            return ClientMsgReply((const bcEvent::ClientMsgReply*)E->e.get());
+        case bcEventEnum::ClientTxSubscribeRSP :
+            return ClientTxSubscribeRSP((const bcEvent::ClientTxSubscribeRSP*)E->e.get());
+
         default:
             logErr2("unhandled event %s %s %d",iUtils->genum_name(E->e->id),__func__,__LINE__);
             break;
@@ -206,13 +213,13 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base>& e)
         switch (IDA)
         {
         case mtjsEventEnum::mtjsRpcREQ:
-        {
             return mtjsRpcREQ((mtjsEvent::mtjsRpcREQ*)E->e.get(),E->esi);
-        }
         case mtjsEventEnum::mtjsRpcRSP:
-        {
             return mtjsRpcRSP((mtjsEvent::mtjsRpcRSP*)E->e.get(),E->esi);
-        }
+        case bcEventEnum::ClientMsgReply :
+            return ClientMsgReply((const bcEvent::ClientMsgReply*)E->e.get());
+        case bcEventEnum::ClientTxSubscribeRSP :
+            return ClientTxSubscribeRSP((const bcEvent::ClientTxSubscribeRSP*)E->e.get());
         default:
             logErr2("unhandled event %s %s %d",iUtils->genum_name(E->e->id),__func__,__LINE__);
             break;
@@ -252,10 +259,36 @@ void MTJS::Service::checkForExit()
     exit(0);
 }
 
-
+JSValue makeError(JSContext *ctx, int errid, const char *errstr) {
+    JSValue obj = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, errid));
+    JS_SetPropertyStr(ctx, obj, "errstr", JS_NewString(ctx, errstr));
+    return obj;
+}
 bool MTJS::Service::TickAlarm(const timerEvent::TickAlarm* e)
 {
     MUTEX_INSPECTOR;
+    if(e->tid==Timers::TIMER_ClientMsg_TIMEDOUT)
+    {
+        // logErr2("if(e->tid==Timers::TIMER_ClientMsg_TIMEDOUT)");
+        JSScope <10,10> scope(js_ctx);
+        THASH_id h;
+        h.container=e->data.get()->container;
+        auto it=opaque.node_req_promises.find(h);
+        if(it==opaque.node_req_promises.end())
+            throw CommonError("if(i!=opaque.node_req_promises.end())");
+        // it->second.ctx
+
+        JSValue global_obj = JS_GetGlobalObject(js_ctx);
+        auto o=makeError(it->second.ctx,BCERR_TIMEDOUT,"timed out");
+        scope.addValue(o);
+        // logErr2("")
+        JSValue func_result = JS_Call(it->second.ctx, it->second.reject, global_obj, 1, &o);
+        scope.addValue(func_result);
+        opaque.node_req_promises.erase(h);
+        return true;
+        // JS_Call
+    }
     if(e->tid==Timers::TIMER_TIMER)
     {
         JSScope <10,10> scope(js_ctx);
@@ -337,7 +370,7 @@ JSValue loadModule(JSContext* ctx, const std::string& moduleCode)
         JSValue exc_obj = JS_GetException(ctx);
         scope.addValue(exc_obj);
         auto message(scope.toStdStringView(exc_obj));
-        JSValue stack_val = JS_GetPropertyStr(ctx, exc_obj, "stack"); 
+        JSValue stack_val = JS_GetPropertyStr(ctx, exc_obj, "stack");
         auto stack = JS_IsUndefined(stack_val) ? "No stack available" : scope.toStdStringView(stack_val);
 
         if(stack.size())
@@ -380,6 +413,7 @@ bool MTJS::Service::RequestIncoming(const webHandlerEvent::RequestIncoming* e)
 }
 #endif
 JSValue create_uint8array(JSContext *ctx, const char *data, size_t len) {
+    MUTEX_INSPECTOR;
     JSValue array_buffer = JS_NewArrayBufferCopy(ctx, (const uint8_t*)data, len);
     if (JS_IsException(array_buffer)) {
         return JS_EXCEPTION;
@@ -388,6 +422,7 @@ JSValue create_uint8array(JSContext *ctx, const char *data, size_t len) {
 }
 bool MTJS::Service::EmitterData(const mtjsEvent::EmitterData*e)
 {
+    MUTEX_INSPECTOR;
 
     JSScope <10,10> scope(js_ctx);
     auto sValue = create_uint8array(js_ctx,e->data.data(),e->data.size());
@@ -400,6 +435,7 @@ JSValue js_telnet_request_new(JSContext *ctx, const REF_getter<telnetEvent::Comm
 
 bool MTJS::Service::CommandEntered(const telnetEvent::CommandEntered* e)
 {
+    MUTEX_INSPECTOR;
     if(opaque.telnet_callback.has_value())
     {
         JSScope <10,10> scope(js_ctx);
@@ -412,6 +448,135 @@ bool MTJS::Service::CommandEntered(const telnetEvent::CommandEntered* e)
             JSValue result = JS_Call(js_ctx, telnetCallback, JS_UNDEFINED, 1, &args);
             scope.addValue(result);
             qjs::checkForException(js_ctx, result, "CommandEntered: JS_Call");
+        }
+    }
+    return true;
+}
+
+#include "msg.h"
+// #include "quickjspp.hpp"
+
+bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply*e)
+{
+    logErr2("bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply*e)");
+    MUTEX_INSPECTOR;
+
+    auto it=opaque.node_req_promises.find(e->hash_of_request);
+    if(it==opaque.node_req_promises.end())
+        throw CommonError("if(it==opaque.node_req_promises.end())");
+
+    inBuffer in(e->msg);
+    auto p=in.get_PN();
+    switch(p)
+    {
+    case msgid::get_user_status_rsp:
+    {
+        msg::get_user_status_rsp r;
+        r.unpack(in);
+        auto *ctx=it->second.ctx;
+        JSScope<20,20> scope(it->second.ctx);
+        auto obj=JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, r.balance.toString().c_str()));
+        JS_SetPropertyStr(ctx,obj,"nonce",JS_NewString(ctx, r.nonce.toString().c_str()));
+        JSValue ret = JS_Call(it->second.ctx, it->second.resolve, JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT,toRef(e->hash_of_request.container),this));
+        return true;
+    }
+    break;
+    case msgid::transaction_added_rsp:
+    {
+        msg::transaction_added_rsp r;
+        r.unpack(in);
+        auto *ctx=it->second.ctx;
+        JSScope<20,20> scope(it->second.ctx);
+        auto obj=JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "err", JS_NewInt32(ctx, r.err));
+        JS_SetPropertyStr(ctx,obj,"err_str",JS_NewString(ctx, r.err_str.c_str()));
+        JS_SetPropertyStr(ctx,obj,"tx_hash",JS_NewString(ctx, iUtils->bin2hex(r.tx_hash.container).c_str()));
+        JSValue ret = JS_Call(it->second.ctx, it->second.resolve, JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT,toRef(e->hash_of_request.container),this));
+        return true;
+    }
+    break;
+    case msgid::node_message_ed:
+    {
+        msg::node_message_ed nm;
+        nm.unpack(in);
+        inBuffer inn(nm.payload);
+        auto pp=inn.get_PN();
+        switch(pp)
+        {
+            break;
+
+        }
+        return true;
+    }
+    break;
+    default:
+        logErr2("unhandled msg Z %d",p);
+    }
+    return false;
+}
+#include <nlohmann/json.hpp>
+// JSValue convert_yyjson_to_js(JSContext *ctx, yyjson_val *val);
+extern "C"
+JSValue parse_yyjson(JSContext *ctx, const char *json_str, size_t len);
+
+bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP* e)
+{
+    MUTEX_INSPECTOR;
+    logErr2("ClientTxSubscribeRSP from node");
+
+    msg::publish_block pb(e->msg);
+    nlohmann::json j;
+    for(size_t ti=0; ti<pb.att_data.trs.size(); ti++)
+    {
+        nlohmann::json jtr;
+        if(opaque.tx_subscription_cb.has_value())
+        {
+            THASH_id tx_hash=blake2b_hash(pb.att_data.trs[ti].container);
+            jtr["tx_hash"] = iUtils->bin2hex(tx_hash.container);
+            logErr2("ClientTxSubscribeRSP: tx_hash %s",iUtils->bin2hex(tx_hash.container).c_str());
+            JSScope <10,10> scope(js_ctx);
+            JSValue global_obj = JS_GetGlobalObject(js_ctx);
+            scope.addValue(global_obj);
+
+            for(int ii=0; ii<pb.att_data.instruction_reports[ti].size(); ii++)
+            {
+                nlohmann::json ii_json;
+                ii_json["errcode"]=pb.att_data.instruction_reports[ti][ii].err_code;
+                ii_json["errstr"]=pb.att_data.instruction_reports[ti][ii].err_str;
+                // logErr2("err_str %d %d %s",ti,ii,pb.att_data.instruction_reports[ti][ii].err_str.c_str());
+                nlohmann::json logmsgs_json;
+                for(int k=0; k<pb.att_data.instruction_reports[ti][ii].logMsgs.size(); k++)
+                {
+                    logErr2("logmsgs %d %d %d %s",ti,ii,k,pb.att_data.instruction_reports[ti][ii].logMsgs[k].c_str());
+                    logmsgs_json.push_back( pb.att_data.instruction_reports[ti][ii].logMsgs[k]);
+                }
+                ii_json["logMsgs"]=logmsgs_json;
+                jtr["instructions"].push_back(ii_json);
+
+            }
+            if(!JS_IsFunction(js_ctx,opaque.tx_subscription_cb->listener))
+            {
+                throw CommonError("callback not a function");
+            }
+            logErr2("ClientTxSubscribeRSP: calling callback");
+            auto str=jtr.dump();
+            logErr2("json %s",str.c_str());
+            JSValue obj = JS_ParseJSON(js_ctx, str.data(), str.size(), "<input>");
+            scope.addValue(obj);
+            JSValue argv[1];
+            argv[0] = obj;
+            JSValue func_result = JS_Call(js_ctx, opaque.tx_subscription_cb->listener, global_obj, 1, argv);
+            scope.addValue(func_result);
+            qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
         }
     }
     return true;

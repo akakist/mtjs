@@ -1,4 +1,5 @@
 #include "mtjsService.h"
+
 extern JSClassID js_ws_server_connection_class_id;
 bool MTJS::Service::WSDisaccepted(const httpEvent::WSDisaccepted*e)
 {

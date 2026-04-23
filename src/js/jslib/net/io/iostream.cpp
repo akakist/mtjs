@@ -417,7 +417,7 @@ static JSValue js_EventEmitterStream_ctor(JSContext *ctx, JSValueConst new_targe
     if (!s)
         return JS_EXCEPTION;
 
-    s->stream=new EventEmitterStream(ctx,op->listener);
+    s->stream=new EventEmitterStream(ctx,op->listener_);
     JSValue proto = JS_GetPropertyStr(ctx, new_target, "prototype");
     scope.addValue(proto);
     if (JS_IsException(proto))

@@ -1,4 +1,5 @@
 #include "mtjsService.h"
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -19,6 +20,8 @@ void init_rpc_object(JSContext *ctx,JSValue & mtjs_obj);
 void register_rpc_request_class(JSContext* ctx);
 void register_rpc_response_class(JSContext* ctx);
 void js_register_async_tools( JSContext *ct,JSValue & mtjs_obj);
+void js_register_add_instance( JSContext *ctx,JSValue & mtjs_obj);
+
 void init_utils_object(JSContext *ctx,JSValue & mtjs_obj) ;
 void init_telnet_object(JSContext *ctx,JSValue & mtjs_obj);
 
@@ -176,6 +179,8 @@ bool MTJS::Service::on_startService(const systemEvent::startService*)
     register_rpc_request_class(js_ctx);
     register_rpc_response_class(js_ctx);
     js_register_async_tools(js_ctx,mtjs_obj);
+    js_register_add_instance(js_ctx,mtjs_obj);
+
     js_init_fs(js_ctx, mtjs_obj);
 
 
@@ -202,7 +207,7 @@ bool MTJS::Service::on_startService(const systemEvent::startService*)
 
     opaque.broadcaster = this;
     opaque.rcf = rconf;
-    opaque.listener = this;
+    opaque.listener_ = this;
 
     JS_SetContextOpaque(js_ctx, &opaque);
 

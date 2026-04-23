@@ -8,6 +8,7 @@
 #include "event_mt.h"
 #include <Events/System/Run/startServiceEvent.h>
 #include "Events/System/Net/httpEvent.h"
+#include "Events/System/Net/rpcEvent.h"
 #include "Events/System/timerEvent.h"
 #include "Events/System/Net/socketEvent.h"
 
@@ -18,6 +19,7 @@
 #include "common/mtjsEvent.h"
 #include "Events/Tools/webHandlerEvent.h"
 #include "Events/Tools/telnetEvent.h"
+#include "bcEvent.h"
 
 extern "C"
 {
@@ -71,6 +73,8 @@ namespace MTJS
 #ifdef WEBDUMP
         bool RequestIncoming(const webHandlerEvent::RequestIncoming*);
 #endif
+        bool ClientMsgReply(const bcEvent::ClientMsgReply*);
+        bool ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP*);
 
         void load_config();
         void executePending();

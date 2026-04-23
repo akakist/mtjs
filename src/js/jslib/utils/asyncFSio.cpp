@@ -34,7 +34,7 @@ static void file_handle_finalizer(JSRuntime *rt, JSValue val)
     {
         if(!fhd->closed && fhd->fd >= 0)
             close(fhd->fd);
-            delete fhd;
+        delete fhd;
     }
 }
 
@@ -94,7 +94,7 @@ JSValue js_fs_access(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     }
 
     auto path=scope.toStdStringView(argv[0]);
-    REF_getter<c_js_fs_access> f=new c_js_fs_access(op->listener);
+    REF_getter<c_js_fs_access> f=new c_js_fs_access(op->listener_);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
 
@@ -178,7 +178,7 @@ JSValue js_fs_appendFile(JSContext *ctx, JSValueConst this_val, int argc, JSValu
 
     auto path=scope.toStdStringView(argv[0]);
     auto buf=scope.toStdStringView(argv[1]);
-    REF_getter<c_js_fs_appendFile> f=new c_js_fs_appendFile(op->listener);
+    REF_getter<c_js_fs_appendFile> f=new c_js_fs_appendFile(op->listener_);
     f->path=path;
     f->buf=buf;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -221,7 +221,7 @@ struct c_js_fs_chmod: public async_task
             JS_DefinePropertyValueStr(ctx, r, "message",
                                       JS_NewString(ctx, errstr.c_str()),
                                       JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
-            
+
             auto ret=JS_Call(ctx, promise_data[1], JS_UNDEFINED, 1, &r);
             scope.addValue(ret);
 
@@ -254,7 +254,7 @@ JSValue js_fs_chmod(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
     }
 
     auto path=scope.toStdStringView(argv[0]);
-    REF_getter<c_js_fs_chmod> f=new c_js_fs_chmod(op->listener);
+    REF_getter<c_js_fs_chmod> f=new c_js_fs_chmod(op->listener_);
     f->path=path;
     f->mode=mode;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -333,7 +333,7 @@ JSValue js_fs_chown(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
     }
 
     auto path=scope.toStdStringView(argv[0]);
-    REF_getter<c_js_fs_chown> f=new c_js_fs_chown(op->listener);
+    REF_getter<c_js_fs_chown> f=new c_js_fs_chown(op->listener_);
     f->path=path;
     f->uid=uid;
     f->gid=gid;
@@ -439,7 +439,7 @@ JSValue js_fs_copyFile(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
 
     auto src=scope.toStdStringView(argv[0]);
     auto dst=scope.toStdStringView(argv[1]);
-    REF_getter<c_js_fs_copyFile> f=new c_js_fs_copyFile(op->listener);
+    REF_getter<c_js_fs_copyFile> f=new c_js_fs_copyFile(op->listener_);
     f->src=src;
     f->dst=dst;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -514,7 +514,7 @@ JSValue js_fs_mkdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
     m.emplace(mode);
 
     auto path=scope.toStdStringView(argv[0]);
-    REF_getter<c_js_fs_mkdir> f=new c_js_fs_mkdir(op->listener);
+    REF_getter<c_js_fs_mkdir> f=new c_js_fs_mkdir(op->listener_);
     f->path=path;
     f->mode=m;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -590,7 +590,7 @@ JSValue js_fs_mkdtemp(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
     auto path=scope.toStdStringView(argv[0]);
-    REF_getter<c_js_fs_mkdtemp> f=new c_js_fs_mkdtemp(op->listener);
+    REF_getter<c_js_fs_mkdtemp> f=new c_js_fs_mkdtemp(op->listener_);
     f->path=path;
     f->path+="XXXXXX";
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -680,7 +680,7 @@ JSValue js_fs_readFile(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
     auto path=scope.toStdStringView(argv[0]);
-    REF_getter<filehandle_readFile> f=new filehandle_readFile(op->listener);
+    REF_getter<filehandle_readFile> f=new filehandle_readFile(op->listener_);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
 
@@ -769,7 +769,7 @@ JSValue js_fs_readdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
     auto path=scope.toStdStringView(argv[0]);
-    REF_getter<filehandle_readdir> f=new filehandle_readdir(op->listener);
+    REF_getter<filehandle_readdir> f=new filehandle_readdir(op->listener_);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
 
@@ -836,7 +836,7 @@ JSValue js_fs_rmdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
     auto path=scope.toStdStringView(argv[0]);
-    REF_getter<filehandle_rmdir> f=new filehandle_rmdir(op->listener);
+    REF_getter<filehandle_rmdir> f=new filehandle_rmdir(op->listener_);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
 
@@ -905,7 +905,7 @@ JSValue js_fs_rename(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     }
     auto path1=scope.toStdStringView(argv[0]);
     auto path2=scope.toStdStringView(argv[1]);
-    REF_getter<filehandle_rename> f=new filehandle_rename(op->listener);
+    REF_getter<filehandle_rename> f=new filehandle_rename(op->listener_);
     f->path1=path1;
     f->path2=path2;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -973,7 +973,7 @@ JSValue js_fs_unlink(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
     auto path=scope.toStdStringView(argv[0]);
-    REF_getter<filehandle_unlink> f=new filehandle_unlink(op->listener);
+    REF_getter<filehandle_unlink> f=new filehandle_unlink(op->listener_);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
 
@@ -1061,7 +1061,7 @@ JSValue js_fs_stat(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
         return JS_ThrowTypeError(ctx,"fs.truncate requires (path, len)");
     }
     auto path=scope.toStdStringView(argv[0]);
-    REF_getter<filehandle_stat> f=new filehandle_stat(op->listener);
+    REF_getter<filehandle_stat> f=new filehandle_stat(op->listener_);
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
 
@@ -1130,7 +1130,7 @@ JSValue js_fs_symlink(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
     }
     auto path1=scope.toStdStringView(argv[0]);
     auto path2=scope.toStdStringView(argv[1]);
-    REF_getter<filehandle_symlink> f=new filehandle_symlink(op->listener);
+    REF_getter<filehandle_symlink> f=new filehandle_symlink(op->listener_);
     f->path1=path1;
     f->path2=path2;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -1203,7 +1203,7 @@ JSValue js_fs_truncate(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
         fprintf(stderr, "[%s] => parse length => EXIT\n", __func__);
         return JS_EXCEPTION;
     }
-    REF_getter<filehandle_truncate> f=new filehandle_truncate(op->listener);
+    REF_getter<filehandle_truncate> f=new filehandle_truncate(op->listener_);
     f->path=path;
     f->size=length;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -1288,7 +1288,7 @@ JSValue js_fs_utimes(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
         return JS_EXCEPTION;
     }
 
-    REF_getter<filehandle_utimes> f=new filehandle_utimes(op->listener);
+    REF_getter<filehandle_utimes> f=new filehandle_utimes(op->listener_);
     f->path=path;
     f->a=a;
     f->m=m;
@@ -1370,7 +1370,7 @@ JSValue js_fs_writeFile(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 
     auto body=scope.toStdStringView(argv[1]);
 
-    REF_getter<filehandle_writeFile> f=new filehandle_writeFile(op->listener);
+    REF_getter<filehandle_writeFile> f=new filehandle_writeFile(op->listener_);
     f->body=body;
     f->path=path;
     JSValue promise = JS_NewPromiseCapability(ctx, f->promise_data);
@@ -1461,7 +1461,7 @@ JSValue js_fs_open(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
         }
 
     }
-    REF_getter<filehandle_open> f=new filehandle_open(op->listener);
+    REF_getter<filehandle_open> f=new filehandle_open(op->listener_);
     f->path=path;
     f->fl=fl;
     f->mode=mode;
@@ -1556,7 +1556,7 @@ JSValue js_filehandle_read(JSContext *ctx, JSValueConst this_val, int argc, JSVa
 
     }
 
-    REF_getter<filehandle_read> fr=new filehandle_read(op->listener);
+    REF_getter<filehandle_read> fr=new filehandle_read(op->listener_);
     fr->fd=fhd->fd;
     fr->size=size;
     fr->pz=pz;
@@ -1645,7 +1645,7 @@ JSValue js_filehandle_write(JSContext *ctx, JSValueConst this_val, int argc, JSV
             return JS_ThrowSyntaxError(ctx, "second param is optional must be file offset from beginning (SEEK_SET)");
     }
 
-    REF_getter<filehandle_write> fw=new filehandle_write(op->listener);
+    REF_getter<filehandle_write> fw=new filehandle_write(op->listener_);
     fw->buf=std::move(buf);
     fw->pz=pz;
     fw->fd=fhd->fd;
@@ -1717,7 +1717,7 @@ JSValue js_filehandle_close(JSContext *ctx, JSValueConst this_val, int argc, JSV
         return JS_ThrowInternalError(ctx, "if(!fhd||fhd->closed)");
     }
 
-    REF_getter<filehandle_close> fc=new filehandle_close(op->listener);
+    REF_getter<filehandle_close> fc=new filehandle_close(op->listener_);
     fc->fd=fhd->fd;
     JSValue promise = JS_NewPromiseCapability(ctx, fc->promise_data);
 

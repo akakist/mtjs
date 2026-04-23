@@ -58,7 +58,7 @@ static JSValue js_ws_server_connection_send(JSContext *ctx, JSValueConst this_va
         return JS_ThrowInternalError(ctx,"if(argc!=1)");
     auto msg=scope.toStdStringView(argv[0]);
 
-    conn->broadcaster->sendEvent(ServiceEnum::HTTP, new httpEvent::WSWrite(conn->req,std::string(msg),conn->listener));
+    conn->broadcaster->sendEvent(ServiceEnum::HTTP, new httpEvent::WSWrite(conn->req->ctx,std::string(msg),conn->listener));
 
 
     return JS_UNDEFINED;

@@ -1,1 +1,1 @@
-../../megatron/tools/ifacegen2/ifacegen2.debug.exe mtjs *.cpp *.h
+../../../megatron/tools/ifacegen2/ifacegen2.debug.exe mtjs *.cpp *.h

@@ -11,7 +11,6 @@
 #include "sv.h"
 
 #include "quickjs.h"
-// #include "httpHeadersParser.h"
 
 
 static JSClassID js_request_class_id;
@@ -54,7 +53,7 @@ static JSValue js_request_get_url(JSContext* ctx, JSValueConst this_val/*, int m
     MUTEX_INSPECTOR;
     JS_HTTP_Request* req = static_cast<JS_HTTP_Request*>(JS_GetOpaque2(ctx, this_val, js_request_class_id));
     if (!req) return JS_EXCEPTION;
-    auto uri=req->req->url;
+    auto &uri=req->req->url;
     return JS_NewStringLen(ctx, uri.data(),uri.size());
 }
 
@@ -131,9 +130,8 @@ static JSValue js_parse_headers_simple(JSContext* ctx, JSValueConst this_val,
     if (!req) return JS_EXCEPTION;
 
 
-    auto & headers=req->req->headers;
+    auto &headers=req->req->headers;
 
-    
     
     // Создаем объект
     JSValue headers_obj = JS_NewObject(ctx);
@@ -157,7 +155,7 @@ static JSValue js_parse_uri_no_malloc(JSContext* ctx, JSValueConst this_val,
     if (!req) return JS_EXCEPTION;
 
 
-    auto uri=req->req->url;
+    auto &uri=req->req->url;
     
     URIParser parser;
     

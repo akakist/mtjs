@@ -24,7 +24,7 @@ struct EventEmitter: public Refcountable
     void on(const std::string& event, JSValue listener);
     std::vector<JSValue> listeners(const std::string& event);
 
-    ~EventEmitter() 
+    ~EventEmitter()
     {
     }
 

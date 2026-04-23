@@ -1,6 +1,6 @@
 
 
-add_library(jsnet STATIC
+add_library(mtjsnet STATIC
 
 ./http/http_server_root.cpp
 ./http/http_server_request.cpp
@@ -19,6 +19,7 @@ rpc.cpp
 rpc_request.cpp
 rpc_response.cpp
 asyncExecute.cpp
+createInstance.cpp
            )
 
 

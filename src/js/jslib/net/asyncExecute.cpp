@@ -47,7 +47,7 @@ JSValue js_execute_async(JSContext *ctx, JSValueConst this_val, int argc, JSValu
 
         JSScope <10,10> scope(ctx);
 
-        REF_getter<execute_task> task=new execute_task(op->listener);
+        REF_getter<execute_task> task=new execute_task(op->listener_);
 
         JSValue promise = JS_NewPromiseCapability(ctx, task->promise_data);
         if (JS_IsException(promise)) {

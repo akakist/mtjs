@@ -16,8 +16,10 @@ void registerHTTPModule(const char* pn);
 void registerMysqlModule(const char*pn);
 void registerWebHandlerModule(const char* pn);
 void registerTelnetService(const char*);
-
-
+void registerMTJSModule(const char* );
+void registerNodeService(const char* pn);
+void registerTxValidatorService(const char* pn);
+void registerBlockValidatorService(const char* pn);
 struct par {
     int n; /// n defises
     bool hasParam;
@@ -66,6 +68,10 @@ int mainMTJS(int argc, char** argv )
         registerTelnetService(NULL);
 
         registerMTJSModule(NULL);
+        registerNodeService(NULL);
+        registerTxValidatorService(NULL);
+        registerBlockValidatorService(NULL);
+
 
 #ifdef WEBDUMP
         registerWebHandlerModule(NULL);

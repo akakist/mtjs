@@ -36,7 +36,8 @@ FetchContent_Declare(
     URL https://github.com/ibireme/yyjson/archive/refs/tags/0.8.0.tar.gz
 )
 FetchContent_MakeAvailable(yyjson)
-
+message (STATUS "YYJSON: "  ${yyjson_SOURCE_DIR}/src)
+include_directories( ${yyjson_SOURCE_DIR}/src )
 
 find_package(PkgConfig REQUIRED)
 
