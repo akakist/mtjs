@@ -5,39 +5,44 @@
 #include "msg_tx.h"
 // #include     "nodeService.h"
 
-std::optional<std::string> TR::execute(const tx::registerUser &c, t_params & t,const std::string& senderNick, const REF_getter<fee_calcer>& by, int txid, int seqId)
+// std::optional<std::string> TR::execute(const tx::registerUser &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
+// {
+//     auto v=t.root->getValues(by);
+//     auto u=t.root->getUser(senderNick,by);
+//     if(!u.valid())
+//         return "user not found/created";
+//     auto cu=t.root->getUser(c.nickName,by);
+//     if(cu.valid())
+//         return "nick already registered";
+//     cu=t.root->addUser(c.pk, by);
+//     cu->pkbin=c.pk;
+//     t.fee[senderNick]+=v->fees[bc_values::register_nick];
+//     // n=t.root->addNick(c.nickName,by);
+//     // n->owner=senderAddress;
+//     t.logMsg(txid,seqId,"user %s sucessfully registered",c.nickName.c_str());
+
+//     return std::nullopt;
+// }
+
+std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
 {
     auto v=t.root->getValues(by);
-    auto u=t.root->getUser(senderNick,by);
-    if(!u.valid())
-        return "user not found/created";
-    auto cu=t.root->getUser(c.nickName,by);
-    if(cu.valid())
-        return "nick already registered";
-    cu=t.root->addUser(c.nickName, c.pk, by);
-    cu->pkbin=c.pk;
-    t.fee[senderNick]+=v->fees[bc_values::register_nick];
-    // n=t.root->addNick(c.nickName,by);
-    // n->owner=senderAddress;
-    t.logMsg(txid,seqId,"user %s sucessfully registered",c.nickName.c_str());
-
-    return std::nullopt;
-}
-
-std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std::string& senderNick, const REF_getter<fee_calcer>& by, int txid, int seqId)
-{
-    auto v=t.root->getValues(by);
-    auto it=v->emitters.find(senderNick);
+    auto it=v->emitters.find(senderAddress);
     if(it==v->emitters.end())
         return "insufficient_privileges";
 
 
-    auto u=t.root->getUser(senderNick,by);
+    auto u=t.root->getUser(senderAddress,by);
     if(!u.valid())
-        return "user not found/created";
+    {
+        u=t.root->addUser(senderAddress,by);
+    }
+    u->balance+=c.amount;
+        // return "user not found/created";
+    
 
-    t.fee[senderNick]+=v->fees[bc_values::mint];
-    t.transfer_to[senderNick]+=c.amount;
+    t.fee[senderAddress]+=v->fees[bc_values::mint];
+    t.transfer_to[senderAddress]+=c.amount;
 
     t.logMsg(txid,seqId,"amount %s sucessfully minted on your balance",c.amount.toString().c_str());
 
@@ -45,7 +50,7 @@ std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std
 }
 
 
-std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const std::string& senderNick, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
 {
     auto v=t.root->getValues(by);
 
@@ -54,7 +59,7 @@ std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const 
     {
         return "nodes not registered";
     }
-    auto nodeStakeIt = n->stakes.find(senderNick);
+    auto nodeStakeIt = n->stakes.find(senderAddress);
     if (nodeStakeIt == n->stakes.end()) {
         return "no_stake_found";
     }
@@ -65,7 +70,7 @@ std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const 
 
     // auto v=t.root->getValues(by);
 
-    auto u=t.root->getUser(senderNick,by);
+    auto u=t.root->getUser(senderAddress,by);
 
 
     if(!u.valid())
@@ -73,20 +78,20 @@ std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const 
 
 
     nodeStake-=c.amount;
-    t.transfer_to[senderNick]+=c.amount;
+    t.transfer_to[senderAddress]+=c.amount;
     v->total_staked-=c.amount;
 
-    t.fee[senderNick]+=v->fees[bc_values::unstake];
+    t.fee[senderAddress]+=v->fees[bc_values::unstake];
 
     t.logMsg(txid,seqId,"node %s unstaked on amount %s",c.node.container.c_str(),c.amount.toString().c_str());
 
     return std::nullopt;
 
 }
-std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t,const std::string& senderNick, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
 {
     auto v=t.root->getValues(by);
-    auto u=t.root->getUser(senderNick,by);
+    auto u=t.root->getUser(senderAddress,by);
     if(!u.valid())
         return "sender not found";
 
@@ -97,7 +102,7 @@ std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t
 
 
     REF_getter<bc_contract> ci=t.root->addContract(c.name,by);
-    ci->owner=senderNick;
+    ci->owner=senderAddress;
     ci->name=c.name;
     ci->src=c.src;
     ci->ready_for_sale=false;
@@ -105,31 +110,31 @@ std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t
 
     u->contracts.insert(c.name);
 
-    t.fee[senderNick]+=v->fees[bc_values::contract_deploy];
+    t.fee[senderAddress]+=v->fees[bc_values::contract_deploy];
 
     t.logMsg(txid,seqId,"contract %s deployed successfully",c.name.c_str());
 
     return std::nullopt;
 }
 
-std::optional<std::string> TR::execute(const tx::transfer &c, t_params & t,const std::string& senderNick, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::transfer &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
 {
     auto v=t.root->getValues(by);
-    auto from=t.root->getUser(senderNick,by);
+    auto from=t.root->getUser(senderAddress,by);
     if(!from.valid())
         return "cannot find src addr";
 
     REF_getter<bc_user> to(NULL);
-    to=t.root->getUser(c.to_nick,by);
+    to=t.root->getUser(c.to_address,by);
     if(!to.valid())
     {
-        return "destination user not found "+c.to_nick;
+        return "destination user not found "+ base62::encode(c.to_address);
         // to=t.root->addUser(c.to_addr,by);
     }
 
-    t.transfer_from[senderNick]+=c.amount;
-    t.transfer_to[c.to_nick]+=c.amount;
-    t.fee[senderNick]+=v->fees[bc_values::transfer];
+    t.transfer_from[senderAddress]+=c.amount;
+    t.transfer_to[c.to_address]+=c.amount;
+    t.fee[senderAddress]+=v->fees[bc_values::transfer];
     // // if (from->balance < c.amount + v->fees[bc_values::transfer]) {
     // //     return "insufficient_funds";
     // // }
@@ -144,7 +149,7 @@ std::optional<std::string> TR::execute(const tx::transfer &c, t_params & t,const
 
 
 
-std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const std::string& senderNick, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
 {
     auto v=t.root->getValues(by);
     if(!v.valid())
@@ -156,7 +161,7 @@ std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const st
     {
         return "Node not registered";
     }
-    auto sender = t.root->getUser(senderNick,by);
+    auto sender = t.root->getUser(senderAddress,by);
     if (!sender.valid()) {
         return "user account not found";
     }
@@ -167,13 +172,13 @@ std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const st
         return "Insufficient funds";
     }
 
-    BigInt& nodeStake = n->stakes[senderNick];
+    BigInt& nodeStake = n->stakes[senderAddress];
 
     sender->balance-=c.amount;
     nodeStake+=c.amount;
-    t.transfer_from[senderNick]+=c.amount;
+    t.transfer_from[senderAddress]+=c.amount;
     // t.transfer_to[c.to_addr]+=c.amount;
-    t.fee[senderNick]+=v->fees[bc_values::stake];
+    t.fee[senderAddress]+=v->fees[bc_values::stake];
 
     // v->total_staked+=c.amount;
     // sender->my_stakes[c.node]+=nodeStake;
@@ -185,7 +190,7 @@ std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const st
 }
 
 
-std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,const std::string& senderNick, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
 {
     auto v=t.root->getValues(by);
     for(auto &z: c.name.container)
@@ -202,7 +207,7 @@ std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,c
     auto nn=t.root->getNode(c.name, by);
     if(nn.valid())
         return "Node already registered with name";
-    auto u=t.root->getUser(senderNick,by);
+    auto u=t.root->getUser(senderAddress,by);
     if(!u.valid())
         return "if(!u.valid())";
     // if(u->balance<v->fees[bc_values::node_create])
@@ -213,14 +218,14 @@ std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,c
     //     return "fallback, node already registered";
 
     n->ip=c.ip;
-    n->owner=senderNick;
+    n->owner_ed_pk=senderAddress;
     n->bls_pk=c.pk_bls;
     n->ed_pk=c.pk_ed;
     u->nodes.insert(c.name.container);
 
     // t.transfer_from[senderAddress]+=c.amount;
     // t.transfer_to[c.to_addr]+=c.amount;
-    t.fee[senderNick]+=v->fees[bc_values::node_create];
+    t.fee[senderAddress]+=v->fees[bc_values::node_create];
 
     // by->add(v->fees[bc_values::node_create]);
 

@@ -5,6 +5,9 @@
 #include <stdexcept>
 #include <cstdint>
 #include <string.h>
+// #include "IUtils.h"
+#include "ioBuffer.h"
+#include "base62.h"
 extern "C" {
 #include <blst.h>
 }
@@ -14,6 +17,7 @@ namespace blst_cpp {
     constexpr uint8_t BLS_DST[] = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
     constexpr size_t BLS_DST_LEN = sizeof(BLS_DST) - 1;
 
+    class Signature;
 // SecretKey (scalar)
     class SecretKey {
     public:
@@ -28,25 +32,33 @@ namespace blst_cpp {
         const blst_scalar* raw() const {
             return &sk_;
         }
-        std::vector<uint8_t> serialize() const {
-            std::vector<uint8_t> out(32);
+        std::string serialize() const {
+            std::string out;
+            out.resize(32);
             memcpy(out.data(), sk_.b, 32);
             return out;
         }
-
-        static SecretKey deserialize(const uint8_t* data, size_t len) {
+        void deserializeBase62Str(const std::string& hex) {
+            return deserialize(base62::decode(hex));
+        }
+        void deserialize(const std::string& buf)
+        {
+            return deserialize((const uint8_t*)buf.data(), buf.size());
+        }
+        void deserialize(const uint8_t* data, size_t len) {
             if (len != 32)
                 throw std::runtime_error("bad sk size");
-            SecretKey sk;
-            memcpy(sk.sk_.b, data, 32);
-            return sk;
+            memcpy(sk_.b, data, 32);
         }
+        // void sign(Signature& sig, const uint8_t* msg,
+        //     size_t len);
+
     private:
         blst_scalar sk_{};
     };
 
 // PublicKey in G1
-    class PublicKey {
+    class   PublicKey {
     public:
         PublicKey() = default;
 
@@ -59,23 +71,28 @@ namespace blst_cpp {
             blst_p1_to_affine(&a, &pk_);
             return a;
         }
-        std::vector<uint8_t> serialize() const {
-            std::vector<uint8_t> out(48);
-            blst_p1_compress(out.data(), &pk_);
+        std::string serialize() const {
+            std::string out;
+            out.resize(48);
+            blst_p1_compress((uint8_t*)out.data(), &pk_);
             return out;
         }
-
-        static PublicKey deserialize(const uint8_t* data, size_t len) {
+        void deserializeBase62Str(const std::string& hex) {
+            deserialize(base62::decode(hex));
+        }
+        void deserialize(const std::string& buf)
+        {
+            deserialize((const uint8_t*)buf.data(), buf.size());
+        }
+        void deserialize(const uint8_t* data, size_t len) {
             if (len != 48)
-                throw std::runtime_error("bad pk size");
+                throw std::runtime_error("bad pk(48) size"+std::to_string(len));
 
             blst_p1_affine aff;
             if (blst_p1_uncompress(&aff, data) != BLST_SUCCESS)
                 throw std::runtime_error("bad pk");
 
-            PublicKey pk;
-            blst_p1_from_affine(&pk.pk_, &aff);
-            return pk;
+            blst_p1_from_affine(&pk_, &aff);
         }
         const blst_p1* raw() const {
             return &pk_;
@@ -85,12 +102,18 @@ namespace blst_cpp {
         blst_p1 pk_{};
     };
 
+    class Signature;
+    inline bool verifyZ(const PublicKey& pk,
+                       const Signature& sig,
+                       const uint8_t* msg,
+                       size_t len);
+
 // Signature in G2
     class Signature {
     public:
         Signature() = default;
 
-        Signature(const SecretKey& sk,
+        void sign(const SecretKey& sk,
                   const uint8_t* msg,
                   size_t len)
         {
@@ -108,19 +131,31 @@ namespace blst_cpp {
                 sk.raw()
             );
         }
+        void sign(const SecretKey& sk, const std::string& msg)
+        {
+            sign(sk, (const uint8_t*)msg.data(), msg.size());
+        }
 
         blst_p2_affine affine() const {
             blst_p2_affine a;
             blst_p2_to_affine(&a, &sig_);
             return a;
         }
-        std::vector<uint8_t> serialize() const {
-            std::vector<uint8_t> out(96);
-            blst_p2_compress(out.data(), &sig_);
+        std::string serialize() const {
+            std::string out;
+            out.resize(96);
+            blst_p2_compress((uint8_t*)out.data(), &sig_);
             return out;
         }
-
-        static Signature deserialize(const uint8_t* data, size_t len) {
+        void deserializeBase62Str(const std::string& hex) 
+        {
+            deserialize(base62::decode(hex));
+        }
+        void deserialize(const std::string& buf)
+        {
+            deserialize((const uint8_t*)buf.data(), buf.size());
+        }
+        void deserialize(const uint8_t* data, size_t len) {
             if (len != 96)
                 throw std::runtime_error("bad sig size");
 
@@ -128,9 +163,17 @@ namespace blst_cpp {
             if (blst_p2_uncompress(&aff, data) != BLST_SUCCESS)
                 throw std::runtime_error("bad sig");
 
-            Signature s;
-            blst_p2_from_affine(&s.sig_, &aff);
-            return s;
+            blst_p2_from_affine(&sig_, &aff);
+        }
+        bool verify(const PublicKey& pk,
+                       const uint8_t* msg,
+                       size_t len) const
+        {
+            return verifyZ(pk, *this, msg, len);
+        }
+        bool verify(const PublicKey& pk, const std::string& msg) const
+        {
+            return verifyZ(pk, *this, (const uint8_t*)msg.data(), msg.size());
         }
         const blst_p2* raw() const {
             return &sig_;
@@ -140,8 +183,10 @@ namespace blst_cpp {
         blst_p2 sig_{};
     };
 
+
+
 // Single verify
-    inline bool verify(const PublicKey& pk,
+    inline bool verifyZ(const PublicKey& pk,
                        const Signature& sig,
                        const uint8_t* msg,
                        size_t len)
@@ -158,6 +203,11 @@ namespace blst_cpp {
                    nullptr, 0
                ) == BLST_SUCCESS;
     }
+    class AggregateSignature;
+    inline bool fast_aggregate_verify(const std::vector<PublicKey>& pks,
+                                      const AggregateSignature& agg_sig,
+                                      const uint8_t* msg,
+                                      size_t len);
 
 // AggregateSignature (one message)
     class AggregateSignature {
@@ -178,19 +228,28 @@ namespace blst_cpp {
             blst_p2_to_affine(&a, &agg_);
             return a;
         }
-        std::vector<uint8_t> serialize() const {
+        std::string serialize() const {
             if (!init_)
                 throw std::runtime_error("empty aggregate signature");
 
-            std::vector<uint8_t> out(96);
-            blst_p2_compress(out.data(), &agg_);
+            std::string out;
+            out.resize(96);
+            blst_p2_compress((byte*)out.data(), &agg_);
             return out;
         }
 
         // ============================
         // DESERIALIZATION
         // ============================
-        static AggregateSignature deserialize(const uint8_t* data, size_t len) {
+        void deserializeBase62Str(const std::string& hex) 
+        {
+            deserialize(base62::decode(hex));
+        }
+        void deserialize(const std::string& buf)
+        {
+            deserialize((const uint8_t*)buf.data(), buf.size());
+        }
+        void deserialize(const uint8_t* data, size_t len) {
             if (len != 96)
                 throw std::runtime_error("bad aggregate signature size");
 
@@ -198,17 +257,19 @@ namespace blst_cpp {
             if (blst_p2_uncompress(&aff, data) != BLST_SUCCESS)
                 throw std::runtime_error("bad aggregate signature");
 
-            AggregateSignature as;
-            blst_p2_from_affine(&as.agg_, &aff);
-            as.init_ = true;
-            return as;
+            blst_p2_from_affine(&agg_, &aff);
+            init_ = true;
         }
         const blst_p2* raw() const {
             if (!init_)
                 throw std::runtime_error("empty aggregate signature");
             return &agg_;
         }
+        bool verify(const std::vector<PublicKey>& pks,const std::string& msg) const
+        {
+            return fast_aggregate_verify(pks, *this, (const uint8_t*)msg.data(), msg.size());
 
+        }
     private:
         blst_p2 agg_{};
         bool init_ = false;
@@ -243,4 +304,55 @@ namespace blst_cpp {
                ) == BLST_SUCCESS;
     }
 
+
 } // namespace blst_cpp
+
+
+inline outBuffer& operator<<(outBuffer &o,const blst_cpp::SecretKey& z)
+{
+    o<<z.serialize();
+    return o;
+}
+inline inBuffer& operator>>(inBuffer &o,blst_cpp::SecretKey& z)
+{
+    std::string s;
+    o>>s;
+    z.deserialize(s);
+    return o;
+}
+inline outBuffer& operator<<(outBuffer &o,const blst_cpp::PublicKey& z)
+{
+    o<<z.serialize();
+    return o;
+}
+inline inBuffer& operator>>(inBuffer &o,blst_cpp::PublicKey& z)
+{
+    std::string s;
+    o>>s;
+    z.deserialize(s);
+    return o;
+}
+inline outBuffer& operator<<(outBuffer &o,const blst_cpp::Signature& z)
+{
+    o<<z.serialize();
+    return o;
+}
+inline inBuffer& operator>>(inBuffer &o,blst_cpp::Signature& z)
+{
+    std::string s;
+    o>>s;
+    z.deserialize(s);
+    return o;
+}
+inline outBuffer& operator<<(outBuffer &o,const blst_cpp::AggregateSignature& z)
+{
+    o<<z.serialize();
+    return o;
+}
+inline inBuffer& operator>>(inBuffer &o,blst_cpp::AggregateSignature& z)
+{
+    std::string s;
+    o>>s;
+    z.deserialize(s);
+    return o;
+}

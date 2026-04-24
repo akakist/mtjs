@@ -9,7 +9,7 @@ include_directories(common quickjs . bc_tools Event)
 
 ADD_SUBDIRECTORY(services)
 ADD_SUBDIRECTORY(bc_tools)
-#ADD_SUBDIRECTORY(test)
+ADD_SUBDIRECTORY(test)
 ADD_SUBDIRECTORY(jslib)
 ADD_SUBDIRECTORY(mono)
 ADD_SUBDIRECTORY(common)

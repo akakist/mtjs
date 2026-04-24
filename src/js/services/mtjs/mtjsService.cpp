@@ -496,7 +496,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply*e)
         scope.addValue(obj);
         JS_SetPropertyStr(ctx, obj, "err", JS_NewInt32(ctx, r.err));
         JS_SetPropertyStr(ctx,obj,"err_str",JS_NewString(ctx, r.err_str.c_str()));
-        JS_SetPropertyStr(ctx,obj,"tx_hash",JS_NewString(ctx, iUtils->bin2hex(r.tx_hash.container).c_str()));
+        JS_SetPropertyStr(ctx,obj,"tx_hash",JS_NewString(ctx, base62::encode(r.tx_hash.container).c_str()));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve, JS_UNDEFINED, 1, &obj);
         scope.addValue(ret);
         opaque.node_req_promises.erase(e->hash_of_request);
@@ -541,8 +541,8 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP* e)
         if(opaque.tx_subscription_cb.has_value())
         {
             THASH_id tx_hash=blake2b_hash(pb.att_data.trs[ti].container);
-            jtr["tx_hash"] = iUtils->bin2hex(tx_hash.container);
-            logErr2("ClientTxSubscribeRSP: tx_hash %s",iUtils->bin2hex(tx_hash.container).c_str());
+            jtr["tx_hash"] = base62::encode(tx_hash.container);
+            logErr2("ClientTxSubscribeRSP: tx_hash %s",base62::encode(tx_hash.container).c_str());
             JSScope <10,10> scope(js_ctx);
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);

@@ -5,7 +5,7 @@
 #include <ioBuffer.h>
 #include <blake2bHasher.h>
 #include "tree.h"
-#include <blstpp.h>
+#include "blst_cp.h"
 #include "IUtils.h"
 #include "bls_io.h"
 #include "BLOCK_id.h"
@@ -13,7 +13,7 @@
 #include "THASH_id.h"
 #include "s_ed.h"
 #include "NODE_id.h"
-#include "blstpp.h"
+#include "blst_cp.h"
 struct instruction_report
 {
     int err_code;
@@ -198,7 +198,7 @@ namespace msg
         std::vector<std::string> payload;
         BigInt nonce;
         std::string signature;
-        std::string nick;
+        std::string address_pk_ed;
         bool verify(const std::string& pk)
         {
             Blake2bHasher h;
@@ -224,7 +224,7 @@ namespace msg
             message_base::pack(b);
             b<<payload;
             b<<nonce;
-            b<< signature<<nick;
+            b<< signature<<address_pk_ed;
 
         }
         void unpack(inBuffer& b) final
@@ -233,7 +233,7 @@ namespace msg
             message_base::unpack(b);
             b>>payload;
             b>>nonce;
-            b>> signature>>nick;
+            b>> signature>>address_pk_ed;
         }
     };
     struct transaction_added_rsp: public message_base
@@ -296,19 +296,19 @@ namespace msg
         {
             unpack(in);
         }
-        std::string nick;
+        std::string address_pk_ed;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
 
             message_base::pack(b);
-            b<<nick;
+            b<<address_pk_ed;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             message_base::unpack(b);
-            b>>nick;
+            b>>address_pk_ed;
         }
     };
     struct heart_beat: public message_base
@@ -350,11 +350,10 @@ namespace msg
     {
         heart_beat_rsp():message_base(msgid::heart_beat_rsp)
         {
-            signature.clear();
         }
         std::string payload_heart_beat;
         NODE_id node_signer;
-        BlsSignature signature;
+        blst_cpp::Signature signature;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -454,7 +453,7 @@ namespace msg
         }
         std::string payload_heart_beat;
         std::vector<NODE_id> nodes;
-        BlsAggregateSignature agg_sig;
+        blst_cpp::AggregateSignature agg_sig;
         // BlsPublicKey agg_pk;
         void pack(outBuffer& b) const final
         {
@@ -611,7 +610,7 @@ namespace msg
         std::string leader_certificateZ;
         std::string block_payload;
         std::vector<NODE_id> node_validators;
-        bls::Signature agg_sig;
+        blst_cpp::AggregateSignature agg_sig;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -637,12 +636,12 @@ namespace msg
         }
         NODE_id node_signer;
         BLOCK_id new_root_hash;
-        BlsSignature sig_bls;
-        void sign(const BlsSecretKey& sk)
+        blst_cpp::Signature sig_bls;
+        void sign(const blst_cpp::SecretKey& sk)
         {
-            sk.sign(sig_bls,new_root_hash.container);
+            sig_bls.sign(sk, new_root_hash.container);
         }
-        bool verify(const BlsPublicKey & pk)
+        bool verify(const blst_cpp::PublicKey & pk)
         {
             return sig_bls.verify(pk,new_root_hash.container);
         }
@@ -672,7 +671,7 @@ namespace msg
             unpack(in);
         }
         std::string payload_block;
-        bls::Signature sig;
+        blst_cpp::Signature sig;
         NODE_id node_validator;
         void pack(outBuffer& b) const final
         {
@@ -691,14 +690,13 @@ namespace msg
             b>>sig;
             b>>node_validator;
         }
-        void sign(const bls::SecretKey &sk)
+        void sign(const blst_cpp::SecretKey &sk)
         {
-            sig.clear();
             // Blake2bHasher h;
             // h.update(payload_block);
-            sk.sign(sig,blake2b_hash(payload_block).container);
+            sig.sign(sk, blake2b_hash(payload_block).container);
         }
-        bool verify(const bls::PublicKey &pk) const
+        bool verify(const blst_cpp::PublicKey &pk) const
         {
             return sig.verify(pk, blake2b_hash(payload_block).container);
         }
@@ -707,7 +705,7 @@ namespace msg
 
     struct get_user_status_rsp: public message_base
     {
-        std::string nick;
+        std::string address_pk_ed;
         BigInt nonce;
         BigInt balance;
         get_user_status_rsp():message_base(msgid::get_user_status_rsp)
@@ -718,13 +716,13 @@ namespace msg
         {
             MUTEX_INSPECTOR;
             message_base::pack(b);
-            b<<nick<<nonce<<balance;
+            b<<address_pk_ed<<nonce<<balance;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             message_base::unpack(b);
-            b>>nick>>nonce>>balance;
+            b>>address_pk_ed>>nonce>>balance;
         }
 
     };

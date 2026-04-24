@@ -22,7 +22,7 @@
 #include "THASH_id.h"
 #include "NODE_id.h"
 #include "db_to_save.h"
-#include "blstpp.h"
+#include "blst_cp.h"
 
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 #define HEART_BEAT_TIMEDOUT_SEC 20
@@ -190,11 +190,11 @@ namespace Node
             std::string block_payload;
             std::vector<msg::block_response> responses;
             BigInt stake;
-            std::map<NODE_id /*validator*/, BlsSignature> sigs;
+            std::map<NODE_id /*validator*/, blst_cpp::Signature> sigs;
 
 
 
-            std::vector<std::pair<NODE_id/*node*/,BlsSignature> > signs;
+            std::vector<std::pair<NODE_id/*node*/,blst_cpp::Signature> > signs;
             bool executed=false;
             bool block_accepted_sent=false;
             bool heart_bit_sent_on_block_accepted_rsp=false;
@@ -269,7 +269,7 @@ namespace Node
 
         std::vector<std::string> telnet_data_path;
 
-        BlsSecretKey my_sk_bls;
+        blst_cpp::SecretKey my_sk_bls;
         std::string my_sk_ed;
 
         NODE_id this_node_name;

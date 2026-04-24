@@ -42,7 +42,7 @@ declare global
         async asyncExecute(command: string): Promise<void>;
         addInstance(name:string, conf:string);
         get_user_info(nodeaddr:string, nick:string, timeout: number): Promise<userInfo>;
-        mint(nodeaddr:string, nick:string, params:object): Promise<object>;
+        mint(nodeaddr:string, sk:string, params:object): Promise<object>;
         tx_submit(nodeaddr:string, nick:string, nonce:string, sk:string, timeout:number, params:Request[]): Promise<object>;
         tx_subscribe(nodeaddr:string, callback: (params:tx_report) => void): void;
         pipe: Pipe;

@@ -34,19 +34,18 @@ bool Node::Service::on_startService(const systemEvent::startService*)
     init_root(root);
 
 
-    char *_bls_sk_name=getenv(my_sk_bls_env_key.c_str());
-    if(!_bls_sk_name)
-        throw CommonError("if(!_bls_sk_name) "+my_sk_bls_env_key);
-    char *_ed_sk_name=getenv(my_sk_ed_env_key.c_str());
-    if(!_ed_sk_name)
-        throw CommonError("if(!_bls_sk_name) "+my_sk_ed_env_key);
+    // char *_bls_sk_name=getenv(my_sk_bls_env_key.c_str());
+    // if(!_bls_sk_name)
+    //     throw CommonError("if(!_bls_sk_name) "+my_sk_bls_env_key);
+    // char *_ed_sk_name=getenv(my_sk_ed_env_key.c_str());
+    // if(!_ed_sk_name)
+    //     throw CommonError("if(!_bls_sk_name) "+my_sk_ed_env_key);
 
 
-    my_sk_bls.init();
-    my_sk_bls.deserializeHexStr(_bls_sk_name);
+    my_sk_bls.deserializeBase62Str(getenv2(my_sk_bls_env_key));
 
 
-    my_sk_ed=iUtils->hex2bin((std::string)_ed_sk_name);
+    my_sk_ed=base62::decode(getenv2(my_sk_ed_env_key));
 
 
     for(auto& z: rpc_addr)
@@ -82,14 +81,18 @@ void Node::Service::collectTransactions()
     for(auto& z: transaction_pool_unverified)
     {
         msg::user_message_req ur(z.second);
-        cnt[ur.nick].insert(z.first);
-        auto u=root->getUser(ur.nick,NULL);
-        if(!u.valid())
-            throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
-        if(u->nonce!=ur.nonce)
+        cnt[ur.address_pk_ed].insert(z.first);
+        BigInt nonce=0;
+        auto u=root->getUser(ur.address_pk_ed,NULL);
+        if(u.valid())
         {
-            logErr2("tr: %s nonce %s %s",u->nonce.toString().c_str(), ur.nonce.toString().c_str());
-            logErr2("tr: %s declined due invalid nonce",z.first.str().c_str());
+            nonce=u->nonce;
+        }
+            // throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
+        if(nonce!=ur.nonce)
+        {
+            // logErr2("tr: %s nonce %s %s",u->nonce.toString().c_str(), ur.nonce.toString().c_str());
+            logErr2("tr: %s declined due invalid nonce",base62::encode(z.first.str()).c_str());
             rm.insert(z.first);
         }
 
@@ -106,7 +109,7 @@ void Node::Service::collectTransactions()
         {
             for(auto &k: z.second)
             {
-                logErr2("tr: %s declined due multiple transaction from one sender",iUtils->bin2hex(z.first).c_str());
+                logErr2("tr: %s declined due multiple transaction from one sender",base62::encode(z.first).c_str());
                 rm.insert(k);
             }
         }
@@ -481,15 +484,13 @@ void Node::Service::on_blockResponse(const msg::block_response& br)
         ba.block_payload=bt.block_payload;
         if(bt.block_payload.empty())
             throw CommonError("if(bt.block_payload.empty())");
-        ba.agg_sig.clear();
-        bls::PublicKey agg_pk;
-        agg_pk.clear();
+        std::vector<blst_cpp::PublicKey> agg_pk;
 
         ba.leader_certificateZ=heart_beat_store.leader_info[heart_beat_store.node_leader].leader_cert;
         for(auto& z: bt.responses)
         {
             auto n=root->getNode(z.node_validator,NULL);
-            agg_pk.add(n->bls_pk);
+            agg_pk.push_back(n->bls_pk);
             ba.agg_sig.add(z.sig);
             ba.node_validators.push_back(z.node_validator);
         }
@@ -610,8 +611,8 @@ bool Node::Service::MsgReply(const bcEvent::MsgReply* e)
             auto &bp=blocks[prev_block_hash];
             bp.acceptors.insert({bar.node_signer,bar});
 
-            BlsAggregateSignature agg_sig;
-            std::vector<BlsPublicKey> agg_pk;
+            blst_cpp::AggregateSignature agg_sig;
+            std::vector<blst_cpp::PublicKey> agg_pk;
             BigInt stake;
             stake=0;
             for(auto &z:bp.acceptors)
@@ -681,7 +682,7 @@ void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, con
     MUTEX_INSPECTOR;
     sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
 
-    std::vector<BlsPublicKey> agg_pk;
+    std::vector<blst_cpp::PublicKey> agg_pk;
     for(auto& z: ba.node_validators)
     {
         agg_pk.push_back(root->getNode(z,NULL)->bls_pk);
@@ -727,7 +728,7 @@ void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, con
 
     SQLite::Statement insert(dbs, "INSERT INTO blocks (epoch, data) VALUES (?, ?)");
     insert.bind(1,pb.epoch.toString());
-    insert.bind(2,iUtils->bin2hex(pb.getBuffer()));
+    insert.bind(2,base62::encode(pb.getBuffer()));
     insert.exec();
 
     prev_block_hash=blk.new_root_hash1;
@@ -810,20 +811,29 @@ bool Node::Service::Msg(const bcEvent::Msg*e)
                     MUTEX_INSPECTOR;
                     msg::user_message_req um;
                     um.unpack(in_bt);
-                    auto u=root->getUser(um.nick,NULL);
-                    if(!u.valid())
-                    {
-                        logErr2("if(!u.valid()) %s %d",__FILE__,__LINE__);
-                    }
-                    if(!um.verify(u->pkbin))
+                    // auto u=root->getUser(um.address_pk_ed,NULL);
+                    // if(!u.valid())
+                    // {
+                    //     logErr2("if(!u.valid()) %s %d",__FILE__,__LINE__);
+                    // }
+                    if(!um.verify(um.address_pk_ed))
                     {
                         logErr2("if(!um.verify_ed())");
                         return true;
                     }
+                    auto u=root->getUser(um.address_pk_ed,NULL);
                     if(u.valid())
                     {
                         if(u->nonce==um.nonce)
                             addToTransactionToPool(bt.payload);
+                    }
+                    else if(um.nonce==0)
+                    {
+                        addToTransactionToPool(bt.payload);
+                    }
+                    else
+                    {
+                        logErr2("invalid nonce for new user");
                     }
                     // logErr2("case msgid::user_message_req:");
                 }
@@ -1018,18 +1028,25 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
     {
         THASH_id th=blake2b_hash(trs[ti].container);
         msg::user_message_req ur(trs[ti]);
-        REF_getter<fee_calcer> by=feeCalcers.get(ur.nick);
-        auto u=rt->getUser(ur.nick,by);
-        if(!u.valid())
-            throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
-        if(!ur.verify(u->pkbin))
+        REF_getter<fee_calcer> by=feeCalcers.get(ur.address_pk_ed);
+        // if(!u.valid())
+        //     throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
+        if(!ur.verify(ur.address_pk_ed))
             throw CommonError("if(!ur.verify())");
-        if(u->nonce != ur.nonce)
+        BigInt nonce=0;
+        auto u=rt->getUser(ur.address_pk_ed,by);
+        if(u.valid())
+        {
+            nonce=u->nonce;
+        }
+        if(nonce != ur.nonce)
             throw CommonError("if(u->nonce != ur.nonce)");
         t.instruction_reports[ti].resize(ur.payload.size());
-        execute_transaction(ti,t,ur.nick,ur.payload,by);
+        execute_transaction(ti,t,ur.address_pk_ed,ur.payload,by);
         BigInt one;
         one=1;
+        if(!u.valid())
+            u=rt->addUser(ur.address_pk_ed,NULL);
         u->nonce+=one;
 
         // fees.push_back(fee);
@@ -1065,7 +1082,7 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
         auto node=rt->getNode(n,NULL);
         if(!node.valid())
             throw CommonError("if(!node.valid()) 556677");
-        auto owner=node->owner;
+        auto owner=node->owner_ed_pk;
         auto u=rt->getUser(owner,NULL);
         if(!u.valid())
         {
@@ -1129,17 +1146,26 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg*e)
             msg::get_user_status_req rq(in2);
             logNode("get_user_status_req");
             std::optional<std::string> err;
-            auto u=root->getUser(rq.nick,NULL);
+            auto u=root->getUser(rq.address_pk_ed,NULL);
             if(!u.valid())
-                err="user not found "+rq.nick;
+                err="user not found "+base62::encode(rq.address_pk_ed);
 
             msg::get_user_status_rsp r;
             if(!err)
             {
-                r.nick=rq.nick;
+                r.address_pk_ed=rq.address_pk_ed;
                 r.nonce=u->nonce;
                 r.balance=u->balance;
             }
+            else
+            {
+                r.address_pk_ed=rq.address_pk_ed;
+                r.nonce=0;
+                r.balance=0;
+
+            }
+            if(err)
+                logErr2("get_user_status_req %s",err->c_str());
             logNode("passEvent(new bcEvent::ClientMsgReply(resp.getBuffer(), hash,poppedFrontRoute(e->route)));");
             passEvent(new bcEvent::ClientMsgReply(hash, r.getBuffer(),poppedFrontRoute(e->route)));
 
@@ -1158,19 +1184,27 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg*e)
         std::optional<std::string> err;
         sendEvent(ServiceEnum::TxValidator,new bcEvent::AddTx(e,this));
         msg::user_message_req um(in);
-        auto u=root->getUser(um.nick,NULL);
-        if(!u.valid())
-            err="user not found "+um.nick;
-        if(!err && !um.verify(u->pkbin))
+        // auto u=root->getUser(um.nick,NULL);
+        // if(!u.valid())
+        //     err="user not found "+um.nick;
+        if(!err && !um.verify(um.address_pk_ed))
         {
             err="verify failed";
             return true;
 
         }
-        // logErr2("um.nonce %s",um.nonce.toString().c_str());
-        if(!err && u->nonce!=um.nonce)
+        BigInt nonce=0;
+        logErr2("getUser %s",base62::encode(um.address_pk_ed).c_str());
+        auto u=root->getUser(um.address_pk_ed,NULL);
+        if(u.valid())
         {
-            err="invalid_nonce "+ u->nonce.toString()+" != "+um.nonce.toString();
+            nonce=u->nonce;
+        }
+
+        // logErr2("um.nonce %s",um.nonce.toString().c_str());
+        if(!err && nonce!=um.nonce)
+        {
+            err="invalid_nonce "+ nonce.toString()+" != "+um.nonce.toString();
         }
         if(!err)
             addToTransactionToPool(e->msg);

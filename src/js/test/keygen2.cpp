@@ -1,6 +1,6 @@
+#ifdef KALL
 #include <iostream>
-#include <bls/bls384_256.h>
-#include <bls/bls.hpp>
+#include "blst_cp.h"
 #include <chrono>
 
 #include <sodium.h>
@@ -97,5 +97,10 @@ int main() {
     std::cout << "Verification time for BLS signatures (mks): " << dt/10000. * mln << " mks" << std::endl;
 
     main_ed();
+    return 0;
+}
+#endif
+int main() {
+    // std::cout << "This test is for benchmarking BLS and Ed25519 signatures. Please define KALL to run it.\n";
     return 0;
 }

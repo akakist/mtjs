@@ -134,18 +134,18 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     if(!JS_IsString(argv[0]))
         return JS_ThrowInternalError(ctx, "node addr not specified");
     if(!JS_IsString(argv[1]))
-        return JS_ThrowInternalError(ctx, "nick addr not specified");
+        return JS_ThrowInternalError(ctx, "sk not specified");
     if(!JS_IsObject(argv[2]))
         return JS_ThrowInternalError(ctx, "msg Object not specified");
 
-    std::string node_addr=(std::string)scope.toStdStringView(argv[0]);
-    std::string nick=(std::string)scope.toStdStringView(argv[1]);
+    std::string node_addr=scope.toStdString(argv[0]);
+    std::string sk=base62::decode(scope.toStdString(argv[1]));
 
 
-    JSValue sk = JS_GetPropertyStr(ctx, argv[2], "sk");
-    scope.addValue(sk);
-    if(!JS_IsString(sk))
-        return JS_ThrowInternalError(ctx, "msg wrong param sk");
+    // JSValue sk = JS_GetPropertyStr(ctx, argv[2], "sk");
+    // scope.addValue(sk);
+    // if(!JS_IsString(sk))
+    //     return JS_ThrowInternalError(ctx, "msg wrong param sk");
     JSValue amount = JS_GetPropertyStr(ctx, argv[2], "amount");
     scope.addValue(amount);
     if(!JS_IsString(amount))
@@ -164,7 +164,7 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     //     return JS_ThrowInternalError(ctx, "msg wrong params");
     //  }
 
-    auto _sk=scope.toStdStringView(sk);
+    // auto _sk=scope.toStdStringView(sk);
     auto _amount=scope.toStdStringView(amount);
     auto _nonce=scope.toStdStringView(nonce);
     double to;
@@ -178,19 +178,25 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
 
     msg::user_message_req um;
     // if(um.payload.size()==1)
-    um.nick=nick;
+    // crypto_sign_ed25519_sk_to_seed(seed, sk.data());
+    if(sk.size()!=crypto_sign_SECRETKEYBYTES)
+        return JS_ThrowRangeError(ctx, "if(sk.size()!=crypto_sign_SECRETKEYBYTES)");
+    unsigned char extracted_public[crypto_sign_PUBLICKEYBYTES];
+    crypto_sign_ed25519_sk_to_pk(extracted_public, (uint8_t*)sk.data());
+    auto pk=std::string((char*)extracted_public,crypto_sign_PUBLICKEYBYTES);
+    um.address_pk_ed=pk;
     um.payload.push_back(m.getBuffer());
     um.nonce.from_string((std::string)_nonce);
-    auto skk=iUtils->hex2bin(_sk);
-    if(skk.size()!=crypto_sign_SECRETKEYBYTES)
-        return JS_ThrowInternalError(ctx, "sk size invalid");
+    // auto skk=iUtils->hex2bin(_sk);
+    // if(skk.size()!=crypto_sign_SECRETKEYBYTES)
+    //     return JS_ThrowInternalError(ctx, "sk size invalid");
 
 
 
 
     // um.pk.resize(crypto_sign_PUBLICKEYBYTES);
     // crypto_sign_ed25519_sk_to_pk((uint8_t*)um.pk.data(), (unsigned char*)skk.data());
-    um.sign(skk);
+    um.sign(sk);
 
     auto buf=um.getBuffer();
     auto hash=blake2b_hash(buf);
@@ -221,36 +227,39 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     JSScope <10,10> scope(ctx);
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
-    if(argc !=6)
+    if(argc !=5)
         return JS_ThrowInternalError(ctx, "number of argument must be 2");
 
 
     if(!JS_IsString(argv[0]))
         return JS_ThrowInternalError(ctx, "node addr not specified");
     if(!JS_IsString(argv[1]))
-        return JS_ThrowInternalError(ctx, "nick not specified");
-    if(!JS_IsString(argv[2]))
         return JS_ThrowInternalError(ctx, "nonce not specified");
-    if(!JS_IsString(argv[3]))
+    if(!JS_IsString(argv[2]))
         return JS_ThrowInternalError(ctx, "sk not specified");
-    if(!JS_IsNumber(argv[4]))
+    if(!JS_IsNumber(argv[3]))
         return JS_ThrowInternalError(ctx, "timeout not specified");
-    if(!JS_IsArray(ctx, argv[5]))
+    if(!JS_IsArray(ctx, argv[4]))
         return JS_ThrowInternalError(ctx, "msg array not specified");
 
     auto node_addr=scope.toStdString(argv[0]);
-    auto nick=scope.toStdString(argv[1]);
     logErr2("node_addr %s",node_addr.c_str());
     auto nonce=scope.toStdString(argv[2]);
     logErr2("nonce %s",nonce.c_str());
-    std::string sk=iUtils->hex2bin(scope.toStdString(argv[3]));
+    std::string sk=base62::decode(scope.toStdString(argv[3]));
     int64_t timeout;
     if(JS_ToInt64(ctx,& timeout, argv[4]))
     {
         return JS_ThrowInternalError(ctx, "error parsing timeout");
     }
+    if(sk.size()!=crypto_sign_SECRETKEYBYTES)
+        return JS_ThrowRangeError(ctx, "if(sk.size()!=crypto_sign_SECRETKEYBYTES)");
+    unsigned char extracted_public[crypto_sign_PUBLICKEYBYTES];
+    crypto_sign_ed25519_sk_to_pk(extracted_public, (uint8_t*)sk.data());
+    auto pk=std::string((char*)extracted_public,crypto_sign_PUBLICKEYBYTES);
+
     msg::user_message_req um;
-    um.nick=nick;
+    um.address_pk_ed=pk;
 
     // std::vector<std::string> trs;
     JSValue length_val = JS_GetPropertyStr(ctx, argv[5], "length");
@@ -308,8 +317,8 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
             tx::registerNode m;
             m.name.container=name;
             m.ip=ip;
-            m.pk_bls.deserializeHexStr(pk_bls);
-            m.pk_ed=iUtils->hex2bin(pk_ed);
+            m.pk_bls.deserializeBase62Str(pk_bls);
+            m.pk_ed=base62::decode(pk_ed);
 
             um.payload.push_back(m.getBuffer());
         }
@@ -359,7 +368,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
             scope.addValue(_to);
             if(!JS_IsString(_to))
                 return JS_ThrowSyntaxError(ctx, "to not specified");
-            auto to=scope.toStdString(_to);
+            auto to=base62::decode(scope.toStdString(_to));
 
             JSValue _amount=JS_GetPropertyStr(ctx,item,"amount");
             scope.addValue(_amount);
@@ -368,7 +377,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
             auto amount=scope.toStdString(_amount);
 
             tx::transfer m;
-            m.to_nick=to;
+            m.to_address=to;
             m.amount.from_string(amount);
             um.payload.push_back(m.getBuffer());
         }
@@ -391,16 +400,16 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
             m.src=src;
             um.payload.push_back(m.getBuffer());
         }
-        if(type=="register_user")
-        {
-            JSValue _name=JS_GetPropertyStr(ctx,item,"nick");
-            scope.addValue(_name);
-            if(!JS_IsString(_name))
-                return JS_ThrowSyntaxError(ctx, "name not specified");
-            tx::registerUser m;
-            m.nickName=scope.toStdString(_name);
-            um.payload.push_back(m.getBuffer());
-        }
+        // if(type=="register_user")
+        // {
+        //     JSValue _name=JS_GetPropertyStr(ctx,item,"nick");
+        //     scope.addValue(_name);
+        //     if(!JS_IsString(_name))
+        //         return JS_ThrowSyntaxError(ctx, "name not specified");
+        //     tx::registerUser m;
+        //     m.nickName=scope.toStdString(_name);
+        //     um.payload.push_back(m.getBuffer());
+        // }
 
 
     }
@@ -445,7 +454,7 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
         return JS_ThrowInternalError(ctx, "timeout not specified");
 
     std::string node_addr=(std::string)scope.toStdString(argv[0]);
-    std::string nick=(std::string)scope.toStdString(argv[1]);
+    std::string address=base62::decode(scope.toStdString(argv[1]));
     // std::string nick=(std::string)scope.toStdString(argv[1]);
     double to;
     if(JS_ToFloat64(ctx,&to,argv[2]))
@@ -475,7 +484,7 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     ur.rnd.resize(10);
     RAND_bytes((unsigned char*)ur.rnd.data(),10);
     msg::get_user_status_req m;
-    m.nick=nick;
+    m.address_pk_ed=address;
 
     ur.payload=m.getBuffer();
 

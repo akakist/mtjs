@@ -4,7 +4,7 @@ namespace tx_id
 {
     enum {
         registerNode,
-        stake,unstake,transfer,createContract, mint, transferContract, registerUser
+        stake,unstake,transfer,createContract, mint, transferContract
 
     };
 }
@@ -26,38 +26,35 @@ inline const char* txName(int id)
         return "mint";
     case tx_id::transferContract:
         return "transferContract";
-    case tx_id::registerUser:
-        return "registerUser";
     default:
         return "unknown";
     }
 }
 namespace tx
 {
-    struct registerUser: public msg::message_base
-    {
-        registerUser():message_base(tx_id::registerUser) {}
-        std::string nickName;
-        std::string pk;
-        void pack(outBuffer& b) const final
-        {
-            message_base::pack(b);
-            b<<nickName<<pk;
-        }
-        void unpack(inBuffer& b) final
-        {
-            message_base::unpack(b);
-            b>>nickName>>pk;
-        }
+    // struct registerUser: public msg::message_base
+    // {
+    //     registerUser():message_base(tx_id::registerUser) {}
+    //     std::string pk;
+    //     void pack(outBuffer& b) const final
+    //     {
+    //         message_base::pack(b);
+    //         b<<pk;
+    //     }
+    //     void unpack(inBuffer& b) final
+    //     {
+    //         message_base::unpack(b);
+    //         b>>pk;
+    //     }
 
-    };
+    // };
     struct registerNode: public msg::message_base
     {
         registerNode():message_base(tx_id::registerNode) {}
         NODE_id name;
         std::string ip;
         std::string pk_ed;
-        bls::PublicKey pk_bls;
+        blst_cpp::PublicKey pk_bls;
         void pack(outBuffer& b) const final
         {
             message_base::pack(b);
@@ -106,17 +103,17 @@ namespace tx
     {
         transfer():message_base(tx_id::transfer) {}
 
-        std::string to_nick;
+        std::string to_address;
         BigInt amount;
         void pack(outBuffer& b) const final
         {
             message_base::pack(b);
-            b<<to_nick<<amount;
+            b<<to_address<<amount;
         }
         void unpack(inBuffer& b) final
         {
             message_base::unpack(b);
-            b>>to_nick>>amount;
+            b>>to_address>>amount;
         }
     };
     struct createContract: public msg::message_base

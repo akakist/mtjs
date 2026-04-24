@@ -3,7 +3,7 @@
 // #include <auto_mpz_t.h>
 #include <nlohmann/json.hpp>
 // #include "base62.h"
-#include <blstpp.h>
+#include "blst_cp.h"
 #include <stdint.h>
 #include "IUtils.h"
 #include "blake2bHasher.h"
@@ -45,7 +45,7 @@ struct bc_contract:  public data_base
     {
         std::ostringstream o;
         o<<"Contract: "  << name << std::endl;
-        o<< "Owner: " << iUtils->bin2hex(owner) << std::endl;
+        o<< "Owner: " << base62::encode(owner) << std::endl;
         o<< "Frozen: " << frozen <<std::endl;
         o<< "Src: " << src << std::endl;
         o<< "Ready for sale: " <<ready_for_sale << std::endl;
@@ -60,7 +60,6 @@ struct bc_user: public data_base
         nonce=0;
         balance=0;
     }
-    std::string nick;
     std::string pkbin;
     BigInt balance;
     BigInt nonce;
@@ -72,19 +71,18 @@ struct bc_user: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<nick<<pkbin<<balance<<nonce<<my_stakes<<nodes<<contracts;
+        o<<pkbin<<balance<<nonce<<my_stakes<<nodes<<contracts;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
-        o>>nick>>pkbin>>balance>>nonce>>my_stakes>>nodes>>contracts;
+        o>>pkbin>>balance>>nonce>>my_stakes>>nodes>>contracts;
     }
     std::string dump() final
     {
         std::ostringstream o;
-        o<<"Nick: "  << nick << std::endl;
-        o<<"PK: "  << iUtils->bin2hex(pkbin) << std::endl;
+        o<<"PK: "  << base62::encode(pkbin) << std::endl;
         o<< "Balance: " << balance.toString() << std::endl;
         o<< "Nonce: " << nonce.toString() <<std::endl;
         o<< "Stakes: ";
@@ -121,8 +119,8 @@ struct bc_node: public data_base
         total_stake=0;
     }
     NODE_id name;
-    std::string owner;
-    BlsPublicKey bls_pk;
+    std::string owner_ed_pk;
+    blst_cpp::PublicKey bls_pk;
     std::string ed_pk;
     std::string ip;
     std::map<std::string /*user*/, BigInt> stakes;
@@ -133,28 +131,28 @@ struct bc_node: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<name<<owner<<bls_pk<<ed_pk<<ip<<stakes<<total_stake<<disabled_manual<<disabled_offline;
+        o<<name<<owner_ed_pk<<bls_pk<<ed_pk<<ip<<stakes<<total_stake<<disabled_manual<<disabled_offline;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name>>owner>>bls_pk>>ed_pk>>ip>>stakes>>total_stake>>disabled_manual>>disabled_offline;
+        o>>name>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>total_stake>>disabled_manual>>disabled_offline;
     }
     std::string dump() final
     {
         std::ostringstream o;
         o<< "Node: "<< name.container << std::endl;
-        o<< "Owner: "<< iUtils->bin2hex(owner) << std::endl;
-        o<< "bls_pk: "<< bls_pk.serializeToHexStr() << std::endl;
-        o<< "ed_pk: "<< iUtils->bin2hex(ed_pk) << std::endl;
+        o<< "Owner: "<< base62::encode(owner_ed_pk) << std::endl;
+        o<< "bls_pk: "<< base62::encode(bls_pk.serialize()) << std::endl;
+        o<< "ed_pk: "<< base62::encode(ed_pk) << std::endl;
         o<< "ip:port: "<< ip << std::endl;
         o<< "stake: "<< total_stake.toString() << std::endl;
         o<< "stakers: "<< std::endl;
         for(auto &z: stakes)
         {
-            o<< "\t"<< iUtils->bin2hex(z.first) << " -> " << z.second.toString() << std::endl;
+            o<< "\t"<< base62::encode(z.first) << " -> " << z.second.toString() << std::endl;
         }
         return o.str();
     }
@@ -245,8 +243,8 @@ struct root_data: public Cellable
     REF_getter<bc_values> getValues(const REF_getter<fee_calcer>& bc);
 
     std::vector<std::string> getUserPath(const std::string &pk);
-    REF_getter<bc_user> getUser(const std::string &nick, const REF_getter<fee_calcer>& bc);
-    REF_getter<bc_user> addUser(const std::string &nick, const std::string& pk, const REF_getter<fee_calcer>& bc);
+    REF_getter<bc_user> getUser(const std::string &pk, const REF_getter<fee_calcer>& bc);
+    REF_getter<bc_user> addUser(const std::string &pk, const REF_getter<fee_calcer>& bc);
     std::vector<std::string> getNickPath(const std::string &pk);
     // REF_getter<bc_nick> getNick(const std::string &nick, const REF_getter<fee_calcer>& bc);
     // REF_getter<bc_nick> addNick(const std::string &nick, const REF_getter<fee_calcer>& bc);

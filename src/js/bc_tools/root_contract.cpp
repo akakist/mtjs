@@ -38,13 +38,12 @@ bool root_data::verify_lider_certificate(const msg::leader_certificate& lc)
     /// проверка сертификата лидера
     {
         MUTEX_INSPECTOR;
-        bls::PublicKey agg_pk;
-        agg_pk.clear();
+        std::vector<blst_cpp::PublicKey> agg_pk;
         BigInt stake;
         for(auto &z: lc.nodes)
         {
             auto n=this->getNode(z,NULL);
-            agg_pk.add(n->bls_pk);
+            agg_pk.push_back(n->bls_pk);
             stake+=n->total_stake;
         }
         if(stake.toDouble() < this->getValues(NULL)->total_staked.toDouble() * QUORUM)
@@ -149,21 +148,20 @@ REF_getter<bc_values> root_data::getValues(const REF_getter<fee_calcer>& bc)
     return v;
 }
 
-std::vector<std::string> root_data::getUserPath(const std::string &nick)
+std::vector<std::string> root_data::getUserPath(const std::string &pk)
 {
     std::vector<std::string> p;
     p.push_back("u");
-    appendRelativeInternalPath(p,nick,3);
-    p.push_back(nick);
+    appendRelativeInternalPath(p,pk,3);
+    p.push_back(pk);
     return p;
 
 }
 
-REF_getter<bc_user> root_data::getUser(const std::string &nick, const REF_getter<fee_calcer>& bc)
+REF_getter<bc_user> root_data::getUser(const std::string &pk, const REF_getter<fee_calcer>& bc)
 {
     MUTEX_INSPECTOR;
-    auto v=getUserPath(nick);
-
+    auto v=getUserPath(pk);
     auto cc=getByPathNoCreate(this,v,db.get(),bc);
     if(!cc.valid())
         return NULL;
@@ -174,10 +172,10 @@ REF_getter<bc_user> root_data::getUser(const std::string &nick, const REF_getter
     else throw CommonError("if(cc->data.valid())");
 }
 
-REF_getter<bc_user> root_data::addUser(const std::string &nick, const std::string& pk, const REF_getter<fee_calcer>& bc)
+REF_getter<bc_user> root_data::addUser(const std::string& pk, const REF_getter<fee_calcer>& bc)
 {
     MUTEX_INSPECTOR;
-    auto v=getUserPath(nick);
+    auto v=getUserPath(pk);
     auto cc=getByPathOrCreate(this,v,db.get(),bc);
     if(!cc.valid())
         throw CommonError("if(!cc.valid())");
@@ -188,7 +186,6 @@ REF_getter<bc_user> root_data::addUser(const std::string &nick, const std::strin
     REF_getter<bc_user> u=new bc_user;
     cc->data=u.get();
     cc->payload_ctor_idx=hsh::bc_user;
-    u->nick=nick;
     u->pkbin=pk;
     return u;
 }

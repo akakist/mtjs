@@ -17,7 +17,7 @@ std::string Cellable::dump()
        <<"children:" << std::endl;
     for(auto &z: children_hashes)
     {
-        str<<"<a href='"<<z.first<< "/'>" << z.first << "</a>" << " -> "<< iUtils->bin2hex(z.second.container) << std::endl;
+        str<<"<a href='"<<z.first<< "/'>" << z.first << "</a>" << " -> "<< base62::encode(z.second.container) << std::endl;
     }
     if(data.valid())
         str << data->dump();

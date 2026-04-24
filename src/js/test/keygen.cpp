@@ -1,10 +1,8 @@
 #include <iostream>
-#include <bls/bls384_256.h>
-#include <bls/bls.hpp>
-#include <bls/msg.hpp>
-#include <mcl/fp.hpp>
+#include "blst_cp.h"
 #include <openssl/rand.h>
 #include <nlohmann/json.hpp>
+#include "base62.h"
 std::vector<unsigned char> randomBytes(size_t len) {
     std::vector<unsigned char> buf(len);
     if (RAND_bytes(buf.data(), static_cast<int>(len)) != 1) {
@@ -13,7 +11,6 @@ std::vector<unsigned char> randomBytes(size_t len) {
     return buf;
 }
 
-#include <bls/bls.hpp>
 #include <vector>
 #include <string>
 
@@ -25,8 +22,8 @@ std::vector<unsigned char> randomBytes(size_t len) {
 struct Ed25519Keypair {
     std::vector<uint8_t> sk_bin; // 64 bytes (seed+expanded or full secret)
     std::vector<uint8_t> pk_bin; // 32 bytes
-    std::string sk_hex;
-    std::string pk_hex;
+    // std::string sk_hex;
+    // std::string pk_hex;
 };
 
 static std::string toHex(const uint8_t* data, size_t len) {
@@ -35,6 +32,15 @@ static std::string toHex(const uint8_t* data, size_t len) {
     for (size_t i = 0; i < len; ++i) {
         out[2*i]   = hex[(data[i] >> 4) & 0xF];
         out[2*i+1] = hex[data[i] & 0xF];
+    }
+    return out;
+}
+static std::string toHex(const std::string &str) {
+    static const char* hex = "0123456789abcdef";
+    std::string out; out.resize(str.size() * 2);
+    for (size_t i = 0; i < str.size(); ++i) {
+        out[2*i]   = hex[(str[i] >> 4) & 0xF];
+        out[2*i+1] = hex[str[i] & 0xF];
     }
     return out;
 }
@@ -52,8 +58,8 @@ Ed25519Keypair generateEd25519Keypair() {
         throw std::runtime_error("crypto_sign_keypair failed");
     }
 
-    kp.sk_hex = toHex(kp.sk_bin.data(), kp.sk_bin.size());
-    kp.pk_hex = toHex(kp.pk_bin.data(), kp.pk_bin.size());
+    // kp.sk_hex = toHex(kp.sk_bin.data(), kp.sk_bin.size());
+    // kp.pk_hex = toHex(kp.pk_bin.data(), kp.pk_bin.size());
     // printf("ed sk %s\ned pk %s",kp.sk_hex.c_str(),kp.pk_hex.c_str());
     return kp;
 }
@@ -61,24 +67,23 @@ Ed25519Keypair generateEd25519Keypair() {
 
 int main() {
     // Инициализация (BN254 или BLS12-381 в зависимости от сборки)
-    bls::init();
 // 
     // Генерация секретного ключа
-    bls::SecretKey sk;
     auto buf = randomBytes(32);
-    sk.setLittleEndian(buf.data(), buf.size()); // задать секретный ключ вручную
+    blst_cpp::SecretKey sk(buf.data(), buf.size());
+    // sk.setLittleEndian(buf.data(), buf.size()); // задать секретный ключ вручную
     // sk.setByCSPRNG();  // криптографически стойкий случайный скаляр
 
     // Получение публичного ключа
-    bls::PublicKey pk;
-    sk.getPublicKey(pk);
+    blst_cpp::PublicKey pk(sk);
+    // sk.getPublicKey(pk);
 
     // Сообщение
     std::string msg = "Hello Sergey";
 
     // Подпись
-    bls::Signature sig;
-    sk.sign(sig, msg);
+    blst_cpp::Signature sig;
+    sig.sign(sk , msg);
 
     // Проверка
     if (sig.verify(pk, msg)) {
@@ -87,18 +92,34 @@ int main() {
         std::cout << "Verification failed!" << std::endl;
     }
     nlohmann::json j;
-    j["bls"]["sk"]=sk.serializeToHexStr();
-    j["bls"]["pk"]=pk.serializeToHexStr();
+    j["bls"]["sk"]=base62::encode(sk.serialize());
+    j["bls"]["pk"]=base62::encode(pk.serialize());
 
         // std::cout << "SK:"<< sk.serializeToHexStr() << std::endl;
         // std::cout << "PK:"<< pk.serializeToHexStr() << std::endl;
         // std::cout << "SIG:"<< sig.serializeToHexStr() << std::endl;
 
     auto kp=generateEd25519Keypair();
-    j["ed"]["sk"]=kp.sk_hex;
-    j["ed"]["pk"]=kp.pk_hex;
+    j["ed"]["sk"]=base62::encode(kp.sk_bin);
+    j["ed"]["pk"]=base62::encode(kp.pk_bin);
     std::cout<< j.dump(4);
 
-    
+    std::vector<std::string> names={"main","root","n0","n1","n2","n3","n4"};
+
+    for(auto &n:names)
+    {
+        auto buf = randomBytes(32);
+        blst_cpp::SecretKey sk(buf.data(), buf.size());
+        blst_cpp::PublicKey pk(sk);
+
+        printf("export k_%s_bls_sk=%s\n",n.c_str(),base62::encode(sk.serialize()).c_str());
+        printf("export k_%s_bls_pk=%s\n",n.c_str(),base62::encode(pk.serialize()).c_str());
+        auto kp=generateEd25519Keypair();
+        printf("export k_%s_ed_sk=%s\n",n.c_str(),base62::encode(kp.sk_bin).c_str());
+        printf("export k_%s_ed_pk=%s\n",n.c_str(),base62::encode(kp.pk_bin).c_str());
+
+
+    }
+
     return 0;
 }

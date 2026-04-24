@@ -5,6 +5,7 @@ USER root
 
 RUN apt-get update && \
     apt-get install -y cmake  g++ libssl-dev libsqlite3-dev git pkg-config libpq-dev libmariadb-dev nlohmann-json3-dev librocksdb-dev/noble python3 clang libgmp-dev libsodium-dev libsqlitecpp-dev libsqlite3-dev \
+    libzstd-dev liblz4-dev libbz2-dev libsnappy-dev\
  &&  apt-get clean \
  &&  rm -rf /var/lib/apt/lists/*
 
@@ -13,8 +14,8 @@ RUN apt-get update && \
 #COPY usr/local/include/ /usr/local/include/
 #COPY usr/local/lib /usr/local/lib
 #RUN git clone https://github.com/skalenetwork/libBLS.git && cd libBLS && mkdir build && cd build && cmake .. && make -j4 install
-RUN git clone --recursive https://github.com/herumi/bls
-RUN cd bls && make && cp -r include/* /usr/local/include && cp lib/*.a /usr/local/lib && cp -r mcl/include/* /usr/local/include && cp mcl/lib/*.a /usr/local/lib
+RUN git clone --recursive https://github.com/supranational/blst.git
+RUN cd blst && ./build.sh && cp  bindings/*.h /usr/local/include && cp libblst.a /usr/local/lib 
 
 COPY ./src /root/src
 

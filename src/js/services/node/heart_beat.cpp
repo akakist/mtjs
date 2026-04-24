@@ -1,6 +1,7 @@
 #include "nodeService.h"
 #include "QUORUM.h"
 #include "tools_mt.h"
+#include "blst_cp.h"
 void Node::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
 {
     msg::heart_beat m_heart_beat(hbr.payload_heart_beat);
@@ -40,10 +41,8 @@ void Node::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
     }
     BigInt hb_staked=0;
     {
-        bls::Signature sig_agg;
-        sig_agg.clear();
-        bls::PublicKey pk_agg;
-        pk_agg.clear();
+        blst_cpp::AggregateSignature sig_agg;
+        std::vector<blst_cpp::PublicKey> pk_agg;
         bool matched=true;
         if(li.responses.empty())
             throw CommonError("if(li.responses.empty())");
@@ -57,7 +56,7 @@ void Node::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
             }
             sig_agg.add(z.second.rsp.signature);
             auto nn=root->getNode(z.second.rsp.node_signer,NULL);
-            pk_agg.add(nn->bls_pk);
+            pk_agg.push_back(nn->bls_pk);
             hb_staked+=z.second.stake;
         }
         if(!sig_agg.verify(pk_agg, blake2b_hash(hbr.payload_heart_beat).container))
@@ -125,7 +124,7 @@ bool Node::Service::on_heart_beat(const msg::heart_beat &h,const std::string &he
         msg::heart_beat_rsp hba;
         hba.payload_heart_beat=heart_beat_payload;
         hba.node_signer=this_node_name;
-        my_sk_bls.sign(hba.signature, blake2b_hash(heart_beat_payload).container);
+        hba.signature.sign(my_sk_bls, blake2b_hash(heart_beat_payload).container);
 
         msg::node_message_ed nme(hba.getBuffer(),this_node_name,my_sk_ed);
         passEvent(new bcEvent::MsgReply(nme.getBuffer(),poppedFrontRoute(route)));
@@ -188,9 +187,7 @@ void Node::Service::make_leader_certificate()
     auto &li=hbs.leader_info[hbs.node_leader];
     msg::leader_certificate lc;
     // bls::Signature sig_agg;
-    lc.agg_sig.clear();
-    bls::PublicKey agg_pk;
-    agg_pk.clear();
+    std::vector<blst_cpp::PublicKey> agg_pk;
     if(li.responses.empty())
         return;
     auto msg=li.responses.begin()->second.rsp.payload_heart_beat;
@@ -205,7 +202,7 @@ void Node::Service::make_leader_certificate()
         }
         lc.agg_sig.add(r.second.rsp.signature);
         auto nn=root->getNode(r.second.rsp.node_signer,NULL);
-        agg_pk.add(nn->bls_pk);
+        agg_pk.push_back(nn->bls_pk);
         lc.nodes.push_back(r.second.rsp.node_signer);
     }
     if(!lc.agg_sig.verify(agg_pk,h.container))

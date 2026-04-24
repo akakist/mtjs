@@ -2,18 +2,19 @@
 import * as std from "std";
 import { sleep } from "os";
 const node = "127.0.0.1:2301";
-let sk = std.getenv('u_root_ed_sk');
+let sk = std.getenv('k_root_ed_sk');
+let root_pk = std.getenv('k_root_ed_pk');
 async function exec() {
     while (true) {
         mtjs.tx_subscribe(node, (params) => {
             console.log("tx report from js:", JSON.stringify(params));
         });
-        const ui = await mtjs.get_user_info(node, "root", 1);
+        const ui = await mtjs.get_user_info(node, root_pk, 1);
         const nonce = ui.nonce;
         console.log(ui);
-        const rsp = await mtjs.mint(node, "root", { sk: sk, amount: "2000", timeout: 4, nonce: nonce });
+        const rsp = await mtjs.mint(node, sk, { amount: "2000", timeout: 4, nonce: nonce });
         console.log(rsp);
-        sleep(1000);
+        sleep(700);
     }
 }
 console.log(std.getenv("PATH"));
@@ -38,17 +39,15 @@ try {
                 HTTP_max_post=1000000
                 HTTP_doc_urls=/pics,/html,/css
                 HTTP_document_root=./www
-                Node_my_sk_bls_env_key=n${i}_sk_bls
-                Node_my_sk_ed_env_key=n${i}_sk_ed
+                Node_my_sk_bls_env_key=k_n${i}_bls_sk
+                Node_my_sk_ed_env_key=k_n${i}_ed_sk
                 Node_this_node_name=n${i}
                 Node_sqlite_pn=db/s${i}
 
         `);
     }
-    console.log("1");
     sleep(200);
     console.log("Start");
-    console.log("2");
     try {
         const sk = std.getenv('u_root_ed_sk');
         setInterval(() => {

@@ -5,6 +5,7 @@
 #)
  add_executable(keygen
   keygen.cpp
+    ../bc_tools/base62.cpp
 #  base62.cpp
 #  mcrypto.cpp
  )
@@ -13,8 +14,8 @@
 #  base62.cpp
 #  mcrypto.cpp
  )
-target_link_libraries(keygen bls384_256 mcl crypto sodium)
-target_link_libraries(keygen2 bls384_256 mcl crypto sodium)
+target_link_libraries(keygen blst crypto sodium)
+target_link_libraries(keygen2 blst crypto sodium)
 # add_executable(client
   # client.cpp
 #  base62.cpp

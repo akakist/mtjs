@@ -1,6 +1,8 @@
 #include "nodeService.h"
 #include <SQLiteCpp/Database.h>
 #include "tools_mt.h"
+#include "blst_cp.h"
+#include "base62.h"
 void Node::Service::on_get_blocks_req(const msg::get_blocks_req &r, const route_t& route)
 {
     SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READONLY);
@@ -13,7 +15,7 @@ void Node::Service::on_get_blocks_req(const msg::get_blocks_req &r, const route_
         // BigInt ep;
         BigInt ep = query.getColumn(0).getInt();
         std::string data = query.getColumn(1).getString();
-        ret.blocks_Z.push_back({ep,iUtils->hex2bin(data)});
+        ret.blocks_Z.push_back({ep,base62::decode(data)});
     }
     ret.lastEpoch=root->getValues(NULL)->epoch;
     msg::node_message_ed nm(ret.getBuffer(),this_node_name,my_sk_ed);
@@ -60,12 +62,11 @@ void Node::Service::on_get_blocks_rsp(const msg::get_blocks_rsp& r)
         if(hb.epoch!=root->getValues(NULL)->epoch)
             throw CommonError("if(hb.epoch!=root->getValues(NULL)->epoch) %s %s",hb.epoch.toString().c_str(), root->getValues(NULL)->epoch.toString().c_str()   );
 
-        bls::PublicKey agg_pk;
-        agg_pk.clear();
+        std::vector<blst_cpp::PublicKey> agg_pk;
         for(auto& k: ba.node_validators)
         {
             auto n=root->getNode(k,NULL);
-            agg_pk.add(n->bls_pk);
+            agg_pk.push_back(n->bls_pk);
         }
         if(!ba.agg_sig.verify(agg_pk,blake2b_hash(ba.block_payload).container))
         {
@@ -81,7 +82,7 @@ void Node::Service::on_get_blocks_rsp(const msg::get_blocks_rsp& r)
 
         SQLite::Statement insert(dbs, "INSERT INTO blocks (epoch, data) VALUES (?, ?)");
         insert.bind(1,pb.epoch.toString());
-        insert.bind(2,iUtils->bin2hex(pb.getBuffer()));
+        insert.bind(2,base62::encode(pb.getBuffer()));
         insert.exec();
 
         auto new_root_hash=execute_block(root, prev_block_hash, pb.att_data.trs,lc.nodes);
