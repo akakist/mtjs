@@ -41,6 +41,7 @@ namespace BlockValidator
         bool on_alarm(const timerEvent::TickAlarm*);
         bool handleEvent(const REF_getter<Event::Base>& e);
 
+        bool ServiceInit(const bcEvent::ServiceInit*);
 
 
 
@@ -70,7 +71,7 @@ namespace BlockValidator
 
 
 
-
+        REF_getter<bcEvent::ServiceInit> conf=nullptr;
 
 
 

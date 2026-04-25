@@ -15,7 +15,7 @@ void Node::Service::on_get_blocks_req(const msg::get_blocks_req &r, const route_
         // BigInt ep;
         BigInt ep = query.getColumn(0).getInt();
         std::string data = query.getColumn(1).getString();
-        ret.blocks_Z.push_back({ep,base62::decode(data)});
+        ret.blocks_Z.push_back({ep,data});
     }
     ret.lastEpoch=root->getValues(NULL)->epoch;
     msg::node_message_ed nm(ret.getBuffer(),this_node_name,my_sk_ed);
@@ -82,7 +82,7 @@ void Node::Service::on_get_blocks_rsp(const msg::get_blocks_rsp& r)
 
         SQLite::Statement insert(dbs, "INSERT INTO blocks (epoch, data) VALUES (?, ?)");
         insert.bind(1,pb.epoch.toString());
-        insert.bind(2,base62::encode(pb.getBuffer()));
+        insert.bind(2,pb.getBuffer());
         insert.exec();
 
         auto new_root_hash=execute_block(root, prev_block_hash, pb.att_data.trs,lc.nodes);

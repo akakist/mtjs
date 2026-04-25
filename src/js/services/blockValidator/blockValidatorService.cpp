@@ -53,6 +53,8 @@ bool BlockValidator::Service::handleEvent(const REF_getter<Event::Base>& e)
             return on_RequestIncoming((const webHandlerEvent::RequestIncoming*)e.get());
         case systemEventEnum::startService:
             return on_startService((const systemEvent::startService*)e.get());
+        case bcEventEnum::ServiceInit:
+            return ServiceInit((const bcEvent::ServiceInit*)e.get());
         case rpcEventEnum::IncomingOnAcceptor:
         {
             const rpcEvent::IncomingOnAcceptor*ev=static_cast<const rpcEvent::IncomingOnAcceptor*>(e.get());
@@ -128,10 +130,16 @@ void registerBlockValidatorService(const char* pn)
 
 
 
+bool BlockValidator::Service::ServiceInit(const bcEvent::ServiceInit* e)
+{
+    conf=e;
+    return true;    
+}
 
 
 bool BlockValidator::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
 {
+
     return true;
 
 }

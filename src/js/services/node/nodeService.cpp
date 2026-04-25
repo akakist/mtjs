@@ -47,7 +47,8 @@ bool Node::Service::on_startService(const systemEvent::startService*)
 
     my_sk_ed=base62::decode(getenv2(my_sk_ed_env_key));
 
-
+    sendEvent(ServiceEnum::BlockValidator,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
+    sendEvent(ServiceEnum::TxValidator,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     for(auto& z: rpc_addr)
     {
         SECURE sec;
@@ -728,7 +729,7 @@ void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, con
 
     SQLite::Statement insert(dbs, "INSERT INTO blocks (epoch, data) VALUES (?, ?)");
     insert.bind(1,pb.epoch.toString());
-    insert.bind(2,base62::encode(pb.getBuffer()));
+    insert.bind(2,pb.getBuffer());
     insert.exec();
 
     prev_block_hash=blk.new_root_hash1;
@@ -816,7 +817,7 @@ bool Node::Service::Msg(const bcEvent::Msg*e)
                     // {
                     //     logErr2("if(!u.valid()) %s %d",__FILE__,__LINE__);
                     // }
-                    if(!um.verify(um.address_pk_ed))
+                    if(!um.verify())
                     {
                         logErr2("if(!um.verify_ed())");
                         return true;
@@ -1031,7 +1032,7 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
         REF_getter<fee_calcer> by=feeCalcers.get(ur.address_pk_ed);
         // if(!u.valid())
         //     throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
-        if(!ur.verify(ur.address_pk_ed))
+        if(!ur.verify())
             throw CommonError("if(!ur.verify())");
         BigInt nonce=0;
         auto u=rt->getUser(ur.address_pk_ed,by);
@@ -1144,7 +1145,6 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg*e)
         {
             MUTEX_INSPECTOR;
             msg::get_user_status_req rq(in2);
-            logNode("get_user_status_req");
             std::optional<std::string> err;
             auto u=root->getUser(rq.address_pk_ed,NULL);
             if(!u.valid())
@@ -1165,8 +1165,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg*e)
 
             }
             if(err)
-                logErr2("get_user_status_req %s",err->c_str());
-            logNode("passEvent(new bcEvent::ClientMsgReply(resp.getBuffer(), hash,poppedFrontRoute(e->route)));");
+                logErr2("get_user_status_req error %s",err->c_str());
             passEvent(new bcEvent::ClientMsgReply(hash, r.getBuffer(),poppedFrontRoute(e->route)));
 
         }
@@ -1182,19 +1181,16 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg*e)
     {
         MUTEX_INSPECTOR;
         std::optional<std::string> err;
-        sendEvent(ServiceEnum::TxValidator,new bcEvent::AddTx(e,this));
+        sendEvent(ServiceEnum::TxValidator,new bcEvent::AddTx(e,e->route));
         msg::user_message_req um(in);
-        // auto u=root->getUser(um.nick,NULL);
-        // if(!u.valid())
-        //     err="user not found "+um.nick;
-        if(!err && !um.verify(um.address_pk_ed))
+        if(!err && !um.verify())
         {
             err="verify failed";
-            return true;
+            // return true;
 
         }
         BigInt nonce=0;
-        logErr2("getUser %s",base62::encode(um.address_pk_ed).c_str());
+        // logErr2("getUser %s",base62::encode(um.address_pk_ed).c_str());
         auto u=root->getUser(um.address_pk_ed,NULL);
         if(u.valid())
         {
@@ -1241,7 +1237,6 @@ void Node::Service::logNode(const char* fmt, ...)
 }
 bool Node::Service::ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ* e)
 {
-    logNode("ClientTxSubscribeREQ from client");
     auto& s=clientTxSubscriptions[e->route];
     s.created_at=time(NULL);
     // s.backroute=e->route;

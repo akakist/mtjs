@@ -92,6 +92,10 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base>& e)
         auto& ID=e->id;
         switch(ID)
         {
+        case bcEventEnum::ClientMsg:
+            return ClientMsg((const bcEvent::ClientMsg*)e.get());
+        case bcEventEnum::ServiceInit:
+            return ServiceInit((const bcEvent::ServiceInit*)e.get());
         case bcEventEnum::AddTx:
             return AddTx((const bcEvent::AddTx*)e.get());
         case bcEventEnum::TxValidatorStart:
@@ -184,6 +188,120 @@ bool TxValidator::Service::TxValidatorStop(const bcEvent::TxValidatorStop *e)
     is_working = false;
     return true;
 }
+bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
+{
+    conf=e;
+    return true;
+}
+bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
+{
+
+
+    MUTEX_INSPECTOR;
+    inBuffer in(e->msg);
+
+    auto p=in.get_PN();
+    THASH_id hash;
+    hash=blake2b_hash(e->msg);
+    switch(p)
+    {
+        #ifdef KALL
+    case msgid::user_request:
+    {
+        msg::user_request ur(in);
+
+
+        inBuffer in2(ur.payload);
+        auto p2=in2.get_PN();
+        switch(p2)
+        {
+        case msgid::get_user_status_req:
+        {
+            MUTEX_INSPECTOR;
+            msg::get_user_status_req rq(in2);
+            std::optional<std::string> err;
+            auto u=root->getUser(rq.address_pk_ed,NULL);
+            if(!u.valid())
+                err="user not found "+base62::encode(rq.address_pk_ed);
+
+            msg::get_user_status_rsp r;
+            if(!err)
+            {
+                r.address_pk_ed=rq.address_pk_ed;
+                r.nonce=u->nonce;
+                r.balance=u->balance;
+            }
+            else
+            {
+                r.address_pk_ed=rq.address_pk_ed;
+                r.nonce=0;
+                r.balance=0;
+
+            }
+            if(err)
+                logErr2("get_user_status_req error %s",err->c_str());
+            passEvent(new bcEvent::ClientMsgReply(hash, r.getBuffer(),poppedFrontRoute(e->route)));
+
+        }
+        break;
+        default:
+            throw CommonError("unhandled msgid sdf %d",p);
+        }
+
+
+    }
+    break;
+    #endif
+    case msgid::user_message_req:
+    {
+        MUTEX_INSPECTOR;
+        std::optional<std::string> err;
+        // sendEvent(ServiceEnum::TxValidator,new bcEvent::AddTx(e,this));
+        msg::user_message_req um(in);
+        if(!err && !um.verify())
+        {
+            err="verify failed";
+            // return true;
+
+        }
+        BigInt nonce=0;
+        // logErr2("getUser %s",base62::encode(um.address_pk_ed).c_str());
+        auto u=root->getUser(um.address_pk_ed,NULL);
+        if(u.valid())
+        {
+            nonce=u->nonce;
+        }
+
+        // logErr2("um.nonce %s",um.nonce.toString().c_str());
+        if(!err && nonce!=um.nonce)
+        {
+            err="invalid_nonce "+ nonce.toString()+" != "+um.nonce.toString();
+        }
+        if(!err)
+        {
+            THASH_id h=blake2b_hash(e->msg);
+            TRANSACTION_body t;
+            t.container=e->msg;
+            transaction_pool_verified.insert({h,t});
+        }
+            // addToTransactionToPool(e->msg);
+
+        msg::transaction_added_rsp tr;
+        tr.err=err.has_value();
+        tr.err_str=err?*err:"transaction added to pool";
+        tr.tx_hash=blake2b_hash(e->msg);
+        // msg::node_message_ed nm(tr.getBuffer(),this_node_name,my_sk_ed);
+        passEvent(new bcEvent::ClientMsgReply(hash, tr.getBuffer(),poppedFrontRoute(e->route)));
+        return true;
+    }
+    break;
+    default:
+        throw CommonError("unhandled msgid e. ff %d",p);
+    }
+
+    return true;
+}
+
 
 void registerTxValidatorService(const char* pn)
 {

@@ -199,13 +199,13 @@ namespace msg
         BigInt nonce;
         std::string signature;
         std::string address_pk_ed;
-        bool verify(const std::string& pk)
+        bool verify()
         {
             Blake2bHasher h;
             for(auto& z:payload)
                 h.update(z);
             h.update(nonce.toString());
-            return verify_ed_pk(pk,signature,h.final());
+            return verify_ed_pk(address_pk_ed,signature,h.final());
         }
         void sign(const std::string &sk)
         {

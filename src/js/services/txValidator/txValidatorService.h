@@ -45,6 +45,9 @@ namespace TxValidator
         bool AddTx(const bcEvent::AddTx *e);
         bool TxValidatorStart(const bcEvent::TxValidatorStart *e);
         bool TxValidatorStop(const bcEvent::TxValidatorStop *e);
+        bool ServiceInit(const bcEvent::ServiceInit *e);
+        bool ClientMsg(const bcEvent::ClientMsg*e);
+
 
 
         Service(const SERVICE_id&, const std::string&  nm, IInstance *ins);
@@ -65,6 +68,7 @@ namespace TxValidator
             XPASS;
         }
 
+        std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
 
         std::thread _validator;
 
@@ -78,6 +82,8 @@ namespace TxValidator
         // std::string last_block_hash;
         REF_getter<root_data> root=NULL;
         REF_getter<IDatabase> db=nullptr;
+
+        REF_getter<bcEvent::ServiceInit> conf=nullptr;
 
 
 

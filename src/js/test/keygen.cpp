@@ -104,7 +104,7 @@ int main() {
     j["ed"]["pk"]=base62::encode(kp.pk_bin);
     std::cout<< j.dump(4);
 
-    std::vector<std::string> names={"main","root","n0","n1","n2","n3","n4"};
+    std::vector<std::string> names={"main","root","n0","n1","n2","n3","n4","u0","u1","u2","u3","u4"};
 
     for(auto &n:names)
     {

@@ -2,6 +2,8 @@
 // #include "signedBuffer.h"
 #include "THASH_id.h"
 #include "IDatabase.h"
+#include "blst_cp.h"
+#include "NODE_id.h"
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
@@ -21,6 +23,7 @@ namespace bcEventEnum
     const EVENT_id TxValidatorStart(ghash("@g_TxValidatorStart"));
     const EVENT_id TxValidatorStop(ghash("@g_TxValidatorStop"));
     const EVENT_id AddTx(ghash("@g_AddTx"));
+    const EVENT_id ServiceInit(ghash("@g_ServiceInit"));
     
 }
 
@@ -160,13 +163,6 @@ namespace bcEvent
         {
             return new ClientTxSubscribeREQ(r);
         }
-        // std::string msg;
-
-
-        // ClientTxSubscribeREQ(const std::string& _msg,   const route_t &r)
-        //     :Base(bcEventEnum::ClientTxSubscribeREQ,r),
-        //      msg(_msg)
-        // {}
 
 
         ClientTxSubscribeREQ(const route_t& r)
@@ -254,6 +250,28 @@ class TxValidatorStart: public Event::NoPacked
             :NoPacked(bcEventEnum::AddTx,r), msg(m) {}
         
         REF_getter<ClientMsg>msg;
+
+    };
+    class ServiceInit: public Event::NoPacked
+    {
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return NULL;
+        }
+        ServiceInit(blst_cpp::SecretKey my_sk_bls_,
+            std::string my_sk_ed_, const NODE_id& this_node_name_, const REF_getter<IDatabase> &db_,
+             const route_t& r)
+            :NoPacked(bcEventEnum::ServiceInit,r), my_sk_bls(my_sk_bls_), my_sk_ed(my_sk_ed_),db(db_) {}
+        
+        blst_cpp::SecretKey my_sk_bls;
+        std::string my_sk_ed;
+
+        NODE_id this_node_name;
+        REF_getter<IDatabase> db;
+
+
 
     };
      

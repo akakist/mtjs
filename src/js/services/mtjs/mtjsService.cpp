@@ -458,7 +458,6 @@ bool MTJS::Service::CommandEntered(const telnetEvent::CommandEntered* e)
 
 bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply*e)
 {
-    logErr2("bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply*e)");
     MUTEX_INSPECTOR;
 
     auto it=opaque.node_req_promises.find(e->hash_of_request);
@@ -531,7 +530,7 @@ JSValue parse_yyjson(JSContext *ctx, const char *json_str, size_t len);
 bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP* e)
 {
     MUTEX_INSPECTOR;
-    logErr2("ClientTxSubscribeRSP from node");
+    // logErr2("ClientTxSubscribeRSP from node");
 
     msg::publish_block pb(e->msg);
     nlohmann::json j;
@@ -567,9 +566,8 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP* e)
             {
                 throw CommonError("callback not a function");
             }
-            logErr2("ClientTxSubscribeRSP: calling callback");
             auto str=jtr.dump();
-            logErr2("json %s",str.c_str());
+            // logErr2("json %s",str.c_str());
             JSValue obj = JS_ParseJSON(js_ctx, str.data(), str.size(), "<input>");
             scope.addValue(obj);
             JSValue argv[1];
