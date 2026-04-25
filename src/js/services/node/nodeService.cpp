@@ -46,7 +46,7 @@ bool Node::Service::on_startService(const systemEvent::startService*)
 
 
     my_sk_ed=base62::decode(getenv2(my_sk_ed_env_key));
-
+    logErr2("ServiceInit nodename %s",this_node_name.container.c_str());
     sendEvent(ServiceEnum::BlockValidator,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     sendEvent(ServiceEnum::TxValidator,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     for(auto& z: rpc_addr)
@@ -79,7 +79,7 @@ void Node::Service::collectTransactions()
 {
     std::map<std::string, std::set<THASH_id>> cnt;
     std::set<THASH_id> rm;
-    for(auto& z: transaction_pool_unverified)
+    for(auto& z: transaction_pool_of_leader)
     {
         msg::user_message_req ur(z.second);
         cnt[ur.address_pk_ed].insert(z.first);
@@ -100,7 +100,7 @@ void Node::Service::collectTransactions()
     }
     for(auto& z: rm)
     {
-        transaction_pool_unverified.erase(z);
+        transaction_pool_of_leader.erase(z);
     }
     rm.clear();
 
@@ -117,13 +117,13 @@ void Node::Service::collectTransactions()
     }
     for(auto& z: rm)
     {
-        transaction_pool_unverified.erase(z);
+        transaction_pool_of_leader.erase(z);
     }
     rm.clear();
 }
 void Node::Service::do_start_block()
 {
-    if(transaction_pool_unverified.empty())
+    if(transaction_pool_of_leader.empty())
     {
         DBG(logErr2("if(transaction_pool_main.empty())"));
         sendEvent(ServiceEnum::Timer,new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK,NULL,NULL, 1,this));
@@ -142,9 +142,9 @@ void Node::Service::do_start_block()
 
             collectTransactions();
 
-            for(auto& z: transaction_pool_unverified)
+            for(auto& z: transaction_pool_of_leader)
                 b.transaction_bodies.push_back(z.second);
-            transaction_pool_unverified.clear();
+            transaction_pool_of_leader.clear();
 
 
             msg::node_message_ed nm(b.getBuffer(),this_node_name,my_sk_ed);
@@ -213,6 +213,11 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base>& e)
 {
     MUTEX_INSPECTOR;
     XTRY;
+    if(e->route.size())
+    {
+        passEvent(e);
+        return true;
+    }
     try {
         MUTEX_INSPECTOR;
         auto& ID=e->id;
@@ -436,6 +441,7 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
     return true;
 
 }
+#ifdef KALL
 void Node::Service::addToTransactionToPool(const std::string& body)
 {
     MUTEX_INSPECTOR;
@@ -451,6 +457,7 @@ void Node::Service::addToTransactionToPool(const std::string& body)
     transaction_pool_unverified.insert({h,t});
 
 }
+#endif
 
 void Node::Service::on_blockResponse(const msg::block_response& br)
 {
@@ -536,7 +543,7 @@ bool Node::Service::MsgReply(const bcEvent::MsgReply* e)
         node_message_ed.unpack(in);
         auto n=root->getNode(node_message_ed.src_node,NULL);
         if(!n.valid())
-            throw CommonError("invalid node "+node_message_ed.src_node.container);
+            throw CommonError("invalid node AAA "+node_message_ed.src_node.container);
         if(!node_message_ed.verify(n->ed_pk))
         {
             throw CommonError("if(!node_message_ed.verify_ed_pk(n->ed_pk))");
@@ -585,7 +592,7 @@ bool Node::Service::MsgReply(const bcEvent::MsgReply* e)
             for(auto& z: rwt.trs)
             {
                 THASH_id h=blake2b_hash(z.container);
-                transaction_pool_unverified.insert({h,z});
+                transaction_pool_of_leader.insert({h,z});
             }
             auto &hbs=heart_beat_store;
             auto &li=hbs.leader_info[hbs.node_leader];
@@ -772,7 +779,7 @@ bool Node::Service::Msg(const bcEvent::Msg*e)
 
         auto n=root->getNode(node_message_ed.src_node,NULL);
         if(!n.valid())
-            throw CommonError("invalid node "+node_message_ed.src_node.container);
+            throw CommonError("invalid node BBB "+node_message_ed.src_node.container);
         if(!node_message_ed.verify(n->ed_pk))
         {
             throw CommonError("if(!node_message_ed.verify_ed_pk(n->ed_pk))");
@@ -812,6 +819,8 @@ bool Node::Service::Msg(const bcEvent::Msg*e)
                 // default: break;
                 case msgid::user_message_req:
                 {
+                    throw CommonError("case msgid::user_message_req: not implemented");
+#ifdef KALL                    
                     MUTEX_INSPECTOR;
                     msg::user_message_req um;
                     um.unpack(in_bt);
@@ -840,6 +849,7 @@ bool Node::Service::Msg(const bcEvent::Msg*e)
                         logErr2("invalid nonce for new user");
                     }
                     // logErr2("case msgid::user_message_req:");
+#endif
                 }
                 break;
                 case msgid::node_message_ed:
@@ -969,14 +979,7 @@ bool Node::Service::Msg(const bcEvent::Msg*e)
                             }
 
                         }
-                        msg::response_with_transactions rwt;
-                        for(auto& z: transaction_pool_unverified)
-                        {
-                            rwt.trs.push_back(z.second);
-                        }
-                        transaction_pool_unverified.clear();
-                        msg::node_message_ed nm(rwt.getBuffer(),this_node_name,my_sk_ed);
-                        passEvent(new bcEvent::MsgReply(nm.getBuffer(),poppedFrontRoute(e->route)));
+                        sendEvent(ServiceEnum::TxValidator,new bcEvent::GetTransactions(e->route));
                         return true;
                     }
                     break;
@@ -1187,6 +1190,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg*e)
         logErr2("send to txvalidator");
         sendEvent(ServiceEnum::TxValidator,e);
         return true;
+#ifdef KALL
         msg::user_message_req um(in);
         if(!err && !um.verify())
         {
@@ -1216,6 +1220,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg*e)
         tr.tx_hash=blake2b_hash(e->msg);
         // msg::node_message_ed nm(tr.getBuffer(),this_node_name,my_sk_ed);
         passEvent(new bcEvent::ClientMsgReply(hash, tr.getBuffer(),poppedFrontRoute(e->route)));
+#endif
         return true;
     }
     break;

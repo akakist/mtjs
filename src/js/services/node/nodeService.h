@@ -208,7 +208,7 @@ namespace Node
         heart_beat_info    heart_beat_store;
         std::string last_leader_cert;
 
-        std::map<THASH_id, TRANSACTION_body>  transaction_pool_unverified;
+        std::map<THASH_id, TRANSACTION_body>  transaction_pool_of_leader;
         // std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
         std::map<BLOCK_id,block> blocks;
 

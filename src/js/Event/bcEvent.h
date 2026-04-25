@@ -24,6 +24,8 @@ namespace bcEventEnum
     const EVENT_id TxValidatorStop(ghash("@g_TxValidatorStop"));
     const EVENT_id AddTx(ghash("@g_AddTx"));
     const EVENT_id ServiceInit(ghash("@g_ServiceInit"));
+    const EVENT_id GetTransactions(ghash("@g_GetTransactions"));
+    
     
 }
 
@@ -263,7 +265,7 @@ class TxValidatorStart: public Event::NoPacked
         ServiceInit(blst_cpp::SecretKey my_sk_bls_,
             std::string my_sk_ed_, const NODE_id& this_node_name_, const REF_getter<IDatabase> &db_,
              const route_t& r)
-            :NoPacked(bcEventEnum::ServiceInit,r), my_sk_bls(my_sk_bls_), my_sk_ed(my_sk_ed_),db(db_) {}
+            :NoPacked(bcEventEnum::ServiceInit,r), my_sk_bls(my_sk_bls_), my_sk_ed(my_sk_ed_),this_node_name(this_node_name_), db(db_) {}
         
         blst_cpp::SecretKey my_sk_bls;
         std::string my_sk_ed;
@@ -274,5 +276,21 @@ class TxValidatorStart: public Event::NoPacked
 
 
     };
-     
+
+    class GetTransactions: public Event::NoPacked
+    {
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return NULL;
+        }
+        GetTransactions(const route_t& r)
+            :NoPacked(bcEventEnum::GetTransactions,r){}
+        
+
+
+
+    };
+
 }
