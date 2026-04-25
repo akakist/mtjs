@@ -228,6 +228,9 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base>& e)
             return on_CommandEntered((const telnetEvent::CommandEntered*)e.get());
         case systemEventEnum::startService:
             return on_startService((const systemEvent::startService*)e.get());
+        case bcEventEnum::ClientMsgReply:
+            passEvent(e);
+            return true;
         case bcEventEnum::ClientMsg:
             return ClientMsg(static_cast<const bcEvent::ClientMsg*>(e.get()));
         case bcEventEnum::ClientTxSubscribeREQ:
@@ -1181,7 +1184,9 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg*e)
     {
         MUTEX_INSPECTOR;
         std::optional<std::string> err;
-        sendEvent(ServiceEnum::TxValidator,new bcEvent::AddTx(e,e->route));
+        logErr2("send to txvalidator");
+        sendEvent(ServiceEnum::TxValidator,e);
+        return true;
         msg::user_message_req um(in);
         if(!err && !um.verify())
         {

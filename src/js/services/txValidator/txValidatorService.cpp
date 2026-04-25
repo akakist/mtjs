@@ -23,50 +23,10 @@
 #include "init_root.h"
 
 
-void TxValidator::Service::validator()
-{
-    while(1)
-    {
-        if(iUtils->isTerminating())
-            return;
-        {
-            M_LOCKC(mx);
-            if(dirty_pool.size()==0 || !is_working)
-                condvar.wait();
-        }
-        while(is_working)
-        {
-            {
-                M_LOCKC(mx);
-                if(dirty_pool.size()==0 || !is_working)
-                    condvar.wait();
-            }
-
-            REF_getter<bcEvent::ClientMsg> m(NULL);
-            {
-                M_LOCKC(mx);
-                if(dirty_pool.size())
-                {
-                    m=*dirty_pool.begin();
-                    dirty_pool.pop_front();
-                }
-
-            }
-            if(m.valid())
-            {
-
-            }
-        }
-
-    }
-}
 
 bool TxValidator::Service::on_startService(const systemEvent::startService*)
 {
     MUTEX_INSPECTOR;
-    _validator=std::thread([this] {
-        validator();
-    });
 
     return true;
 }
@@ -150,7 +110,6 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base>& e)
 
 TxValidator::Service::~Service()
 {
-    _validator.join();
 }
 
 
@@ -158,29 +117,24 @@ TxValidator::Service::Service(const SERVICE_id& id, const std::string& nm,IInsta
     :
     UnknownBase(nm),
     ListenerBuffered1Thread(nm,id),
-    Broadcaster(ins), condvar(mx)
+    Broadcaster(ins)
 {
 }
 
 bool TxValidator::Service::AddTx(const bcEvent::AddTx *e)
 {
-    {
-        M_LOCKC(mx);
-        dirty_pool.push_back(e->msg);
-    }
 
     return true;
 }
 bool TxValidator::Service::TxValidatorStart(const bcEvent::TxValidatorStart *e)
 {
-    db=e->db;
-    is_working = true;
-    if(!root.valid())
-        root=getRoot(db.get());
+    // db=e->db;
+    // is_working = true;
+    // if(!root.valid())
+    //     root=getRoot(db.get());
 
-    init_root(root);
+    // init_root(root);
 
-    condvar.signal();
     return true;
 }
 bool TxValidator::Service::TxValidatorStop(const bcEvent::TxValidatorStop *e)
@@ -191,6 +145,10 @@ bool TxValidator::Service::TxValidatorStop(const bcEvent::TxValidatorStop *e)
 bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     conf=e;
+    if(!root.valid())
+        root=getRoot(conf->db.get());
+
+    init_root(root);
     return true;
 }
 bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
@@ -285,7 +243,7 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
             transaction_pool_verified.insert({h,t});
         }
             // addToTransactionToPool(e->msg);
-
+        logErr2("txValidated");
         msg::transaction_added_rsp tr;
         tr.err=err.has_value();
         tr.err_str=err?*err:"transaction added to pool";

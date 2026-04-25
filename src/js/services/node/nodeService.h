@@ -209,7 +209,7 @@ namespace Node
         std::string last_leader_cert;
 
         std::map<THASH_id, TRANSACTION_body>  transaction_pool_unverified;
-        std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
+        // std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
         std::map<BLOCK_id,block> blocks;
 
         struct _prepared_block
