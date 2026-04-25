@@ -441,23 +441,6 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
     return true;
 
 }
-#ifdef KALL
-void Node::Service::addToTransactionToPool(const std::string& body)
-{
-    MUTEX_INSPECTOR;
-    THASH_id h=blake2b_hash(body);
-    auto & bt=blocks[prev_block_hash];
-    if(transaction_pool_unverified.count(h))
-    {
-        logNode("transaction already added");
-        return;
-    }
-    TRANSACTION_body t;
-    t.container=body;
-    transaction_pool_unverified.insert({h,t});
-
-}
-#endif
 
 void Node::Service::on_blockResponse(const msg::block_response& br)
 {
@@ -821,36 +804,6 @@ bool Node::Service::Msg(const bcEvent::Msg*e)
                 case msgid::user_message_req:
                 {
                     throw CommonError("case msgid::user_message_req: not implemented");
-#ifdef KALL                    
-                    MUTEX_INSPECTOR;
-                    msg::user_message_req um;
-                    um.unpack(in_bt);
-                    // auto u=root->getUser(um.address_pk_ed,NULL);
-                    // if(!u.valid())
-                    // {
-                    //     logErr2("if(!u.valid()) %s %d",__FILE__,__LINE__);
-                    // }
-                    if(!um.verify())
-                    {
-                        logErr2("if(!um.verify_ed())");
-                        return true;
-                    }
-                    auto u=root->getUser(um.address_pk_ed,NULL);
-                    if(u.valid())
-                    {
-                        if(u->nonce==um.nonce)
-                            addToTransactionToPool(bt.payload);
-                    }
-                    else if(um.nonce==0)
-                    {
-                        addToTransactionToPool(bt.payload);
-                    }
-                    else
-                    {
-                        logErr2("invalid nonce for new user");
-                    }
-                    // logErr2("case msgid::user_message_req:");
-#endif
                 }
                 break;
                 case msgid::node_message_ed:
@@ -1190,38 +1143,6 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg*e)
         std::optional<std::string> err;
         logErr2("send to txvalidator");
         sendEvent(ServiceEnum::TxValidator,e);
-        return true;
-#ifdef KALL
-        msg::user_message_req um(in);
-        if(!err && !um.verify())
-        {
-            err="verify failed";
-            // return true;
-
-        }
-        BigInt nonce=0;
-        // logErr2("getUser %s",base62::encode(um.address_pk_ed).c_str());
-        auto u=root->getUser(um.address_pk_ed,NULL);
-        if(u.valid())
-        {
-            nonce=u->nonce;
-        }
-
-        // logErr2("um.nonce %s",um.nonce.toString().c_str());
-        if(!err && nonce!=um.nonce)
-        {
-            err="invalid_nonce "+ nonce.toString()+" != "+um.nonce.toString();
-        }
-        if(!err)
-            addToTransactionToPool(e->msg);
-
-        msg::transaction_added_rsp tr;
-        tr.err=err.has_value();
-        tr.err_str=err?*err:"transaction added to pool";
-        tr.tx_hash=blake2b_hash(e->msg);
-        // msg::node_message_ed nm(tr.getBuffer(),this_node_name,my_sk_ed);
-        passEvent(new bcEvent::ClientMsgReply(hash, tr.getBuffer(),poppedFrontRoute(e->route)));
-#endif
         return true;
     }
     break;

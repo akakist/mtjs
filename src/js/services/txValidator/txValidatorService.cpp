@@ -187,53 +187,6 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
     hash=blake2b_hash(e->msg);
     switch(p)
     {
-        #ifdef KALL
-    case msgid::user_request:
-    {
-        msg::user_request ur(in);
-
-
-        inBuffer in2(ur.payload);
-        auto p2=in2.get_PN();
-        switch(p2)
-        {
-        case msgid::get_user_status_req:
-        {
-            MUTEX_INSPECTOR;
-            msg::get_user_status_req rq(in2);
-            std::optional<std::string> err;
-            auto u=root->getUser(rq.address_pk_ed,NULL);
-            if(!u.valid())
-                err="user not found "+base62::encode(rq.address_pk_ed);
-
-            msg::get_user_status_rsp r;
-            if(!err)
-            {
-                r.address_pk_ed=rq.address_pk_ed;
-                r.nonce=u->nonce;
-                r.balance=u->balance;
-            }
-            else
-            {
-                r.address_pk_ed=rq.address_pk_ed;
-                r.nonce=0;
-                r.balance=0;
-
-            }
-            if(err)
-                logErr2("get_user_status_req error %s",err->c_str());
-            passEvent(new bcEvent::ClientMsgReply(hash, r.getBuffer(),poppedFrontRoute(e->route)));
-
-        }
-        break;
-        default:
-            throw CommonError("unhandled msgid sdf %d",p);
-        }
-
-
-    }
-    break;
-    #endif
     case msgid::user_message_req:
     {
         MUTEX_INSPECTOR;
@@ -248,10 +201,13 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
         }
         BigInt nonce=0;
         // logErr2("getUser %s",base62::encode(um.address_pk_ed).c_str());
-        auto u=root->getUser(um.address_pk_ed,NULL);
-        if(u.valid())
+        if(!err)
         {
-            nonce=u->nonce;
+            auto u=root->getUser(um.address_pk_ed,NULL);
+            if(u.valid())
+            {
+                nonce=u->nonce;
+            }
         }
 
         // logErr2("um.nonce %s",um.nonce.toString().c_str());
@@ -267,7 +223,6 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
             transaction_pool_verified.insert({h,t});
         }
             // addToTransactionToPool(e->msg);
-        logErr2("txValidated");
         msg::transaction_added_rsp tr;
         tr.err=err.has_value();
         tr.err_str=err?*err:"transaction added to pool";
