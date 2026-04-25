@@ -48,6 +48,7 @@ namespace TxValidator
         bool ServiceInit(const bcEvent::ServiceInit *e);
         bool ClientMsg(const bcEvent::ClientMsg*e);
         bool GetTransactions(const bcEvent::GetTransactions*e);
+        bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
 
 
 

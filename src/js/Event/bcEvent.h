@@ -25,6 +25,7 @@ namespace bcEventEnum
     const EVENT_id AddTx(ghash("@g_AddTx"));
     const EVENT_id ServiceInit(ghash("@g_ServiceInit"));
     const EVENT_id GetTransactions(ghash("@g_GetTransactions"));
+    const EVENT_id InvalidateRoot(ghash("@g_InvalidateRoot"));
     
     
 }
@@ -279,7 +280,6 @@ class TxValidatorStart: public Event::NoPacked
 
     class GetTransactions: public Event::NoPacked
     {
-
     public:
         static Base* construct(const route_t &r)
         {
@@ -287,10 +287,16 @@ class TxValidatorStart: public Event::NoPacked
         }
         GetTransactions(const route_t& r)
             :NoPacked(bcEventEnum::GetTransactions,r){}
-        
-
-
-
+    };
+    class InvalidateRoot: public Event::NoPacked
+    {
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return NULL;
+        }
+        InvalidateRoot(const route_t& r)
+            :NoPacked(bcEventEnum::InvalidateRoot,r){}
     };
 
 }

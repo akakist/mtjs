@@ -747,6 +747,7 @@ void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, con
     root=getRoot(db.get());
     init_root(root);
     blocks.clear();
+    sendEvent(ServiceEnum::TxValidator,new bcEvent::InvalidateRoot(this));
     msg::block_accepted_rsp br;
     br.new_root_hash=prev_block_hash;
     br.node_signer=this_node_name;

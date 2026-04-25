@@ -52,6 +52,8 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base>& e)
         auto& ID=e->id;
         switch(ID)
         {
+        case bcEventEnum::InvalidateRoot:
+            return InvalidateRoot((const bcEvent::InvalidateRoot*)e.get());
         case bcEventEnum::GetTransactions:
             return GetTransactions((const bcEvent::GetTransactions*)e.get());
         case bcEventEnum::ClientMsg:
@@ -161,10 +163,15 @@ bool TxValidator::Service::GetTransactions(const bcEvent::GetTransactions*e)
         rwt.trs.push_back(z.second);
     }
     transaction_pool_verified.clear();
-    logErr2("conf->this_node_name %s",conf->this_node_name.container.c_str());
     msg::node_message_ed nm(rwt.getBuffer(),conf->this_node_name,conf->my_sk_ed);
     passEvent(new bcEvent::MsgReply(nm.getBuffer(),poppedFrontRoute(e->route)));
 
+    return true;
+}
+bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot*e)
+{
+    root=getRoot(conf->db.get());
+    init_root(root);
     return true;
 }
 

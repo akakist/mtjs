@@ -1,0 +1,1 @@
+megatron/tools/scang/scang > megatron/corelib/get_symbol_name.cpp
