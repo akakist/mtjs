@@ -63,21 +63,9 @@ namespace Node
 {
     enum timers
     {
-        // TIMER_BROADCAST_ACK_TIMEDOUT,
         TIMER_START_HEART_BEAT,
         TIMER_RESTART_BLOCK,
     };
-#ifdef KALL
-    struct TIMER_BROADCAST_ACK_TIMEDOUT_cookie: public Refcountable
-    {
-        NODE_id dstName_;
-        BroadcasterTree::TreeNode tree;
-        std::string msg;
-        REF_getter<root_data> root=NULL;
-        route_t route;
-
-    };
-#endif
     struct heart_beat_responce2
     {
         BigInt stake;
@@ -211,7 +199,6 @@ namespace Node
         std::string last_leader_cert;
 
         std::map<THASH_id, TRANSACTION_body>  transaction_pool_of_leader;
-        // std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
         std::map<BLOCK_id,block> blocks;
 
         struct _prepared_block
@@ -235,10 +222,8 @@ namespace Node
         BLOCK_id prev_block_hash;
         void do_start_block();
 
-        // void addToTransactionToPool(const std::string& body);
         void collectTransactions();
         BLOCK_id execute_block(const REF_getter<root_data> &rt, const BLOCK_id & bl, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert);
-        // void execute_transaction(int tx_id, t_params& t, const std::string& senderAddress, const std::vector<std::string>& payloads,const REF_getter<fee_calcer> &by);
 
 
 

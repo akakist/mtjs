@@ -75,8 +75,6 @@ namespace BroadcasterTree
         Service(const SERVICE_id&, const std::string&  nm, IInstance *ins);
         ~Service();
 
-        // void make_broadcast_message(const std::string & msg);
-        // void make_broadcast_message(const std::vector<uint8_t> & msg);
         void make_broadcast_message_to_tree(SERVICE_id dstService,const std::string & msg, const BroadcasterTree::TreeNode& root, const route_t& route);
 
 
@@ -95,18 +93,8 @@ namespace BroadcasterTree
 
         std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
 
-        // std::thread _validator;
-
-
-        // void validator();
-        // MutexC mx;
-        // Condition condvar;
-
-        // std::deque< REF_getter<bcEvent::ClientMsg > > dirty_pool;
         bool is_working=false;
-        // std::string last_block_hash;
         REF_getter<root_data> root=NULL;
-        // REF_getter<IDatabase> db=nullptr;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
 

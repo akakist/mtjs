@@ -213,15 +213,6 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage*
     make_broadcast_message_to_tree(e->dstService, e->msg,root, e->route);
     return true;    
 }
-// void BroadcasterTree::Service::make_broadcast_message(const std::string & msg)
-// {
-// }
-
-// void BroadcasterTree::Service::make_broadcast_message(const std::vector<uint8_t> & msg)
-// {
-//     MUTEX_INSPECTOR;
-//     make_broadcast_message({(char*)msg.data(),msg.size()});
-// }
 void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const std::string & msg, const BroadcasterTree::TreeNode& root, const route_t& route)
 {
     MUTEX_INSPECTOR;
@@ -290,16 +281,12 @@ void registerBroadcasterTreeService(const char* pn)
 bool BroadcasterTree::Service::SendToChild(const bcEvent::SendToChild*e, bool fromNetwork)
 {
     sendEvent(e->dst_service,new bcEvent::Msg(e->payload,e->route));
-    // outBuffer o;
-    // iUtils->packEvent(o,e);
-    // auto hash=blake2b_hash(o.asString()->container);
     passEvent(new bcEvent::SendToChildAck(e->hash(),poppedFrontRoute(e->route)));
     make_broadcast_message_to_tree(e->dst_service,e->payload,e->bt,e->route);
     return true;
 }
 bool BroadcasterTree::Service::SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork)
 {
-    // logNode("stop alarm for hash %s",base62::encode(e->hash).c_str());
     sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BROADCAST_ACK_TIMEDOUT,toRef(e->hash),this));
     return true;
 }

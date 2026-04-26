@@ -1101,6 +1101,5 @@ bool Node::Service::ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ* e)
 {
     auto& s=clientTxSubscriptions[e->route];
     s.created_at=time(NULL);
-    // s.backroute=e->route;
     return true;
 }
