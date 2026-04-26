@@ -9,7 +9,7 @@ namespace ServiceEnum
     const SERVICE_id Node(ghash("@g_Node"));
     const SERVICE_id BlockValidator(ghash("@g_BlockValidator"));
     const SERVICE_id TxValidator(ghash("@g_TxValidator"));
-    // const SERVICE_id Reader(ghash("@g_Reader"));
+    const SERVICE_id BroadcasterTree(ghash("@g_BroadcasterTree"));
     // const SERVICE_id Executor(ghash("@g_Execitor"));
 }
 namespace bcEventEnum
@@ -26,6 +26,7 @@ namespace bcEventEnum
     const EVENT_id ServiceInit(ghash("@g_ServiceInit"));
     const EVENT_id GetTransactions(ghash("@g_GetTransactions"));
     const EVENT_id InvalidateRoot(ghash("@g_InvalidateRoot"));
+    const EVENT_id BroadcastMessage(ghash("@g_BroadcastMessage"));
     
     
 }
@@ -299,4 +300,20 @@ class TxValidatorStart: public Event::NoPacked
             :NoPacked(bcEventEnum::InvalidateRoot,r){}
     };
 
+    class BroadcastMessage: public Event::NoPacked
+    {
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return NULL;
+        }
+        BroadcastMessage(const SERVICE_id& dstService_, const std::string& m, const route_t& r)
+            :NoPacked(bcEventEnum::BroadcastMessage,r), dstService(dstService_),  msg(m) {}
+        
+        SERVICE_id dstService;
+        const std::string msg;
+
+    };
+ 
 }

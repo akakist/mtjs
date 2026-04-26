@@ -63,10 +63,11 @@ namespace Node
 {
     enum timers
     {
-        TIMER_BROADCAST_ACK_TIMEDOUT,
+        // TIMER_BROADCAST_ACK_TIMEDOUT,
         TIMER_START_HEART_BEAT,
         TIMER_RESTART_BLOCK,
     };
+#ifdef KALL
     struct TIMER_BROADCAST_ACK_TIMEDOUT_cookie: public Refcountable
     {
         NODE_id dstName_;
@@ -76,6 +77,7 @@ namespace Node
         route_t route;
 
     };
+#endif
     struct heart_beat_responce2
     {
         BigInt stake;
@@ -159,8 +161,8 @@ namespace Node
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
         bool ClientMsg(const bcEvent::ClientMsg*);
         bool ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ*);
-        bool Msg(const bcEvent::Msg*);
-        bool MsgReply(const bcEvent::MsgReply*);
+        bool Msg(const bcEvent::Msg*, bool fromNetwork);
+        bool MsgReply(const bcEvent::MsgReply*, bool fromNetwork);
 
 
 
@@ -175,9 +177,9 @@ namespace Node
         void do_request_for_transactions(const Node::heart_beat_node_info& li);
 
 
-        void make_broadcast_message(const std::string & msg);
-        void make_broadcast_message(const std::vector<uint8_t> & msg);
-        void make_broadcast_message_to_tree(const std::string & msg, const BroadcasterTree::TreeNode& root, const route_t& route);
+        // void make_broadcast_message(const std::string & msg);
+        // void make_broadcast_message(const std::vector<uint8_t> & msg);
+        // void make_broadcast_message_to_tree(const std::string & msg, const BroadcasterTree::TreeNode& root, const route_t& route);
 
 
 
@@ -233,7 +235,7 @@ namespace Node
         BLOCK_id prev_block_hash;
         void do_start_block();
 
-        void addToTransactionToPool(const std::string& body);
+        // void addToTransactionToPool(const std::string& body);
         void collectTransactions();
         BLOCK_id execute_block(const REF_getter<root_data> &rt, const BLOCK_id & bl, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert);
         // void execute_transaction(int tx_id, t_params& t, const std::string& senderAddress, const std::vector<std::string>& payloads,const REF_getter<fee_calcer> &by);

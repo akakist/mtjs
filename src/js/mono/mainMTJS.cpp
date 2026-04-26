@@ -20,6 +20,8 @@ void registerMTJSModule(const char* );
 void registerNodeService(const char* pn);
 void registerTxValidatorService(const char* pn);
 void registerBlockValidatorService(const char* pn);
+void registerBroadcasterTreeService(const char* pn);
+
 struct par {
     int n; /// n defises
     bool hasParam;
@@ -71,6 +73,8 @@ int mainMTJS(int argc, char** argv )
         registerNodeService(NULL);
         registerTxValidatorService(NULL);
         registerBlockValidatorService(NULL);
+        registerBroadcasterTreeService(NULL);
+
 
 
 #ifdef WEBDUMP

@@ -1,3 +1,4 @@
+#ifdef KALL
 #include "nodeService.h"
 void Node::Service::make_broadcast_message_to_tree(const std::string & msg, const BroadcasterTree::TreeNode& root, const route_t& route)
 {
@@ -58,3 +59,4 @@ void Node::Service::make_broadcast_message(const std::vector<uint8_t> & msg)
     MUTEX_INSPECTOR;
     make_broadcast_message({(char*)msg.data(),msg.size()});
 }
+#endif

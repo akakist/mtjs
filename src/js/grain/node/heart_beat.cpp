@@ -172,7 +172,9 @@ void Node::Service::do_heart_beat()
         h.node_leader=this_node_name;
         h.epoch=root->getValues(NULL)->epoch;
         DBG(logNode("TIMER_HEART_BEAT broadcast heart beat as leader %s",this_node_name.container.c_str()));
-        make_broadcast_message(h.getBuffer());
+        msg::node_message_ed nm(h.getBuffer(),this_node_name,my_sk_ed);
+        sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
+        // make_broadcast_message(h.getBuffer());
         // return;
 
     }

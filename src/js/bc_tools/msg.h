@@ -770,15 +770,16 @@ namespace msg
 
         std::string payload;
         BroadcasterTree::TreeNode tree;
+        SERVICE_id dst_service;
         void pack(outBuffer& b) const final
         {
             message_base::pack(b);
-            b<<payload<<tree;
+            b<<payload<<tree<<dst_service;
         }
         void unpack(inBuffer& b) final
         {
             message_base::unpack(b);
-            b>>payload>>tree;
+            b>>payload>>tree>>dst_service;
         }
 
     };

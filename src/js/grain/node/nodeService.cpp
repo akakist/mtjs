@@ -49,6 +49,7 @@ bool Node::Service::on_startService(const systemEvent::startService*)
     logErr2("ServiceInit nodename %s",this_node_name.container.c_str());
     sendEvent(ServiceEnum::BlockValidator,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     sendEvent(ServiceEnum::TxValidator,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
+    sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     for(auto& z: rpc_addr)
     {
         SECURE sec;
@@ -150,7 +151,8 @@ void Node::Service::do_start_block()
             msg::node_message_ed nm(b.getBuffer(),this_node_name,my_sk_ed);
 
 
-            make_broadcast_message(nm.getBuffer());
+            sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
+            // make_broadcast_message(nm.getBuffer());
         }
     }
 
@@ -189,20 +191,20 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm* e)
 
     }
     break;
-    case timers::TIMER_BROADCAST_ACK_TIMEDOUT:
-    {
-        MUTEX_INSPECTOR;
-        TIMER_BROADCAST_ACK_TIMEDOUT_cookie *c=dynamic_cast<TIMER_BROADCAST_ACK_TIMEDOUT_cookie*>(e->cookie.get());
-        if(!c) throw CommonError("if(!c) 1222447");
+    // case timers::TIMER_BROADCAST_ACK_TIMEDOUT:
+    // {
+    //     MUTEX_INSPECTOR;
+    //     TIMER_BROADCAST_ACK_TIMEDOUT_cookie *c=dynamic_cast<TIMER_BROADCAST_ACK_TIMEDOUT_cookie*>(e->cookie.get());
+    //     if(!c) throw CommonError("if(!c) 1222447");
 
-        logNode("TIMER_BROADCAST_ACK_TIMEDOUT %s",c->dstName_.container.c_str());
+    //     logNode("TIMER_BROADCAST_ACK_TIMEDOUT %s",c->dstName_.container.c_str());
 
-        make_broadcast_message_to_tree(c->msg,c->tree, c->route);
+    //     make_broadcast_message_to_tree(c->msg,c->tree, c->route);
 
-        return true;
+    //     return true;
 
-    }
-    break;
+    // }
+    // break;
 
     }
     return false;
@@ -241,9 +243,9 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base>& e)
         case bcEventEnum::ClientTxSubscribeREQ:
             return ClientTxSubscribeREQ(static_cast<const bcEvent::ClientTxSubscribeREQ*>(e.get()));
         case bcEventEnum::Msg:
-            return Msg(static_cast<const bcEvent::Msg*>(e.get()));
+            return Msg(static_cast<const bcEvent::Msg*>(e.get()),false);
         case bcEventEnum::MsgReply:
-            return MsgReply(static_cast<const bcEvent::MsgReply*>(e.get()));
+            return MsgReply(static_cast<const bcEvent::MsgReply*>(e.get()),false);
         case httpEventEnum::RequestIncoming:
             return RequestIncoming(static_cast<const httpEvent::RequestIncoming*>(e.get()));
         case rpcEventEnum::IncomingOnAcceptor:
@@ -258,9 +260,9 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base>& e)
             case bcEventEnum::ClientTxSubscribeREQ:
                 return ClientTxSubscribeREQ(static_cast<const bcEvent::ClientTxSubscribeREQ*>(ev->e.get()));
             case bcEventEnum::Msg:
-                return Msg(static_cast<const bcEvent::Msg*>(ev->e.get()));
+                return Msg(static_cast<const bcEvent::Msg*>(ev->e.get()),true);
             case bcEventEnum::MsgReply:
-                return MsgReply(static_cast<const bcEvent::MsgReply*>(ev->e.get()));
+                return MsgReply(static_cast<const bcEvent::MsgReply*>(ev->e.get()),true);
             default:
                 throw CommonError("unhabdled ev %d %s",IDA, iUtils->genum_name(IDA));
             }
@@ -277,9 +279,9 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base>& e)
             case bcEventEnum::ClientTxSubscribeREQ:
                 return ClientTxSubscribeREQ(static_cast<const bcEvent::ClientTxSubscribeREQ*>(ev->e.get()));
             case bcEventEnum::Msg:
-                return Msg(static_cast<const bcEvent::Msg*>(ev->e.get()));
+                return Msg(static_cast<const bcEvent::Msg*>(ev->e.get()),true);
             case bcEventEnum::MsgReply:
-                return MsgReply(static_cast<const bcEvent::MsgReply*>(ev->e.get()));
+                return MsgReply(static_cast<const bcEvent::MsgReply*>(ev->e.get()),true);
 
             default:
                 throw CommonError("unhabdled ev %d %s",IDC, iUtils->genum_name(IDC));
@@ -496,7 +498,9 @@ void Node::Service::on_blockResponse(const msg::block_response& br)
             logErr2("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
 
         msg::node_message_ed nm(ba.getBuffer(),this_node_name,my_sk_ed);
-        make_broadcast_message(nm.getBuffer());
+        // make_broadcast_message(nm.getBuffer());
+        sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
+
         bt.block_accepted_sent=true;
     }
 
@@ -507,11 +511,12 @@ void Node::Service::do_request_for_transactions(const Node::heart_beat_node_info
     msg::request_for_transactions rt;
     rt.payload_lc=li.leader_cert;
     msg::node_message_ed nm(rt.getBuffer(),this_node_name,my_sk_ed);
-    make_broadcast_message(nm.getBuffer());
+    sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
+    // make_broadcast_message(nm.getBuffer());
 
 }
 
-bool Node::Service::MsgReply(const bcEvent::MsgReply* e)
+bool Node::Service::MsgReply(const bcEvent::MsgReply* e, bool fromNetwork)
 {
     inBuffer in(e->msg);
 
@@ -535,15 +540,15 @@ bool Node::Service::MsgReply(const bcEvent::MsgReply* e)
         auto p2=in2.get_PN();
         switch (p2)
         {
-        case msgid::broadcast_tree_ack:
-        {
-            MUTEX_INSPECTOR;
-            msg::broadcast_tree_ack m_broadcast_tree_ack;
-            m_broadcast_tree_ack.unpack(in2);
-            sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BROADCAST_ACK_TIMEDOUT,toRef(m_broadcast_tree_ack.hash_buf.container),this));
-            return true;
-        }
-        break;
+        // case msgid::broadcast_tree_ack:
+        // {
+        //     MUTEX_INSPECTOR;
+        //     msg::broadcast_tree_ack m_broadcast_tree_ack;
+        //     m_broadcast_tree_ack.unpack(in2);
+        //     sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BROADCAST_ACK_TIMEDOUT,toRef(m_broadcast_tree_ack.hash_buf.container),this));
+        //     return true;
+        // }
+        // break;
         case msgid::heart_beat_rsp:
         {
             MUTEX_INSPECTOR;
@@ -731,6 +736,7 @@ void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, con
     init_root(root);
     blocks.clear();
     sendEvent(ServiceEnum::TxValidator,new bcEvent::InvalidateRoot(this));
+    sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::InvalidateRoot(this));
     msg::block_accepted_rsp br;
     br.new_root_hash=prev_block_hash;
     br.node_signer=this_node_name;
@@ -745,7 +751,7 @@ void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, con
     iUtils->getNow();
 
 }
-bool Node::Service::Msg(const bcEvent::Msg*e)
+bool Node::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
 {
     MUTEX_INSPECTOR;
 
@@ -772,6 +778,7 @@ bool Node::Service::Msg(const bcEvent::Msg*e)
         auto p2=in2.get_PN();
         switch (p2)
         {
+#ifdef KALL
         case msgid::broadcast_tree:
         {
             MUTEX_INSPECTORS("broadcast_tree");
@@ -959,17 +966,18 @@ bool Node::Service::Msg(const bcEvent::Msg*e)
             return true;
 
         }
+#endif
         break;
 
         default:
-            throw CommonError("unhabdled p2 %s",msgName(p2));
+            throw CommonError("unhabdled 33p2 %s",msgName(p2));
             break;
         }{
 
         }
     } break;
     default:
-        throw CommonError("unhabdled p %s",msgName(p));
+        throw CommonError("unhabdled Zp %s",msgName(p));
     }
     return true;
 }
