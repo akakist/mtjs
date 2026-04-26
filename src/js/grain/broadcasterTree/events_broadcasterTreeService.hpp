@@ -17,15 +17,22 @@ inline std::set<EVENT_id> getEvents_broadcasterTreeService()
 
 	std::set<EVENT_id> out;
 	out.insert(bcEventEnum::AddTx);
+	out.insert(bcEventEnum::BroadcastMessage);
 	out.insert(bcEventEnum::ClientMsg);
 	out.insert(bcEventEnum::ClientMsgReply);
 	out.insert(bcEventEnum::GetTransactions);
 	out.insert(bcEventEnum::InvalidateRoot);
+	out.insert(bcEventEnum::Msg);
 	out.insert(bcEventEnum::MsgReply);
+	out.insert(bcEventEnum::SendToChild);
+	out.insert(bcEventEnum::SendToChildAck);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(rpcEventEnum::IncomingOnAcceptor);
 	out.insert(rpcEventEnum::IncomingOnConnector);
 	out.insert(systemEventEnum::startService);
+	out.insert(timerEventEnum::ResetAlarm);
+	out.insert(timerEventEnum::SetAlarm);
+	out.insert(timerEventEnum::StopAlarm);
 	out.insert(timerEventEnum::TickAlarm);
 	out.insert(timerEventEnum::TickTimer);
 
@@ -35,15 +42,22 @@ inline std::set<EVENT_id> getEvents_broadcasterTreeService()
 inline void regEvents_broadcasterTreeService()
 {
 	iUtils->registerEvent(bcEvent::AddTx::construct);
+	iUtils->registerEvent(bcEvent::BroadcastMessage::construct);
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
 	iUtils->registerEvent(bcEvent::GetTransactions::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
+	iUtils->registerEvent(bcEvent::Msg::construct);
 	iUtils->registerEvent(bcEvent::MsgReply::construct);
+	iUtils->registerEvent(bcEvent::SendToChild::construct);
+	iUtils->registerEvent(bcEvent::SendToChildAck::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnAcceptor::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnConnector::construct);
 	iUtils->registerEvent(systemEvent::startService::construct);
+	iUtils->registerEvent(timerEvent::ResetAlarm::construct);
+	iUtils->registerEvent(timerEvent::SetAlarm::construct);
+	iUtils->registerEvent(timerEvent::StopAlarm::construct);
 	iUtils->registerEvent(timerEvent::TickAlarm::construct);
 	iUtils->registerEvent(timerEvent::TickTimer::construct);
 }

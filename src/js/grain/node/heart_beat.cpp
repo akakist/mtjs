@@ -127,6 +127,7 @@ bool Node::Service::on_heart_beat(const msg::heart_beat &h,const std::string &he
         hba.signature.sign(my_sk_bls, blake2b_hash(heart_beat_payload).container);
 
         msg::node_message_ed nme(hba.getBuffer(),this_node_name,my_sk_ed);
+        // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
         passEvent(new bcEvent::MsgReply(nme.getBuffer(),poppedFrontRoute(route)));
 
     }

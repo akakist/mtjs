@@ -97,7 +97,7 @@ namespace msgid
     {
         node_message_ed,
         user_message_req,transaction_added_rsp,
-        broadcast_tree,broadcast_tree_ack,user_request,get_user_status_req,get_user_status_rsp, heart_beat,heart_beat_rsp,
+        user_request,get_user_status_req,get_user_status_rsp, heart_beat,heart_beat_rsp,
         leader_certificate, block_request, block_response, blockZ, block_accepted_req,block_accepted_rsp, request_for_transactions,response_with_transactions,
         publish_block, get_blocks_req,get_blocks_rsp
     };
@@ -113,10 +113,6 @@ inline const char* msgName(int id)
         return "user_message_req";
     case msgid::transaction_added_rsp:
         return "transaction_added_rsp";
-    case msgid::broadcast_tree:
-        return "broadcast_tree";
-    case msgid::broadcast_tree_ack:
-        return "broadcast_tree_ack";
     case msgid::user_request:
         return "user_request";
     case msgid::get_user_status_req:
@@ -760,46 +756,6 @@ namespace msg
 
     };
 
-
-
-
-
-    struct broadcast_tree: public message_base
-    {
-        broadcast_tree():message_base(msgid::broadcast_tree) {}
-
-        std::string payload;
-        BroadcasterTree::TreeNode tree;
-        SERVICE_id dst_service;
-        void pack(outBuffer& b) const final
-        {
-            message_base::pack(b);
-            b<<payload<<tree<<dst_service;
-        }
-        void unpack(inBuffer& b) final
-        {
-            message_base::unpack(b);
-            b>>payload>>tree>>dst_service;
-        }
-
-    };
-    struct broadcast_tree_ack: public message_base
-    {
-        broadcast_tree_ack():message_base(msgid::broadcast_tree_ack ) {}
-
-        THASH_id hash_buf;
-        void pack(outBuffer& b) const final
-        {
-            message_base::pack(b);
-            b<<hash_buf;
-        }
-        void unpack(inBuffer& b) final
-        {
-            message_base::unpack(b);
-            b>>hash_buf;
-        }
-
-    };
 
     struct get_blocks_req: public message_base
     {

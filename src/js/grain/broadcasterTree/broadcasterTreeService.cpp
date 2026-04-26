@@ -44,12 +44,12 @@ bool BroadcasterTree::Service::on_alarm(const timerEvent::TickAlarm* e)
     case TIMER_BROADCAST_ACK_TIMEDOUT:
     {
         MUTEX_INSPECTOR;
-        TIMER_BROADCAST_ACK_TIMEDOUT_cookie *c=dynamic_cast<TIMER_BROADCAST_ACK_TIMEDOUT_cookie*>(e->cookie.get());
+        bcEvent::SendToChild *c=dynamic_cast<bcEvent::SendToChild*>(e->cookie.get());
         if(!c) throw CommonError("if(!c) 1222447");
 
-        logErr2("TIMER_BROADCAST_ACK_TIMEDOUT %s",c->dstName_.container.c_str());
+        logErr2("TIMER_BROADCAST_ACK_TIMEDOUT %s",c->dstNodeName.container.c_str());
 
-        make_broadcast_message_to_tree(c->dstService, c->msg,c->tree, c->route);
+        make_broadcast_message_to_tree(c->dst_service, c->payload,c->bt, c->route);
 
         return true;
 
@@ -92,6 +92,10 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base>& e)
             return MsgReply(static_cast<const bcEvent::MsgReply*>(e.get()),false);
         case bcEventEnum::Msg:
             return Msg(static_cast<const bcEvent::Msg*>(e.get()),false);
+        case bcEventEnum::SendToChild:
+            return SendToChild(static_cast<const bcEvent::SendToChild*>(e.get()),false);
+        case bcEventEnum::SendToChildAck:
+            return SendToChildAck(static_cast<const bcEvent::SendToChildAck*>(e.get()),false);
 
         case rpcEventEnum::IncomingOnAcceptor:
         {
@@ -104,6 +108,10 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base>& e)
                 return MsgReply(static_cast<const bcEvent::MsgReply*>(ev->e.get()),true);
             case bcEventEnum::Msg:
                 return Msg(static_cast<const bcEvent::Msg*>(ev->e.get()),true);
+            case bcEventEnum::SendToChild:
+                return SendToChild(static_cast<const bcEvent::SendToChild*>(ev->e.get()),true);
+            case bcEventEnum::SendToChildAck:
+                return SendToChildAck(static_cast<const bcEvent::SendToChildAck*>(ev->e.get()),true);
 
             default:
                 throw CommonError("unhabdled ev %d %s",IDA, iUtils->genum_name(IDA));
@@ -120,6 +128,10 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base>& e)
                 return MsgReply(static_cast<const bcEvent::MsgReply*>(ev->e.get()),true);
             case bcEventEnum::Msg:
                 return Msg(static_cast<const bcEvent::Msg*>(ev->e.get()),true);
+            case bcEventEnum::SendToChild:
+                return SendToChild(static_cast<const bcEvent::SendToChild*>(ev->e.get()),true);
+            case bcEventEnum::SendToChildAck:
+                return SendToChildAck(static_cast<const bcEvent::SendToChildAck*>(ev->e.get()),true);
 
             default:
                 throw CommonError("unhabdled ev %d %s",IDC, iUtils->genum_name(IDC));
@@ -204,7 +216,7 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage*
         return true;
     BroadcasterTree::TreeNode root = BroadcasterTree::buildTree(nodes, conf->this_node_name);
 
-    make_broadcast_message_to_tree(ServiceEnum::BroadcasterTree, e->msg,root, e->route);
+    make_broadcast_message_to_tree(e->dstService, e->msg,root, e->route);
     return true;    
 }
 // void BroadcasterTree::Service::make_broadcast_message(const std::string & msg)
@@ -225,23 +237,29 @@ void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstServ
     {
         MUTEX_INSPECTOR;
         // logErr2("send to %s",it->node.name.c_str());
-        msg::broadcast_tree bt;
-        bt.tree=*it;
-        bt.payload=msg;
+        REF_getter<bcEvent::SendToChild> e1=new bcEvent::SendToChild(msg,*it,dstService,it->node.name,route);
+        REF_getter<bcEvent::SendToChild> e2=new bcEvent::SendToChild(msg,*it,dstService,it->node.name,route);
+        // msg::broadcast_tree bt;
+        // bt.tree=*it;
+        // bt.payload=msg;
+        // bt.dst_service=dstService;
 
-        msg::node_message_ed nm(bt.getBuffer(),conf->this_node_name,conf->my_sk_ed);
-        auto sb=nm.getBuffer();
-        sendEvent(it->node.ip, ServiceEnum::BroadcasterTree, new bcEvent::Msg(sb,route));
+        // msg::node_message_ed nm(bt.getBuffer(),conf->this_node_name,conf->my_sk_ed);
+        // auto sb=nm.getBuffer();
+        sendEvent(it->node.ip, ServiceEnum::BroadcasterTree, e1.get());
 
+        // outBuffer o;
+        // iUtils->packEvent(o,e2.get());
 
-        REF_getter<TIMER_BROADCAST_ACK_TIMEDOUT_cookie> cc=new TIMER_BROADCAST_ACK_TIMEDOUT_cookie;
-        cc->dstService=dstService;
-        cc->dstName_=it->node.name;
-        cc->msg=msg;
-        cc->tree=(*it);
-        cc->route=route;
+        // REF_getter<TIMER_BROADCAST_ACK_TIMEDOUT_cookie> cc=new TIMER_BROADCAST_ACK_TIMEDOUT_cookie;
+        // cc->dstService=dstService;
+        // cc->dstName_=it->node.name;
+        // cc->msg=msg;
+        // cc->tree=(*it);
+        // cc->route=route;
+        // logNode("set alarm for hash %s",base62::encode(e2->hash()).c_str());
         sendEvent(ServiceEnum::Timer,new timerEvent::SetAlarm(TIMER_BROADCAST_ACK_TIMEDOUT,
-                  toRef(blake2b_hash(sb).container), cc.get(), BROADCAST_ACK_TIMEDOUT_SEC, this));
+                  toRef(e2->hash()), e2.get(), BROADCAST_ACK_TIMEDOUT_SEC, this));
 
     }
 
@@ -249,6 +267,9 @@ void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstServ
 
 bool BroadcasterTree::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
 {
+    throw CommonError("BroadcasterTree::Service::Msg not implemented");
+#ifdef KALL    
+    logNode("Msg: ");
     MUTEX_INSPECTOR;
 
     inBuffer in(e->msg);
@@ -274,8 +295,20 @@ bool BroadcasterTree::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
         auto p2=in2.get_PN();
         switch (p2)
         {
+        // case msgid::heart_beat:
+        // {
+        //     MUTEX_INSPECTOR;
+        //     //  logNode("case msgid::heart_beat:");
+        //     msg::heart_beat h;
+        //     h.unpack(in_bt);
+        //     on_heart_beat(h,bt.payload, e->route);
+        // }
+        // break;
+
         case msgid::broadcast_tree:
         {
+            throw CommonError("case msgid::broadcast_tree: not implemented");
+            #ifdef KALL
             MUTEX_INSPECTORS("broadcast_tree");
             logNode("Msg: broadcast_tree from %s",node_message_ed.src_node.container.c_str());
             msg::broadcast_tree bt;
@@ -285,6 +318,10 @@ bool BroadcasterTree::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
             bta.hash_buf=blake2b_hash(e->msg);
             msg::node_message_ed nme(bta.getBuffer(),conf->this_node_name,conf->my_sk_ed);
             passEvent(new bcEvent::MsgReply(nme.getBuffer(),poppedFrontRoute(e->route)));
+            logNode("send to dst_service %s",iUtils->serviceName(bt.dst_service).c_str());
+            sendEvent(bt.dst_service,new bcEvent::Msg(bt.payload,e->route));
+            // sendEvent(ServiceEnum::txNode,new bcEvent::Msg(bt.payload,e->route));
+            #endif
         
 #ifdef KALL
             {
@@ -294,15 +331,6 @@ bool BroadcasterTree::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
                 // logErr2("p_bt %d",p_bt);
                 switch(p_bt)
                 {
-                case msgid::heart_beat:
-                {
-                    MUTEX_INSPECTOR;
-                    //  logNode("case msgid::heart_beat:");
-                    msg::heart_beat h;
-                    h.unpack(in_bt);
-                    on_heart_beat(h,bt.payload, e->route);
-                }
-                break;
                 // default: break;
                 case msgid::user_message_req:
                 {
@@ -469,7 +497,7 @@ bool BroadcasterTree::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
         #endif
 
         default:
-            sendEvent(ServiceEnum::Node,new bcEvent::Msg(node_message_ed.payload,e->route));
+            // sendEvent(ServiceEnum::Node,new bcEvent::Msg(node_message_ed.payload,e->route));
 
             // throw CommonError("unhabdled p22222 %s",msgName(p2));
             break;
@@ -478,13 +506,21 @@ bool BroadcasterTree::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
         }
     } break;
     default:
-        throw CommonError("unhabdled p %s",msgName(p));
+        throw CommonError("unhabdled XXp %s",msgName(p));
     }
+#endif    
     return true;
 }
 
 bool BroadcasterTree::Service::MsgReply(const bcEvent::MsgReply* e, bool fromNetwork)
 {
+    if(e->route.size())
+    {
+        passEvent(e);
+        return true;
+    }
+    else throw CommonError("if(e->route.size())");
+#ifdef KALL    
     inBuffer in(e->msg);
 
 
@@ -620,7 +656,8 @@ bool BroadcasterTree::Service::MsgReply(const bcEvent::MsgReply* e, bool fromNet
         break;
 #endif
         default:
-            throw CommonError("unhandled22 p %s",msgName(p2));
+            logNode("unhandled22 2343p %s",msgName(p2));
+            throw CommonError("unhandled22 2343p %s",msgName(p2));
         }
     }
     break;
@@ -628,6 +665,7 @@ bool BroadcasterTree::Service::MsgReply(const bcEvent::MsgReply* e, bool fromNet
         throw CommonError("unhandled11 p %s",msgName(p));
 
     }
+#endif    
     return true;
 }
 #ifdef KALL
@@ -731,3 +769,19 @@ void registerBroadcasterTreeService(const char* pn)
 
 
 
+bool BroadcasterTree::Service::SendToChild(const bcEvent::SendToChild*e, bool fromNetwork)
+{
+    sendEvent(e->dst_service,new bcEvent::Msg(e->payload,e->route));
+    // outBuffer o;
+    // iUtils->packEvent(o,e);
+    // auto hash=blake2b_hash(o.asString()->container);
+    passEvent(new bcEvent::SendToChildAck(e->hash(),poppedFrontRoute(e->route)));
+    make_broadcast_message_to_tree(e->dst_service,e->payload,e->bt,e->route);
+    return true;
+}
+bool BroadcasterTree::Service::SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork)
+{
+    // logNode("stop alarm for hash %s",base62::encode(e->hash).c_str());
+    sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BROADCAST_ACK_TIMEDOUT,toRef(e->hash),this));
+    return true;
+}

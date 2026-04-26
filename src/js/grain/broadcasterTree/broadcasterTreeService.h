@@ -59,17 +59,16 @@ namespace BroadcasterTree
         bool on_alarm(const timerEvent::TickAlarm*);
         bool handleEvent(const REF_getter<Event::Base>& e);
 
-        // bool AddTx(const bcEvent::AddTx *e);
-        // bool BroadcasterTreeStart(const bcEvent::BroadcasterTreeStart *e);
-        // bool BroadcasterTreeStop(const bcEvent::BroadcasterTreeStop *e);
         bool ServiceInit(const bcEvent::ServiceInit *e);
-        // bool ClientMsg(const bcEvent::ClientMsg*e);
         bool GetTransactions(const bcEvent::GetTransactions*e);
         bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
         bool MsgReply(const bcEvent::MsgReply* e, bool fromNetwork);
         bool Msg(const bcEvent::Msg* e, bool fromNetwork);
 
         bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
+        bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
+        bool SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork);
+        
         void logNode(const char* fmt, ...);
 
 

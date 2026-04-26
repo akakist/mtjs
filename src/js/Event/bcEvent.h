@@ -4,6 +4,7 @@
 #include "IDatabase.h"
 #include "blst_cp.h"
 #include "NODE_id.h"
+#include "tree.h"
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
@@ -27,6 +28,8 @@ namespace bcEventEnum
     const EVENT_id GetTransactions(ghash("@g_GetTransactions"));
     const EVENT_id InvalidateRoot(ghash("@g_InvalidateRoot"));
     const EVENT_id BroadcastMessage(ghash("@g_BroadcastMessage"));
+    const EVENT_id SendToChild(ghash("@g_SendToChild"));
+    const EVENT_id SendToChildAck(ghash("@g_SendToChildAck"));
     
     
 }
@@ -315,5 +318,71 @@ class TxValidatorStart: public Event::NoPacked
         const std::string msg;
 
     };
- 
+    class SendToChild: public Event::Base
+    {
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return new SendToChild(r);
+        }
+        SendToChild(const std::string& _payload, const BroadcasterTree::TreeNode &_bt, const SERVICE_id& _dstSvs, const NODE_id& _dstNodeName, const route_t& r)
+            :Base(bcEventEnum::SendToChild,r), payload(_payload),bt(_bt),dst_service(_dstSvs),dstNodeName(_dstNodeName) {}
+        
+        std::string hash() const
+        {
+            Blake2bHasher h;
+            h.update(payload);
+            h.update(bt.node.name.container);
+            return h.final();
+        }    
+        std::string payload;
+        BroadcasterTree::TreeNode bt;
+        SERVICE_id dst_service;
+        NODE_id dstNodeName;
+
+        SendToChild(const route_t& r)
+            :Base(bcEventEnum::SendToChild,r) {}
+
+        void unpack(inBuffer& o)
+        {   
+
+            o>>payload>>bt>>dst_service>>dstNodeName;
+        }
+        void pack(outBuffer& o) const
+        {
+
+            o<<payload<<bt<<dst_service<<dstNodeName;
+        }
+
+    };
+   class SendToChildAck: public Event::Base
+    {
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return new SendToChildAck(r);
+        }
+        SendToChildAck(const std::string& _hash, const route_t& r)
+            :Base(bcEventEnum::SendToChildAck,r), hash(_hash) {}
+        
+        std::string hash;
+
+        SendToChildAck(const route_t& r)
+            :Base(bcEventEnum::SendToChildAck,r) {}
+
+        void unpack(inBuffer& o)
+        {   
+
+            o>>hash;
+        }
+        void pack(outBuffer& o) const
+        {
+
+            o<<hash;
+        }
+
+    };
+  
 }
