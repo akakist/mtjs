@@ -63,7 +63,6 @@ namespace BroadcasterTree
         bool GetTransactions(const bcEvent::GetTransactions*e);
         bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
         bool MsgReply(const bcEvent::MsgReply* e, bool fromNetwork);
-        bool Msg(const bcEvent::Msg* e, bool fromNetwork);
 
         bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
         bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);

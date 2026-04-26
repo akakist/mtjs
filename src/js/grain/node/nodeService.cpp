@@ -191,20 +191,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm* e)
 
     }
     break;
-    // case timers::TIMER_BROADCAST_ACK_TIMEDOUT:
-    // {
-    //     MUTEX_INSPECTOR;
-    //     TIMER_BROADCAST_ACK_TIMEDOUT_cookie *c=dynamic_cast<TIMER_BROADCAST_ACK_TIMEDOUT_cookie*>(e->cookie.get());
-    //     if(!c) throw CommonError("if(!c) 1222447");
-
-    //     logNode("TIMER_BROADCAST_ACK_TIMEDOUT %s",c->dstName_.container.c_str());
-
-    //     make_broadcast_message_to_tree(c->msg,c->tree, c->route);
-
-    //     return true;
-
-    // }
-    // break;
 
     }
     return false;
@@ -758,13 +744,11 @@ void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, con
 }
 bool Node::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
 {
-        // logNode("Msg: ");
 
     MUTEX_INSPECTOR;
 
     inBuffer in(e->msg);
 
-    // printf("NODE KALL\n");
     auto p=in.get_PN();
     switch(p)
     {
@@ -884,77 +868,8 @@ bool Node::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
 
 
             }
-
-
-
-
-
         }
         break;        
-#ifdef KALL
-        case msgid::broadcast_tree:
-        {
-            MUTEX_INSPECTORS("broadcast_tree");
-            msg::broadcast_tree bt;
-            bt.unpack(in2);
-            make_broadcast_message_to_tree(bt.payload,bt.tree,e->route);
-            msg::broadcast_tree_ack bta;
-            bta.hash_buf=blake2b_hash(e->msg);
-            msg::node_message_ed nme(bta.getBuffer(),this_node_name,my_sk_ed);
-            auto popped_route=poppedFrontRoute(e->route);
-            passEvent(new bcEvent::MsgReply(nme.getBuffer(),popped_route));
-
-            {
-                MUTEX_INSPECTOR;
-                inBuffer in_bt(bt.payload);
-                auto p_bt=in_bt.get_PN();
-                // logErr2("p_bt %d",p_bt);
-                switch(p_bt)
-                {
-                // default: break;
-                case msgid::user_message_req:
-                {
-                    throw CommonError("case msgid::user_message_req: not implemented");
-                }
-                break;
-                case msgid::node_message_ed:
-                {
-                    MUTEX_INSPECTOR;
-                    msg::node_message_ed nm4(in_bt);
-                    if(!nm4.verify(root->getNode(nm4.src_node,NULL)->ed_pk))
-                    {
-                        logNode("msg::node_message_ed verify failed");
-                        return true;
-                    }
-
-                    inBuffer in4(nm4.payload);
-                    int t4=in4.get_PN();
-                    switch(t4)
-                    {
-                    
-                    default:
-                        logNode("unhandled pp4 %s %d",msgName(t4),t4);
-
-                    }
-                }
-                break;
-                default:
-                    logErr2("unhandled msg dd3 %s",msgName(p_bt));
-                    return true;
-                    // break;
-                }
-            }
-        }
-        break;
-        case msgid::get_blocks_req:
-        {
-            logNode("case msgid::get_blocks_req: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            msg::get_blocks_req gbr(in2);
-            on_get_blocks_req(gbr,e->route);
-            return true;
-
-        }
-#endif
         break;
         case msgid::heart_beat:
         {
