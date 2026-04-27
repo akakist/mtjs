@@ -13,6 +13,8 @@ namespace ServiceEnum
     const SERVICE_id BroadcasterTree(ghash("@g_BroadcasterTree"));
     const SERVICE_id GrainReader(ghash("@g_GrainReader"));
     const SERVICE_id BlockStreamer(ghash("@g_BlockStreamer"));
+    const SERVICE_id LeaderElection(ghash("@g_LeaderElection"));
+    
     
 }
 namespace bcEventEnum
