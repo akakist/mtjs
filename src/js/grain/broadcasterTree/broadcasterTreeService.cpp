@@ -170,6 +170,7 @@ bool BroadcasterTree::Service::ServiceInit(const bcEvent::ServiceInit *e)
     init_root(root);
     return true;
 }
+#ifdef KALL
 bool BroadcasterTree::Service::GetTransactions(const bcEvent::GetTransactions*e)
 {
     msg::response_with_transactions rwt;
@@ -183,6 +184,7 @@ bool BroadcasterTree::Service::GetTransactions(const bcEvent::GetTransactions*e)
 
     return true;
 }
+#endif
 bool BroadcasterTree::Service::InvalidateRoot(const bcEvent::InvalidateRoot*e)
 {
     root=getRoot(conf->db.get());

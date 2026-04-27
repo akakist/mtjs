@@ -117,7 +117,7 @@ JSValue js_tx_subscribe(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     JSValue cb=argv[1];
     op->tx_subscription_cb.emplace(JHolder(ctx,cb));
 
-    op->broadcaster->sendEvent(node_addr,ServiceEnum::Node, new bcEvent::ClientTxSubscribeREQ(op->listener_->serviceId));
+    op->broadcaster->sendEvent(node_addr,ServiceEnum::BlockStreamer, new bcEvent::ClientTxSubscribeREQ(op->listener_->serviceId));
 
     // op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT,toRef(hash.container),NULL,to,op->listener_));
     return JS_UNDEFINED;
@@ -200,7 +200,7 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
 
     auto buf=um.getBuffer();
     auto hash=blake2b_hash(buf);
-    op->broadcaster->sendEvent(node_addr,ServiceEnum::Node, new bcEvent::ClientMsg(buf, op->listener_->serviceId));
+    op->broadcaster->sendEvent(node_addr,ServiceEnum::TxValidator, new bcEvent::ClientMsg(buf, op->listener_->serviceId));
 
     // logErr2("setalarm %lf",to);
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT,toRef(hash.container),NULL,to,op->listener_));
@@ -417,7 +417,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     um.sign(sk);
     std::string buf=um.getBuffer();
     auto hash=blake2b_hash(buf);
-    op->broadcaster->sendEvent(node_addr,ServiceEnum::Node, new bcEvent::ClientMsg(buf, op->listener_->serviceId));
+    op->broadcaster->sendEvent(node_addr,ServiceEnum::TxValidator, new bcEvent::ClientMsg(buf, op->listener_->serviceId));
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT,toRef(hash.container),NULL,timeout,op->listener_));
 
@@ -489,7 +489,7 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     ur.payload=m.getBuffer();
 
     auto hash=blake2b_hash(ur.getBuffer());
-    op->broadcaster->sendEvent(scope.toStdString(argv[0]),ServiceEnum::Node, new bcEvent::ClientMsg(ur.getBuffer(), op->listener_->serviceId));
+    op->broadcaster->sendEvent(scope.toStdString(argv[0]),ServiceEnum::GrainReader, new bcEvent::ClientMsg(ur.getBuffer(), op->listener_->serviceId));
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT,toRef(hash.container),NULL,to,op->listener_));
 

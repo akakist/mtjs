@@ -14,7 +14,6 @@ include_directories(/usr/local/include)
 add_library(node-serviceS STATIC
     node.cpp
     nodeService.cpp
-    broadcast.cpp
     sync.cpp
     heart_beat.cpp
 )

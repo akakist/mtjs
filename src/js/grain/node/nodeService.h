@@ -32,11 +32,6 @@ enum State
 {
     NORMAL,SYNCING
 };
-struct clientTxSubscription
-{
-    time_t created_at;
-    clientTxSubscription():created_at(time(NULL)) {}
-};
 struct _feeCalcers
 {
     std::map<std::string /*pk*/,REF_getter<fee_calcer>> calcers;
@@ -147,8 +142,7 @@ namespace Node
 
 
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
-        bool ClientMsg(const bcEvent::ClientMsg*);
-        bool ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ*);
+        // bool ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ*);
         bool Msg(const bcEvent::Msg*, bool fromNetwork);
         bool MsgReply(const bcEvent::MsgReply*, bool fromNetwork);
 
@@ -159,21 +153,13 @@ namespace Node
         bool on_heart_beat(const msg::heart_beat &hb,const std::string &bt_payload, const route_t& route);
         void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);
 
-        // bool verify_lider_certificate(const msg::leader_certificate& s);
         void make_leader_certificate();
 
         void do_request_for_transactions(const Node::heart_beat_node_info& li);
 
 
-        // void make_broadcast_message(const std::string & msg);
-        // void make_broadcast_message(const std::vector<uint8_t> & msg);
-        // void make_broadcast_message_to_tree(const std::string & msg, const BroadcasterTree::TreeNode& root, const route_t& route);
 
 
-
-
-
-        // std::string last_block_hash;
 
         struct block
         {
@@ -212,8 +198,8 @@ namespace Node
             }
         };
         _prepared_block prepared_block;
-        void do_client_tx_report(const msg::publish_block &pb);
-
+        // void do_client_tx_report(const msg::publish_block &pb);
+// 
         void setBlockId(const BLOCK_id& b)
         {
             prev_block_hash=b;
@@ -245,7 +231,6 @@ namespace Node
         REF_getter<IDatabase> db=nullptr;
 
 
-        std::map<route_t,clientTxSubscription> clientTxSubscriptions;
 
         std::string sqlite_pn;
         std::string rocksdb_path;

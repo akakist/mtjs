@@ -79,6 +79,8 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base>& e)
 
             switch(IDA)
             {
+            case bcEventEnum::ClientMsg:
+                return ClientMsg((const bcEvent::ClientMsg*)ev->e.get());
             default:
                 throw CommonError("unhabdled ev %d %s",IDA, iUtils->genum_name(IDA));
             }
@@ -90,6 +92,8 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base>& e)
             auto &IDC=ev->e->id;
             switch(IDC)
             {
+            case bcEventEnum::ClientMsg:
+                return ClientMsg((const bcEvent::ClientMsg*)ev->e.get());
 
             default:
                 throw CommonError("unhabdled ev %d %s",IDC, iUtils->genum_name(IDC));
@@ -238,7 +242,6 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
 
     return true;
 }
-
 
 void registerTxValidatorService(const char* pn)
 {

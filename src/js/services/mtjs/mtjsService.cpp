@@ -541,7 +541,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP* e)
         {
             THASH_id tx_hash=blake2b_hash(pb.att_data.trs[ti].container);
             jtr["tx_hash"] = base62::encode(tx_hash.container);
-            logErr2("ClientTxSubscribeRSP: tx_hash %s",base62::encode(tx_hash.container).c_str());
+            // logErr2("ClientTxSubscribeRSP: tx_hash %s",base62::encode(tx_hash.container).c_str());
             JSScope <10,10> scope(js_ctx);
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);

@@ -34,14 +34,6 @@ bool Node::Service::on_startService(const systemEvent::startService*)
     init_root(root);
 
 
-    // char *_bls_sk_name=getenv(my_sk_bls_env_key.c_str());
-    // if(!_bls_sk_name)
-    //     throw CommonError("if(!_bls_sk_name) "+my_sk_bls_env_key);
-    // char *_ed_sk_name=getenv(my_sk_ed_env_key.c_str());
-    // if(!_ed_sk_name)
-    //     throw CommonError("if(!_bls_sk_name) "+my_sk_ed_env_key);
-
-
     my_sk_bls.deserializeBase62Str(getenv2(my_sk_bls_env_key));
 
 
@@ -50,6 +42,7 @@ bool Node::Service::on_startService(const systemEvent::startService*)
     sendEvent(ServiceEnum::BlockValidator,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     sendEvent(ServiceEnum::TxValidator,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
+    sendEvent(ServiceEnum::GrainReader,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     for(auto& z: rpc_addr)
     {
         SECURE sec;
@@ -224,10 +217,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base>& e)
         case bcEventEnum::ClientMsgReply:
             passEvent(e);
             return true;
-        case bcEventEnum::ClientMsg:
-            return ClientMsg(static_cast<const bcEvent::ClientMsg*>(e.get()));
-        case bcEventEnum::ClientTxSubscribeREQ:
-            return ClientTxSubscribeREQ(static_cast<const bcEvent::ClientTxSubscribeREQ*>(e.get()));
         case bcEventEnum::Msg:
             return Msg(static_cast<const bcEvent::Msg*>(e.get()),false);
         case bcEventEnum::MsgReply:
@@ -241,10 +230,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base>& e)
 
             switch(IDA)
             {
-            case bcEventEnum::ClientMsg:
-                return ClientMsg(static_cast<const bcEvent::ClientMsg*>(ev->e.get()));
-            case bcEventEnum::ClientTxSubscribeREQ:
-                return ClientTxSubscribeREQ(static_cast<const bcEvent::ClientTxSubscribeREQ*>(ev->e.get()));
             case bcEventEnum::Msg:
                 return Msg(static_cast<const bcEvent::Msg*>(ev->e.get()),true);
             case bcEventEnum::MsgReply:
@@ -260,10 +245,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base>& e)
             auto &IDC=ev->e->id;
             switch(IDC)
             {
-            case bcEventEnum::ClientMsg:
-                return ClientMsg(static_cast<const bcEvent::ClientMsg*>(ev->e.get()));
-            case bcEventEnum::ClientTxSubscribeREQ:
-                return ClientTxSubscribeREQ(static_cast<const bcEvent::ClientTxSubscribeREQ*>(ev->e.get()));
             case bcEventEnum::Msg:
                 return Msg(static_cast<const bcEvent::Msg*>(ev->e.get()),true);
             case bcEventEnum::MsgReply:
@@ -531,15 +512,6 @@ bool Node::Service::MsgReply(const bcEvent::MsgReply* e, bool fromNetwork)
         auto p2=in2.get_PN();
         switch (p2)
         {
-        // case msgid::broadcast_tree_ack:
-        // {
-        //     MUTEX_INSPECTOR;
-        //     msg::broadcast_tree_ack m_broadcast_tree_ack;
-        //     m_broadcast_tree_ack.unpack(in2);
-        //     sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BROADCAST_ACK_TIMEDOUT,toRef(m_broadcast_tree_ack.hash_buf.container),this));
-        //     return true;
-        // }
-        // break;
         case msgid::heart_beat_rsp:
         {
             MUTEX_INSPECTOR;
@@ -659,14 +631,6 @@ void Node::Service::dump_stats(const msg::publish_block&  pb)
 
     }
 }
-void Node::Service::do_client_tx_report(const msg::publish_block &pb)
-{
-    MUTEX_INSPECTOR;
-    for(auto &z:clientTxSubscriptions)
-    {
-        passEvent(new bcEvent::ClientTxSubscribeRSP(pb.getBuffer(),poppedFrontRoute(z.first)));
-    }
-}
 void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, const NODE_id& src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
@@ -709,7 +673,7 @@ void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, con
     pb.att_data=prepared_block.att_data;
     pb.block_accepted_req=ba.getBuffer();
     pb.epoch=prepared_block.epoch;
-    do_client_tx_report(pb);
+    sendEvent(ServiceEnum::BlockStreamer,new bcEvent::StreamBlock(pb.getBuffer(),this));
     dump_stats(pb);
     SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
     dbs.exec("CREATE TABLE IF NOT EXISTS blocks ("
@@ -728,6 +692,7 @@ void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, con
     blocks.clear();
     sendEvent(ServiceEnum::TxValidator,new bcEvent::InvalidateRoot(this));
     sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::InvalidateRoot(this));
+    sendEvent(ServiceEnum::GrainReader,new bcEvent::InvalidateRoot(this));
     msg::block_accepted_rsp br;
     br.new_root_hash=prev_block_hash;
     br.node_signer=this_node_name;
@@ -1010,78 +975,6 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 }
 
 
-bool Node::Service::ClientMsg(const bcEvent::ClientMsg*e)
-{
-
-
-    MUTEX_INSPECTOR;
-    inBuffer in(e->msg);
-
-    auto p=in.get_PN();
-    THASH_id hash;
-    hash=blake2b_hash(e->msg);
-    switch(p)
-    {
-    case msgid::user_request:
-    {
-        msg::user_request ur(in);
-
-
-        inBuffer in2(ur.payload);
-        auto p2=in2.get_PN();
-        switch(p2)
-        {
-        case msgid::get_user_status_req:
-        {
-            MUTEX_INSPECTOR;
-            msg::get_user_status_req rq(in2);
-            std::optional<std::string> err;
-            auto u=root->getUser(rq.address_pk_ed,NULL);
-            if(!u.valid())
-                err="user not found "+base62::encode(rq.address_pk_ed);
-
-            msg::get_user_status_rsp r;
-            if(!err)
-            {
-                r.address_pk_ed=rq.address_pk_ed;
-                r.nonce=u->nonce;
-                r.balance=u->balance;
-            }
-            else
-            {
-                r.address_pk_ed=rq.address_pk_ed;
-                r.nonce=0;
-                r.balance=0;
-
-            }
-            if(err)
-                logErr2("get_user_status_req error %s",err->c_str());
-            passEvent(new bcEvent::ClientMsgReply(hash, r.getBuffer(),poppedFrontRoute(e->route)));
-
-        }
-        break;
-        default:
-            throw CommonError("unhandled msgid sdf %d",p);
-        }
-
-
-    }
-    break;
-    case msgid::user_message_req:
-    {
-        MUTEX_INSPECTOR;
-        std::optional<std::string> err;
-        logErr2("send to txvalidator");
-        sendEvent(ServiceEnum::TxValidator,e);
-        return true;
-    }
-    break;
-    default:
-        throw CommonError("unhandled msgid e. ff %d",p);
-    }
-
-    return true;
-}
 
 
 void Node::Service::logNode(const char* fmt, ...)
@@ -1096,10 +989,4 @@ void Node::Service::logNode(const char* fmt, ...)
         va_end(ap);
 
     }
-}
-bool Node::Service::ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ* e)
-{
-    auto& s=clientTxSubscriptions[e->route];
-    s.created_at=time(NULL);
-    return true;
 }

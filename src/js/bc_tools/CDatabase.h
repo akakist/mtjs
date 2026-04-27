@@ -56,6 +56,8 @@ struct CDatabase: public IDatabase
         options.write_buffer_size = 64 * 1024 * 1024; // 64MB memtable
         options.target_file_size_base = 64 * 1024 * 1024;
         options.level_compaction_dynamic_level_bytes = true;
+        options.keep_log_file_num = 3;        // хранить только 3 старых лога
+        options.max_log_file_size = 10 * 1024 * 1024; // 10 MB
         rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
         if (!s.ok()) {
             std::cerr << "Open failed: " << s.ToString() << "\n";

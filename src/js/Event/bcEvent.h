@@ -11,7 +11,9 @@ namespace ServiceEnum
     const SERVICE_id BlockValidator(ghash("@g_BlockValidator"));
     const SERVICE_id TxValidator(ghash("@g_TxValidator"));
     const SERVICE_id BroadcasterTree(ghash("@g_BroadcasterTree"));
-    // const SERVICE_id Executor(ghash("@g_Execitor"));
+    const SERVICE_id GrainReader(ghash("@g_GrainReader"));
+    const SERVICE_id BlockStreamer(ghash("@g_BlockStreamer"));
+    
 }
 namespace bcEventEnum
 {
@@ -30,6 +32,7 @@ namespace bcEventEnum
     const EVENT_id BroadcastMessage(ghash("@g_BroadcastMessage"));
     const EVENT_id SendToChild(ghash("@g_SendToChild"));
     const EVENT_id SendToChildAck(ghash("@g_SendToChildAck"));
+    const EVENT_id StreamBlock(ghash("@g_StreamBlock"));
     
     
 }
@@ -384,5 +387,19 @@ class TxValidatorStart: public Event::NoPacked
         }
 
     };
-  
+    class StreamBlock: public Event::NoPacked
+    {
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return NULL;
+        }
+        StreamBlock(const std::string& _payload, const route_t& r)
+            :NoPacked(bcEventEnum::StreamBlock,r),  payload(_payload) {}
+        
+        const std::string payload;
+
+    };
+ 
 }
