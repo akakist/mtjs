@@ -16,15 +16,12 @@ public:
     JS_RPC_response(const REF_getter<mtjsEvent::mtjsRpcRSP>& _rsp, const REF_getter<epoll_socket_info>& _esi ) : rsp(_rsp),esi(_esi)
     {
     }
-    ~JS_RPC_response()
-    {
-    }
 
 };
 
 
 static void js_response_finalizer(JSRuntime* rt, JSValue val) {
-    JS_RPC_response* req = static_cast<JS_RPC_response*>(JS_GetOpaque(val, js_rpc_response_class_id));
+    auto* req = static_cast<JS_RPC_response*>(JS_GetOpaque(val, js_rpc_response_class_id));
     if (req) {
         delete req;
     }

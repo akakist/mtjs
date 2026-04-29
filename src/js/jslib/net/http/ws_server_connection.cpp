@@ -8,7 +8,7 @@ JSClassID js_ws_server_connection_class_id;
 
 static void js_ws_server_connection_finalizer(JSRuntime* rt, JSValue val) {
 
-    JS_WS_server_connection* req = static_cast<JS_WS_server_connection*>(JS_GetOpaque(val, js_ws_server_connection_class_id));
+    auto* req = static_cast<JS_WS_server_connection*>(JS_GetOpaque(val, js_ws_server_connection_class_id));
     if (req) {
 
         delete req;

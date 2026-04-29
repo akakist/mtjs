@@ -21,7 +21,7 @@
 struct clientTxSubscription
 {
     time_t created_at;
-    clientTxSubscription():created_at(time(nullptr)) {}
+    clientTxSubscription():created_at(time(NULL)) {}
 };
 
 enum timers
@@ -82,7 +82,7 @@ struct heart_beat_info
 };
 
 
-namespace LeaderElection
+namespace TransactionCollector
 {
     enum timers
     {
@@ -104,7 +104,7 @@ namespace LeaderElection
         bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
         bool StartElection(const bcEvent::StartElection*e);
         // bool ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ*);
-        // bool StreamBlock(const bcEvent::StreamBlock*);
+        bool StartCollector(const bcEvent::StartCollector*);
         
 
         void logNode(const char* fmt, ...);
@@ -112,7 +112,7 @@ namespace LeaderElection
         void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);
 
         void make_leader_certificate();
-        void do_request_for_transactions(const heart_beat_node_info& li);
+        bool MsgReply(const bcEvent::MsgReply* e);
 
 
         Service(const SERVICE_id&, const std::string&  nm, IInstance *ins);
@@ -138,6 +138,8 @@ namespace LeaderElection
         REF_getter<root_data> root=NULL;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
+
+        std::map<THASH_id, TRANSACTION_body>  transaction_pool_of_leader;
 
 
         std::map<route_t,clientTxSubscription> clientTxSubscriptions;

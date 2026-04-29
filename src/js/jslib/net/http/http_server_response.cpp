@@ -15,8 +15,7 @@ public:
     JS_HTTP_Response(const REF_getter<HTTP_ResponseP>& r) : respP(r) {
     }
     ~JS_HTTP_Response()
-    {
-    }
+    = default;
 };
 
 

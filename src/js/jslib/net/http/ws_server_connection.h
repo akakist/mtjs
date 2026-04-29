@@ -18,7 +18,6 @@ public:
     {
     }
     ~JS_WS_server_connection()
-    {
-    }
+    = default;
 
 };

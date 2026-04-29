@@ -2,7 +2,6 @@
 #include <SQLiteCpp/Database.h>
 #include "tools_mt.h"
 #include "blst_cp.h"
-#include "base62.h"
 void Node::Service::on_get_blocks_req(const msg::get_blocks_req &r, const route_t& route)
 {
     SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READONLY);

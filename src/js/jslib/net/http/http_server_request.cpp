@@ -4,13 +4,8 @@
 #include "http_server_request.h"
 #include "common/js_tools.h"
 #include "ioStreams.h"
-#include "quickjs.h"
 #include <string_view>
-#include <vector>
 #include "httpUrlParser.h"
-#include "sv.h"
-
-#include "quickjs.h"
 
 
 static JSClassID js_request_class_id;
@@ -24,8 +19,7 @@ public:
     {
     }
     ~JS_HTTP_Request()
-    {
-    }
+    = default;
 
 };
 

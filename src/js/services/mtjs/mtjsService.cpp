@@ -8,14 +8,11 @@
 #include <mutexInspector.h>
 #include "IUtils.h"
 #include <deque>
-#include <string>
-#include "version.h"
 #include "events_mtjs.hpp"
 #include "common/rcf.h"
 #include "common/mtjs_opaque.h"
 #include <msockaddr_in.h>
 
-#include "common/mtjsEvent.h"
 #include "common/jsscope.h"
 #include "common/timers.h"
 #include "Events/Tools/webHandlerEvent.h"

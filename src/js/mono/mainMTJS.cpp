@@ -24,6 +24,7 @@ void registerBroadcasterTreeService(const char* pn);
 void registerGrainReaderService(const char* pn);
 void registerBlockStreamerService(const char* pn);
 void registerLeaderElectionService(const char* pn);
+void registerTransactionCollectorService(const char* pn);
 struct par {
     int n; /// n defises
     bool hasParam;
@@ -79,6 +80,7 @@ int mainMTJS(int argc, char** argv )
         registerGrainReaderService(NULL);
 	registerBlockStreamerService(NULL);
 	registerLeaderElectionService(NULL);
+	registerTransactionCollectorService(NULL);
 
 
 

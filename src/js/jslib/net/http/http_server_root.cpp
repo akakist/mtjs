@@ -15,8 +15,8 @@ static JSValue js_createServer(JSContext *ctx, JSValueConst this_val,
                                int argc, JSValueConst *argv)
 {
     MUTEX_INSPECTOR;
-    mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
-    if(op==NULL)
+    auto *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);
+    if(op==nullptr)
     {
         printf("if(op==NULL)\n");
         return JS_ThrowTypeError(ctx, "if(op==NULL)");
@@ -45,7 +45,7 @@ static JSValue js_createServer(JSContext *ctx, JSValueConst this_val,
     }
 
 
-    JS_HttpServer* srv = new JS_HttpServer(ctx, op->listener_,op->broadcaster,op->rcf);
+    auto* srv = new JS_HttpServer(ctx, op->listener_,op->broadcaster,op->rcf);
     JSValue jsSrv = JS_NewObjectClass(ctx,js_http_server_class_id);
 
     if (JS_IsException(jsSrv)) {

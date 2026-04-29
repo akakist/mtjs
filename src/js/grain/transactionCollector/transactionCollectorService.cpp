@@ -2,48 +2,40 @@
 #include "Events/System/timerEvent.h"
 #include "corelib/mutexInspector.h"
 #include "Event/bcEvent.h"
-#include <time.h>
+#include <ctime>
 #include <map>
-#include "leaderElectionService.h"
+#include "transactionCollectorService.h"
 #include "tools_mt.h"
-#include "tree.h"
-#include "events_leaderElectionService.hpp"
+#include "events_transactionCollectorService.hpp"
 #include "version_mega.h"
 #include "tr_exec.h"
 #include "CDatabase.h"
-#include "s_ed.h"
 #include "QUORUM.h"
 #include <SQLiteCpp/Database.h>
-#include "CDatabase.h"
-#include <iostream>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <chrono>
 #include "init_root.h"
 
 
 
-bool LeaderElection::Service::on_startService(const systemEvent::startService*)
+bool TransactionCollector::Service::on_startService(const systemEvent::startService*)
 {
     MUTEX_INSPECTOR;
 
     return true;
 }
 
-bool LeaderElection::Service::on_timer(const timerEvent::TickTimer*e)
+bool TransactionCollector::Service::on_timer(const timerEvent::TickTimer*e)
 {
     MUTEX_INSPECTOR;
     return true;
 }
-bool LeaderElection::Service::on_alarm(const timerEvent::TickAlarm* e)
+bool TransactionCollector::Service::on_alarm(const timerEvent::TickAlarm* e)
 {
     MUTEX_INSPECTOR;
     return false;
 }
 
 
-bool LeaderElection::Service::handleEvent(const REF_getter<Event::Base>& e)
+bool TransactionCollector::Service::handleEvent(const REF_getter<Event::Base>& e)
 {
     MUTEX_INSPECTOR;
     XTRY;
@@ -55,6 +47,8 @@ bool LeaderElection::Service::handleEvent(const REF_getter<Event::Base>& e)
         case bcEventEnum::StartElection:
             return StartElection((const bcEvent::StartElection*)e.get());
 
+        case bcEventEnum::StartCollector:
+            return StartCollector((const bcEvent::StartCollector*)e.get());
         case bcEventEnum::Msg:
             return Msg((const bcEvent::Msg*)e.get());
         case bcEventEnum::MsgReply:
@@ -111,26 +105,26 @@ bool LeaderElection::Service::handleEvent(const REF_getter<Event::Base>& e)
 
     } catch(std::exception &e)
     {
-        logErr2("LeaderElection std::exception  %s",e.what());
+        logErr2("TransactionCollector std::exception  %s",e.what());
     }
     XPASS;
     return false;
 }
 #include <regex>
 
-LeaderElection::Service::~Service()
+TransactionCollector::Service::~Service()
 {
 }
 
 
-LeaderElection::Service::Service(const SERVICE_id& id, const std::string& nm,IInstance* ins)
+TransactionCollector::Service::Service(const SERVICE_id& id, const std::string& nm,IInstance* ins)
     :
     UnknownBase(nm),
     ListenerBuffered1Thread(nm,id),
     Broadcaster(ins)
 {
 }
-bool LeaderElection::Service::ServiceInit(const bcEvent::ServiceInit *e)
+bool TransactionCollector::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     conf=e;
     if(!root.valid())
@@ -139,13 +133,13 @@ bool LeaderElection::Service::ServiceInit(const bcEvent::ServiceInit *e)
     init_root(root);
     return true;
 }
-bool LeaderElection::Service::InvalidateRoot(const bcEvent::InvalidateRoot*e)
+bool TransactionCollector::Service::InvalidateRoot(const bcEvent::InvalidateRoot*e)
 {
     root=getRoot(conf->db.get());
     init_root(root);
     return true;
 }
-bool LeaderElection::Service::StartElection(const bcEvent::StartElection*e)
+bool TransactionCollector::Service::StartElection(const bcEvent::StartElection*e)
 {
     std::string res;
     int err=conf->db->get_cell("#root_hash#",&res);
@@ -192,7 +186,7 @@ bool LeaderElection::Service::StartElection(const bcEvent::StartElection*e)
         h.epoch=root->getValues(NULL)->epoch;
         DBG(logNode("TIMER_HEART_BEAT broadcast heart beat as leader %s",this_node_name.container.c_str()));
         msg::node_message_ed nm(h.getBuffer(),conf->this_node_name,conf->my_sk_ed);
-        sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::LeaderElection, nm.getBuffer(),ListenerBase::serviceId));
+        sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::TransactionCollector, nm.getBuffer(),ListenerBase::serviceId));
         // make_broadcast_message(h.getBuffer());
         // return;
 
@@ -201,7 +195,7 @@ bool LeaderElection::Service::StartElection(const bcEvent::StartElection*e)
 
     return true;
 }
-bool LeaderElection::Service::Msg(const bcEvent::Msg*e)
+bool TransactionCollector::Service::Msg(const bcEvent::Msg*e)
 {
 
     MUTEX_INSPECTOR;
@@ -369,7 +363,7 @@ bool LeaderElection::Service::Msg(const bcEvent::Msg*e)
     return true;
 }
 
-bool LeaderElection::Service::on_heart_beat(const msg::heart_beat &h,const std::string &heart_beat_payload, const route_t& route)
+bool TransactionCollector::Service::on_heart_beat(const msg::heart_beat &h,const std::string &heart_beat_payload, const route_t& route)
 {
     MUTEX_INSPECTOR;
 
@@ -415,15 +409,15 @@ bool LeaderElection::Service::on_heart_beat(const msg::heart_beat &h,const std::
     return true;
 }
 
-// bool LeaderElection::Service::Msg(const bcEvent::Msg *e)
+// bool TransactionCollector::Service::Msg(const bcEvent::Msg *e)
 // {
 //     return false;
 // }
-// bool LeaderElection::Service::MsgReply(const bcEvent::MsgReply *e)
+// bool TransactionCollector::Service::MsgReply(const bcEvent::MsgReply *e)
 // {
 //     return false;
 // }
-bool LeaderElection::Service::MsgReply(const bcEvent::MsgReply* e)
+bool TransactionCollector::Service::MsgReply(const bcEvent::MsgReply* e)
 {
     if(e->route.size())
     {
@@ -568,7 +562,7 @@ bool LeaderElection::Service::MsgReply(const bcEvent::MsgReply* e)
     }
     return true;
 }
-void LeaderElection::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
+void TransactionCollector::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
 {
     msg::heart_beat m_heart_beat(hbr.payload_heart_beat);
 
@@ -644,7 +638,6 @@ void LeaderElection::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
             // li.leader_approved=true;
             li.request_for_transactions_sent=true;
             //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!AAAA
-            sendEvent(ServiceEnum::TransactionCollector,new bcEvent::StartCollector(li.leader_cert, this));
             // do_request_for_transactions(li);
 
             // outBuffer o;
@@ -655,18 +648,8 @@ void LeaderElection::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
 
 
 }
-void LeaderElection::Service::do_request_for_transactions(const heart_beat_node_info& li)
-{
-    msg::request_for_transactions rt;
-    rt.payload_lc=li.leader_cert;
-    msg::node_message_ed nm(rt.getBuffer(),conf->this_node_name,conf->my_sk_ed);
-    sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::TxValidator, nm.getBuffer(),ListenerBase::serviceId));
-    // make_broadcast_message(nm.getBuffer());
 
-}
-
-
-void LeaderElection::Service::make_leader_certificate()
+void TransactionCollector::Service::make_leader_certificate()
 {
     auto &hbs=heart_beat_store;
     auto &li=hbs.leader_info[hbs.node_leader];
@@ -698,21 +681,184 @@ void LeaderElection::Service::make_leader_certificate()
 }
 
 
-void LeaderElection::Service::logNode(const char* fmt, ...)
+void TransactionCollector::Service::logNode(const char* fmt, ...)
 {
 
     {
         va_list ap;
         va_start(ap, fmt);
-        fprintf(stdout,"%ld [LeaderElection] [%s] [%s] [%s] ", time(NULL), conf->this_node_name.container.c_str(), prev_block_hash.str().c_str(), root->getValues(NULL)->epoch.toString().c_str());
+        fprintf(stdout,"%ld [TransactionCollector] [%s] [%s] [%s] ", time(NULL), conf->this_node_name.container.c_str(), prev_block_hash.str().c_str(), root->getValues(NULL)->epoch.toString().c_str());
         vfprintf(stdout,fmt, ap);
         fprintf(stdout,"\n");
         va_end(ap);
 
     }
 }
+bool TransactionCollector::Service::StartCollector(const bcEvent::StartCollector* e)
+{
+    std::string res;
+    int err=conf->db->get_cell("#root_hash#",&res);
+    if(!err)
+    {
+        prev_block_hash.container=res;
+    }
 
-void registerLeaderElectionService(const char* pn)
+    msg::request_for_transactions rt;
+    rt.payload_lc=e->leader_cert;
+    msg::node_message_ed nm(rt.getBuffer(),conf->this_node_name,conf->my_sk_ed);
+    sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::TxValidator, nm.getBuffer(),ListenerBase::serviceId));
+
+    return true;
+}
+
+bool TransactionCollector::Service::MsgReply(const bcEvent::MsgReply* e)
+{
+    if(e->route.size())
+    {
+        passEvent(e);
+        return true;
+    }
+    inBuffer in(e->msg);
+
+
+    auto p=in.get_PN();
+    switch(p)
+    {
+    case msgid::node_message_ed:
+    {
+        MUTEX_INSPECTOR;
+        msg::node_message_ed node_message_ed;
+        node_message_ed.unpack(in);
+        auto n=root->getNode(node_message_ed.src_node,NULL);
+        if(!n.valid())
+            throw CommonError("invalid node AAA "+node_message_ed.src_node.container);
+        if(!node_message_ed.verify(n->ed_pk))
+        {
+            throw CommonError("if(!node_message_ed.verify_ed_pk(n->ed_pk))");
+        }
+        inBuffer in2(node_message_ed.payload);
+        auto p2=in2.get_PN();
+        switch (p2)
+        {
+#ifdef KALL            
+        case msgid::heart_beat_rsp:
+        {
+            MUTEX_INSPECTOR;
+            if(e->route.size())
+            {
+                passEvent(new bcEvent::MsgReply(e->msg, e->route));
+                return true;
+            }
+
+            msg::heart_beat_rsp m_heart_beat_rsp;
+            m_heart_beat_rsp.unpack(in2);
+            on_heart_beat_rsp(m_heart_beat_rsp);
+
+            return true;
+        }
+        break;
+        case msgid::block_response:
+        {
+            msg::block_response br(in2);
+
+            on_blockResponse(br);
+
+
+        }
+        break;
+#endif
+        case msgid::response_with_transactions:
+        {
+            msg::response_with_transactions rwt(in2);
+            for(auto& z: rwt.trs)
+            {
+                THASH_id h=blake2b_hash(z.container);
+                transaction_pool_of_leader.insert({h,z});
+            }
+            auto &hbs=heart_beat_store;
+            auto &li=hbs.leader_info[hbs.node_leader];
+            li.transaction_responders.insert(node_message_ed.src_node);
+            BigInt stake=0;
+            for(auto &z :li.transaction_responders)
+            {
+                auto n=root->getNode(z,NULL);
+                stake+=n->total_stake;
+            }
+            if(stake.toDouble() > root->getValues(NULL)->total_staked.toDouble() * QUORUM)
+            {
+                do_start_block();
+                li.transaction_responders.clear();
+            }
+            return true;
+        }
+        break;
+#ifdef KALL
+        case msgid::block_accepted_rsp:
+        {
+            msg::block_accepted_rsp bar(in2);
+            if(!bar.verify(root->getNode(bar.node_signer,NULL)->bls_pk))
+            {
+                logErr2("block_accepted_rsp: verify failed");
+                return true;
+            }
+            auto &bp=blocks[prev_block_hash];
+            bp.acceptors.insert({bar.node_signer,bar});
+
+            blst_cpp::AggregateSignature agg_sig;
+            std::vector<blst_cpp::PublicKey> agg_pk;
+            BigInt stake;
+            stake=0;
+            for(auto &z:bp.acceptors)
+            {
+                agg_sig.add(z.second.sig_bls);
+                auto n=root->getNode(z.first,NULL);
+                if(!n.valid())
+                    throw CommonError("if(!n.valid())");
+
+                agg_pk.push_back(n->bls_pk);
+                stake+=n->total_stake;
+            }
+            if(!agg_sig.verify(agg_pk,bar.new_root_hash.container))
+            {
+                logNode("block_accepted_rsp: aggsig !veried");
+                return true;
+            }
+            if(root->getValues(NULL)->total_staked.toDouble()*0.7 < stake.toDouble())
+            {
+                if(!bp.heart_bit_sent_on_block_accepted_rsp)
+                {
+                    bp.heart_bit_sent_on_block_accepted_rsp=true;
+                    do_heart_beat();
+
+                }
+            }
+            last_access_time_hbZ=time(NULL);
+
+
+        }
+        break;
+        case msgid::get_blocks_rsp:
+        {
+            msg::get_blocks_rsp r(in2);
+            on_get_blocks_rsp(r);
+            return true;
+        }
+        break;
+#endif
+        default:
+            throw CommonError("unhandled22 p020 %s",msgName(p2));
+        }
+    }
+    break;
+    default:
+        throw CommonError("unhandled11 p %s",msgName(p));
+
+    }
+    return true;
+}
+
+
+void registerTransactionCollectorService(const char* pn)
 {
     MUTEX_INSPECTOR;
     /// регистрация в фабрике сервиса и событий
@@ -720,12 +866,12 @@ void registerLeaderElectionService(const char* pn)
     XTRY;
     if(pn)
     {
-        iUtils->registerPlugingInfo(pn,IUtils::PLUGIN_TYPE_SERVICE,ServiceEnum::LeaderElection,"LeaderElection",getEvents_leaderElectionService());
+        iUtils->registerPlugingInfo(pn,IUtils::PLUGIN_TYPE_SERVICE,ServiceEnum::TransactionCollector,"TransactionCollector",getEvents_transactionCollectorService());
     }
     else
     {
-        iUtils->registerService(ServiceEnum::LeaderElection,LeaderElection::Service::construct,"LeaderElection");
-        regEvents_leaderElectionService();
+        iUtils->registerService(ServiceEnum::TransactionCollector,TransactionCollector::Service::construct,"TransactionCollector");
+        regEvents_transactionCollectorService();
     }
 
     XPASS;

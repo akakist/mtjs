@@ -14,6 +14,7 @@ namespace ServiceEnum
     const SERVICE_id GrainReader(ghash("@g_GrainReader"));
     const SERVICE_id BlockStreamer(ghash("@g_BlockStreamer"));
     const SERVICE_id LeaderElection(ghash("@g_LeaderElection"));
+    const SERVICE_id TransactionCollector(ghash("@g_TransactionCollector"));
     
     
 }
@@ -35,6 +36,8 @@ namespace bcEventEnum
     const EVENT_id SendToChild(ghash("@g_SendToChild"));
     const EVENT_id SendToChildAck(ghash("@g_SendToChildAck"));
     const EVENT_id StreamBlock(ghash("@g_StreamBlock"));
+    const EVENT_id StartElection(ghash("@g_StartElection"));
+    const EVENT_id StartCollector(ghash("@g_StartCollector"));
     
     
 }
@@ -401,6 +404,33 @@ class TxValidatorStart: public Event::NoPacked
             :NoPacked(bcEventEnum::StreamBlock,r),  payload(_payload) {}
         
         const std::string payload;
+
+    };
+    class StartElection: public Event::NoPacked
+    {
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return NULL;
+        }
+        StartElection(const route_t& r)
+            :NoPacked(bcEventEnum::StartElection,r) {}
+        
+
+    };
+    class StartCollector: public Event::NoPacked
+    {
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return NULL;
+        }
+        StartCollector(const std::string & _leader_cert, const route_t& r)
+            :NoPacked(bcEventEnum::StartCollector,r), leader_cert(_leader_cert){}
+        
+            std::string leader_cert;
 
     };
  

@@ -2,7 +2,6 @@
 
 #include "broadcaster.h"
 
-// #include "signedBuffer.h"
 
 #include "listenerBuffered1Thread.h"
 #include <map>
@@ -12,11 +11,9 @@
 #include "Events/Tools/webHandlerEvent.h"
 #include "Events/System/Net/httpEvent.h"
 #include "Events/System/timerEvent.h"
-#include "Events/System/Net/httpEvent.h"
 #include "Event/bcEvent.h"
 #include "root_contract.h"
 #include "msg.h"
-#include "tr_exec.h"
 #include "bigint.h"
 #include "TRANSACTION_id.h"
 #include "THASH_id.h"

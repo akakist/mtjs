@@ -136,6 +136,9 @@ bool Node::Service::on_heart_beat(const msg::heart_beat &h,const std::string &he
 
 void Node::Service::do_heart_beat()
 {
+ 
+    sendEvent(ServiceEnum::LeaderElection,new bcEvent::StartElection(this));
+    return;
     sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
     auto &hbs=heart_beat_store;
     hbs.clear();

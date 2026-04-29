@@ -6,7 +6,7 @@
 struct RCF;
 class JS_HttpServer {
 public:
-    JSValue http_handler_callback;
+    JSValue http_handler_callback{};
     ListenerBase* lst;
     Broadcaster* brd;
     REF_getter<RCF> rcf;
@@ -16,7 +16,6 @@ public:
     {
     }
     ~JS_HttpServer()
-    {
-    }
+    = default;
 };
 

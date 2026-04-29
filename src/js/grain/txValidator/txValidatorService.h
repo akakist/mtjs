@@ -2,28 +2,20 @@
 
 #include "broadcaster.h"
 
-// #include "signedBuffer.h"
 
 #include "listenerBuffered1Thread.h"
 #include <map>
 #include <rocksdb/db.h>
 #include "Events/System/Run/startServiceEvent.h"
 #include "Events/Tools/telnetEvent.h"
-#include "Events/Tools/webHandlerEvent.h"
 #include "Events/System/Net/httpEvent.h"
 #include "Events/System/timerEvent.h"
-#include "Events/System/Net/httpEvent.h"
 #include "Event/bcEvent.h"
 #include "root_contract.h"
 #include "msg.h"
-#include "tr_exec.h"
-#include "bigint.h"
 #include "TRANSACTION_id.h"
 #include "THASH_id.h"
-#include "NODE_id.h"
-#include "db_to_save.h"
 #include <thread>
-#include <condition_variable>
 
 
 
@@ -49,8 +41,10 @@ namespace TxValidator
         bool ClientMsg(const bcEvent::ClientMsg*e);
         bool GetTransactions(const bcEvent::GetTransactions*e);
         bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
+        bool Msg(const bcEvent::Msg*e);
 
 
+        void logNode(const char* fmt, ...);
 
         Service(const SERVICE_id&, const std::string&  nm, IInstance *ins);
         ~Service();
@@ -84,6 +78,7 @@ namespace TxValidator
         // std::string last_block_hash;
         REF_getter<root_data> root=NULL;
         // REF_getter<IDatabase> db=nullptr;
+        BLOCK_id prev_block_hash;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
 

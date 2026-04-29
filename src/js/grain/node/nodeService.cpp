@@ -6,15 +6,12 @@
 #include <map>
 #include "nodeService.h"
 #include "tools_mt.h"
-#include "tree.h"
 #include "events_nodeService.hpp"
 #include "version_mega.h"
 #include "tr_exec.h"
 #include "CDatabase.h"
-#include "s_ed.h"
 #include "QUORUM.h"
 #include <SQLiteCpp/Database.h>
-#include "CDatabase.h"
 #include "init_root.h"
 #include "execute_transaction.h"
 
@@ -43,6 +40,9 @@ bool Node::Service::on_startService(const systemEvent::startService*)
     sendEvent(ServiceEnum::TxValidator,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     sendEvent(ServiceEnum::GrainReader,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
+    sendEvent(ServiceEnum::BlockStreamer,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
+    sendEvent(ServiceEnum::LeaderElection,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
+    sendEvent(ServiceEnum::TransactionCollector,new bcEvent::ServiceInit(my_sk_bls,my_sk_ed,this_node_name,db, this));
     for(auto& z: rpc_addr)
     {
         SECURE sec;
@@ -60,6 +60,7 @@ bool Node::Service::on_startService(const systemEvent::startService*)
     }
 
     logNode("do_heart_beat in startService");
+    sendEvent(ServiceEnum::LeaderElection,new bcEvent::StartElection(this));
     do_heart_beat();
 
     sendEvent(ServiceEnum::Telnet,new telnetEvent::RegisterCommand("","^ds$","show current element dump",ListenerBase::serviceId));
@@ -693,6 +694,9 @@ void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, con
     sendEvent(ServiceEnum::TxValidator,new bcEvent::InvalidateRoot(this));
     sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::InvalidateRoot(this));
     sendEvent(ServiceEnum::GrainReader,new bcEvent::InvalidateRoot(this));
+    sendEvent(ServiceEnum::BlockStreamer,new bcEvent::InvalidateRoot(this));
+    sendEvent(ServiceEnum::LeaderElection,new bcEvent::InvalidateRoot(this));
+    sendEvent(ServiceEnum::TransactionCollector,new bcEvent::InvalidateRoot(this));
     msg::block_accepted_rsp br;
     br.new_root_hash=prev_block_hash;
     br.node_signer=this_node_name;

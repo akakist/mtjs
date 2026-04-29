@@ -5,6 +5,7 @@
 
 
 add_subdirectory(node)
+add_subdirectory(transactionCollector)
 add_subdirectory(blockStreamer)
 add_subdirectory(leaderElection)
 add_subdirectory(grainReader)

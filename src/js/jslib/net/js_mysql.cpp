@@ -10,10 +10,6 @@ extern "C" {
 #include <mariadb/mysql.h>
 #include "jsscope.h"
 
-#include "quickjs.h"
-#include <mariadb/mysql.h>
-// #include "json/json.h"
-// Json::Value jsvalue_to_json(JSContext* ctx, JSValueConst val);
 
 struct  MySQLConnection {
     MYSQL *conn=nullptr;
