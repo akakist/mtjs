@@ -98,7 +98,7 @@ namespace msgid
         node_message_ed,
         user_message_req,transaction_added_rsp,
         user_request,get_user_status_req,get_user_status_rsp, HeartBeatREQ,heart_beat_rsp,
-        leader_certificate, ValidateBlockREQ, block_response, blockZ, BlockAcceptedREQ,block_accepted_rsp, GetTransactionREQ,response_with_transactions,
+        LeaderCertificate, ValidateBlockREQ, block_response, blockZ, BlockAcceptedREQ,block_accepted_rsp, GetTransactionREQ,response_with_transactions,
         publish_block, get_blocks_req,get_blocks_rsp
     };
 
@@ -123,8 +123,8 @@ inline const char* msgName(int id)
         return "HeartBeatREQ";
     case msgid::heart_beat_rsp:
         return "heart_beat_rsp";
-    case msgid::leader_certificate:
-        return "leader_certificate";
+    case msgid::LeaderCertificate:
+        return "LeaderCertificate";
     case msgid::ValidateBlockREQ:
         return "ValidateBlockREQ";
     case msgid::block_response:
@@ -435,16 +435,16 @@ namespace msg
 
     struct leader_certificate: public message_base
     {
-        leader_certificate():message_base(msgid::leader_certificate)
+        leader_certificate():message_base(msgid::LeaderCertificate)
         {
 
         }
-        leader_certificate(const std::string& s):message_base(msgid::leader_certificate)
+        leader_certificate(const std::string& s):message_base(msgid::LeaderCertificate)
         {
             inBuffer in(s);
             auto t=in.get_PN();
-            if(t!=msgid::leader_certificate)
-                throw CommonError("if(t!=msgid::leader_certificate)");
+            if(t!=msgid::LeaderCertificate)
+                throw CommonError("if(t!=msgid::LeaderCertificate)");
             unpack(in);
         }
         std::string payload_heart_beat;
@@ -869,6 +869,38 @@ namespace MsgEvent
         static Base* construct()
         {
             return new HeartBeatREQ();
+        }
+
+    };
+    struct LeaderCertificate: public Base
+    {
+        LeaderCertificate():Base(msgid::LeaderCertificate)
+        {
+
+        }
+        std::string payload_heart_beat;
+        std::vector<NODE_id> nodes;
+        blst_cpp::AggregateSignature agg_sig;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            b<<payload_heart_beat;
+            b<<nodes;
+            b<<agg_sig;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>payload_heart_beat;
+            b>>nodes;
+            b>>agg_sig;
+        }
+        static Base* construct()
+        {
+            return new LeaderCertificate();
         }
 
     };

@@ -642,9 +642,12 @@ void Node::Service::dump_stats(const msg::publish_block&  pb)
     }
 }
 bool Node::Service::BlockAcceptedREQ(const MsgEvent::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route)
-// void Node::Service::on_block_accepted_req(const msg::block_accepted_req& ba, const NODE_id& src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
+
+    if(state_Z!=State::NORMAL)
+    return true;
+
     sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
 
     std::vector<blst_cpp::PublicKey> agg_pk;
@@ -979,6 +982,7 @@ bool Node::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
         //     HeartBeatREQ(dynamic_cast<const MsgEvent::HeartBeatREQ*>(msg.get()),node_message_ed.payload, e->route);
         // }
         // break;
+#ifdef KALL        
         case msgid::BlockAcceptedREQ:
         {
             if(state_Z!=State::NORMAL)
@@ -991,7 +995,7 @@ bool Node::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
 
         }
         break;
-
+#endif
         default:
             throw CommonError("unhabdled 33p2 %s",msgName(p2));
             break;
