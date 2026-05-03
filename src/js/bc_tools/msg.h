@@ -97,8 +97,8 @@ namespace msgid
     {
         node_message_ed,
         user_message_req,transaction_added_rsp,
-        user_request,get_user_status_req,get_user_status_rsp, HeartBeatREQ,heart_beat_rsp,
-        LeaderCertificate, ValidateBlockREQ, block_response, blockZ, BlockAcceptedREQ,block_accepted_rsp, GetTransactionREQ,response_with_transactions,
+        user_request,get_user_status_req,get_user_status_rsp, HeartBeatREQ,HeartBeatRSP,
+        LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, blockZ, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
         publish_block, get_blocks_req,get_blocks_rsp
     };
 
@@ -121,24 +121,24 @@ inline const char* msgName(int id)
         return "get_user_status_rsp";
     case msgid::HeartBeatREQ:
         return "HeartBeatREQ";
-    case msgid::heart_beat_rsp:
-        return "heart_beat_rsp";
+    case msgid::HeartBeatRSP:
+        return "HeartBeatRSP";
     case msgid::LeaderCertificate:
         return "LeaderCertificate";
     case msgid::ValidateBlockREQ:
         return "ValidateBlockREQ";
-    case msgid::block_response:
-        return "block_response";
+    case msgid::ValidateBlockRSP:
+        return "ValidateBlockRSP";
     case msgid::blockZ:
         return "blockZ";
     case msgid::BlockAcceptedREQ:
         return "BlockAcceptedREQ";
-    case msgid::block_accepted_rsp:
-        return "block_accepted_rsp";
+    case msgid::BlockAcceptedRSP:
+        return "BlockAcceptedRSP";
     case msgid::GetTransactionREQ:
         return "GetTransactionREQ";
-    case msgid::response_with_transactions:
-        return "response_with_transactions";
+    case msgid::GetTransactionRSP:
+        return "GetTransactionRSP";
     case msgid::publish_block:
         return "publish_block";
     case msgid::get_blocks_req:
@@ -344,7 +344,7 @@ namespace msg
     };
     struct heart_beat_rsp: public message_base
     {
-        heart_beat_rsp():message_base(msgid::heart_beat_rsp)
+        heart_beat_rsp():message_base(msgid::HeartBeatRSP)
         {
         }
         std::string payload_heart_beat;
@@ -399,19 +399,19 @@ namespace msg
     };
     struct response_with_transactions: public message_base
     {
-        response_with_transactions():message_base(msgid::response_with_transactions)
+        response_with_transactions():message_base(msgid::GetTransactionRSP)
         {
 
         }
-        response_with_transactions(const std::string& s):message_base(msgid::response_with_transactions)
+        response_with_transactions(const std::string& s):message_base(msgid::GetTransactionRSP)
         {
             inBuffer in(s);
             auto t=in.get_PN();
-            if(t!=msgid::response_with_transactions)
-                throw CommonError("if(t!=msgid::response_with_transactions)");
+            if(t!=msgid::GetTransactionRSP)
+                throw CommonError("if(t!=msgid::GetTransactionRSP)");
             unpack(in);
         }
-        response_with_transactions(inBuffer &in):message_base(msgid::response_with_transactions)
+        response_with_transactions(inBuffer &in):message_base(msgid::GetTransactionRSP)
         {
             unpack(in);
         }
@@ -622,11 +622,11 @@ namespace msg
     };
     struct block_accepted_rsp: public message_base
     {
-        block_accepted_rsp():message_base(msgid::block_accepted_rsp)
+        block_accepted_rsp():message_base(msgid::BlockAcceptedRSP)
         {
 
         }
-        block_accepted_rsp(inBuffer &in):message_base(msgid::block_accepted_rsp)
+        block_accepted_rsp(inBuffer &in):message_base(msgid::BlockAcceptedRSP)
         {
             unpack(in);
         }
@@ -658,11 +658,11 @@ namespace msg
 
     struct block_response: public message_base
     {
-        block_response():message_base(msgid::block_response)
+        block_response():message_base(msgid::ValidateBlockRSP)
         {
 
         }
-        block_response(inBuffer& in):message_base(msgid::block_response)
+        block_response(inBuffer& in):message_base(msgid::ValidateBlockRSP)
         {
             unpack(in);
         }
@@ -874,11 +874,11 @@ namespace MsgEvent
     };
     struct LeaderCertificate: public Base
     {
-        LeaderCertificate():Base(msgid::LeaderCertificate)
+        LeaderCertificate():Base(msgid::LeaderCertificate), heart_beat(new MsgEvent::HeartBeatREQ())
         {
 
         }
-        std::string payload_heart_beat;
+        REF_getter<MsgEvent::HeartBeatREQ> heart_beat;
         std::vector<NODE_id> nodes;
         blst_cpp::AggregateSignature agg_sig;
         void pack(outBuffer& b) const final
@@ -886,7 +886,8 @@ namespace MsgEvent
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<payload_heart_beat;
+            heart_beat->pack(b);
+            // b<<payload_heart_beat;
             b<<nodes;
             b<<agg_sig;
         }
@@ -894,7 +895,8 @@ namespace MsgEvent
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>payload_heart_beat;
+            heart_beat->unpack(b);
+            // b>>payload_heart_beat;
             b>>nodes;
             b>>agg_sig;
         }
@@ -994,13 +996,151 @@ namespace MsgEvent
             b>>leader_certificateZ>>block_payload>>node_validators>>agg_sig;
         }
     };
+    struct HeartBeatRSP: public Base
+    {
+        HeartBeatRSP():Base(msgid::HeartBeatRSP)
+        {
+        }
+        std::string payload_heart_beat;
+        NODE_id node_signer;
+        blst_cpp::Signature signature;
+        static Base* construct()
+        {
+            return new HeartBeatRSP();
+        }
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            b<<payload_heart_beat;
+            b<<node_signer;
+            b<<signature;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>payload_heart_beat;
+            b>>node_signer;
+            b>>signature;
+        }
+    };
+    struct GetTransactionRSP: public Base
+    {
+        static Base* construct()
+        {
+            return new GetTransactionRSP();
+        }
+        GetTransactionRSP():Base(msgid::GetTransactionRSP)
+        {
+            
+        }
+        GetTransactionRSP(inBuffer &in):Base(msgid::GetTransactionRSP)
+        {
+            unpack(in);
+        }
+
+        std::vector<TRANSACTION_body>  trs;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            b<<trs;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>trs;
+        }
+
+    };
     
+    struct ValidateBlockRSP: public Base
+    {
+        static Base* construct()
+        {
+            return new ValidateBlockRSP();
+        }
+        ValidateBlockRSP(): Base(msgid::ValidateBlockRSP)
+        {
+
+        }
+        std::string payload_block;
+        blst_cpp::Signature sig;
+        NODE_id node_validator;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            b<<payload_block;
+            b<<sig;
+            b<<node_validator;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>payload_block;
+            b>>sig;
+            b>>node_validator;
+        }
+        void sign(const blst_cpp::SecretKey &sk)
+        {
+            // Blake2bHasher h;
+            // h.update(payload_block);
+            sig.sign(sk, blake2b_hash(payload_block).container);
+        }
+        bool verify(const blst_cpp::PublicKey &pk) const
+        {
+            return sig.verify(pk, blake2b_hash(payload_block).container);
+        }
+
+    };
+    struct BlockAcceptedRSP: public Base
+    {
+        static Base* construct()
+        {
+            return new BlockAcceptedRSP();
+        }
+        BlockAcceptedRSP():Base(msgid::BlockAcceptedRSP)
+        {
+
+        }
+        NODE_id node_signer;
+        BLOCK_id new_root_hash;
+        blst_cpp::Signature sig_bls;
+        void sign(const blst_cpp::SecretKey& sk)
+        {
+            sig_bls.sign(sk, new_root_hash.container);
+        }
+        bool verify(const blst_cpp::PublicKey & pk) const
+        {
+            return sig_bls.verify(pk,new_root_hash.container);
+        }
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            Base::pack(b);
+            b<<new_root_hash<<sig_bls<<node_signer;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>new_root_hash>>sig_bls>>node_signer;
+        }
+    };
+
 
 }
 
-#include <iostream>
-#include <map>
-#include <string>
+// #include <iostream>
+// #include <map>
+// #include <string>
 
 class Base {
 public:

@@ -64,8 +64,8 @@ namespace Node
     struct heart_beat_responce2
     {
         BigInt stake;
-        msg::heart_beat_rsp rsp;
-        heart_beat_responce2()
+        REF_getter<MsgEvent::HeartBeatRSP> rsp;
+        heart_beat_responce2():rsp(nullptr)
         {
             stake=0;
         }
@@ -152,9 +152,13 @@ namespace Node
 
         // bool HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
         bool HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
+        bool HeartBeatRSP(const MsgEvent::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
         bool GetTransactionREQ(const MsgEvent::GetTransactionREQ* r, const NODE_id & src_node, const route_t& route);
+        bool GetTransactionRSP(const MsgEvent::GetTransactionRSP* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockREQ(const MsgEvent::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
+        bool ValidateBlockRSP(const MsgEvent::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
         bool BlockAcceptedREQ(const MsgEvent::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route);
+        bool BlockAcceptedRSP(const MsgEvent::BlockAcceptedRSP* r, const NODE_id & src_node, const route_t& route);
 
 
         void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);
@@ -170,7 +174,7 @@ namespace Node
         struct block
         {
             std::string block_payload;
-            std::vector<msg::block_response> responses;
+            std::vector<REF_getter<MsgEvent::ValidateBlockRSP> > responses;
             BigInt stake;
             std::map<NODE_id /*validator*/, blst_cpp::Signature> sigs;
 
@@ -181,7 +185,7 @@ namespace Node
             bool block_accepted_sent=false;
             bool heart_bit_sent_on_block_accepted_rsp=false;
 
-            std::map<NODE_id, msg::block_accepted_rsp> acceptors;
+            std::map<NODE_id, REF_getter<MsgEvent::BlockAcceptedRSP> > acceptors;
 
         };
         _db_to_save db_to_save_Z;
