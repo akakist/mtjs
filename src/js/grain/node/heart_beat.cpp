@@ -88,7 +88,7 @@ void Node::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
 
 }
 
-bool Node::Service::on_heart_beat(const msg::heart_beat &h,const std::string &heart_beat_payload, const route_t& route)
+bool Node::Service::HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route)
 {
     MUTEX_INSPECTOR;
 
@@ -99,19 +99,19 @@ bool Node::Service::on_heart_beat(const msg::heart_beat &h,const std::string &he
     // logNode("heart beat received from leader %s last block %s",h.node_leader.c_str(),h.last_block.toString().c_str());
     auto &hbs=heart_beat_store;
 
-    if(hbs.node_leader==h.node_leader)
+    if(hbs.node_leader==h->node_leader)
     {
         need_reply=true;
     }
     else
     {
         auto old_leader=root->getNode(hbs.node_leader,NULL);
-        auto new_leader=root->getNode(h.node_leader,NULL);
+        auto new_leader=root->getNode(h->node_leader,NULL);
         if(old_leader.valid() &&  new_leader.valid())
         {
             if(new_leader->total_stake>old_leader->total_stake)
             {
-                hbs.node_leader=h.node_leader;
+                hbs.node_leader=h->node_leader;
                 need_reply=true;
             }
         }

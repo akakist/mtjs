@@ -97,8 +97,8 @@ namespace msgid
     {
         node_message_ed,
         user_message_req,transaction_added_rsp,
-        user_request,get_user_status_req,get_user_status_rsp, heart_beat,heart_beat_rsp,
-        leader_certificate, block_request, block_response, blockZ, block_accepted_req,block_accepted_rsp, request_for_transactions,response_with_transactions,
+        user_request,get_user_status_req,get_user_status_rsp, HeartBeatREQ,heart_beat_rsp,
+        leader_certificate, ValidateBlockREQ, block_response, blockZ, BlockAcceptedREQ,block_accepted_rsp, GetTransactionREQ,response_with_transactions,
         publish_block, get_blocks_req,get_blocks_rsp
     };
 
@@ -119,24 +119,24 @@ inline const char* msgName(int id)
         return "get_user_status_req";
     case msgid::get_user_status_rsp:
         return "get_user_status_rsp";
-    case msgid::heart_beat:
-        return "heart_beat";
+    case msgid::HeartBeatREQ:
+        return "HeartBeatREQ";
     case msgid::heart_beat_rsp:
         return "heart_beat_rsp";
     case msgid::leader_certificate:
         return "leader_certificate";
-    case msgid::block_request:
-        return "block_request";
+    case msgid::ValidateBlockREQ:
+        return "ValidateBlockREQ";
     case msgid::block_response:
         return "block_response";
     case msgid::blockZ:
         return "blockZ";
-    case msgid::block_accepted_req:
-        return "block_accepted_req";
+    case msgid::BlockAcceptedREQ:
+        return "BlockAcceptedREQ";
     case msgid::block_accepted_rsp:
         return "block_accepted_rsp";
-    case msgid::request_for_transactions:
-        return "request_for_transactions";
+    case msgid::GetTransactionREQ:
+        return "GetTransactionREQ";
     case msgid::response_with_transactions:
         return "response_with_transactions";
     case msgid::publish_block:
@@ -309,16 +309,16 @@ namespace msg
     };
     struct heart_beat: public message_base
     {
-        heart_beat():message_base(msgid::heart_beat)
+        heart_beat():message_base(msgid::HeartBeatREQ)
         {
 
         }
-        heart_beat(const std::string& s):message_base(msgid::heart_beat)
+        heart_beat(const std::string& s):message_base(msgid::HeartBeatREQ)
         {
             inBuffer in(s);
             auto t=in.get_PN();
-            if(t!=msgid::heart_beat)
-                throw CommonError("if(t!=msgid::heart_beat)");
+            if(t!=msgid::HeartBeatREQ)
+                throw CommonError("if(t!=msgid::HeartBeatREQ)");
             unpack(in);
         }
         BLOCK_id prev_block_hash;
@@ -373,11 +373,11 @@ namespace msg
 //
     struct request_for_transactions: public message_base
     {
-        request_for_transactions():message_base(msgid::request_for_transactions)
+        request_for_transactions():message_base(msgid::GetTransactionREQ)
         {
 
         }
-        request_for_transactions(inBuffer & in):message_base(msgid::request_for_transactions)
+        request_for_transactions(inBuffer & in):message_base(msgid::GetTransactionREQ)
         {
             unpack(in);
         }
@@ -474,10 +474,10 @@ namespace msg
     };
     struct block_request: public message_base
     {
-        block_request():message_base(msgid::block_request)
+        block_request():message_base(msgid::ValidateBlockREQ)
         {
         }
-        block_request(inBuffer& in):message_base(msgid::block_request)
+        block_request(inBuffer& in):message_base(msgid::ValidateBlockREQ)
         {
             unpack(in);
         }
@@ -587,20 +587,20 @@ namespace msg
     };
     struct block_accepted_req: public message_base
     {
-        block_accepted_req():message_base(msgid::block_accepted_req)
+        block_accepted_req():message_base(msgid::BlockAcceptedREQ)
         {
 
         }
-        block_accepted_req(inBuffer &in):message_base(msgid::block_accepted_req)
+        block_accepted_req(inBuffer &in):message_base(msgid::BlockAcceptedREQ)
         {
             unpack(in);
         }
-        block_accepted_req(const std::string &s):message_base(msgid::block_accepted_req)
+        block_accepted_req(const std::string &s):message_base(msgid::BlockAcceptedREQ)
         {
             inBuffer in(s);
             auto t=in.get_PN();
-            if(t!=msgid::block_accepted_req)
-                throw CommonError("if(t!=msgid::block_accepted_req)");
+            if(t!=msgid::BlockAcceptedREQ)
+                throw CommonError("if(t!=msgid::BlockAcceptedREQ)");
             unpack(in);
         }
         std::string leader_certificateZ;
@@ -838,11 +838,11 @@ namespace MsgEvent
     };
     struct HeartBeatREQ: public Base
     {
-        HeartBeatREQ():Base(msgid::heart_beat)
+        HeartBeatREQ():Base(msgid::HeartBeatREQ)
         {
 
         }
-        HeartBeatREQ(const BLOCK_id& _prev_block_hash, const BigInt& _epoch, const NODE_id& _node_leader):Base(msgid::heart_beat),
+        HeartBeatREQ(const BLOCK_id& _prev_block_hash, const BigInt& _epoch, const NODE_id& _node_leader):Base(msgid::HeartBeatREQ),
         prev_block_hash(_prev_block_hash), epoch(_epoch), node_leader(_node_leader)
         {
         }
@@ -872,5 +872,131 @@ namespace MsgEvent
         }
 
     };
+    struct GetTransactionREQ: public Base
+    {
+        GetTransactionREQ():Base(msgid::GetTransactionREQ)
+        {
+        }
+        std::string payload_lc;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            b<<payload_lc;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>payload_lc;
+        }
+
+        static Base* construct()
+        {
+            return new GetTransactionREQ();
+        }
+    };
+    struct ValidateBlockREQ: public Base
+    {
+        ValidateBlockREQ():Base(msgid::ValidateBlockREQ)
+        {
+        }
+        ValidateBlockREQ(inBuffer& in):Base(msgid::ValidateBlockREQ)
+        {
+            unpack(in);
+        }
+        static Base* construct()
+        {
+            return new ValidateBlockREQ();
+        }
+
+        std::string leader_cert;
+        std::vector<TRANSACTION_body> transaction_bodies;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            b<<leader_cert;
+            b<<transaction_bodies;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>leader_cert;
+            b>>transaction_bodies;
+        }
+
+    };
+
+    struct BlockAcceptedREQ: public Base
+    {
+        BlockAcceptedREQ():Base(msgid::BlockAcceptedREQ)
+        {
+
+        }
+        BlockAcceptedREQ(inBuffer &in):Base(msgid::BlockAcceptedREQ)
+        {
+            unpack(in);
+        }
+        static Base* construct()
+        {
+            return new BlockAcceptedREQ();
+        }
+        std::string leader_certificateZ;
+        std::string block_payload;
+        std::vector<NODE_id> node_validators;
+        blst_cpp::AggregateSignature agg_sig;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            Base::pack(b);
+            b<<leader_certificateZ<<block_payload<<node_validators<<agg_sig;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>leader_certificateZ>>block_payload>>node_validators>>agg_sig;
+        }
+    };
+    
 
 }
+
+#include <iostream>
+#include <map>
+#include <string>
+
+class Base {
+public:
+    virtual ~Base() = default;
+    virtual void speak() = 0;
+};
+
+
+class MsgFactory {
+public:
+    using Constructor = MsgEvent::Base* (*)();
+    
+    MsgEvent::Base* create(const int& id) {
+
+        auto it = registry.find(id);
+        if(it==registry.end())
+        {
+            throw CommonError("Message type not found %d %s", id,msgName(id));
+        }
+        return it->second();
+    }
+    
+    bool registerMsg(const int& id, Constructor ctor) {
+        registry[id] = ctor;
+        return true;
+    }
+    
+private:
+        std::map<int, Constructor> registry;
+};
+

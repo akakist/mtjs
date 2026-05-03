@@ -150,7 +150,13 @@ namespace Node
 
         void do_heart_beat();
 
-        bool on_heart_beat(const msg::heart_beat &hb,const std::string &bt_payload, const route_t& route);
+        // bool HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
+        bool HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
+        bool GetTransactionREQ(const MsgEvent::GetTransactionREQ* r, const NODE_id & src_node, const route_t& route);
+        bool ValidateBlockREQ(const MsgEvent::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
+        bool BlockAcceptedREQ(const MsgEvent::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route);
+
+
         void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);
 
         void make_leader_certificate();
@@ -250,6 +256,8 @@ namespace Node
 
         std::string my_sk_bls_env_key;
         std::string my_sk_ed_env_key;
+
+        MsgFactory msgFactory;
 
     };
 
