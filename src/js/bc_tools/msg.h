@@ -811,3 +811,66 @@ namespace msg
 
 }
 
+namespace MsgEvent
+{
+    struct Base: public Refcountable
+    {
+        int type;
+        Base(int type_):type(type_) {}
+        virtual ~Base() {}
+        virtual void pack(outBuffer& b) const
+        {
+            MUTEX_INSPECTOR;
+            b<<type;
+
+        }
+        virtual void unpack(inBuffer& b)
+        {
+        }
+        std::string getBuffer() const
+        {
+            MUTEX_INSPECTOR;
+            outBuffer o;
+            pack(o);
+            return o.asString()->container;
+        }
+
+    };
+    struct HeartBeatREQ: public Base
+    {
+        HeartBeatREQ():Base(msgid::heart_beat)
+        {
+
+        }
+        HeartBeatREQ(const BLOCK_id& _prev_block_hash, const BigInt& _epoch, const NODE_id& _node_leader):Base(msgid::heart_beat),
+        prev_block_hash(_prev_block_hash), epoch(_epoch), node_leader(_node_leader)
+        {
+        }
+        BLOCK_id prev_block_hash;
+        BigInt epoch;
+        NODE_id node_leader;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            
+            Base::pack(b);
+            b<<prev_block_hash;
+            b<<node_leader;
+            b<<epoch;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>prev_block_hash;
+            b>>node_leader;
+            b>>epoch;
+        }
+        static Base* construct()
+        {
+            return new HeartBeatREQ();
+        }
+
+    };
+
+}

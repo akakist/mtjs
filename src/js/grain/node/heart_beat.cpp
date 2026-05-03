@@ -168,16 +168,15 @@ void Node::Service::do_heart_beat()
 
     if(hbs.node_leader==this_node_name)
     {
-        msg::heart_beat h;
-        h.prev_block_hash=prev_block_hash;
-        h.node_leader=this_node_name;
-        h.epoch=root->getValues(NULL)->epoch;
+        REF_getter<MsgEvent::HeartBeatREQ> hb_req=
+            new MsgEvent::HeartBeatREQ(prev_block_hash, 
+                root->getValues(NULL)->epoch, 
+                this_node_name);
         DBG(logNode("TIMER_HEART_BEAT broadcast heart beat as leader %s",this_node_name.container.c_str()));
-        msg::node_message_ed nm(h.getBuffer(),this_node_name,my_sk_ed);
+        outBuffer o;
+        hb_req->pack(o);
+        msg::node_message_ed nm(o.asString()->container,this_node_name,my_sk_ed);
         sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
-        // make_broadcast_message(h.getBuffer());
-        // return;
-
     }
 
     return;
