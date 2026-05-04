@@ -523,14 +523,12 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply*e)
     return false;
 }
 #include <nlohmann/json.hpp>
-// JSValue convert_yyjson_to_js(JSContext *ctx, yyjson_val *val);
 extern "C"
 JSValue parse_yyjson(JSContext *ctx, const char *json_str, size_t len);
 
 bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP* e)
 {
     MUTEX_INSPECTOR;
-    // logErr2("ClientTxSubscribeRSP from node");
 
     inBuffer in(e->msg);
     REF_getter<MsgEvent::BlockDBStore>  pb=new MsgEvent::BlockDBStore();
