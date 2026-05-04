@@ -2,41 +2,42 @@
 #include "QUORUM.h"
 #include "tools_mt.h"
 #include "blst_cp.h"
-void Node::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
+bool Node::Service::HeartBeatRSP(const MsgEvent::HeartBeatRSP* m, const NODE_id & src_node, const route_t& route)
 {
-    msg::heart_beat m_heart_beat(hbr.payload_heart_beat);
+    // msg::heart_beat m_heart_beat(m->payload_heart_beat);
 
     auto &hbs=heart_beat_store;
     auto &li=hbs.leader_info[hbs.node_leader];
-    // if(li.responses.count(hbr.node_signer))
+    // if(li.responses.count(m->node_signer))
     // {
     //     return;
     // }
-    if(prev_block_hash!=m_heart_beat.prev_block_hash)
+    if(prev_block_hash!=m->payload_heart_beat->prev_block_hash)
     {
-        logErr2("heat beat expired %s %s",prev_block_hash.str().c_str(),m_heart_beat.prev_block_hash.str().c_str());
-        return;
+        logErr2("heat beat expired %s %s",prev_block_hash.str().c_str(),m->payload_heart_beat->prev_block_hash.str().c_str());
+        return false;
     }
 
     // li.respons.insert(m_heart_beat_rsp.node_signer);
 
-    auto n=root->getNode(hbr.node_signer,NULL);
+    auto n=root->getNode(m->node_signer,NULL);
     if(!n.valid())
     {
         logErr2("if(!n.valid())");
-        return;
+        return false;
     }
-
-    if(!hbr.signature.verify(n->bls_pk, blake2b_hash(hbr.payload_heart_beat).container))
+    outBuffer o;
+    m->payload_heart_beat->pack(o);
+    if(!m->signature.verify(n->bls_pk, blake2b_hash(o.asString()->container).container))
     {
         logNode("if(!sig_check.verify(n->bls_pk, blake2b_hash(mhbr.payload)))");
-        return;
+        return false;
     }
     {
         heart_beat_responce2 hbrs2;
-        hbrs2.rsp=hbr;
+        hbrs2.rsp=m;
         hbrs2.stake=n->total_stake;
-        li.responses.insert({hbr.node_signer,hbrs2});
+        li.responses.insert({m->node_signer,hbrs2});
 
     }
     BigInt hb_staked=0;
@@ -49,22 +50,21 @@ void Node::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
 
         for(auto &z:li.responses)
         {
-            if(z.second.rsp.payload_heart_beat != hbr.payload_heart_beat)
-            {
-                throw CommonError("r.rsp.payload != m_heart_beat_rsp.payload");
-                return;
-            }
-            sig_agg.add(z.second.rsp.signature);
-            auto nn=root->getNode(z.second.rsp.node_signer,NULL);
+            // if(*z.second.rsp->payload_heart_beat.get() != * m->payload_heart_beat.get())
+            // {
+            //     throw CommonError("r.rsp.payload != m_heart_beat_rsp.payload");
+            // }
+            sig_agg.add(z.second.rsp->signature);
+            auto nn=root->getNode(z.second.rsp->node_signer,NULL);
             pk_agg.push_back(nn->bls_pk);
             hb_staked+=z.second.stake;
         }
-        if(!sig_agg.verify(pk_agg, blake2b_hash(hbr.payload_heart_beat).container))
-        {
-            logNode("aggig veriify fail ! %s %d",__FILE__,__LINE__);
-            return;
-            // logNode("aggig veriify ok");
-        }
+        // if(!sig_agg.verify(pk_agg, blake2b_hash(m->payload_heart_beat).container))
+        // {
+        //     logNode("aggig veriify fail ! %s %d",__FILE__,__LINE__);
+        //     return false;
+        //     // logNode("aggig veriify ok");
+        // }
     }
     auto pers=(hb_staked.toDouble())/root->getValues(NULL)->total_staked.toDouble();
 
@@ -84,11 +84,11 @@ void Node::Service::on_heart_beat_rsp(const msg::heart_beat_rsp& hbr)
         }
     }
 
-
+    return true;
 
 }
 
-bool Node::Service::on_heart_beat(const msg::heart_beat &h,const std::string &heart_beat_payload, const route_t& route)
+bool Node::Service::HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route)
 {
     MUTEX_INSPECTOR;
 
@@ -99,19 +99,19 @@ bool Node::Service::on_heart_beat(const msg::heart_beat &h,const std::string &he
     // logNode("heart beat received from leader %s last block %s",h.node_leader.c_str(),h.last_block.toString().c_str());
     auto &hbs=heart_beat_store;
 
-    if(hbs.node_leader==h.node_leader)
+    if(hbs.node_leader==h->node_leader)
     {
         need_reply=true;
     }
     else
     {
         auto old_leader=root->getNode(hbs.node_leader,NULL);
-        auto new_leader=root->getNode(h.node_leader,NULL);
+        auto new_leader=root->getNode(h->node_leader,NULL);
         if(old_leader.valid() &&  new_leader.valid())
         {
             if(new_leader->total_stake>old_leader->total_stake)
             {
-                hbs.node_leader=h.node_leader;
+                hbs.node_leader=h->node_leader;
                 need_reply=true;
             }
         }
@@ -120,13 +120,13 @@ bool Node::Service::on_heart_beat(const msg::heart_beat &h,const std::string &he
     if(need_reply)
     {
         last_access_time_hbZ=time(NULL);
+        REF_getter<MsgEvent::HeartBeatRSP> hbr=new MsgEvent::HeartBeatRSP();
+        // msg::heart_beat_rsp hba;
+        hbr->payload_heart_beat=h;
+        hbr->node_signer=this_node_name;
+        hbr->signature.sign(my_sk_bls, blake2b_hash(heart_beat_payload).container);
 
-        msg::heart_beat_rsp hba;
-        hba.payload_heart_beat=heart_beat_payload;
-        hba.node_signer=this_node_name;
-        hba.signature.sign(my_sk_bls, blake2b_hash(heart_beat_payload).container);
-
-        msg::node_message_ed nme(hba.getBuffer(),this_node_name,my_sk_ed);
+        msg::node_message_ed nme(hbr->getBuffer(),this_node_name,my_sk_ed);
         // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
         passEvent(new bcEvent::MsgReply(nme.getBuffer(),poppedFrontRoute(route)));
 
@@ -168,16 +168,15 @@ void Node::Service::do_heart_beat()
 
     if(hbs.node_leader==this_node_name)
     {
-        msg::heart_beat h;
-        h.prev_block_hash=prev_block_hash;
-        h.node_leader=this_node_name;
-        h.epoch=root->getValues(NULL)->epoch;
+        REF_getter<MsgEvent::HeartBeatREQ> hb_req=
+            new MsgEvent::HeartBeatREQ(prev_block_hash, 
+                root->getValues(NULL)->epoch, 
+                this_node_name);
         DBG(logNode("TIMER_HEART_BEAT broadcast heart beat as leader %s",this_node_name.container.c_str()));
-        msg::node_message_ed nm(h.getBuffer(),this_node_name,my_sk_ed);
+        outBuffer o;
+        hb_req->pack(o);
+        msg::node_message_ed nm(o.asString()->container,this_node_name,my_sk_ed);
         sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
-        // make_broadcast_message(h.getBuffer());
-        // return;
-
     }
 
     return;
@@ -188,29 +187,29 @@ void Node::Service::make_leader_certificate()
 {
     auto &hbs=heart_beat_store;
     auto &li=hbs.leader_info[hbs.node_leader];
-    msg::leader_certificate lc;
+    REF_getter<MsgEvent::LeaderCertificate>  lc= new MsgEvent::LeaderCertificate();
     // bls::Signature sig_agg;
-    std::vector<blst_cpp::PublicKey> agg_pk;
+    // std::vector<blst_cpp::PublicKey> agg_pk;
     if(li.responses.empty())
         return;
-    auto msg=li.responses.begin()->second.rsp.payload_heart_beat;
-    auto h=blake2b_hash(msg);
-    lc.payload_heart_beat=msg;
+    auto msg=li.responses.begin()->second.rsp->payload_heart_beat;
+    // auto h=blake2b_hash(msg);
+    lc->heart_beat=li.responses.begin()->second.rsp->payload_heart_beat;
     for(auto &r:li.responses)
     {
-        if(r.second.rsp.payload_heart_beat != msg)
-        {
-            throw CommonError("r.rsp.payload != m_heart_beat_rsp.payload");
-            return;
-        }
-        lc.agg_sig.add(r.second.rsp.signature);
-        auto nn=root->getNode(r.second.rsp.node_signer,NULL);
-        agg_pk.push_back(nn->bls_pk);
-        lc.nodes.push_back(r.second.rsp.node_signer);
+        // if(r.second.rsp->payload_heart_beat != msg)
+        // {
+        //     throw CommonError("r.rsp.payload != m_heart_beat_rsp.payload");
+        //     return;
+        // }
+        lc->agg_sig.add(r.second.rsp->signature);
+        auto nn=root->getNode(r.second.rsp->node_signer,NULL);
+        // agg_pk.push_back(nn->bls_pk);
+        lc->nodes.push_back(r.second.rsp->node_signer);
     }
-    if(!lc.agg_sig.verify(agg_pk,h.container))
-        throw CommonError("if(!lc.agg_sig.verify(lc.agg_pk))");
+    // if(!lc->agg_sig.verify(agg_pk,h.container))
+    //     throw CommonError("if(!lc.agg_sig.verify(lc.agg_pk))");
 
-    li.leader_cert=lc.getBuffer();
+    li.leader_cert=lc;
 
 }

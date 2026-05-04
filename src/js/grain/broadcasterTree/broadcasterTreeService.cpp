@@ -170,21 +170,6 @@ bool BroadcasterTree::Service::ServiceInit(const bcEvent::ServiceInit *e)
     init_root(root);
     return true;
 }
-#ifdef KALL
-bool BroadcasterTree::Service::GetTransactions(const bcEvent::GetTransactions*e)
-{
-    msg::response_with_transactions rwt;
-    for(auto& z: transaction_pool_verified)
-    {
-        rwt.trs.push_back(z.second);
-    }
-    transaction_pool_verified.clear();
-    msg::node_message_ed nm(rwt.getBuffer(),conf->this_node_name,conf->my_sk_ed);
-    passEvent(new bcEvent::MsgReply(nm.getBuffer(),poppedFrontRoute(e->route)));
-
-    return true;
-}
-#endif
 bool BroadcasterTree::Service::InvalidateRoot(const bcEvent::InvalidateRoot*e)
 {
     root=getRoot(conf->db.get());

@@ -33,14 +33,14 @@ std::vector<data_base* (*)()> db_constructors = {
 };
 
 
-bool root_data::verify_lider_certificate(const msg::leader_certificate& lc)
+bool root_data::verify_lider_certificate(const REF_getter<MsgEvent::LeaderCertificate>& lc)
 {
     /// проверка сертификата лидера
     {
         MUTEX_INSPECTOR;
         std::vector<blst_cpp::PublicKey> agg_pk;
         BigInt stake;
-        for(auto &z: lc.nodes)
+        for(auto &z: lc->nodes)
         {
             auto n=this->getNode(z,NULL);
             agg_pk.push_back(n->bls_pk);
@@ -48,7 +48,7 @@ bool root_data::verify_lider_certificate(const msg::leader_certificate& lc)
         }
         if(stake.toDouble() < this->getValues(NULL)->total_staked.toDouble() * QUORUM)
             throw CommonError("if(stake.toDouble() < root->getValues(NULL)->total_staked.toDouble() * QUORUM)");
-        if(!lc.agg_sig.verify(agg_pk,blake2b_hash(lc.payload_heart_beat).container))
+        if(!lc->agg_sig.verify(agg_pk,blake2b_hash(lc->heart_beat->getBuffer()).container))
         {
             return false;
         }

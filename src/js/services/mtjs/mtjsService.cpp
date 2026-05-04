@@ -523,40 +523,40 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply*e)
     return false;
 }
 #include <nlohmann/json.hpp>
-// JSValue convert_yyjson_to_js(JSContext *ctx, yyjson_val *val);
 extern "C"
 JSValue parse_yyjson(JSContext *ctx, const char *json_str, size_t len);
 
 bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP* e)
 {
     MUTEX_INSPECTOR;
-    // logErr2("ClientTxSubscribeRSP from node");
 
-    msg::publish_block pb(e->msg);
+    inBuffer in(e->msg);
+    REF_getter<MsgEvent::BlockDBStore>  pb=new MsgEvent::BlockDBStore();
+    pb->unpack2(in);
     nlohmann::json j;
-    for(size_t ti=0; ti<pb.att_data.trs.size(); ti++)
+    for(size_t ti=0; ti<pb->att_data.trs.size(); ti++)
     {
         nlohmann::json jtr;
         if(opaque.tx_subscription_cb.has_value())
         {
-            THASH_id tx_hash=blake2b_hash(pb.att_data.trs[ti].container);
+            THASH_id tx_hash=blake2b_hash(pb->att_data.trs[ti].container);
             jtr["tx_hash"] = base62::encode(tx_hash.container);
             // logErr2("ClientTxSubscribeRSP: tx_hash %s",base62::encode(tx_hash.container).c_str());
             JSScope <10,10> scope(js_ctx);
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);
 
-            for(int ii=0; ii<pb.att_data.instruction_reports[ti].size(); ii++)
+            for(int ii=0; ii<pb->att_data.instruction_reports[ti].size(); ii++)
             {
                 nlohmann::json ii_json;
-                ii_json["errcode"]=pb.att_data.instruction_reports[ti][ii].err_code;
-                ii_json["errstr"]=pb.att_data.instruction_reports[ti][ii].err_str;
-                // logErr2("err_str %d %d %s",ti,ii,pb.att_data.instruction_reports[ti][ii].err_str.c_str());
+                ii_json["errcode"]=pb->att_data.instruction_reports[ti][ii].err_code;
+                ii_json["errstr"]=pb->att_data.instruction_reports[ti][ii].err_str;
+                // logErr2("err_str %d %d %s",ti,ii,pb->att_data.instruction_reports[ti][ii].err_str.c_str());
                 nlohmann::json logmsgs_json;
-                for(int k=0; k<pb.att_data.instruction_reports[ti][ii].logMsgs.size(); k++)
+                for(int k=0; k<pb->att_data.instruction_reports[ti][ii].logMsgs.size(); k++)
                 {
-                    logErr2("logmsgs %d %d %d %s",ti,ii,k,pb.att_data.instruction_reports[ti][ii].logMsgs[k].c_str());
-                    logmsgs_json.push_back( pb.att_data.instruction_reports[ti][ii].logMsgs[k]);
+                    logErr2("logmsgs %d %d %d %s",ti,ii,k,pb->att_data.instruction_reports[ti][ii].logMsgs[k].c_str());
+                    logmsgs_json.push_back( pb->att_data.instruction_reports[ti][ii].logMsgs[k]);
                 }
                 ii_json["logMsgs"]=logmsgs_json;
                 jtr["instructions"].push_back(ii_json);

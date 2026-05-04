@@ -5,16 +5,17 @@ const node = "127.0.0.1:2301";
 let sk = std.getenv('k_root_ed_sk');
 let root_pk = std.getenv('k_root_ed_pk');
 async function exec() {
-    while (true) {
         mtjs.tx_subscribe(node, (params) => {
             console.log("tx report from js:", JSON.stringify(params));
         });
+    while (true) {
+	console.log("gaga");
         const ui = await mtjs.get_user_info(node, root_pk, 1);
         const nonce = ui.nonce;
         console.log(ui);
         const rsp = await mtjs.mint(node, sk, { amount: "2000", timeout: 4, nonce: nonce });
         console.log(rsp);
-        sleep(700);
+	sleep(1100);
     }
 }
 console.log(std.getenv("PATH"));

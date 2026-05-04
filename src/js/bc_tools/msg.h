@@ -97,9 +97,9 @@ namespace msgid
     {
         node_message_ed,
         user_message_req,transaction_added_rsp,
-        user_request,get_user_status_req,get_user_status_rsp, heart_beat,heart_beat_rsp,
-        leader_certificate, block_request, block_response, blockZ, block_accepted_req,block_accepted_rsp, request_for_transactions,response_with_transactions,
-        publish_block, get_blocks_req,get_blocks_rsp
+        user_request,get_user_status_req,get_user_status_rsp, HeartBeatREQ,HeartBeatRSP,
+        LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
+        BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP
     };
 
 }
@@ -119,32 +119,32 @@ inline const char* msgName(int id)
         return "get_user_status_req";
     case msgid::get_user_status_rsp:
         return "get_user_status_rsp";
-    case msgid::heart_beat:
-        return "heart_beat";
-    case msgid::heart_beat_rsp:
-        return "heart_beat_rsp";
-    case msgid::leader_certificate:
-        return "leader_certificate";
-    case msgid::block_request:
-        return "block_request";
-    case msgid::block_response:
-        return "block_response";
-    case msgid::blockZ:
-        return "blockZ";
-    case msgid::block_accepted_req:
-        return "block_accepted_req";
-    case msgid::block_accepted_rsp:
-        return "block_accepted_rsp";
-    case msgid::request_for_transactions:
-        return "request_for_transactions";
-    case msgid::response_with_transactions:
-        return "response_with_transactions";
-    case msgid::publish_block:
-        return "publish_block";
-    case msgid::get_blocks_req:
-        return "get_blocks_req";
-    case msgid::get_blocks_rsp:
-        return "get_blocks_rsp";
+    case msgid::HeartBeatREQ:
+        return "HeartBeatREQ";
+    case msgid::HeartBeatRSP:
+        return "HeartBeatRSP";
+    case msgid::LeaderCertificate:
+        return "LeaderCertificate";
+    case msgid::ValidateBlockREQ:
+        return "ValidateBlockREQ";
+    case msgid::ValidateBlockRSP:
+        return "ValidateBlockRSP";
+    case msgid::BlockInfo:
+        return "BlockInfo";
+    case msgid::BlockAcceptedREQ:
+        return "BlockAcceptedREQ";
+    case msgid::BlockAcceptedRSP:
+        return "BlockAcceptedRSP";
+    case msgid::GetTransactionREQ:
+        return "GetTransactionREQ";
+    case msgid::GetTransactionRSP:
+        return "GetTransactionRSP";
+    case msgid::BlockDBStore:
+        return "BlockDBStore";
+    case msgid::GetSavedBlocksREQ:
+        return "GetSavedBlocksREQ";
+    case msgid::GetSavedBlocksRSP:
+        return "GetSavedBlocksRSP";
     default:
         return "unknown";
     }
@@ -307,397 +307,6 @@ namespace msg
             b>>address_pk_ed;
         }
     };
-    struct heart_beat: public message_base
-    {
-        heart_beat():message_base(msgid::heart_beat)
-        {
-
-        }
-        heart_beat(const std::string& s):message_base(msgid::heart_beat)
-        {
-            inBuffer in(s);
-            auto t=in.get_PN();
-            if(t!=msgid::heart_beat)
-                throw CommonError("if(t!=msgid::heart_beat)");
-            unpack(in);
-        }
-        BLOCK_id prev_block_hash;
-        BigInt epoch;
-        NODE_id node_leader;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-
-            message_base::pack(b);
-            b<<prev_block_hash;
-            b<<node_leader;
-            b<<epoch;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>prev_block_hash;
-            b>>node_leader;
-            b>>epoch;
-        }
-    };
-    struct heart_beat_rsp: public message_base
-    {
-        heart_beat_rsp():message_base(msgid::heart_beat_rsp)
-        {
-        }
-        std::string payload_heart_beat;
-        NODE_id node_signer;
-        blst_cpp::Signature signature;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-
-            message_base::pack(b);
-            b<<payload_heart_beat;
-            b<<node_signer;
-            b<<signature;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>payload_heart_beat;
-            b>>node_signer;
-            b>>signature;
-        }
-    };
-
-// leader_certificate;
-//
-    struct request_for_transactions: public message_base
-    {
-        request_for_transactions():message_base(msgid::request_for_transactions)
-        {
-
-        }
-        request_for_transactions(inBuffer & in):message_base(msgid::request_for_transactions)
-        {
-            unpack(in);
-        }
-        std::string payload_lc;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-
-            message_base::pack(b);
-            b<<payload_lc;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>payload_lc;
-        }
-
-    };
-    struct response_with_transactions: public message_base
-    {
-        response_with_transactions():message_base(msgid::response_with_transactions)
-        {
-
-        }
-        response_with_transactions(const std::string& s):message_base(msgid::response_with_transactions)
-        {
-            inBuffer in(s);
-            auto t=in.get_PN();
-            if(t!=msgid::response_with_transactions)
-                throw CommonError("if(t!=msgid::response_with_transactions)");
-            unpack(in);
-        }
-        response_with_transactions(inBuffer &in):message_base(msgid::response_with_transactions)
-        {
-            unpack(in);
-        }
-
-        std::vector<TRANSACTION_body>  trs;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-
-            message_base::pack(b);
-            b<<trs;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>trs;
-        }
-
-    };
-
-    struct leader_certificate: public message_base
-    {
-        leader_certificate():message_base(msgid::leader_certificate)
-        {
-
-        }
-        leader_certificate(const std::string& s):message_base(msgid::leader_certificate)
-        {
-            inBuffer in(s);
-            auto t=in.get_PN();
-            if(t!=msgid::leader_certificate)
-                throw CommonError("if(t!=msgid::leader_certificate)");
-            unpack(in);
-        }
-        std::string payload_heart_beat;
-        std::vector<NODE_id> nodes;
-        blst_cpp::AggregateSignature agg_sig;
-        // BlsPublicKey agg_pk;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-
-            message_base::pack(b);
-            b<<payload_heart_beat;
-            b<<nodes;
-            b<<agg_sig;
-            // b<<agg_pk;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>payload_heart_beat;
-            b>>nodes;
-            b>>agg_sig;
-            // b>>agg_pk;
-        }
-
-    };
-    struct block_request: public message_base
-    {
-        block_request():message_base(msgid::block_request)
-        {
-        }
-        block_request(inBuffer& in):message_base(msgid::block_request)
-        {
-            unpack(in);
-        }
-
-        std::string leader_cert;
-        std::vector<TRANSACTION_body> transaction_bodies;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-
-            message_base::pack(b);
-            b<<leader_cert;
-            b<<transaction_bodies;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>leader_cert;
-            b>>transaction_bodies;
-        }
-
-    };
-    struct blockZ: public message_base
-    {
-        blockZ():message_base(msgid::blockZ)
-        {
-
-        }
-        blockZ(const std::string& s):message_base(msgid::blockZ)
-        {
-            inBuffer in(s);
-            int t=in.get_PN();
-            if(t!=msgid::blockZ)
-                throw CommonError("if(t!=msgid::blockZ)");
-            unpack(in);
-        }
-        BigInt prev_epoch;
-        BLOCK_id prev_root_hash;
-        BLOCK_id new_root_hash1;
-        THASH_id attachment_hash;
-        // THASH_id instruction_reports_hash;
-        // THASH_id rewards_hash;
-        // THASH_id fee_hash;
-        // THASH_id trs_hash;
-        std::string payload_heart_bit;
-        // std::vector<THASH_id> transaction_hashes;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-            message_base::pack(b);
-            b<<prev_epoch;
-            b<<prev_root_hash;
-            b<<new_root_hash1;
-            b<<attachment_hash;
-            b<<payload_heart_bit;
-            // b<<transaction_hashes;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>prev_epoch;
-            b>>prev_root_hash;
-            b>>new_root_hash1;
-            b>>attachment_hash;
-            b>>payload_heart_bit;
-            // b>>transaction_hashes;
-        }
-
-    };
-
-    struct publish_block: public message_base
-    {
-        publish_block():message_base(msgid::publish_block)
-        {
-
-        }
-        publish_block(const std::string& s):message_base(msgid::publish_block)
-        {
-            inBuffer in(s);
-            int t=in.get_PN();
-            if(t!=msgid::publish_block)
-                throw CommonError("if(t!=msgid::publish_block)");
-            unpack(in);
-        }
-        BigInt epoch;
-        attachment_data att_data;
-        std::string block_accepted_req;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-            message_base::pack(b);
-            b<<epoch;
-            b<<att_data;
-            b<<block_accepted_req;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>epoch;
-            b>>att_data;
-            b>>block_accepted_req;
-        }
-
-    };
-    struct block_accepted_req: public message_base
-    {
-        block_accepted_req():message_base(msgid::block_accepted_req)
-        {
-
-        }
-        block_accepted_req(inBuffer &in):message_base(msgid::block_accepted_req)
-        {
-            unpack(in);
-        }
-        block_accepted_req(const std::string &s):message_base(msgid::block_accepted_req)
-        {
-            inBuffer in(s);
-            auto t=in.get_PN();
-            if(t!=msgid::block_accepted_req)
-                throw CommonError("if(t!=msgid::block_accepted_req)");
-            unpack(in);
-        }
-        std::string leader_certificateZ;
-        std::string block_payload;
-        std::vector<NODE_id> node_validators;
-        blst_cpp::AggregateSignature agg_sig;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-            message_base::pack(b);
-            b<<leader_certificateZ<<block_payload<<node_validators<<agg_sig;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>leader_certificateZ>>block_payload>>node_validators>>agg_sig;
-        }
-    };
-    struct block_accepted_rsp: public message_base
-    {
-        block_accepted_rsp():message_base(msgid::block_accepted_rsp)
-        {
-
-        }
-        block_accepted_rsp(inBuffer &in):message_base(msgid::block_accepted_rsp)
-        {
-            unpack(in);
-        }
-        NODE_id node_signer;
-        BLOCK_id new_root_hash;
-        blst_cpp::Signature sig_bls;
-        void sign(const blst_cpp::SecretKey& sk)
-        {
-            sig_bls.sign(sk, new_root_hash.container);
-        }
-        bool verify(const blst_cpp::PublicKey & pk)
-        {
-            return sig_bls.verify(pk,new_root_hash.container);
-        }
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-            message_base::pack(b);
-            b<<new_root_hash<<sig_bls<<node_signer;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>new_root_hash>>sig_bls>>node_signer;
-        }
-    };
-
-
-    struct block_response: public message_base
-    {
-        block_response():message_base(msgid::block_response)
-        {
-
-        }
-        block_response(inBuffer& in):message_base(msgid::block_response)
-        {
-            unpack(in);
-        }
-        std::string payload_block;
-        blst_cpp::Signature sig;
-        NODE_id node_validator;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-
-            message_base::pack(b);
-            b<<payload_block;
-            b<<sig;
-            b<<node_validator;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>payload_block;
-            b>>sig;
-            b>>node_validator;
-        }
-        void sign(const blst_cpp::SecretKey &sk)
-        {
-            // Blake2bHasher h;
-            // h.update(payload_block);
-            sig.sign(sk, blake2b_hash(payload_block).container);
-        }
-        bool verify(const blst_cpp::PublicKey &pk) const
-        {
-            return sig.verify(pk, blake2b_hash(payload_block).container);
-        }
-
-    };
 
     struct get_user_status_rsp: public message_base
     {
@@ -757,57 +366,473 @@ namespace msg
     };
 
 
-    struct get_blocks_req: public message_base
+}
+
+namespace MsgEvent
+{
+    struct Base: public Refcountable
     {
-        get_blocks_req():message_base(msgid::get_blocks_req)
+        int type;
+        Base(int type_):type(type_) {}
+        virtual ~Base() {}
+        virtual void pack(outBuffer& b) const
+        {
+            MUTEX_INSPECTOR;
+            b<<type;
+
+        }
+        virtual void unpack(inBuffer& b)
+        {
+        }
+        void unpack2(inBuffer& b)
+        {
+            MUTEX_INSPECTOR;
+            auto t=b.get_PN();
+            if(t!=type)
+                throw CommonError("if(type!=mtype)");
+            unpack(b);
+        }
+        std::string getBuffer() const
+        {
+            MUTEX_INSPECTOR;
+            outBuffer o;
+            pack(o);
+            return o.asString()->container;
+        }
+
+    };
+    struct HeartBeatREQ: public Base
+    {
+        HeartBeatREQ():Base(msgid::HeartBeatREQ)
         {
 
         }
-        get_blocks_req(inBuffer &in):message_base(msgid::get_blocks_req)
+        HeartBeatREQ(const BLOCK_id& _prev_block_hash, const BigInt& _epoch, const NODE_id& _node_leader):Base(msgid::HeartBeatREQ),
+        prev_block_hash(_prev_block_hash), epoch(_epoch), node_leader(_node_leader)
+        {
+        }
+        BLOCK_id prev_block_hash;
+        BigInt epoch;
+        NODE_id node_leader;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            
+            Base::pack(b);
+            b<<prev_block_hash;
+            b<<node_leader;
+            b<<epoch;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>prev_block_hash;
+            b>>node_leader;
+            b>>epoch;
+        }
+        static Base* construct()
+        {
+            return new HeartBeatREQ();
+        }
+
+    };
+    struct LeaderCertificate: public Base
+    {
+        LeaderCertificate():Base(msgid::LeaderCertificate), heart_beat(new MsgEvent::HeartBeatREQ())
+        {
+
+        }
+        REF_getter<MsgEvent::HeartBeatREQ> heart_beat;
+        std::vector<NODE_id> nodes;
+        blst_cpp::AggregateSignature agg_sig;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            heart_beat->pack(b);
+            // b<<payload_heart_beat;
+            b<<nodes;
+            b<<agg_sig;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            // auto t=b.get_PN();
+            // if(t!=msgid::HeartBeatREQ)                throw CommonError("if(t!=msgid::HeartBeatREQ)");
+            heart_beat->unpack2(b);
+            // b>>payload_heart_beat;
+            b>>nodes;
+            b>>agg_sig;
+        }
+        static Base* construct()
+        {
+            return new LeaderCertificate();
+        }
+
+    };
+    struct GetTransactionREQ: public Base
+    {
+        GetTransactionREQ():Base(msgid::GetTransactionREQ),payload_lc(new LeaderCertificate())
+        {
+        }
+        REF_getter<LeaderCertificate> payload_lc;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            payload_lc->pack(b);
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            payload_lc->unpack2(b);
+        }
+
+        static Base* construct()
+        {
+            return new GetTransactionREQ();
+        }
+    };
+    struct ValidateBlockREQ: public Base
+    {
+        ValidateBlockREQ():Base(msgid::ValidateBlockREQ),leader_cert(new LeaderCertificate())
+        {
+        }
+        static Base* construct()
+        {
+            return new ValidateBlockREQ();
+        }
+
+        REF_getter<LeaderCertificate>  leader_cert;
+        std::vector<TRANSACTION_body> transaction_bodies;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            leader_cert->pack(b);
+            b<<transaction_bodies;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            leader_cert->unpack2(b);
+            b>>transaction_bodies;
+        }
+
+    };
+    struct BlockInfo;
+    struct BlockAcceptedREQ: public Base
+    {
+        BlockAcceptedREQ();
+        static Base* construct()
+        {
+            return new BlockAcceptedREQ();
+        }
+        REF_getter<LeaderCertificate> leader_certificateZ;
+        REF_getter<BlockInfo> block_payload;
+        std::vector<NODE_id> node_validators;
+        blst_cpp::AggregateSignature agg_sig;
+        void pack(outBuffer& b) const final;
+        void unpack(inBuffer& b) final;
+    };
+    struct HeartBeatRSP: public Base
+    {
+        HeartBeatRSP():Base(msgid::HeartBeatRSP), payload_heart_beat(new HeartBeatREQ())
+        {
+        }
+        REF_getter<HeartBeatREQ> payload_heart_beat;
+        NODE_id node_signer;
+        blst_cpp::Signature signature;
+        static Base* construct()
+        {
+            return new HeartBeatRSP();
+        }
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            payload_heart_beat->pack(b);
+            b<<node_signer;
+            b<<signature;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            payload_heart_beat->unpack2(b);
+            b>>node_signer;
+            b>>signature;
+        }
+    };
+    struct GetTransactionRSP: public Base
+    {
+        static Base* construct()
+        {
+            return new GetTransactionRSP();
+        }
+        GetTransactionRSP():Base(msgid::GetTransactionRSP)
+        {
+            
+        }
+        GetTransactionRSP(inBuffer &in):Base(msgid::GetTransactionRSP)
         {
             unpack(in);
+        }
+
+        std::vector<TRANSACTION_body>  trs;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            b<<trs;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>trs;
+        }
+
+    };
+    struct BlockInfo: public Base
+    {
+        static Base* construct()
+        {
+            return new BlockInfo();
+        }
+        BlockInfo():Base(msgid::BlockInfo),payload_heart_beat(new HeartBeatREQ())
+        {
+
+        }
+        BigInt prev_epoch;
+        BLOCK_id prev_root_hash;
+        BLOCK_id new_root_hash1;
+        THASH_id attachment_hash;
+        REF_getter<HeartBeatREQ> payload_heart_beat;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            Base::pack(b);
+            b<<prev_epoch;
+            b<<prev_root_hash;
+            b<<new_root_hash1;
+            b<<attachment_hash;
+            payload_heart_beat->pack(b);
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>prev_epoch;
+            b>>prev_root_hash;
+            b>>new_root_hash1;
+            b>>attachment_hash;
+            payload_heart_beat->unpack2(b);
+        }
+
+    };
+    
+    struct ValidateBlockRSP: public Base
+    {
+        static Base* construct()
+        {
+            return new ValidateBlockRSP();
+        }
+        ValidateBlockRSP(): Base(msgid::ValidateBlockRSP), payload_block(new BlockInfo())
+        {
+
+        }
+        REF_getter<BlockInfo> payload_block;
+        blst_cpp::Signature sig;
+        NODE_id node_validator;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            payload_block->pack(b);
+            b<<sig;
+            b<<node_validator;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            payload_block->unpack2(b);
+            b>>sig;
+            b>>node_validator;
+        }
+        void sign(const blst_cpp::SecretKey &sk)
+        {
+            // Blake2bHasher h;
+            // h.update(payload_block);
+            sig.sign(sk, blake2b_hash(payload_block->getBuffer()).container);
+        }
+        bool verify(const blst_cpp::PublicKey &pk) const
+        {
+            return sig.verify(pk, blake2b_hash(payload_block->getBuffer()).container);
+        }
+
+    };
+    struct BlockAcceptedRSP: public Base
+    {
+        static Base* construct()
+        {
+            return new BlockAcceptedRSP();
+        }
+        BlockAcceptedRSP():Base(msgid::BlockAcceptedRSP)
+        {
+
+        }
+        NODE_id node_signer;
+        BLOCK_id new_root_hash;
+        blst_cpp::Signature sig_bls;
+        void sign(const blst_cpp::SecretKey& sk)
+        {
+            sig_bls.sign(sk, new_root_hash.container);
+        }
+        bool verify(const blst_cpp::PublicKey & pk) const
+        {
+            return sig_bls.verify(pk,new_root_hash.container);
+        }
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            Base::pack(b);
+            b<<new_root_hash<<sig_bls<<node_signer;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>new_root_hash>>sig_bls>>node_signer;
+        }
+    };
+    struct GetSavedBlocksREQ: public Base
+    {
+        GetSavedBlocksREQ():Base(msgid::GetSavedBlocksREQ)
+        {
+
+        }
+        static Base* construct()
+        {
+            return new GetSavedBlocksREQ();
         }
         BigInt myEpoch;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
-            message_base::pack(b);
+            Base::pack(b);
             b<<myEpoch;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
-            message_base::unpack(b);
+            Base::unpack(b);
             b>>myEpoch;
         }
     };
-
-    struct get_blocks_rsp: public message_base
+    struct BlockDBStore: public Base
     {
-        get_blocks_rsp():message_base(msgid::get_blocks_rsp)
+        BlockDBStore():Base(msgid::BlockDBStore), block_accepted_req(new BlockAcceptedREQ())
         {
 
         }
-        get_blocks_rsp(inBuffer &in):message_base(msgid::get_blocks_rsp)
-        {
-            unpack(in);
-        }
-        std::vector<std::pair<BigInt,std::string> > blocks_Z;
-        BigInt lastEpoch;
+        BigInt epoch;
+        attachment_data att_data;
+        REF_getter<BlockAcceptedREQ> block_accepted_req;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
-            message_base::pack(b);
-            b<<blocks_Z<<lastEpoch;
+            Base::pack(b);
+            b<<epoch;
+            b<<att_data;
+            block_accepted_req->pack(b);
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>blocks_Z>>lastEpoch;
+            Base::unpack(b);
+            b>>epoch;
+            b>>att_data;
+            block_accepted_req->unpack2(b);
+        }
+
+    };
+    struct GetSavedBlocksRSP: public Base
+    {
+        static Base* construct()
+        {
+            return new GetSavedBlocksRSP();
+        }
+        GetSavedBlocksRSP():Base(msgid::GetSavedBlocksRSP)
+        {
+
+        }
+        std::vector<std::pair<BigInt, REF_getter<MsgEvent::BlockDBStore>> > blocks_Z;
+        BigInt lastEpoch;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            Base::pack(b);
+            b<<blocks_Z.size();
+            for(auto &z: blocks_Z)
+            {
+                b<<z.first;
+                z.second->pack(b);
+            }
+            b<<lastEpoch;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            int size=b.get_PN();
+            for(int i=0;i<size;i++)            {
+                BigInt epoch;
+                b>>epoch;
+                REF_getter<MsgEvent::BlockDBStore> block_db_store(new MsgEvent::BlockDBStore());
+                block_db_store->unpack2(b);
+                blocks_Z.emplace_back(epoch, block_db_store);
+            }
+            b>>lastEpoch;
         }
     };
 
 
 }
+
+
+
+class MsgFactory {
+public:
+    using Constructor = MsgEvent::Base* (*)();
+    
+    MsgEvent::Base* create(const int& id) {
+
+        auto it = registry.find(id);
+        if(it==registry.end())
+        {
+            throw CommonError("Message type not found %d %s", id,msgName(id));
+        }
+        return it->second();
+    }
+    
+    bool registerMsg(const int& id, Constructor ctor) {
+        registry[id] = ctor;
+        return true;
+    }
+    
+private:
+        std::map<int, Constructor> registry;
+};
 

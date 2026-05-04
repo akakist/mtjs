@@ -20,7 +20,9 @@ namespace ServiceEnum
 namespace bcEventEnum
 {
     const EVENT_id Msg(ghash("@g_bcMsg"));
+    const EVENT_id Msg2(ghash("@g_bcMsg2"));
     const EVENT_id MsgReply(ghash("@g_bcMsgReply"));
+    const EVENT_id MsgReply2(ghash("@g_bcMsgReply2"));
     const EVENT_id ClientMsg(ghash("@g_bcClientMsg"));
     const EVENT_id ClientMsgReply(ghash("@g_bcClientMsgReply"));
     const EVENT_id ClientTxSubscribeREQ(ghash("@g_ClientTxSubscribeREQ"));
@@ -35,6 +37,7 @@ namespace bcEventEnum
     const EVENT_id SendToChild(ghash("@g_SendToChild"));
     const EVENT_id SendToChildAck(ghash("@g_SendToChildAck"));
     const EVENT_id StreamBlock(ghash("@g_StreamBlock"));
+    const EVENT_id HeartBeatREQ(ghash("@g_HeartBeatREQ"));
     
     
 }
@@ -73,6 +76,37 @@ namespace bcEvent
         }
 
     };
+    class Msg2: public Event::Base
+    {
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return new Msg2(r);
+        }
+        std::string msg;
+
+
+        Msg2(const std::string& _msg,   const route_t &r)
+            :Base(bcEventEnum::Msg2,r),
+             msg(_msg)
+        {}
+
+
+        Msg2(const route_t& r)
+            :Base(bcEventEnum::Msg2 ,r) {}
+        void unpack(inBuffer& o)
+        {
+
+            o>>msg;
+        }
+        void pack(outBuffer& o) const
+        {
+
+            o<<msg;
+        }
+
+    };
     class MsgReply: public Event::Base
     {
 
@@ -92,6 +126,37 @@ namespace bcEvent
 
         MsgReply(const route_t& r)
             :Base(bcEventEnum::MsgReply,r) {}
+        void unpack(inBuffer& o)
+        {
+
+            o>>msg;
+        }
+        void pack(outBuffer& o) const
+        {
+
+            o<<msg;
+        }
+
+    };
+    class MsgReply2: public Event::Base
+    {
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return new MsgReply2(r);
+        }
+        std::string msg;
+
+
+        MsgReply2(const std::string& _msg,   const route_t &r)
+            :Base(bcEventEnum::MsgReply2,r),
+             msg(_msg)
+        {}
+
+
+        MsgReply2(const route_t& r)
+            :Base(bcEventEnum::MsgReply2,r) {}
         void unpack(inBuffer& o)
         {
 
@@ -403,5 +468,9 @@ class TxValidatorStart: public Event::NoPacked
         const std::string payload;
 
     };
- 
+    struct NetworkBase: public Event::Base
+    {
+        NetworkBase(const EVENT_id& id, const route_t& r):Event::Base(id,r) {}
+        virtual void  hash(Blake2bHasher &h) const =0;
+    };
 }

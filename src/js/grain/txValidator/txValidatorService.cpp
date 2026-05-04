@@ -152,6 +152,7 @@ bool TxValidator::Service::TxValidatorStop(const bcEvent::TxValidatorStop *e)
 }
 bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
+    MUTEX_INSPECTOR;
     conf=e;
     if(!root.valid())
         root=getRoot(conf->db.get());
@@ -161,19 +162,22 @@ bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
 }
 bool TxValidator::Service::GetTransactions(const bcEvent::GetTransactions*e)
 {
-    msg::response_with_transactions rwt;
+    MUTEX_INSPECTOR;
+    // msg::response_with_transactions rwt;
+    REF_getter<MsgEvent::GetTransactionRSP> rsp=new MsgEvent::GetTransactionRSP();
     for(auto& z: transaction_pool_verified)
     {
-        rwt.trs.push_back(z.second);
+        rsp->trs.push_back(z.second);
     }
     transaction_pool_verified.clear();
-    msg::node_message_ed nm(rwt.getBuffer(),conf->this_node_name,conf->my_sk_ed);
+    msg::node_message_ed nm(rsp->getBuffer(),conf->this_node_name,conf->my_sk_ed);
     passEvent(new bcEvent::MsgReply(nm.getBuffer(),poppedFrontRoute(e->route)));
 
     return true;
 }
 bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot*e)
 {
+    MUTEX_INSPECTOR;
     root=getRoot(conf->db.get());
     init_root(root);
     return true;
