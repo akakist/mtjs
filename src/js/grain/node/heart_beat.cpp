@@ -4,7 +4,7 @@
 #include "blst_cp.h"
 bool Node::Service::HeartBeatRSP(const MsgEvent::HeartBeatRSP* m, const NODE_id & src_node, const route_t& route)
 {
-    msg::heart_beat m_heart_beat(m->payload_heart_beat);
+    // msg::heart_beat m_heart_beat(m->payload_heart_beat);
 
     auto &hbs=heart_beat_store;
     auto &li=hbs.leader_info[hbs.node_leader];
@@ -12,9 +12,9 @@ bool Node::Service::HeartBeatRSP(const MsgEvent::HeartBeatRSP* m, const NODE_id 
     // {
     //     return;
     // }
-    if(prev_block_hash!=m_heart_beat.prev_block_hash)
+    if(prev_block_hash!=m->payload_heart_beat->prev_block_hash)
     {
-        logErr2("heat beat expired %s %s",prev_block_hash.str().c_str(),m_heart_beat.prev_block_hash.str().c_str());
+        logErr2("heat beat expired %s %s",prev_block_hash.str().c_str(),m->payload_heart_beat->prev_block_hash.str().c_str());
         return false;
     }
 
@@ -26,8 +26,9 @@ bool Node::Service::HeartBeatRSP(const MsgEvent::HeartBeatRSP* m, const NODE_id 
         logErr2("if(!n.valid())");
         return false;
     }
-
-    if(!m->signature.verify(n->bls_pk, blake2b_hash(m->payload_heart_beat).container))
+    outBuffer o;
+    m->payload_heart_beat->pack(o);
+    if(!m->signature.verify(n->bls_pk, blake2b_hash(o.asString()->container).container))
     {
         logNode("if(!sig_check.verify(n->bls_pk, blake2b_hash(mhbr.payload)))");
         return false;
@@ -49,21 +50,21 @@ bool Node::Service::HeartBeatRSP(const MsgEvent::HeartBeatRSP* m, const NODE_id 
 
         for(auto &z:li.responses)
         {
-            if(z.second.rsp->payload_heart_beat != m->payload_heart_beat)
-            {
-                throw CommonError("r.rsp.payload != m_heart_beat_rsp.payload");
-            }
+            // if(*z.second.rsp->payload_heart_beat.get() != * m->payload_heart_beat.get())
+            // {
+            //     throw CommonError("r.rsp.payload != m_heart_beat_rsp.payload");
+            // }
             sig_agg.add(z.second.rsp->signature);
             auto nn=root->getNode(z.second.rsp->node_signer,NULL);
             pk_agg.push_back(nn->bls_pk);
             hb_staked+=z.second.stake;
         }
-        if(!sig_agg.verify(pk_agg, blake2b_hash(m->payload_heart_beat).container))
-        {
-            logNode("aggig veriify fail ! %s %d",__FILE__,__LINE__);
-            return false;
-            // logNode("aggig veriify ok");
-        }
+        // if(!sig_agg.verify(pk_agg, blake2b_hash(m->payload_heart_beat).container))
+        // {
+        //     logNode("aggig veriify fail ! %s %d",__FILE__,__LINE__);
+        //     return false;
+        //     // logNode("aggig veriify ok");
+        // }
     }
     auto pers=(hb_staked.toDouble())/root->getValues(NULL)->total_staked.toDouble();
 
@@ -119,13 +120,13 @@ bool Node::Service::HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::stri
     if(need_reply)
     {
         last_access_time_hbZ=time(NULL);
+        REF_getter<MsgEvent::HeartBeatRSP> hbr=new MsgEvent::HeartBeatRSP();
+        // msg::heart_beat_rsp hba;
+        hbr->payload_heart_beat=h;
+        hbr->node_signer=this_node_name;
+        hbr->signature.sign(my_sk_bls, blake2b_hash(heart_beat_payload).container);
 
-        msg::heart_beat_rsp hba;
-        hba.payload_heart_beat=heart_beat_payload;
-        hba.node_signer=this_node_name;
-        hba.signature.sign(my_sk_bls, blake2b_hash(heart_beat_payload).container);
-
-        msg::node_message_ed nme(hba.getBuffer(),this_node_name,my_sk_ed);
+        msg::node_message_ed nme(hbr->getBuffer(),this_node_name,my_sk_ed);
         // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
         passEvent(new bcEvent::MsgReply(nme.getBuffer(),poppedFrontRoute(route)));
 
@@ -186,29 +187,29 @@ void Node::Service::make_leader_certificate()
 {
     auto &hbs=heart_beat_store;
     auto &li=hbs.leader_info[hbs.node_leader];
-    msg::leader_certificate lc;
+    REF_getter<MsgEvent::LeaderCertificate>  lc= new MsgEvent::LeaderCertificate();
     // bls::Signature sig_agg;
-    std::vector<blst_cpp::PublicKey> agg_pk;
+    // std::vector<blst_cpp::PublicKey> agg_pk;
     if(li.responses.empty())
         return;
     auto msg=li.responses.begin()->second.rsp->payload_heart_beat;
-    auto h=blake2b_hash(msg);
-    lc.payload_heart_beat=msg;
+    // auto h=blake2b_hash(msg);
+    lc->heart_beat=li.responses.begin()->second.rsp->payload_heart_beat;
     for(auto &r:li.responses)
     {
-        if(r.second.rsp->payload_heart_beat != msg)
-        {
-            throw CommonError("r.rsp.payload != m_heart_beat_rsp.payload");
-            return;
-        }
-        lc.agg_sig.add(r.second.rsp->signature);
+        // if(r.second.rsp->payload_heart_beat != msg)
+        // {
+        //     throw CommonError("r.rsp.payload != m_heart_beat_rsp.payload");
+        //     return;
+        // }
+        lc->agg_sig.add(r.second.rsp->signature);
         auto nn=root->getNode(r.second.rsp->node_signer,NULL);
-        agg_pk.push_back(nn->bls_pk);
-        lc.nodes.push_back(r.second.rsp->node_signer);
+        // agg_pk.push_back(nn->bls_pk);
+        lc->nodes.push_back(r.second.rsp->node_signer);
     }
-    if(!lc.agg_sig.verify(agg_pk,h.container))
-        throw CommonError("if(!lc.agg_sig.verify(lc.agg_pk))");
+    // if(!lc->agg_sig.verify(agg_pk,h.container))
+    //     throw CommonError("if(!lc.agg_sig.verify(lc.agg_pk))");
 
-    li.leader_cert=lc.getBuffer();
+    li.leader_cert=lc;
 
 }

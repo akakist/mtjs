@@ -3,49 +3,50 @@
 #include "tools_mt.h"
 #include "blst_cp.h"
 #include "base62.h"
-void Node::Service::on_get_blocks_req(const msg::get_blocks_req &r, const route_t& route)
-{
-    SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READONLY);
+// void Node::Service::on_get_blocks_req(const msg::get_blocks_req &r, const route_t& route)
+// {
+//     SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READONLY);
 
-    SQLite::Statement query(dbs, "SELECT epoch, data FROM blocks WHERE epoch>=? order by epoch limit 100");
-    query.bind(1,r.myEpoch.toString());
-    msg::get_blocks_rsp ret;
-    while (query.executeStep())
-    {
-        // BigInt ep;
-        BigInt ep = query.getColumn(0).getInt();
-        std::string data = query.getColumn(1).getString();
-        ret.blocks_Z.push_back({ep,data});
-    }
-    ret.lastEpoch=root->getValues(NULL)->epoch;
-    msg::node_message_ed nm(ret.getBuffer(),this_node_name,my_sk_ed);
-    passEvent(new bcEvent::MsgReply(nm.getBuffer(),poppedFrontRoute(route)));
+//     SQLite::Statement query(dbs, "SELECT epoch, data FROM blocks WHERE epoch>=? order by epoch limit 100");
+//     query.bind(1,r.myEpoch.toString());
+//     msg::get_blocks_rsp ret;
+//     while (query.executeStep())
+//     {
+//         // BigInt ep;
+//         BigInt ep = query.getColumn(0).getInt();
+//         std::string data = query.getColumn(1).getString();
+//         ret.blocks_Z.push_back({ep,data});
+//     }
+//     ret.lastEpoch=root->getValues(NULL)->epoch;
+//     msg::node_message_ed nm(ret.getBuffer(),this_node_name,my_sk_ed);
+//     passEvent(new bcEvent::MsgReply(nm.getBuffer(),poppedFrontRoute(route)));
 
-}
+// }
 
 void Node::Service::do_sync()
 {
     // last_leader_cert
-    if(last_leader_cert.empty())throw CommonError("if(last_leader_cert.empty())");
-    msg::leader_certificate lc(last_leader_cert);
+    if(!last_leader_cert.valid()) throw CommonError("if(last_leader_cert.empty())");
+    // msg::leader_certificate lc(last_leader_cert);
     // lc.nodes
     std::vector<NODE_id> node_names;
-    for(auto& z: lc.nodes)
+    for(auto& z: last_leader_cert->nodes)
     {
         if(z!=this_node_name)
             node_names.push_back(z);
     }
-    auto nn=node_names[rand()%lc.nodes.size()];
+    auto nn=node_names[rand()%last_leader_cert->nodes.size()];
     logNode("selected node %s",nn.container.c_str());
     auto n=root->getNode(nn,NULL);
     if(!n.valid())
         throw CommonError("if(!n.valid())");
-    msg::get_blocks_req gbr;
-    gbr.myEpoch=root->getValues(NULL)->epoch;
-    msg::node_message_ed nm(gbr.getBuffer(),this_node_name,my_sk_ed );
+    REF_getter<MsgEvent::GetSavedBlocksREQ>  gbr=new MsgEvent::GetSavedBlocksREQ();
+    gbr->myEpoch=root->getValues(NULL)->epoch;
+    msg::node_message_ed nm(gbr->getBuffer(),this_node_name,my_sk_ed );
     sendEvent(n->ip,ServiceEnum::Node, new bcEvent::Msg(nm.getBuffer(),ListenerBase::serviceId));
 
 }
+#ifdef KALL
 void Node::Service::on_get_blocks_rsp(const msg::get_blocks_rsp& r)
 {
     // logNode("on_get_blocks_rsp");
@@ -114,3 +115,4 @@ void Node::Service::on_get_blocks_rsp(const msg::get_blocks_rsp& r)
     state_Z=State::NORMAL;
     logNode("State::NORMAL");
 }
+#endif

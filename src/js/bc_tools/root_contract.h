@@ -234,7 +234,7 @@ struct root_data: public Cellable
     {
         accessed=true;
     }
-    bool verify_lider_certificate(const msg::leader_certificate& lc);
+    bool verify_lider_certificate(const REF_getter<MsgEvent::LeaderCertificate>& lc);
 
     std::vector<std::string> getContractPath(const std::string &name);
     std::vector<std::string> getNodePath(const std::string &name);
