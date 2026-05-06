@@ -91,13 +91,9 @@ namespace BroadcasterTree
             XPASS;
         }
 
-        // std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
-
-        // bool is_working=false;
         REF_getter<root_data> root=NULL;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
-
 
 
     };

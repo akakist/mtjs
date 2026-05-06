@@ -32,12 +32,21 @@ std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std
         return "insufficient_privileges";
 
 
-    auto u=t.root->getUser(senderAddress,by);
+    auto u=t.root->getUserState(senderAddress,by);
     if(!u.valid())
     {
-        u=t.root->addUser(senderAddress,by);
+        REF_getter<bc_user_state> uu=new bc_user_state;
+        uu->balance+=c.amount;
+        t.root->addUserState(senderAddress,by,u);
     }
-    u->balance+=c.amount;
+    else
+    {
+        auto uu=u->copy();
+        uu->balance+=c.amount;
+        t.root->setUserState(senderAddress,by,uu);
+
+
+    }
         // return "user not found/created";
     
 
@@ -101,14 +110,16 @@ std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t
         return "contract name already exists";
 
 
-    REF_getter<bc_contract> ci=t.root->addContract(c.name,by);
+    REF_getter<bc_contract> ci=new bc_contract;
     ci->owner=senderAddress;
     ci->name=c.name;
     ci->src=c.src;
-    ci->ready_for_sale=false;
-    ci->cost=BigInt(0);
+    t.root->addContract(c.name,by,ci);
 
-    u->contracts.insert(c.name);
+    auto cu=u->copy();
+    cu->contracts.insert(c.name);
+    t.root->addUser(senderAddress, by, cu);
+    // u->contracts.insert(c.name);
 
     t.fee[senderAddress]+=v->fees[bc_values::contract_deploy];
 
@@ -124,7 +135,7 @@ std::optional<std::string> TR::execute(const tx::transfer &c, t_params & t,const
     if(!from.valid())
         return "cannot find src addr";
 
-    REF_getter<bc_user> to(NULL);
+    REF_getter<const bc_user> to(NULL);
     to=t.root->getUser(c.to_address,by);
     if(!to.valid())
     {
@@ -161,7 +172,7 @@ std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const st
     {
         return "Node not registered";
     }
-    auto sender = t.root->getUser(senderAddress,by);
+    auto sender = t.root->getUserState(senderAddress,by);
     if (!sender.valid()) {
         return "user account not found";
     }
@@ -210,18 +221,17 @@ std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,c
     auto u=t.root->getUser(senderAddress,by);
     if(!u.valid())
         return "if(!u.valid())";
+    auto uu=u->copy();
     // if(u->balance<v->fees[bc_values::node_create])
     // return "Not enough funds";
-
-    auto n=t.root->addNode(c.name,by);
-    // if(n.valid())
-    //     return "fallback, node already registered";
-
+    REF_getter<bc_node> n=new bc_node;
     n->ip=c.ip;
     n->owner_ed_pk=senderAddress;
     n->bls_pk=c.pk_bls;
     n->ed_pk=c.pk_ed;
-    u->nodes.insert(c.name.container);
+    uu->nodes.insert(c.name.container);
+    t.root->setUser(senderAddress, by, uu);
+    t.root->addNode(c.name,by,n);
 
     // t.transfer_from[senderAddress]+=c.amount;
     // t.transfer_to[c.to_addr]+=c.amount;

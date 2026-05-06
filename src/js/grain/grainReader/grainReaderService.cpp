@@ -161,7 +161,7 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg*e)
             MUTEX_INSPECTOR;
             msg::get_user_status_req rq(in2);
             std::optional<std::string> err;
-            auto u=root->getUser(rq.address_pk_ed,NULL);
+            auto u=root->getUserState(rq.address_pk_ed,NULL);
             if(!u.valid())
                 err="user not found "+base62::encode(rq.address_pk_ed);
 

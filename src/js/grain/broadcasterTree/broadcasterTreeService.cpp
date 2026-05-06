@@ -76,10 +76,6 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base>& e)
             return InvalidateRoot((const bcEvent::InvalidateRoot*)e.get());
         case bcEventEnum::BroadcastMessage:
             return BroadcastMessage((const bcEvent::BroadcastMessage*)e.get());
-        // case bcEventEnum::GetTransactions:
-        //     return GetTransactions((const bcEvent::GetTransactions*)e.get());
-        // case bcEventEnum::ClientMsg:
-        //     return ClientMsg((const bcEvent::ClientMsg*)e.get());
         case bcEventEnum::ServiceInit:
             return ServiceInit((const bcEvent::ServiceInit*)e.get());
         case timerEventEnum::TickTimer:
@@ -185,8 +181,6 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage*
     for(auto &nd: ks)
     {
         auto nn=root->getNode(nd,NULL);
-        if(nn->disabled_manual || nn->disabled_offline)
-            continue;
         BroadcasterTree::Node n;
         n.name=nn->name;
         n.stake=nn->total_stake;

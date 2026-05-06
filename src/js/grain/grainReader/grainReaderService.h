@@ -69,7 +69,6 @@ namespace GrainReader
             XPASS;
         }
 
-        // std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
 
         REF_getter<root_data> root=NULL;
 

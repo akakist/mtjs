@@ -91,7 +91,7 @@ void Node::Service::collectTransactions()
         msg::user_message_req ur(z.second);
         cnt[ur.address_pk_ed].insert(z.first);
         BigInt nonce=0;
-        auto u=root->getUser(ur.address_pk_ed,NULL);
+        auto u=root->getUserState(ur.address_pk_ed,NULL);
         if(u.valid())
         {
             nonce=u->nonce;
@@ -580,16 +580,10 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvent::GetSavedBlocksRSP* r, cons
     MUTEX_INSPECTOR;
     for(auto& z: r->blocks_Z)
     {
-        // auto & epoch=z.first
-        // msg::publish_block pb(z.second);
-        // msg::block_accepted_req ba(pb.block_accepted_req);
-        // msg::leader_certificate lc(ba.leader_certificateZ);
-        // msg::blockZ bl(ba.block_payload);
-        // msg::heart_beat hb(bl.payload_heart_bit);
         if(z.second->epoch!=z.first)
             throw CommonError("if(hb.epoch!=z.first)");
-        if(z.second->epoch!=root->getValues(NULL)->epoch)
-            throw CommonError("if(hb.epoch!=root->getValues(NULL)->epoch) %s %s",z.second->epoch.toString().c_str(), root->getValues(NULL)->epoch.toString().c_str()   );
+        if(z.second->epoch!=root->getEpoch(NULL)->epoch)
+            throw CommonError("if(hb.epoch!=root->getValues(NULL)->epoch) %s %s",z.second->epoch.toString().c_str(), root->getEpoch(NULL)->epoch.toString().c_str()   );
 
         std::vector<blst_cpp::PublicKey> agg_pk;
         for(auto& k: z.second->block_accepted_req->node_validators)
@@ -602,7 +596,6 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvent::GetSavedBlocksRSP* r, cons
             throw CommonError("on_get_blocks_rsp: !ba.agg_sig.verify");
         }
         logNode("on_get_blocks_rsp: block verified OK");
-        // logNode("on_get_blocks_rsp: my epoch %s hb.epoch %s",root->getValues(NULL)->epoch.toString().c_str(), hb.epoch.toString().c_str() );
 
         SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
         dbs.exec("CREATE TABLE IF NOT EXISTS blocks ("
@@ -618,7 +611,10 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvent::GetSavedBlocksRSP* r, cons
         if(new_root_hash==z.second->block_accepted_req->block_payload->new_root_hash1)
         {
             logNode("on_get_blocks_rsp: block executed OK on epoch %s",z.second->epoch.toString().c_str());
-            root->getValues(NULL)->epoch=z.second->epoch+1;
+            auto epoch=root->getEpoch(NULL);
+            auto new_epoch=epoch->copy();
+            new_epoch->epoch=z.second->epoch+1;
+            root->setEpoch(new_epoch);
             db->write_batch(db_to_save_Z);
             db_to_save_Z.clear();
 
@@ -634,9 +630,9 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvent::GetSavedBlocksRSP* r, cons
 
 
     }
-    if(r->lastEpoch > root->getValues(NULL)->epoch)
+    if(r->lastEpoch > root->getEpoch(NULL)->epoch)
     {
-        logNode("do_sync again: r.lastEpoch %s > root->getValues(NULL)->epoch %s",r->lastEpoch.toString().c_str(), root->getValues(NULL)->epoch.toString().c_str() );
+        logNode("do_sync again: r.lastEpoch %s > root->getValues(NULL)->epoch %s",r->lastEpoch.toString().c_str(), root->getEpoch(NULL)->epoch.toString().c_str() );
         do_sync();
         return true;
     }
@@ -663,7 +659,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgEvent::GetSavedBlocksREQ* r, cons
         bds->unpack2(in);
         ret->blocks_Z.push_back({ep,bds});
     }
-    ret->lastEpoch=root->getValues(NULL)->epoch;
+    ret->lastEpoch=root->getEpoch(NULL)->epoch;
     msg::node_message_ed nm(ret->getBuffer(),this_node_name,my_sk_ed);
     passEvent(new bcEvent::MsgReply(nm.getBuffer(),poppedFrontRoute(route)));
 
@@ -706,15 +702,15 @@ bool Node::Service::MsgReply(const bcEvent::MsgReply* e, bool fromNetwork)
         switch(m->type)
         {
             case msgid::HeartBeatRSP:
-                return HeartBeatRSP(dynamic_cast<const MsgEvent::HeartBeatRSP*>(m.get()),node_message_ed.src_node, e->route);
+                return HeartBeatRSP(static_cast<const MsgEvent::HeartBeatRSP*>(m.get()),node_message_ed.src_node, e->route);
             case msgid::GetTransactionRSP:
-                return GetTransactionRSP(dynamic_cast<const MsgEvent::GetTransactionRSP*>(m.get()),node_message_ed.src_node, e->route);
+                return GetTransactionRSP(static_cast<const MsgEvent::GetTransactionRSP*>(m.get()),node_message_ed.src_node, e->route);
             case msgid::ValidateBlockRSP:
-                return ValidateBlockRSP(dynamic_cast<const MsgEvent::ValidateBlockRSP*>(m.get()),node_message_ed.src_node, e->route);   
+                return ValidateBlockRSP(static_cast<const MsgEvent::ValidateBlockRSP*>(m.get()),node_message_ed.src_node, e->route);   
             case msgid::BlockAcceptedRSP:
-                return BlockAcceptedRSP(dynamic_cast<const MsgEvent::BlockAcceptedRSP*>(m.get()),node_message_ed.src_node, e->route);   
+                return BlockAcceptedRSP(static_cast<const MsgEvent::BlockAcceptedRSP*>(m.get()),node_message_ed.src_node, e->route);   
             case msgid::GetSavedBlocksRSP:
-                return GetSavedBlocksRSP(dynamic_cast<const MsgEvent::GetSavedBlocksRSP*>(m.get()),node_message_ed.src_node, e->route);   
+                return GetSavedBlocksRSP(static_cast<const MsgEvent::GetSavedBlocksRSP*>(m.get()),node_message_ed.src_node, e->route);   
             default:
                 throw CommonError("unhandled22 p020 %s",msgName(p2));
                 break;
@@ -827,8 +823,9 @@ bool Node::Service::GetTransactionREQ(const MsgEvent::GetTransactionREQ* r, cons
 
             if(r->payload_lc->heart_beat->prev_block_hash!=prev_block_hash) /// todo непонятно как нода узнает достоверно, что предложенный hb.prev_block_hash валиден
             {
-                logNode("root->getValues(NULL)->epoch<hb.epoch %s %s",root->getValues(NULL)->epoch.toString().c_str(),r->payload_lc->heart_beat->epoch.toString().c_str());
-                if(root->getValues(NULL)->epoch<r->payload_lc->heart_beat->epoch)
+                auto epoch=root->getEpoch(NULL);
+                logNode("root->getValues(NULL)->epoch<hb.epoch %s %s",root->getEpoch(NULL)->epoch.toString().c_str(),r->payload_lc->heart_beat->epoch.toString().c_str());
+                if(epoch->epoch < r->payload_lc->heart_beat->epoch)
                 {
                     logNode("if(root->getValues(NULL)->epoch<hb.epoch)");
                     if(state_Z!=State::SYNCING)
@@ -864,7 +861,7 @@ bool Node::Service::ValidateBlockREQ(const MsgEvent::ValidateBlockREQ* r, const 
 
             if(r->leader_cert->heart_beat->prev_block_hash!=prev_block_hash)
             {
-                if(root->getValues(NULL)->epoch<r->leader_cert->heart_beat->epoch)
+                if(root->getEpoch(NULL)->epoch<r->leader_cert->heart_beat->epoch)
                 {
                     setBlockId(r->leader_cert->heart_beat->prev_block_hash);
                     return true;
@@ -932,15 +929,15 @@ bool Node::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
         switch(msg->type)
         {
             case msgid::GetTransactionREQ:
-                return GetTransactionREQ(dynamic_cast<const MsgEvent::GetTransactionREQ*>(msg.get()),node_message_ed.src_node, e->route);
+                return GetTransactionREQ(static_cast<const MsgEvent::GetTransactionREQ*>(msg.get()),node_message_ed.src_node, e->route);
             case msgid::HeartBeatREQ:
-                return HeartBeatREQ(dynamic_cast<const MsgEvent::HeartBeatREQ*>(msg.get()),node_message_ed.payload, e->route);
+                return HeartBeatREQ(static_cast<const MsgEvent::HeartBeatREQ*>(msg.get()),node_message_ed.payload, e->route);
             case msgid::ValidateBlockREQ:
-                return ValidateBlockREQ(dynamic_cast<const MsgEvent::ValidateBlockREQ*>(msg.get()),node_message_ed.src_node, e->route);
+                return ValidateBlockREQ(static_cast<const MsgEvent::ValidateBlockREQ*>(msg.get()),node_message_ed.src_node, e->route);
             case msgid::BlockAcceptedREQ:
-                return BlockAcceptedREQ(dynamic_cast<const MsgEvent::BlockAcceptedREQ*>(msg.get()),node_message_ed.src_node, e->route);
+                return BlockAcceptedREQ(static_cast<const MsgEvent::BlockAcceptedREQ*>(msg.get()),node_message_ed.src_node, e->route);
             case msgid::GetSavedBlocksREQ:
-                return GetSavedBlocksREQ(dynamic_cast<const MsgEvent::GetSavedBlocksREQ*>(msg.get()),node_message_ed.src_node, e->route);
+                return GetSavedBlocksREQ(static_cast<const MsgEvent::GetSavedBlocksREQ*>(msg.get()),node_message_ed.src_node, e->route);
 
                 default: throw CommonError("unjandled msgEvent %s",msgName(msg->type));
         }
@@ -973,7 +970,7 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
         if(!ur.verify())
             throw CommonError("if(!ur.verify())");
         BigInt nonce=0;
-        auto u=rt->getUser(ur.address_pk_ed,by);
+        auto u=rt->getUserState(ur.address_pk_ed,by);
         if(u.valid())
         {
             nonce=u->nonce;
@@ -982,26 +979,38 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
             throw CommonError("if(u->nonce != ur.nonce)");
         t.instruction_reports[ti].resize(ur.payload.size());
         execute_transaction(ti,t,ur.address_pk_ed,ur.payload,by);
-        BigInt one;
-        one=1;
+        // BigInt one;
+        // one=1;
         if(!u.valid())
-            u=rt->addUser(ur.address_pk_ed,NULL);
-        u->nonce+=one;
+        {
+            REF_getter<bc_user_state> u2=new bc_user_state;
+            u2->nonce+=1;
+            rt->addUserState(ur.address_pk_ed,NULL,u2);
+
+        }
+        else{
+            auto u2=u->copy();
+             u2->nonce+=1;
+            rt->setUserState(ur.address_pk_ed,NULL,u2);
+        }
 
         // fees.push_back(fee);
     }
-    prepared_block.epoch=rt->getValues(NULL)->epoch;
+    prepared_block.epoch=rt->getEpoch(NULL)->epoch;
     prepared_block.att_data.instruction_reports=t.instruction_reports;
     prepared_block.att_data.trs=trs;
 
-    rt->getValues(NULL)->epoch+=1;
+    auto newEpoch=rt->getEpoch(NULL)->copy();
+    newEpoch->epoch+=1;
+    rt->setEpoch(newEpoch);
+    // rt->getEpoch(NULL)->epoch+=1;
 
     auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(rt);
 
     BigInt total_fees;
     for(auto& z: feeCalcers.calcers)
     {
-        auto u=rt->getUser(z.first,NULL);
+        auto u=rt->getUserState(z.first,NULL);
         if(!u.valid())
             throw CommonError("if(!u.valid()) 334455");
         if(u->balance < z.second->get_fee())
@@ -1022,7 +1031,7 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
         if(!node.valid())
             throw CommonError("if(!node.valid()) 556677");
         auto owner=node->owner_ed_pk;
-        auto u=rt->getUser(owner,NULL);
+        auto u=rt->getUserState(owner,NULL);
         if(!u.valid())
         {
             throw CommonError("if(!u.valid()) 778899");
@@ -1066,7 +1075,12 @@ void Node::Service::logNode(const char* fmt, ...)
     {
         va_list ap;
         va_start(ap, fmt);
-        fprintf(stdout,"%ld [Node] [%s] [%s] [%s] ", time(NULL), this_node_name.container.c_str(), prev_block_hash.str().c_str(), root->getValues(NULL)->epoch.toString().c_str());
+        auto epoch=root->getEpoch(NULL);
+        if(!epoch.valid())
+        {
+            throw CommonError("if(!epoch.valid())");
+        }
+        fprintf(stdout,"%ld [Node] [%s] [%s] [%s] ", time(NULL), this_node_name.container.c_str(), prev_block_hash.str().c_str(), epoch->epoch.toString().c_str());
         vfprintf(stdout,fmt, ap);
         fprintf(stdout,"\n");
         va_end(ap);

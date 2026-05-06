@@ -22,23 +22,27 @@ struct bc_contract:  public data_base
     bc_contract():data_base(hsh::bc_contract) {}
     std::string name;
     std::string owner;
-    bool frozen=false;
     std::string src;
-    bool ready_for_sale=false;
-    BigInt cost;
-    // std::string contract_state; // js contract variable
+    REF_getter<bc_contract> copy() const
+    {
+        REF_getter<bc_contract> r(new bc_contract);
+        r->name=name;
+        r->owner=owner;
+        r->src=src;
+        return r;
+    }
     void pack(outBuffer&b) const final
     {
         data_base::pack(b);
         b<<1;
-        b<<name<<owner<<frozen<<src<<ready_for_sale<<cost;
+        b<<name<<owner<<src;
 
     }
     void unpack(inBuffer&b) final
     {
         data_base::unpack(b);
         auto v=b.get_PN();
-        b>>name>>owner>>frozen>>src>>ready_for_sale>>cost;
+        b>>name>>owner>>src;
 
     }
     std::string dump() final
@@ -46,10 +50,7 @@ struct bc_contract:  public data_base
         std::ostringstream o;
         o<<"Contract: "  << name << std::endl;
         o<< "Owner: " << base62::encode(owner) << std::endl;
-        o<< "Frozen: " << frozen <<std::endl;
         o<< "Src: " << src << std::endl;
-        o<< "Ready for sale: " <<ready_for_sale << std::endl;
-        o<< "Cost: " <<cost.toString() << std::endl;
 
         return o.str();
     }
@@ -57,34 +58,37 @@ struct bc_contract:  public data_base
 struct bc_user: public data_base
 {
     bc_user(): data_base(hsh::bc_user) {
-        nonce=0;
-        balance=0;
     }
-    std::string pkbin;
-    BigInt balance;
-    BigInt nonce;
+    std::string pkbin_еd;
     std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
     std::set<std::string> nodes;
     std::set<std::string> contracts;
 
+    REF_getter<bc_user> copy() const 
+    {
+        REF_getter<bc_user> r(new bc_user);
+        r->pkbin_еd=pkbin_еd;
+        r->my_stakes=my_stakes;
+        r->nodes=nodes;
+        r->contracts=contracts;
+        return r;
+    }
     void pack(outBuffer& o) const final
     {
         data_base::pack(o);
         o<<1;
-        o<<pkbin<<balance<<nonce<<my_stakes<<nodes<<contracts;
+        o<<pkbin_еd<<my_stakes<<nodes<<contracts;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
-        o>>pkbin>>balance>>nonce>>my_stakes>>nodes>>contracts;
+        o>>pkbin_еd>>my_stakes>>nodes>>contracts;
     }
     std::string dump() final
     {
         std::ostringstream o;
-        o<<"PK: "  << base62::encode(pkbin) << std::endl;
-        o<< "Balance: " << balance.toString() << std::endl;
-        o<< "Nonce: " << nonce.toString() <<std::endl;
+        o<<"PK: "  << base62::encode(pkbin_еd) << std::endl;
         o<< "Stakes: ";
         for(auto& z: my_stakes)
         {
@@ -112,6 +116,45 @@ struct bc_user: public data_base
     }
 
 };
+struct bc_user_state: public data_base
+{
+    bc_user_state(): data_base(hsh::bc_user_state) {
+        nonce=0;
+        balance=0;
+    }
+    BigInt balance;
+    BigInt nonce;
+
+    REF_getter<bc_user_state> copy() const
+    {
+        REF_getter<bc_user_state> r(new bc_user_state);
+        r->balance=balance;
+        r->nonce=nonce;
+        return r;
+    }
+    void pack(outBuffer& o) const final
+    {
+        data_base::pack(o);
+        o<<1;
+        o<<balance<<nonce;
+    }
+    void unpack(inBuffer& o) final
+    {
+        data_base::unpack(o);
+        auto v=o.get_PN();
+        o>>balance>>nonce;
+    }
+    std::string dump() final
+    {
+        std::ostringstream o;
+        o<< "Balance: " << balance.toString() << std::endl;
+        o<< "Nonce: " << nonce.toString() <<std::endl;
+        o<< std::endl;
+        return o.str();
+    }
+
+};
+
 struct bc_node: public data_base
 {
 
@@ -125,20 +168,30 @@ struct bc_node: public data_base
     std::string ip;
     std::map<std::string /*user*/, BigInt> stakes;
     BigInt total_stake;
-    bool disabled_manual=false;
-    bool disabled_offline=false;
+    REF_getter<bc_node> copy() const
+    {
+        REF_getter<bc_node> r(new bc_node);
+        r->name=name;
+        r->owner_ed_pk=owner_ed_pk;
+        r->bls_pk=bls_pk;
+        r->ed_pk=ed_pk;
+        r->ip=ip;
+        r->stakes=stakes;
+        r->total_stake=total_stake;
+        return r;
+    }
     void pack(outBuffer& o)  const final
     {
         data_base::pack(o);
         o<<1;
-        o<<name<<owner_ed_pk<<bls_pk<<ed_pk<<ip<<stakes<<total_stake<<disabled_manual<<disabled_offline;
+        o<<name<<owner_ed_pk<<bls_pk<<ed_pk<<ip<<stakes<<total_stake;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>total_stake>>disabled_manual>>disabled_offline;
+        o>>name>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>total_stake;
     }
     std::string dump() final
     {
@@ -182,7 +235,6 @@ struct bc_values: public data_base
     };
 
     bc_values(): data_base(hsh::bc_values) {
-        epoch=0;
         fees.resize(FEE_TYPE_END);
         fees[contract_deploy]=BigInt(5000);
         fees[contract_transfer]=BigInt(1000);
@@ -202,19 +254,58 @@ struct bc_values: public data_base
     std::vector<BigInt> fees;
     BigInt total_staked;
     std::set<std::string> emitters;
-    BigInt epoch;
+    REF_getter<bc_values> copy() const
+    {
+        REF_getter<bc_values> r(new bc_values);
+        r->fees=fees;
+        r->total_staked=total_staked;
+        r->emitters=emitters;
+        return r;
+    }   
     void pack(outBuffer& o) const final
     {
         // cost.pack(o);
         o<<1;
-        o<<fees<<total_staked<<emitters<<epoch;
+        o<<fees<<total_staked<<emitters;
     }
     void unpack(inBuffer& o) final
     {
         // cost.unpack(o);
         auto v=o.get_PN();
 
-        o>>fees>>total_staked>>emitters>>epoch;
+        o>>fees>>total_staked>>emitters;
+    }
+    std::string dump() final
+    {
+        return "Values";
+    }
+
+};
+
+struct bc_epoch: public data_base
+{
+    bc_epoch(): data_base(hsh::bc_epoch) {
+        epoch=0;
+    }
+    BigInt epoch;
+    REF_getter<bc_epoch> copy() const 
+    {
+        REF_getter<bc_epoch> r(new bc_epoch);
+        r->epoch=epoch;
+        return r;
+    }   
+    void pack(outBuffer& o) const final
+    {
+        // cost.pack(o);
+        o<<1;
+        o<<epoch;
+    }
+    void unpack(inBuffer& o) final
+    {
+        // cost.unpack(o);
+        auto v=o.get_PN();
+
+        o>>epoch;
     }
     std::string dump() final
     {
@@ -238,108 +329,37 @@ struct root_data: public Cellable
 
     std::vector<std::string> getContractPath(const std::string &name);
     std::vector<std::string> getNodePath(const std::string &name);
-    REF_getter<bc_contract> getContract(const std::string &name, const REF_getter<fee_calcer>& bc);
-    REF_getter<bc_contract> addContract(const std::string &name, const REF_getter<fee_calcer>& bca);
-    REF_getter<bc_values> getValues(const REF_getter<fee_calcer>& bc);
-
     std::vector<std::string> getUserPath(const std::string &pk);
-    REF_getter<bc_user> getUser(const std::string &pk, const REF_getter<fee_calcer>& bc);
-    REF_getter<bc_user> addUser(const std::string &pk, const REF_getter<fee_calcer>& bc);
-    std::vector<std::string> getNickPath(const std::string &pk);
-    // REF_getter<bc_nick> getNick(const std::string &nick, const REF_getter<fee_calcer>& bc);
-    // REF_getter<bc_nick> addNick(const std::string &nick, const REF_getter<fee_calcer>& bc);
-    std::vector<NODE_id> getNodesNames( const REF_getter<fee_calcer>& bc)
-    {
+    std::vector<std::string> getUserStatePath(const std::string &pk);
 
-        std::vector<NODE_id>v;
-        auto nodes=this->getLeafNoCreate("n",db.get(),bc);
-        for(auto &z: nodes->children_hashes)
-        {
-            NODE_id n;
-            n.container=z.first;
-            v.push_back(n);
-        }
-        return v;
-    }
-    REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc)
-    {
-        MUTEX_INSPECTOR;
+    REF_getter<const bc_contract> getContract(const std::string &name, const REF_getter<fee_calcer>& bc);
+    void addContract(const std::string &name, const REF_getter<fee_calcer>& bca,const REF_getter<bc_contract> &c);
+    void setContract(const std::string &name, const REF_getter<fee_calcer>& bca,const REF_getter<bc_contract> &c);
 
-        std::vector<std::string> v;
-        v.push_back("n");
-        v.push_back(name.container);
-        auto cc=getByPathOrCreate(this,v,db.get(),bc);
+    REF_getter<bc_values> getValues(const REF_getter<fee_calcer>& bc);
+    void setValues(const REF_getter<fee_calcer>& bc, const REF_getter<bc_values> &v);
 
-        if(cc->data.valid())
-            throw CommonError("if(cc->data.valid())");
-        if(cc->payload.size())
-            throw CommonError("if(cc->payload.size())");
+    REF_getter<const bc_epoch> getEpoch(const REF_getter<fee_calcer>& bc);
+    void setEpoch(const REF_getter<bc_epoch> &v);
 
-        REF_getter<bc_node> u=new bc_node;
-        cc->data=u.get();
-        cc->payload_ctor_idx=hsh::bc_node;
-        return u;
-    }
-    REF_getter<bc_node> getNode(const NODE_id &name, const REF_getter<fee_calcer>& bc)
-    {
-        MUTEX_INSPECTOR;
-        std::vector<std::string> v;
-        v.push_back("n");
-        v.push_back(name.container);
 
-        auto cc=getByPathNoCreate(this,v,db.get(),bc);
-        if(!cc.valid())
-            return NULL;
-        if(cc->data.valid())
-            return dynamic_cast<bc_node*>(cc->data.get());
-        else throw CommonError("if(cc->data.valid())");
 
-    }
+    REF_getter<const bc_user> getUser(const std::string &pk, const REF_getter<fee_calcer>& bc);
+    void setUser(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u);
+    void addUser(const std::string &pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u);
+
+    REF_getter<bc_user_state> getUserState(const std::string &pk, const REF_getter<fee_calcer>& bc);
+    void addUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u);
+    void setUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u);
+
+    std::vector<NODE_id> getNodesNames( const REF_getter<fee_calcer>& bc);
+
+    REF_getter<bc_node> getNode(const NODE_id &name, const REF_getter<fee_calcer>& bc);
+    void addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc,const REF_getter<bc_node> &n);
+    void setNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const REF_getter<bc_node> &n);
+
 
 
 };
+REF_getter<root_data> getRoot(IDatabase* db);
 
-inline REF_getter<root_data> getRoot(IDatabase* db)
-{
-    MUTEX_INSPECTOR;
-    // logErr2("if(!root.valid())");
-
-    REF_getter<root_data> r=new root_data(db);
-    r->accessed=true;
-    // std::string r;
-    THASH_id root_hash;
-    std::string root_cell;
-    int err1=db->get_cell("#root_hash#",&root_hash.container);
-    if(!err1)
-    {
-        int err=db->get_cell("#root#",&root_cell);
-        if(!err)
-        {
-            if(blake2b_hash(root_cell)!=root_hash)
-            {
-                logErr2("if(blake2b_hash(root_cell)!=root_hash)");
-
-            }
-            else
-            {
-                MUTEX_INSPECTOR;
-                inBuffer in(root_cell);
-                r->unpack(in);
-            }
-        }
-    }
-    else logErr2("cannot read #root_hash#");
-
-
-    // int err=db->get_cell("r",&r);
-    // if(err)
-    // {
-    //     logErr2("error read db %s",_DMI().c_str());
-    // }
-    // else
-    // {
-    //     inBuffer in(r);
-    //     root->unpack(in);
-    // }
-    return r;
-}

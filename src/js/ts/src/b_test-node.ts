@@ -19,7 +19,6 @@ async function exec() {
             console.log(rsp);
             sleep(1000);
         }
-    
 }
 
 console.log(std.getenv("PATH"));
@@ -27,7 +26,6 @@ try{
     const nums=[0,1,2,3,4];
     for(let i of nums)
     {
-        // if(i==3) continue;
         mtjs.addInstance(`MTJS${i}`,`
             Start=Node
                 Node_rpc_addr=127.0.0.1:${2300+i}
@@ -49,9 +47,7 @@ try{
                 Node_my_sk_ed_env_key=k_n${i}_ed_sk
                 Node_this_node_name=n${i}
                 Node_sqlite_pn=db/s${i}
-
         `);
-
     }
      sleep(200);
     console.log("Start");
@@ -66,14 +62,5 @@ try{
     {
         console.log("catched: ",e);
     }
-    // mtjs.get_user_info("127.0.0.1:2345", { sk: sk , timeout: 1 })
-    // .then(o=>{
-    //     console.log(o)
-    // })
-    // .catch(e=> {
-    //     console.log("Error:", e)
-    // });
-    
-
 
 } catch(e){console.log(e);}

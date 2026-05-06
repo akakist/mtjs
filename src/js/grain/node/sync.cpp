@@ -22,7 +22,7 @@ void Node::Service::do_sync()
     if(!n.valid())
         throw CommonError("if(!n.valid())");
     REF_getter<MsgEvent::GetSavedBlocksREQ>  gbr=new MsgEvent::GetSavedBlocksREQ();
-    gbr->myEpoch=root->getValues(NULL)->epoch;
+    gbr->myEpoch=root->getEpoch(NULL)->epoch;
     msg::node_message_ed nm(gbr->getBuffer(),this_node_name,my_sk_ed );
     sendEvent(n->ip,ServiceEnum::Node, new bcEvent::Msg(nm.getBuffer(),ListenerBase::serviceId));
 

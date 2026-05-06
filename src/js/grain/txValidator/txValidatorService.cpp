@@ -211,7 +211,7 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
         // logErr2("getUser %s",base62::encode(um.address_pk_ed).c_str());
         if(!err)
         {
-            auto u=root->getUser(um.address_pk_ed,NULL);
+            auto u=root->getUserState(um.address_pk_ed,NULL);
             if(u.valid())
             {
                 nonce=u->nonce;

@@ -60,9 +60,10 @@ struct Cellable: public Refcountable
         // logErr2("~Cellable() %s",m_id.c_str());
     }
 
-    const Cellable * parent=nullptr;
+    Cellable * parent=nullptr;
     const std::string m_id;
     std::set<REF_getter<fee_calcer>> calcers;
+    RWLock rwlock;
 
     // private:
     std::map<std::string,THASH_id > children_hashes;
@@ -79,6 +80,14 @@ public:
         if(bc.valid())
         {
             calcers.insert(bc);
+        }
+    }
+    void setDirty()
+    {
+        accessed=true;
+        if(parent)
+        {
+            parent->setDirty();
         }
     }
     std::string dump();

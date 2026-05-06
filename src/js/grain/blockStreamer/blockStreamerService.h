@@ -78,11 +78,11 @@ namespace BlockStreamer
         }
 
         // std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
+#ifdef KALL
+        REF_getter<root_data> root1=NULL;
 
-        REF_getter<root_data> root=NULL;
-
-        REF_getter<bcEvent::ServiceInit> conf=nullptr;
-
+        REF_getter<bcEvent::ServiceInit> conf1=nullptr;
+#endif
 
         std::map<route_t,clientTxSubscription> clientTxSubscriptions;
 

@@ -9,7 +9,7 @@ async function exec() {
             console.log("tx report from js:", JSON.stringify(params));
         });
     while (true) {
-	console.log("gaga");
+//	console.log("gaga");
         const ui = await mtjs.get_user_info(node, root_pk, 1);
         const nonce = ui.nonce;
         console.log(ui);

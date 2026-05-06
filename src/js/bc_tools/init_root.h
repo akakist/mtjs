@@ -10,13 +10,14 @@ inline void init_root(const REF_getter<root_data> &r)
     std::string u_root_pk=base62::decode(getenv2("k_root_ed_pk"));
     if(!v->emitters.count(u_root_pk))
         v->emitters.insert(u_root_pk);
-    auto u=r->getUser(u_root_pk,NULL);
+    auto u=r->getUserState(u_root_pk,NULL);
     if(!u.valid())
     {
-        u=r->addUser(u_root_pk,NULL);
-
-        u->balance=100;
+        REF_getter<bc_user_state> uu(new bc_user_state);
+        uu->balance=1000000;
+        r->addUserState(u_root_pk,NULL,uu);
     }
+
 
     std::vector<int> stakes= {100,200,300,400,500};
     int total=0;
@@ -61,18 +62,17 @@ inline void init_root(const REF_getter<root_data> &r)
         auto n=r->getNode(name,NULL);
         if(n.valid()) continue;
 
-        n=r->addNode(name,NULL);
-        n->name=name;
-        n->owner_ed_pk=u_root_pk;
-        n->total_stake=stakes[i];//.from_decimal(std::to_string(stakes[i]));
-
-        n->bls_pk.deserializeBase62Str(getenv2(keys[i].first));
+        REF_getter<bc_node> nn=new bc_node;
+        nn->name=name;
+        nn->owner_ed_pk=u_root_pk;
+        nn->total_stake=stakes[i];//.from_decimal(std::to_string(stakes[i]));
+        nn->bls_pk.deserializeBase62Str(getenv2(keys[i].first));
 
         n->ed_pk=base62::decode(getenv2(keys[i].second));
 
-        n->disabled_manual=false;
-        n->disabled_offline=false;
-        n->ip="127.0.0.1:"+std::to_string(2300+i);
+        nn->ip="127.0.0.1:"+std::to_string(2300+i);
+        r->addNode(name,NULL,nn);
+
     }
 
 
