@@ -20,11 +20,13 @@ struct Cellable;
 struct data_base : public Refcountable
 {
     int type;
-    data_base(int t): type(t) {}
+    Cellable *parent;
+    data_base(int t, Cellable* _parent): type(t), parent(_parent) {}
     ~data_base()
     {
         // logErr2("~data_base() %d", type);
     }
+    void setDirty();
     virtual void pack(outBuffer& o) const
     {
         o<<1;
@@ -45,7 +47,7 @@ struct data_base : public Refcountable
 
 };
 
-extern std::vector< data_base* (*)()> db_constructors;
+extern std::vector< data_base* (*)(Cellable*)> db_constructors;
 
 struct Cellable: public Refcountable
 {
@@ -63,12 +65,11 @@ struct Cellable: public Refcountable
     Cellable * parent=nullptr;
     const std::string m_id;
     std::set<REF_getter<fee_calcer>> calcers;
-    RWLock rwlock;
 
     // private:
     std::map<std::string,THASH_id > children_hashes;
     std::map<std::string, REF_getter<Cellable>> children_ptrs;
-    std::string payload;
+    std::string payload_;
     int payload_ctor_idx=hsh::HSH_END;
     REF_getter<data_base> data=nullptr;
 public:
@@ -106,17 +107,19 @@ public:
     {
         o<<1;
         // o<<m_id;
-        o<<children_hashes;
-        o<<payload;
         o<<payload_ctor_idx;
+        o<<children_hashes;
+        // data->pack(o);
+        o<<payload_;
     }
     virtual void unpack(inBuffer& in)
     {
         int v=in.get_PN();
         // in>>m_id;
-        in>>children_hashes;
-        in>>payload;
         in>>payload_ctor_idx;
+        in>>children_hashes;
+        in>>payload_;
+        // in>>payload;
     }
     std::string getBuffer()
     {

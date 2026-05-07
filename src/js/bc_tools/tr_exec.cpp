@@ -35,23 +35,14 @@ std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std
     auto u=t.root->getUserState(senderAddress,by);
     if(!u.valid())
     {
-        REF_getter<bc_user_state> uu=new bc_user_state;
-        uu->balance+=c.amount;
-        t.root->addUserState(senderAddress,by,u);
+        throw CommonError("if(!u.valid())");
     }
-    else
-    {
-        auto uu=u->copy();
-        uu->balance+=c.amount;
-        t.root->setUserState(senderAddress,by,uu);
-
-
-    }
-        // return "user not found/created";
+    u->balance+=c.amount;
+    u->setDirty();
     
 
     t.fee[senderAddress]+=v->fees[bc_values::mint];
-    t.transfer_to[senderAddress]+=c.amount;
+    // t.transfer_to[senderAddress]+=c.amount;
 
     t.logMsg(txid,seqId,"amount %s sucessfully minted on your balance",c.amount.toString().c_str());
 
@@ -87,8 +78,11 @@ std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const 
 
 
     nodeStake-=c.amount;
-    t.transfer_to[senderAddress]+=c.amount;
+    // t.transfer_to[senderAddress]+=c.amount;
     v->total_staked-=c.amount;
+    v->setDirty();
+    n->setDirty();
+    u->setDirty();
 
     t.fee[senderAddress]+=v->fees[bc_values::unstake];
 
@@ -109,16 +103,16 @@ std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t
     if(cc.valid())
         return "contract name already exists";
 
+    cc=t.root->addContract(c.name,by);
+    
+    cc->owner=senderAddress;
+    cc->name=c.name;
+    cc->src=c.src;
 
-    REF_getter<bc_contract> ci=new bc_contract;
-    ci->owner=senderAddress;
-    ci->name=c.name;
-    ci->src=c.src;
-    t.root->addContract(c.name,by,ci);
-
-    auto cu=u->copy();
-    cu->contracts.insert(c.name);
-    t.root->addUser(senderAddress, by, cu);
+    u->contracts.insert(c.name);
+    u->setDirty();
+    cc->setDirty();
+    
     // u->contracts.insert(c.name);
 
     t.fee[senderAddress]+=v->fees[bc_values::contract_deploy];
@@ -131,20 +125,26 @@ std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t
 std::optional<std::string> TR::execute(const tx::transfer &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
 {
     auto v=t.root->getValues(by);
-    auto from=t.root->getUser(senderAddress,by);
+    auto from=t.root->getUserState(senderAddress,by);
     if(!from.valid())
         return "cannot find src addr";
 
-    REF_getter<const bc_user> to(NULL);
-    to=t.root->getUser(c.to_address,by);
+    // REF_getter<const bc_user> to(NULL);
+    auto to=t.root->getUserState(c.to_address,by);
     if(!to.valid())
     {
         return "destination user not found "+ base62::encode(c.to_address);
-        // to=t.root->addUser(c.to_addr,by);
     }
-
-    t.transfer_from[senderAddress]+=c.amount;
-    t.transfer_to[c.to_address]+=c.amount;
+    if(from->balance < v->fees[bc_values::transfer] + c.amount)
+    {
+        return "Not enough money";
+    }
+    from->balance-=c.amount;
+    to->balance+=c.amount;
+    from->setDirty();
+    to->setDirty();
+    // t.transfer_from[senderAddress]+=c.amount;
+    // t.transfer_to[c.to_address]+=c.amount;
     t.fee[senderAddress]+=v->fees[bc_values::transfer];
     // // if (from->balance < c.amount + v->fees[bc_values::transfer]) {
     // //     return "insufficient_funds";
@@ -187,7 +187,7 @@ std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const st
 
     sender->balance-=c.amount;
     nodeStake+=c.amount;
-    t.transfer_from[senderAddress]+=c.amount;
+    // t.transfer_from[senderAddress]+=c.amount;
     // t.transfer_to[c.to_addr]+=c.amount;
     t.fee[senderAddress]+=v->fees[bc_values::stake];
 
@@ -215,23 +215,31 @@ std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,c
             return "allowed only lowercase symbols";
         }
     }
+    
     auto nn=t.root->getNode(c.name, by);
     if(nn.valid())
         return "Node already registered with name";
+    auto us=t.root->getUserState(senderAddress,by);
+    if(!us.valid())
+        return "if(!us.valid())";
     auto u=t.root->getUser(senderAddress,by);
     if(!u.valid())
         return "if(!u.valid())";
-    auto uu=u->copy();
-    // if(u->balance<v->fees[bc_values::node_create])
-    // return "Not enough funds";
-    REF_getter<bc_node> n=new bc_node;
+    if(us->balance < v->fees[bc_values::node_create])
+        return "Not enough funds";
+    
+    u->nodes.insert(c.name);
+
+    auto n=t.root->addNode(c.name,by);
+    n->name=c.name;
     n->ip=c.ip;
-    n->owner_ed_pk=senderAddress;
-    n->bls_pk=c.pk_bls;
     n->ed_pk=c.pk_ed;
-    uu->nodes.insert(c.name.container);
-    t.root->setUser(senderAddress, by, uu);
-    t.root->addNode(c.name,by,n);
+    n->bls_pk=c.pk_bls;
+    n->owner_ed_pk=senderAddress;
+    n->setDirty();
+    u->setDirty();
+    us->setDirty();
+
 
     // t.transfer_from[senderAddress]+=c.amount;
     // t.transfer_to[c.to_addr]+=c.amount;

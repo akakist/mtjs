@@ -97,12 +97,12 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string& id, IDatabase*
 
             inBuffer in(result);
             cc->unpack(in);
-            if(cc->payload.size() && cc->payload_ctor_idx<hsh::HSH_END)
+            if(cc->payload_.size() && cc->payload_ctor_idx<hsh::HSH_END)
             {
                 // logErr2("getLeafNoCreate %s create data cc->payload_ctor_idx %d", id.c_str(),cc->payload_ctor_idx);
 
-                cc->data=db_constructors[cc->payload_ctor_idx]();
-                inBuffer iz(cc->payload);
+                cc->data=db_constructors[cc->payload_ctor_idx](cc.get());
+                inBuffer iz(cc->payload_);
                 cc->data->unpack(iz);
             }
         }
@@ -121,7 +121,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
         return;
     if(data.valid())
     {
-        payload=data->getBuffer();
+        payload_=data->getBuffer();
         // data=NULL;
     }
     for(auto &zz:children_ptrs)
@@ -165,3 +165,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     }
     accessed=false;
 }
+    void data_base::setDirty()
+    {
+        parent->setDirty();
+    }

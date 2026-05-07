@@ -612,9 +612,10 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvent::GetSavedBlocksRSP* r, cons
         {
             logNode("on_get_blocks_rsp: block executed OK on epoch %s",z.second->epoch.toString().c_str());
             auto epoch=root->getEpoch(NULL);
-            auto new_epoch=epoch->copy();
-            new_epoch->epoch=z.second->epoch+1;
-            root->setEpoch(new_epoch);
+            // auto new_epoch=epoch->copy();
+            epoch->epoch=z.second->epoch+1;
+            epoch->setDirty();
+            // root->setEpoch(new_epoch);
             db->write_batch(db_to_save_Z);
             db_to_save_Z.clear();
 
@@ -969,41 +970,28 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
         //     throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
         if(!ur.verify())
             throw CommonError("if(!ur.verify())");
-        BigInt nonce=0;
+        // BigInt nonce=0;
         auto u=rt->getUserState(ur.address_pk_ed,by);
-        if(u.valid())
+        if(!u.valid())
         {
-            nonce=u->nonce;
+            throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
         }
-        if(nonce != ur.nonce)
+        if(u->nonce != ur.nonce)
             throw CommonError("if(u->nonce != ur.nonce)");
         t.instruction_reports[ti].resize(ur.payload.size());
         execute_transaction(ti,t,ur.address_pk_ed,ur.payload,by);
         // BigInt one;
         // one=1;
-        if(!u.valid())
-        {
-            REF_getter<bc_user_state> u2=new bc_user_state;
-            u2->nonce+=1;
-            rt->addUserState(ur.address_pk_ed,NULL,u2);
-
-        }
-        else{
-            auto u2=u->copy();
-             u2->nonce+=1;
-            rt->setUserState(ur.address_pk_ed,NULL,u2);
-        }
-
-        // fees.push_back(fee);
+        u->nonce+=1;
+        u->setDirty();
     }
     prepared_block.epoch=rt->getEpoch(NULL)->epoch;
     prepared_block.att_data.instruction_reports=t.instruction_reports;
     prepared_block.att_data.trs=trs;
 
-    auto newEpoch=rt->getEpoch(NULL)->copy();
+    auto newEpoch=rt->getEpoch(NULL);
     newEpoch->epoch+=1;
-    rt->setEpoch(newEpoch);
-    // rt->getEpoch(NULL)->epoch+=1;
+    newEpoch->setDirty();
 
     auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(rt);
 

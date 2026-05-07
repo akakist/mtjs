@@ -19,18 +19,10 @@
 
 struct bc_contract:  public data_base
 {
-    bc_contract():data_base(hsh::bc_contract) {}
+    bc_contract(Cellable *p):data_base(hsh::bc_contract,p) {}
     std::string name;
     std::string owner;
     std::string src;
-    REF_getter<bc_contract> copy() const
-    {
-        REF_getter<bc_contract> r(new bc_contract);
-        r->name=name;
-        r->owner=owner;
-        r->src=src;
-        return r;
-    }
     void pack(outBuffer&b) const final
     {
         data_base::pack(b);
@@ -57,22 +49,13 @@ struct bc_contract:  public data_base
 };
 struct bc_user: public data_base
 {
-    bc_user(): data_base(hsh::bc_user) {
+    bc_user(Cellable* p): data_base(hsh::bc_user,p) {
     }
     std::string pkbin_еd;
     std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
-    std::set<std::string> nodes;
+    std::set<NODE_id> nodes;
     std::set<std::string> contracts;
 
-    REF_getter<bc_user> copy() const 
-    {
-        REF_getter<bc_user> r(new bc_user);
-        r->pkbin_еd=pkbin_еd;
-        r->my_stakes=my_stakes;
-        r->nodes=nodes;
-        r->contracts=contracts;
-        return r;
-    }
     void pack(outBuffer& o) const final
     {
         data_base::pack(o);
@@ -99,7 +82,7 @@ struct bc_user: public data_base
         o<< "Nodes: ";
         for(auto& z: nodes)
         {
-            o<< z <<" ";
+            o<< z.container <<" ";
         }
         o<< std::endl;
 
@@ -118,20 +101,13 @@ struct bc_user: public data_base
 };
 struct bc_user_state: public data_base
 {
-    bc_user_state(): data_base(hsh::bc_user_state) {
+    bc_user_state(Cellable* p): data_base(hsh::bc_user_state,p) {
         nonce=0;
         balance=0;
     }
     BigInt balance;
     BigInt nonce;
 
-    REF_getter<bc_user_state> copy() const
-    {
-        REF_getter<bc_user_state> r(new bc_user_state);
-        r->balance=balance;
-        r->nonce=nonce;
-        return r;
-    }
     void pack(outBuffer& o) const final
     {
         data_base::pack(o);
@@ -158,7 +134,7 @@ struct bc_user_state: public data_base
 struct bc_node: public data_base
 {
 
-    bc_node():data_base(hsh::bc_node) {
+    bc_node(Cellable *p):data_base(hsh::bc_node,p) {
         total_stake=0;
     }
     NODE_id name;
@@ -168,18 +144,6 @@ struct bc_node: public data_base
     std::string ip;
     std::map<std::string /*user*/, BigInt> stakes;
     BigInt total_stake;
-    REF_getter<bc_node> copy() const
-    {
-        REF_getter<bc_node> r(new bc_node);
-        r->name=name;
-        r->owner_ed_pk=owner_ed_pk;
-        r->bls_pk=bls_pk;
-        r->ed_pk=ed_pk;
-        r->ip=ip;
-        r->stakes=stakes;
-        r->total_stake=total_stake;
-        return r;
-    }
     void pack(outBuffer& o)  const final
     {
         data_base::pack(o);
@@ -234,7 +198,7 @@ struct bc_values: public data_base
         FEE_TYPE_END
     };
 
-    bc_values(): data_base(hsh::bc_values) {
+    bc_values(Cellable *p): data_base(hsh::bc_values,p) {
         fees.resize(FEE_TYPE_END);
         fees[contract_deploy]=BigInt(5000);
         fees[contract_transfer]=BigInt(1000);
@@ -254,14 +218,6 @@ struct bc_values: public data_base
     std::vector<BigInt> fees;
     BigInt total_staked;
     std::set<std::string> emitters;
-    REF_getter<bc_values> copy() const
-    {
-        REF_getter<bc_values> r(new bc_values);
-        r->fees=fees;
-        r->total_staked=total_staked;
-        r->emitters=emitters;
-        return r;
-    }   
     void pack(outBuffer& o) const final
     {
         // cost.pack(o);
@@ -284,16 +240,10 @@ struct bc_values: public data_base
 
 struct bc_epoch: public data_base
 {
-    bc_epoch(): data_base(hsh::bc_epoch) {
+    bc_epoch(Cellable* p): data_base(hsh::bc_epoch,p) {
         epoch=0;
     }
     BigInt epoch;
-    REF_getter<bc_epoch> copy() const 
-    {
-        REF_getter<bc_epoch> r(new bc_epoch);
-        r->epoch=epoch;
-        return r;
-    }   
     void pack(outBuffer& o) const final
     {
         // cost.pack(o);
@@ -332,31 +282,31 @@ struct root_data: public Cellable
     std::vector<std::string> getUserPath(const std::string &pk);
     std::vector<std::string> getUserStatePath(const std::string &pk);
 
-    REF_getter<const bc_contract> getContract(const std::string &name, const REF_getter<fee_calcer>& bc);
-    void addContract(const std::string &name, const REF_getter<fee_calcer>& bca,const REF_getter<bc_contract> &c);
-    void setContract(const std::string &name, const REF_getter<fee_calcer>& bca,const REF_getter<bc_contract> &c);
+    REF_getter<bc_contract> getContract(const std::string &name, const REF_getter<fee_calcer>& bc);
+    REF_getter<bc_contract> addContract(const std::string &name, const REF_getter<fee_calcer>& bca);
+    // void setContract(const std::string &name, const REF_getter<fee_calcer>& bca,const REF_getter<bc_contract> &c);
 
     REF_getter<bc_values> getValues(const REF_getter<fee_calcer>& bc);
-    void setValues(const REF_getter<fee_calcer>& bc, const REF_getter<bc_values> &v);
+    // void setValues(const REF_getter<fee_calcer>& bc, const REF_getter<bc_values> &v);
 
-    REF_getter<const bc_epoch> getEpoch(const REF_getter<fee_calcer>& bc);
-    void setEpoch(const REF_getter<bc_epoch> &v);
+    REF_getter<bc_epoch> getEpoch(const REF_getter<fee_calcer>& bc);
+    // void setEpoch(const REF_getter<bc_epoch> &v);
 
 
 
-    REF_getter<const bc_user> getUser(const std::string &pk, const REF_getter<fee_calcer>& bc);
-    void setUser(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u);
-    void addUser(const std::string &pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u);
+    REF_getter<bc_user> getUser(const std::string &pk, const REF_getter<fee_calcer>& bc);
+    // void setUser(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u);
+    // void addUser(const std::string &pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u);
 
     REF_getter<bc_user_state> getUserState(const std::string &pk, const REF_getter<fee_calcer>& bc);
-    void addUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u);
-    void setUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u);
+    // void addUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u);
+    // void setUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u);
 
     std::vector<NODE_id> getNodesNames( const REF_getter<fee_calcer>& bc);
 
     REF_getter<bc_node> getNode(const NODE_id &name, const REF_getter<fee_calcer>& bc);
-    void addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc,const REF_getter<bc_node> &n);
-    void setNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const REF_getter<bc_node> &n);
+    REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc);
+    // void setNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const REF_getter<bc_node> &n);
 
 
 

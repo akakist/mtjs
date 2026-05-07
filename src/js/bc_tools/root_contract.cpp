@@ -12,13 +12,13 @@
 #include "msg.h"
 #include "QUORUM.h"
 
-std::vector<data_base* (*)()> db_constructors = {
-    +[]() -> data_base* { return new bc_contract; },
-    +[]() -> data_base* { return new bc_user; },
-    +[]() -> data_base* { return new bc_user_state; },
-    +[]() -> data_base* { return new bc_node; },
-    +[]() -> data_base* { return new bc_values; },
-    +[]() -> data_base* { return new bc_epoch; }
+std::vector<data_base* (*)(Cellable*)> db_constructors = {
+    +[](Cellable *p) -> data_base* { return new bc_contract(p); },
+    +[](Cellable *p) -> data_base* { return new bc_user(p); },
+    +[](Cellable *p) -> data_base* { return new bc_user_state(p); },
+    +[](Cellable *p) -> data_base* { return new bc_node(p); },
+    +[](Cellable *p) -> data_base* { return new bc_values(p); },
+    +[](Cellable *p) -> data_base* { return new bc_epoch(p); }
 };
 
 
@@ -89,7 +89,7 @@ std::vector<std::string> root_data::getNodePath(const std::string &name)
     return p;
 }
 
-REF_getter<const bc_contract> root_data::getContract(const std::string &name, const REF_getter<fee_calcer>& bc)
+REF_getter<bc_contract> root_data::getContract(const std::string &name, const REF_getter<fee_calcer>& bc)
 {
     MUTEX_INSPECTOR;
     auto v=getContractPath(name);
@@ -101,7 +101,7 @@ REF_getter<const bc_contract> root_data::getContract(const std::string &name, co
     return dynamic_cast<bc_contract*> (cc->data.get());
 }
 
-void  root_data::addContract(const std::string &name, const REF_getter<fee_calcer>& bca,const REF_getter<bc_contract> &c)
+REF_getter<bc_contract> root_data::addContract(const std::string &name, const REF_getter<fee_calcer>& bca)
 {
     MUTEX_INSPECTOR;
     auto v=getContractPath(name);
@@ -110,30 +110,31 @@ void  root_data::addContract(const std::string &name, const REF_getter<fee_calce
         throw CommonError("if(!cc.valid())");
     if(cc->data.valid())
         throw CommonError("if(cc->data.valid())");
-    if(cc->payload.size())
+    if(cc->payload_.size())
         throw CommonError("if(cc->payload.size())");
-    // REF_getter<bc_contract> bc=new bc_contract;
-    cc->data=c.get();
+    REF_getter<bc_contract> bc=new bc_contract(cc.get());
+    cc->data=bc.get();
     cc->payload_ctor_idx=hsh::bc_contract;
     cc->setDirty();
+    return bc;
 }
-void  root_data::setContract(const std::string &name, const REF_getter<fee_calcer>& bca,const REF_getter<bc_contract> &c)
-{
-    MUTEX_INSPECTOR;
-    auto v=getContractPath(name);
-    auto cc=getByPathOrCreate(this,v,db.get(),bca);
-    if(!cc.valid())
-        throw CommonError("if(!cc.valid())");
-    // if(cc->data.valid())
-    //     throw CommonError("if(cc->data.valid())");
-    // if(cc->payload.size())
-    //     throw CommonError("if(cc->payload.size())");
-    // REF_getter<bc_contract> bc=new bc_contract;
-    cc->data=c.get();
-    cc->payload_ctor_idx=hsh::bc_contract;
-    cc->setDirty();
-}
-REF_getter<const bc_epoch> root_data::getEpoch(const REF_getter<fee_calcer>& bc)
+// void  root_data::setContract(const std::string &name, const REF_getter<fee_calcer>& bca,const REF_getter<bc_contract> &c)
+// {
+//     MUTEX_INSPECTOR;
+//     auto v=getContractPath(name);
+//     auto cc=getByPathOrCreate(this,v,db.get(),bca);
+//     if(!cc.valid())
+//         throw CommonError("if(!cc.valid())");
+//     // if(cc->data.valid())
+//     //     throw CommonError("if(cc->data.valid())");
+//     // if(cc->payload.size())
+//     //     throw CommonError("if(cc->payload.size())");
+//     // REF_getter<bc_contract> bc=new bc_contract;
+//     cc->data=c.get();
+//     cc->payload_ctor_idx=hsh::bc_contract;
+//     cc->setDirty();
+// }
+REF_getter<bc_epoch> root_data::getEpoch(const REF_getter<fee_calcer>& bc)
 {
     MUTEX_INSPECTOR;
     auto r=this;
@@ -143,46 +144,46 @@ REF_getter<const bc_epoch> root_data::getEpoch(const REF_getter<fee_calcer>& bc)
     {
         return dynamic_cast<bc_epoch*>(l->data.get());
     }
-    if(l->payload.size())
-        throw CommonError("if(l->payload.size())");
+    if(l->payload_.size())
+        throw CommonError("if(l->payload_.size())");
 
-    REF_getter<const bc_epoch> v=new bc_epoch;
+    REF_getter<bc_epoch> v=new bc_epoch(l.get());
     l->data=v.get();
     l->payload_ctor_idx=hsh::bc_epoch;
     return v;
 
 }
-void root_data::setEpoch(const REF_getter<bc_epoch> &v)
-{
-    MUTEX_INSPECTOR;
-    auto r=this;
-    auto l=r->getLeafOrCreate("ep",db.get(),NULL);
-    if(!l.valid()) throw CommonError("if(!l.valid())");
-    l->data=v.get();
-    l->payload_ctor_idx=hsh::bc_epoch;
-    l->setDirty();
+// void root_data::setEpoch(const REF_getter<bc_epoch> &v)
+// {
+//     MUTEX_INSPECTOR;
+//     auto r=this;
+//     auto l=r->getLeafOrCreate("ep",db.get(),NULL);
+//     if(!l.valid()) throw CommonError("if(!l.valid())");
+//     l->data=v.get();
+//     l->payload_ctor_idx=hsh::bc_epoch;
+//     l->setDirty();
 
-}
-void root_data::setValues(const REF_getter<fee_calcer>& bc, const REF_getter<bc_values> &v)
-{
-    MUTEX_INSPECTOR;
-    auto r=this;
-    auto l=r->getLeafOrCreate("v",db.get(),bc);
-    if(!l.valid()) throw CommonError("if(!l.valid())");
-    // if(l->data.valid())
-    // {
-    //     return dynamic_cast<bc_values*>(l->data.get());
-    // }
-    // if(l->payload.size())
-    //     throw CommonError("if(l->payload.size())");
+// }
+// void root_data::setValues(const REF_getter<fee_calcer>& bc, const REF_getter<bc_values> &v)
+// {
+//     MUTEX_INSPECTOR;
+//     auto r=this;
+//     auto l=r->getLeafOrCreate("v",db.get(),bc);
+//     if(!l.valid()) throw CommonError("if(!l.valid())");
+//     // if(l->data.valid())
+//     // {
+//     //     return dynamic_cast<bc_values*>(l->data.get());
+//     // }
+//     // if(l->payload.size())
+//     //     throw CommonError("if(l->payload.size())");
 
-    // REF_getter<bc_values> v=new bc_values;
-    l->data=v.get();
-    l->payload_ctor_idx=hsh::bc_values;
-    l->setDirty();
-    // return v;
+//     // REF_getter<bc_values> v=new bc_values;
+//     l->data=v.get();
+//     l->payload_ctor_idx=hsh::bc_values;
+//     l->setDirty();
+//     // return v;
 
-}
+// }
 
 REF_getter<bc_values> root_data::getValues(const REF_getter<fee_calcer>& bc)
 {
@@ -194,10 +195,10 @@ REF_getter<bc_values> root_data::getValues(const REF_getter<fee_calcer>& bc)
     {
         return dynamic_cast<bc_values*>(l->data.get());
     }
-    if(l->payload.size())
-        throw CommonError("if(l->payload.size())");
+    if(l->payload_.size())
+        throw CommonError("if(l->payload_.size())");
 
-    REF_getter<bc_values> v=new bc_values;
+    REF_getter<bc_values> v=new bc_values(l.get());
     l->data=v.get();
     l->payload_ctor_idx=hsh::bc_values;
     return v;
@@ -222,96 +223,111 @@ std::vector<std::string> root_data::getUserStatePath(const std::string &pk)
 
 }
 
-REF_getter<const bc_user> root_data::getUser(const std::string &pk, const REF_getter<fee_calcer>& bc)
+REF_getter<bc_user> root_data::getUser(const std::string &pk, const REF_getter<fee_calcer>& bc)
 {
     MUTEX_INSPECTOR;
     auto v=getUserPath(pk);
-    auto cc=getByPathNoCreate(this,v,db.get(),bc);
+    auto cc=getByPathOrCreate(this,v,db.get(),bc);
     if(!cc.valid())
         return NULL;
     if(cc->data.valid())
     {
         return dynamic_cast<bc_user*>(cc->data.get());
     }
-    else throw CommonError("if(cc->data.valid())");
+    if(cc->payload_.size())
+    throw CommonError("if(cc->payload_.size())");
+    // else throw CommonError("if(cc->data.valid())");
+    REF_getter<bc_user> u=new bc_user(cc.get());
+    cc->data=u.get();
+    cc->payload_ctor_idx=hsh::bc_user;
+    return u;
+
 }
 REF_getter<bc_user_state> root_data::getUserState(const std::string &pk, const REF_getter<fee_calcer>& bc)
 {
     MUTEX_INSPECTOR;
     auto v=getUserStatePath(pk);
-    auto cc=getByPathNoCreate(this,v,db.get(),bc);
+    auto cc=getByPathOrCreate(this,v,db.get(),bc);
     if(!cc.valid())
         return NULL;
     if(cc->data.valid())
     {
         return dynamic_cast<bc_user_state*>(cc->data.get());
     }
-    else throw CommonError("if(cc->data.valid())");
-}
+    // else throw CommonError("if(cc->data.valid())");
+    if(cc->payload_.size())
+        throw CommonError("if(cc->payload_.size())");
 
-void root_data::addUser(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u)
-{
-    MUTEX_INSPECTOR;
-    auto v=getUserPath(pk);
-    auto cc=getByPathOrCreate(this,v,db.get(),bc);
-    if(!cc.valid())
-        throw CommonError("if(!cc.valid())");
-    if(cc->data.valid())
-        throw CommonError("if(cc->data.valid())");
-    if(cc->payload.size())
-        throw CommonError("if(cc->payload.size())");
-    cc->data=u.get();
-    cc->payload_ctor_idx=hsh::bc_user;
-    u->pkbin_еd=pk;
-    cc->setDirty();
-}
-void root_data::setUser(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u)
-{
-    MUTEX_INSPECTOR;
-    auto v=getUserPath(pk);
-    auto cc=getByPathNoCreate(this,v,db.get(),bc);
-    if(!cc.valid())
-        throw CommonError("if(!cc.valid())");
-    if(cc->data.valid())
-        throw CommonError("if(cc->data.valid())");
-    if(cc->payload.size())
-        throw CommonError("if(cc->payload.size())");
-    cc->data=u.get();
-    cc->payload_ctor_idx=hsh::bc_user;
-    cc->setDirty();
-    u->pkbin_еd=pk;
-}
-
-void root_data::addUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u)
-{
-    MUTEX_INSPECTOR;
-    auto v=getUserStatePath(pk);
-    auto cc=getByPathOrCreate(this,v,db.get(),bc);
-    if(!cc.valid())
-        throw CommonError("if(!cc.valid())");
-    if(cc->data.valid())
-        throw CommonError("if(cc->data.valid())");
-    if(cc->payload.size())
-        throw CommonError("if(cc->payload.size())");
+    REF_getter<bc_user_state> u=new bc_user_state(cc.get());
     cc->data=u.get();
     cc->payload_ctor_idx=hsh::bc_user_state;
-    cc->setDirty();
+    return u;
+
 }
-void root_data::setUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u)
-{
-    MUTEX_INSPECTOR;
-    auto v=getUserStatePath(pk);
-    auto cc=getByPathNoCreate(this,v,db.get(),bc);
-    if(!cc.valid())
-        throw CommonError("if(!cc.valid())");
-    // if(cc->data.valid())
-    //     throw CommonError("if(cc->data.valid())");
-    // if(cc->payload.size())
-    //     throw CommonError("if(cc->payload.size())");
-    cc->data=u.get();
-    cc->payload_ctor_idx=hsh::bc_user_state;
-    cc->setDirty();
-}
+
+// void root_data::addUser(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u)
+// {
+//     MUTEX_INSPECTOR;
+//     auto v=getUserPath(pk);
+//     auto cc=getByPathOrCreate(this,v,db.get(),bc);
+//     if(!cc.valid())
+//         throw CommonError("if(!cc.valid())");
+//     if(cc->data.valid())
+//         throw CommonError("if(cc->data.valid())");
+//     if(cc->payload.size())
+//         throw CommonError("if(cc->payload.size())");
+//     cc->data=u.get();
+//     cc->payload_ctor_idx=hsh::bc_user;
+//     u->pkbin_еd=pk;
+//     cc->setDirty();
+// }
+// void root_data::setUser(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u)
+// {
+//     MUTEX_INSPECTOR;
+//     auto v=getUserPath(pk);
+//     auto cc=getByPathNoCreate(this,v,db.get(),bc);
+//     if(!cc.valid())
+//         throw CommonError("if(!cc.valid())");
+//     if(cc->data.valid())
+//         throw CommonError("if(cc->data.valid())");
+//     if(cc->payload.size())
+//         throw CommonError("if(cc->payload.size())");
+//     cc->data=u.get();
+//     cc->payload_ctor_idx=hsh::bc_user;
+//     cc->setDirty();
+//     u->pkbin_еd=pk;
+// }
+
+// void root_data::addUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u)
+// {
+//     MUTEX_INSPECTOR;
+//     auto v=getUserStatePath(pk);
+//     auto cc=getByPathOrCreate(this,v,db.get(),bc);
+//     if(!cc.valid())
+//         throw CommonError("if(!cc.valid())");
+//     if(cc->data.valid())
+//         throw CommonError("if(cc->data.valid())");
+//     if(cc->payload.size())
+//         throw CommonError("if(cc->payload.size())");
+//     cc->data=u.get();
+//     cc->payload_ctor_idx=hsh::bc_user_state;
+//     cc->setDirty();
+// }
+// void root_data::setUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u)
+// {
+//     MUTEX_INSPECTOR;
+//     auto v=getUserStatePath(pk);
+//     auto cc=getByPathNoCreate(this,v,db.get(),bc);
+//     if(!cc.valid())
+//         throw CommonError("if(!cc.valid())");
+//     // if(cc->data.valid())
+//     //     throw CommonError("if(cc->data.valid())");
+//     // if(cc->payload.size())
+//     //     throw CommonError("if(cc->payload.size())");
+//     cc->data=u.get();
+//     cc->payload_ctor_idx=hsh::bc_user_state;
+//     cc->setDirty();
+// }
 
 
 std::vector<NODE_id> root_data::getNodesNames( const REF_getter<fee_calcer>& bc)
@@ -327,7 +343,7 @@ std::vector<NODE_id> root_data::getNodesNames( const REF_getter<fee_calcer>& bc)
     }
     return v;
 }
-void root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc,const REF_getter<bc_node> &n)
+REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc)
 {
     MUTEX_INSPECTOR;
 
@@ -338,32 +354,33 @@ void root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc,co
 
     if(cc->data.valid())
         throw CommonError("if(cc->data.valid())");
-    if(cc->payload.size())
+    if(cc->payload_.size())
         throw CommonError("if(cc->payload.size())");
-
+    REF_getter<bc_node> n=new bc_node(cc.get());
     cc->data=n.get();
     cc->payload_ctor_idx=hsh::bc_node;
     cc->setDirty();
+    return n;
 }
-void root_data::setNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const REF_getter<bc_node> &n)
-{
-    MUTEX_INSPECTOR;
+// void root_data::setNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const REF_getter<bc_node> &n)
+// {
+//     MUTEX_INSPECTOR;
 
-    std::vector<std::string> v=getNodePath(name.container);
-    // v.push_back("n");
-    // v.push_back(name.container);
-    auto cc=getByPathOrCreate(this,v,db.get(),bc);
+//     std::vector<std::string> v=getNodePath(name.container);
+//     // v.push_back("n");
+//     // v.push_back(name.container);
+//     auto cc=getByPathOrCreate(this,v,db.get(),bc);
 
-    if(!cc->data.valid())
-        throw CommonError("!if(cc->data.valid())");
-    // if(cc->payload.size())
-    //     throw CommonError("if(cc->payload.size())");
+//     if(!cc->data.valid())
+//         throw CommonError("!if(cc->data.valid())");
+//     // if(cc->payload.size())
+//     //     throw CommonError("if(cc->payload.size())");
 
-    // REF_getter<bc_node> u=new bc_node;
-    cc->data=n.get();
-    cc->payload_ctor_idx=hsh::bc_node;
-    cc->setDirty();
-}
+//     // REF_getter<bc_node> u=new bc_node;
+//     cc->data=n.get();
+//     cc->payload_ctor_idx=hsh::bc_node;
+//     cc->setDirty();
+// }
 
 REF_getter<bc_node> root_data::getNode(const NODE_id &name, const REF_getter<fee_calcer>& bc)
 {

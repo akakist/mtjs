@@ -13,10 +13,10 @@ inline void init_root(const REF_getter<root_data> &r)
     auto u=r->getUserState(u_root_pk,NULL);
     if(!u.valid())
     {
-        REF_getter<bc_user_state> uu(new bc_user_state);
-        uu->balance=1000000;
-        r->addUserState(u_root_pk,NULL,uu);
+        throw CommonError("cannot find root user state");
     }
+    u->balance=1000000;
+    u->setDirty();
 
 
     std::vector<int> stakes= {100,200,300,400,500};
@@ -62,16 +62,17 @@ inline void init_root(const REF_getter<root_data> &r)
         auto n=r->getNode(name,NULL);
         if(n.valid()) continue;
 
-        REF_getter<bc_node> nn=new bc_node;
+        REF_getter<bc_node> nn=r->addNode(name,NULL);
         nn->name=name;
         nn->owner_ed_pk=u_root_pk;
         nn->total_stake=stakes[i];//.from_decimal(std::to_string(stakes[i]));
         nn->bls_pk.deserializeBase62Str(getenv2(keys[i].first));
 
-        n->ed_pk=base62::decode(getenv2(keys[i].second));
+        nn->ed_pk=base62::decode(getenv2(keys[i].second));
 
         nn->ip="127.0.0.1:"+std::to_string(2300+i);
-        r->addNode(name,NULL,nn);
+        nn->setDirty();
+        // r->;
 
     }
 

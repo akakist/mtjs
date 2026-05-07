@@ -35,8 +35,8 @@ struct t_params
 
     }
 
-    std::map<std::string, BigInt> transfer_from;
-    std::map<std::string, BigInt> transfer_to;
+    // std::map<std::string, BigInt> transfer_from;
+    // std::map<std::string, BigInt> transfer_to;
     std::map<std::string, BigInt> fee;
 
 };
