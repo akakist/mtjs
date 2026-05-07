@@ -10,7 +10,6 @@
 #include "base62.h"
 #include "db_to_save.h"
 #include "fee_calcer.h"
-// struct Hashable;
 #include "hsh.h"
 
 struct Cellable;
@@ -24,7 +23,6 @@ struct data_base : public Refcountable
     data_base(int t, Cellable* _parent): type(t), parent(_parent) {}
     ~data_base()
     {
-        // logErr2("~data_base() %d", type);
     }
     void setDirty();
     virtual void pack(outBuffer& o) const
@@ -59,7 +57,6 @@ struct Cellable: public Refcountable
     }
     ~Cellable()
     {
-        // logErr2("~Cellable() %s",m_id.c_str());
     }
 
     Cellable * parent=nullptr;
@@ -69,11 +66,9 @@ struct Cellable: public Refcountable
     // private:
     std::map<std::string,THASH_id > children_hashes;
     std::map<std::string, REF_getter<Cellable>> children_ptrs;
-    // std::string payload_;
     unsigned int payload_ctor_idx=hsh::HSH_END;
     REF_getter<data_base> data=nullptr;
 public:
-    // std::set<Cellable*> accessed;
     bool is_dirty=false;
 
     Cellable(Cellable* _parent, const std::string & id, const REF_getter<fee_calcer>& bc): parent(_parent), m_id(id)
@@ -113,7 +108,6 @@ public:
         o<<valid;
         if(valid)
             data->pack(o);
-        // o<<payload_;
     }
     virtual void unpack(inBuffer& in)
     {
@@ -136,8 +130,6 @@ public:
             }   
 
         }
-        // in>>payload_;
-        // in>>payload;
     }
     std::string getBuffer()
     {
@@ -178,7 +170,6 @@ inline void appendRelativeInternalPath(std::vector<std::string>&vs, const std::s
         vs.push_back(BASE62_TABLE[k]);
         h/=62;
     }
-    // return vs;
 }
 
 

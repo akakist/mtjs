@@ -7,10 +7,6 @@ bool Node::Service::HeartBeatRSP(const MsgEvent::HeartBeatRSP* m, const NODE_id 
 
     auto &hbs=heart_beat_store;
     auto &li=hbs.leader_info[hbs.node_leader];
-    // if(li.responses.count(m->node_signer))
-    // {
-    //     return;
-    // }
     if(prev_block_hash!=m->payload_heart_beat->prev_block_hash)
     {
         logErr2("heat beat expired %s %s",prev_block_hash.str().c_str(),m->payload_heart_beat->prev_block_hash.str().c_str());
@@ -80,7 +76,6 @@ bool Node::Service::HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::stri
 
     bool need_reply=false;
     bool need_replace=false;
-    // logNode("heart beat received from leader %s last block %s",h.node_leader.c_str(),h.last_block.toString().c_str());
     auto &hbs=heart_beat_store;
 
     if(hbs.node_leader==h->node_leader)

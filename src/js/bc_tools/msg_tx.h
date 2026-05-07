@@ -32,22 +32,6 @@ inline const char* txName(int id)
 }
 namespace tx
 {
-    // struct registerUser: public msg::message_base
-    // {
-    //     registerUser():message_base(tx_id::registerUser) {}
-    //     std::string pk;
-    //     void pack(outBuffer& b) const final
-    //     {
-    //         message_base::pack(b);
-    //         b<<pk;
-    //     }
-    //     void unpack(inBuffer& b) final
-    //     {
-    //         message_base::unpack(b);
-    //         b>>pk;
-    //     }
-
-    // };
     struct registerNode: public msg::message_base
     {
         registerNode():message_base(tx_id::registerNode) {}

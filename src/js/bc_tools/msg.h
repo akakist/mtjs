@@ -7,7 +7,6 @@
 #include "tree.h"
 #include "blst_cp.h"
 #include "IUtils.h"
-#include "bls_io.h"
 #include "BLOCK_id.h"
 #include "TRANSACTION_id.h"
 #include "THASH_id.h"

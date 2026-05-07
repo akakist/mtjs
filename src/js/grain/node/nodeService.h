@@ -223,18 +223,7 @@ namespace Node
         void collectTransactions();
         BLOCK_id execute_block(const REF_getter<root_data> &rt, const BLOCK_id & bl, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert);
 
-
-
-        // void on_blockResponse(const msg::block_response& br);
-        // void on_block_accepted_req(const msg::block_accepted_req& ba, const NODE_id& src_node, const route_t& route);
-
-
         void do_sync();
-        // void on_get_blocks_req(const msg::get_blocks_req &r, const route_t& route);
-        // void on_get_blocks_rsp(const msg::get_blocks_rsp& r);
-
-
-
 
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
 

@@ -136,12 +136,6 @@ bool TxValidator::Service::AddTx(const bcEvent::AddTx *e)
 }
 bool TxValidator::Service::TxValidatorStart(const bcEvent::TxValidatorStart *e)
 {
-    // db=e->db;
-    // is_working = true;
-    // if(!root.valid())
-    //     root=getRoot(db.get());
-
-    // init_root(root);
 
     return true;
 }
@@ -199,16 +193,14 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
     {
         MUTEX_INSPECTOR;
         std::optional<std::string> err;
-        // sendEvent(ServiceEnum::TxValidator,new bcEvent::AddTx(e,this));
         msg::user_message_req um(in);
         if(!err && !um.verify())
         {
             err="verify failed";
-            // return true;
+            return true;
 
         }
         BigInt nonce=0;
-        // logErr2("getUser %s",base62::encode(um.address_pk_ed).c_str());
         if(!err)
         {
             auto u=root->getUserState(um.address_pk_ed,NULL);
@@ -230,12 +222,10 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
             t.container=e->msg;
             transaction_pool_verified.insert({h,t});
         }
-            // addToTransactionToPool(e->msg);
         msg::transaction_added_rsp tr;
         tr.err=err.has_value();
         tr.err_str=err?*err:"transaction added to pool";
         tr.tx_hash=blake2b_hash(e->msg);
-        // msg::node_message_ed nm(tr.getBuffer(),this_node_name,my_sk_ed);
         passEvent(new bcEvent::ClientMsgReply(hash, tr.getBuffer(),poppedFrontRoute(e->route)));
         return true;
     }

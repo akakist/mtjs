@@ -30,8 +30,6 @@
     enum timers
     {
         TIMER_BROADCAST_ACK_TIMEDOUT,
-        // TIMER_START_HEART_BEAT,
-        // TIMER_RESTART_BLOCK,
     };
     struct TIMER_BROADCAST_ACK_TIMEDOUT_cookie: public Refcountable
     {

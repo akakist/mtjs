@@ -1,3 +1,3 @@
 #pragma once
 
-#define QUORUM 0.7
+#define QUORUM 0.6777

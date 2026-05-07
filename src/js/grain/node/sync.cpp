@@ -6,10 +6,7 @@
 
 void Node::Service::do_sync()
 {
-    // last_leader_cert
     if(!last_leader_cert.valid()) throw CommonError("if(last_leader_cert.empty())");
-    // msg::leader_certificate lc(last_leader_cert);
-    // lc.nodes
     std::vector<NODE_id> node_names;
     for(auto& z: last_leader_cert->nodes)
     {

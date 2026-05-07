@@ -13,7 +13,6 @@ std::string Cellable::dump()
 {
     std::ostringstream str;
     str<<"Cellable "<< std::endl
-       // << "payload_ctor_idx="<<payload_ctor_idx << std::endl
        <<"children:" << std::endl;
     for(auto &z: children_hashes)
     {
@@ -69,7 +68,6 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string& id, IDatabase*
         return ip->second;
 
     }
-    // logErr2("getLeafNoCreate %s create new Cellable", id.c_str());
     REF_getter<Cellable> cc=new Cellable(this,id,bc);
 
     children_ptrs.insert({id,cc});
@@ -80,25 +78,14 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string& id, IDatabase*
     if(r)
         logErr2("db->get_cell err %s",cc->getDbId().c_str());
 
-    // logErr2("getLeafNoCreate %s loaded result %d", id.c_str(), result.size());
 
     if(result.size())
     {
         auto h=blake2b_hash(result);
         if(it->second==h)
         {
-            // logErr2("getLeafNoCreate %s hash ok", id.c_str());
-
             inBuffer in(result);
             cc->unpack(in);
-            // if(cc->payload_ctor_idx<hsh::HSH_END)
-            // {
-            //     // logErr2("getLeafNoCreate %s create data cc->payload_ctor_idx %d", id.c_str(),cc->payload_ctor_idx);
-
-            //     cc->data=db_constructors[cc->payload_ctor_idx](cc.get());
-            //     inBuffer iz(cc->payload_);
-            //     cc->data->unpack(iz);
-            // }
         }
         else
         {
@@ -145,10 +132,8 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
                 }
                 children_hashes[cid]=ch;
             }
-            // c->accessed=false;
         }
 
-        // children_ptrs.erase(cid);
     }
     is_dirty=false;
 }

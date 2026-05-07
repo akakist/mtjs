@@ -1,14 +1,11 @@
 #pragma once
 #include <string>
-// #include <auto_mpz_t.h>
 #include <nlohmann/json.hpp>
-// #include "base62.h"
 #include "blst_cp.h"
 #include <stdint.h>
 #include "IUtils.h"
 #include "blake2bHasher.h"
 #include "cellable.h"
-#include "bls_io.h"
 #include <fcntl.h>
 #include "ioBuffer.h"
 #include "bigint.h"
@@ -283,32 +280,24 @@ struct root_data: public Cellable
 
     REF_getter<bc_contract> getContract(const std::string &name, const REF_getter<fee_calcer>& bc);
     REF_getter<bc_contract> addContract(const std::string &name, const REF_getter<fee_calcer>& bca);
-    // void setContract(const std::string &name, const REF_getter<fee_calcer>& bca,const REF_getter<bc_contract> &c);
 
     REF_getter<bc_values> getValues(const REF_getter<fee_calcer>& bc);
     REF_getter<bc_values> checkValues(const REF_getter<fee_calcer>& bc);
-    // void setValues(const REF_getter<fee_calcer>& bc, const REF_getter<bc_values> &v);
 
     REF_getter<bc_epoch> getEpoch(const REF_getter<fee_calcer>& bc);
-    // void setEpoch(const REF_getter<bc_epoch> &v);
 
 
 
     REF_getter<bc_user> getUser(const std::string &pk, const REF_getter<fee_calcer>& bc);
-    // void setUser(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u);
-    // void addUser(const std::string &pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u);
 
     REF_getter<bc_user_state> getUserState(const std::string &pk, const REF_getter<fee_calcer>& bc);
     REF_getter<bc_user_state>   checkUserState(const std::string &pk, const REF_getter<fee_calcer>& bc);
 
-    // void addUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u);
-    // void setUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u);
 
     std::vector<NODE_id> getNodesNames( const REF_getter<fee_calcer>& bc);
 
     REF_getter<bc_node> getNode(const NODE_id &name, const REF_getter<fee_calcer>& bc);
     REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc);
-    // void setNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const REF_getter<bc_node> &n);
 
 
 

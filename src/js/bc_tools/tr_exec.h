@@ -13,5 +13,4 @@ namespace TR {
     std::optional<std::string> execute(const tx::stake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId);
     std::optional<std::string> execute(const tx::registerNode &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId);
     std::optional<std::string> execute(const tx::transferContract &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId);
-    // std::optional<std::string> execute(const tx::registerUser &c, t_params & t,const std::string& senderNick, const REF_getter<fee_calcer>& by, int txid, int seqId);
 }

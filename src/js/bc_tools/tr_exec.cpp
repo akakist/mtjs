@@ -3,26 +3,6 @@
 #include "cellable.h"
 #include "tr_exec.h"
 #include "msg_tx.h"
-// #include     "nodeService.h"
-
-// std::optional<std::string> TR::execute(const tx::registerUser &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
-// {
-//     auto v=t.root->getValues(by);
-//     auto u=t.root->getUser(senderNick,by);
-//     if(!u.valid())
-//         return "user not found/created";
-//     auto cu=t.root->getUser(c.nickName,by);
-//     if(cu.valid())
-//         return "nick already registered";
-//     cu=t.root->addUser(c.pk, by);
-//     cu->pkbin=c.pk;
-//     t.fee[senderNick]+=v->fees[bc_values::register_nick];
-//     // n=t.root->addNick(c.nickName,by);
-//     // n->owner=senderAddress;
-//     t.logMsg(txid,seqId,"user %s sucessfully registered",c.nickName.c_str());
-
-//     return std::nullopt;
-// }
 
 std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
 {
@@ -42,7 +22,6 @@ std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std
     
 
     t.fee[senderAddress]+=v->fees[bc_values::mint];
-    // t.transfer_to[senderAddress]+=c.amount;
 
     t.logMsg(txid,seqId,"amount %s sucessfully minted on your balance",c.amount.toString().c_str());
 
@@ -68,7 +47,6 @@ std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const 
         return "insufficient stake";
     }
 
-    // auto v=t.root->getValues(by);
 
     auto u=t.root->getUser(senderAddress,by);
 
@@ -78,7 +56,6 @@ std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const 
 
 
     nodeStake-=c.amount;
-    // t.transfer_to[senderAddress]+=c.amount;
     v->total_staked-=c.amount;
     v->setDirty();
     n->setDirty();
@@ -113,7 +90,6 @@ std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t
     u->setDirty();
     cc->setDirty();
     
-    // u->contracts.insert(c.name);
 
     t.fee[senderAddress]+=v->fees[bc_values::contract_deploy];
 
@@ -129,7 +105,6 @@ std::optional<std::string> TR::execute(const tx::transfer &c, t_params & t,const
     if(!from.valid())
         return "cannot find src addr";
 
-    // REF_getter<const bc_user> to(NULL);
     auto to=t.root->getUserState(c.to_address,by);
     if(!to.valid())
     {
@@ -143,15 +118,7 @@ std::optional<std::string> TR::execute(const tx::transfer &c, t_params & t,const
     to->balance+=c.amount;
     from->setDirty();
     to->setDirty();
-    // t.transfer_from[senderAddress]+=c.amount;
-    // t.transfer_to[c.to_address]+=c.amount;
     t.fee[senderAddress]+=v->fees[bc_values::transfer];
-    // // if (from->balance < c.amount + v->fees[bc_values::transfer]) {
-    // //     return "insufficient_funds";
-    // // }
-    // by->add(v->fees[bc_values::transfer]);
-    // from->balance-=c.amount;
-    // to->balance+=c.amount;
     t.logMsg(txid,seqId,"amount %s successfully transferred",c.amount.toString().c_str());
     return std::nullopt;
 
@@ -187,14 +154,8 @@ std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const st
 
     sender->balance-=c.amount;
     nodeStake+=c.amount;
-    // t.transfer_from[senderAddress]+=c.amount;
-    // t.transfer_to[c.to_addr]+=c.amount;
     t.fee[senderAddress]+=v->fees[bc_values::stake];
 
-    // v->total_staked+=c.amount;
-    // sender->my_stakes[c.node]+=nodeStake;
-
-    // by->add(v->fees[bc_values::stake]);
     t.logMsg(txid,seqId,"node %s staked on amount %s",c.node.container.c_str(),c.amount.toString().c_str());
     return std::nullopt;
 
@@ -241,11 +202,8 @@ std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,c
     us->setDirty();
 
 
-    // t.transfer_from[senderAddress]+=c.amount;
-    // t.transfer_to[c.to_addr]+=c.amount;
     t.fee[senderAddress]+=v->fees[bc_values::node_create];
 
-    // by->add(v->fees[bc_values::node_create]);
 
     t.logMsg(txid,seqId,"node %s registered",c.name.container.c_str());
 

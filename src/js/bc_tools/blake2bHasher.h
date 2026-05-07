@@ -45,11 +45,6 @@ public:
             throw std::runtime_error("crypto_generichash_final failed");
         }
         return {(char*)out,outlen_};
-        // std::ostringstream oss;
-        // for (size_t i = 0; i < outlen_; i++) {
-        //     oss << std::hex << std::setw(2) << std::setfill('0') << (int)out[i];
-        // }
-        // return oss.str();
     }
 
 private:

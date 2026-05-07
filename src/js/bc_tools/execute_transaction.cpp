@@ -23,18 +23,6 @@ execute_transaction(int tx_id, t_params& t, const std::string& senderAddress, co
 
         }
         break;
-        // case tx_id::registerUser:
-        // {
-        //     tx::registerUser rn;
-        //     rn.unpack(i2);
-        //     auto err=TR::execute(rn,t,senderAddress, by, tx_id,ii);
-        //     if(err)
-        //     {
-        //         t.setError(tx_id,ii,*err);
-        //     }
-
-        // }
-        // break;
         default:
             logErr2("unhndled ty2 %s",txName(ty2));
             t.logError(tx_id,ii,"unhandled transaction type %s",txName(ty2));

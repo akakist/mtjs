@@ -70,21 +70,4 @@ struct CDatabase: public IDatabase
     {
         delete db;
     }
-    // int init()
-    // {
-
-    //     const std::string path = "/var/lib/mydb";
-
-    //     // Put / Get demo
-    //     s = db->Put(rocksdb::WriteOptions(), "key", "value");
-    //     if (!s.ok()) std::cerr << "Put failed: " << s.ToString() << "\n";
-
-    //     std::string val;
-    //     s = db->Get(rocksdb::ReadOptions(), "key", &val);
-    //     if (s.ok()) std::cout << "key=" << val << "\n";
-    //     else std::cerr << "Get failed: " << s.ToString() << "\n";
-
-    //     delete db; // Close
-    //     return 0;
-    // }
 };

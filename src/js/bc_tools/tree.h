@@ -1,11 +1,9 @@
 #pragma once
 #include <string>
-// #include <nlohmann/json.hpp>
 #include <list>
 #include "blake2bHasher.h"
 #include "bigint.h"
 #include "NODE_id.h"
-// #include "auto_mpz_t.h"
 namespace BroadcasterTree
 {
     struct Node {

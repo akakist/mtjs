@@ -47,11 +47,8 @@ namespace BlockStreamer
         bool on_alarm(const timerEvent::TickAlarm*);
         bool handleEvent(const REF_getter<Event::Base>& e);
 
-        // bool AddTx(const bcEvent::AddTx *e);
         bool ServiceInit(const bcEvent::ServiceInit *e);
-        // bool GetTransactions(const bcEvent::GetTransactions*e);
         bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
-        // bool ClientMsg(const bcEvent::ClientMsg*e);
         bool ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ*);
         bool StreamBlock(const bcEvent::StreamBlock*);
         
@@ -77,12 +74,6 @@ namespace BlockStreamer
             XPASS;
         }
 
-        // std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
-#ifdef KALL
-        REF_getter<root_data> root1=NULL;
-
-        REF_getter<bcEvent::ServiceInit> conf1=nullptr;
-#endif
 
         std::map<route_t,clientTxSubscription> clientTxSubscriptions;
 
