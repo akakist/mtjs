@@ -50,23 +50,19 @@ bool root_data::verify_lider_certificate(const REF_getter<MsgEvent::LeaderCertif
 
 REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db, const REF_getter<fee_calcer>& bc)
 {
-    cur->accessed=true;
     for(auto &z:v)
     {
         cur=cur->getLeafOrCreate(z,db,bc);
-        cur->accessed=true;
     }
     return cur;
 }
 REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db, const REF_getter<fee_calcer>& bc)
 {
-    cur->accessed=true;
     for(auto &z:v)
     {
         cur=cur->getLeafNoCreate(z,db,bc);
         if(!cur.valid())
             return NULL;
-        cur->accessed=true;
     }
     return cur;
 }
@@ -110,8 +106,8 @@ REF_getter<bc_contract> root_data::addContract(const std::string &name, const RE
         throw CommonError("if(!cc.valid())");
     if(cc->data.valid())
         throw CommonError("if(cc->data.valid())");
-    if(cc->payload_.size())
-        throw CommonError("if(cc->payload.size())");
+    // if(cc->payload_.size())
+    //     throw CommonError("if(cc->payload.size())");
     REF_getter<bc_contract> bc=new bc_contract(cc.get());
     cc->data=bc.get();
     cc->payload_ctor_idx=hsh::bc_contract;
@@ -144,8 +140,8 @@ REF_getter<bc_epoch> root_data::getEpoch(const REF_getter<fee_calcer>& bc)
     {
         return dynamic_cast<bc_epoch*>(l->data.get());
     }
-    if(l->payload_.size())
-        throw CommonError("if(l->payload_.size())");
+    // if(l->payload_.size())
+    //     throw CommonError("if(l->payload_.size())");
 
     REF_getter<bc_epoch> v=new bc_epoch(l.get());
     l->data=v.get();
@@ -195,13 +191,26 @@ REF_getter<bc_values> root_data::getValues(const REF_getter<fee_calcer>& bc)
     {
         return dynamic_cast<bc_values*>(l->data.get());
     }
-    if(l->payload_.size())
-        throw CommonError("if(l->payload_.size())");
+    // if(l->payload_.size())
+    //     throw CommonError("if(l->payload_.size())");
 
     REF_getter<bc_values> v=new bc_values(l.get());
     l->data=v.get();
     l->payload_ctor_idx=hsh::bc_values;
     return v;
+}
+REF_getter<bc_values> root_data::checkValues(const REF_getter<fee_calcer>& bc)
+{
+    MUTEX_INSPECTOR;
+    auto r=this;
+    auto l=r->getLeafNoCreate("v",db.get(),bc);
+    if(!l.valid()) return NULL;
+    if(l->data.valid())
+    {
+        return dynamic_cast<bc_values*>(l->data.get());
+    }
+    return NULL;
+
 }
 
 std::vector<std::string> root_data::getUserPath(const std::string &pk)
@@ -234,8 +243,8 @@ REF_getter<bc_user> root_data::getUser(const std::string &pk, const REF_getter<f
     {
         return dynamic_cast<bc_user*>(cc->data.get());
     }
-    if(cc->payload_.size())
-    throw CommonError("if(cc->payload_.size())");
+    // if(cc->payload_.size())
+    // throw CommonError("if(cc->payload_.size())");
     // else throw CommonError("if(cc->data.valid())");
     REF_getter<bc_user> u=new bc_user(cc.get());
     cc->data=u.get();
@@ -255,13 +264,24 @@ REF_getter<bc_user_state> root_data::getUserState(const std::string &pk, const R
         return dynamic_cast<bc_user_state*>(cc->data.get());
     }
     // else throw CommonError("if(cc->data.valid())");
-    if(cc->payload_.size())
-        throw CommonError("if(cc->payload_.size())");
+    // if(cc->payload_.size())
+    //     throw CommonError("if(cc->payload_.size())");
 
     REF_getter<bc_user_state> u=new bc_user_state(cc.get());
     cc->data=u.get();
     cc->payload_ctor_idx=hsh::bc_user_state;
     return u;
+
+}
+REF_getter<bc_user_state> root_data::checkUserState(const std::string &pk, const REF_getter<fee_calcer>& bc)
+{
+    MUTEX_INSPECTOR;
+    auto v=getUserStatePath(pk);
+    auto cc=getByPathNoCreate(this,v,db.get(),bc);
+    if(!cc.valid())
+        return NULL;
+
+    return dynamic_cast<bc_user_state*>(cc->data.get());
 
 }
 
@@ -354,8 +374,8 @@ REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee
 
     if(cc->data.valid())
         throw CommonError("if(cc->data.valid())");
-    if(cc->payload_.size())
-        throw CommonError("if(cc->payload.size())");
+    // if(cc->payload_.size())
+    //     throw CommonError("if(cc->payload.size())");
     REF_getter<bc_node> n=new bc_node(cc.get());
     cc->data=n.get();
     cc->payload_ctor_idx=hsh::bc_node;
@@ -405,7 +425,7 @@ REF_getter<root_data> getRoot(IDatabase* db)
     // logErr2("if(!root.valid())");
 
     REF_getter<root_data> r=new root_data(db);
-    r->accessed=true;
+    // r->accessed=true;
     // std::string r;
     THASH_id root_hash;
     std::string root_cell;

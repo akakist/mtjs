@@ -1,5 +1,5 @@
 #include "init_root.h"
-
+#ifdef KALL
 void init_root(const REF_getter<root_data> &r)
 {
     auto v=r->getValues(NULL);
@@ -75,3 +75,4 @@ void init_root(const REF_getter<root_data> &r)
 
 
 }
+#endif

@@ -273,7 +273,6 @@ struct root_data: public Cellable
     REF_getter<IDatabase> db;
     root_data(IDatabase *db_): Cellable(nullptr,"r",NULL),db(db_)
     {
-        accessed=true;
     }
     bool verify_lider_certificate(const REF_getter<MsgEvent::LeaderCertificate>& lc);
 
@@ -287,6 +286,7 @@ struct root_data: public Cellable
     // void setContract(const std::string &name, const REF_getter<fee_calcer>& bca,const REF_getter<bc_contract> &c);
 
     REF_getter<bc_values> getValues(const REF_getter<fee_calcer>& bc);
+    REF_getter<bc_values> checkValues(const REF_getter<fee_calcer>& bc);
     // void setValues(const REF_getter<fee_calcer>& bc, const REF_getter<bc_values> &v);
 
     REF_getter<bc_epoch> getEpoch(const REF_getter<fee_calcer>& bc);
@@ -299,6 +299,8 @@ struct root_data: public Cellable
     // void addUser(const std::string &pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user> &u);
 
     REF_getter<bc_user_state> getUserState(const std::string &pk, const REF_getter<fee_calcer>& bc);
+    REF_getter<bc_user_state>   checkUserState(const std::string &pk, const REF_getter<fee_calcer>& bc);
+
     // void addUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u);
     // void setUserState(const std::string& pk, const REF_getter<fee_calcer>& bc, const REF_getter<bc_user_state> &u);
 

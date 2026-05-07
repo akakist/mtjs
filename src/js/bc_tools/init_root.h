@@ -5,27 +5,36 @@
 
 inline void init_root(const REF_getter<root_data> &r)
 {
-    auto v=r->getValues(NULL);
-    // u_root pk
-    std::string u_root_pk=base62::decode(getenv2("k_root_ed_pk"));
-    if(!v->emitters.count(u_root_pk))
-        v->emitters.insert(u_root_pk);
-    auto u=r->getUserState(u_root_pk,NULL);
-    if(!u.valid())
-    {
-        throw CommonError("cannot find root user state");
-    }
-    u->balance=1000000;
-    u->setDirty();
-
-
     std::vector<int> stakes= {100,200,300,400,500};
-    int total=0;
-    for(auto &z: stakes)
+    std::string u_root_pk=base62::decode(getenv2("k_root_ed_pk"));
+    if(!r->checkValues(NULL).valid())
     {
-        total+=z;
+        auto v=r->getValues(NULL);
+        if(!v->emitters.count(u_root_pk))
+            v->emitters.insert(u_root_pk);
+
+        int total=0;
+        for(auto &z: stakes)
+        {
+            total+=z;
+        }
+        v->total_staked=total;
+        v->setDirty();
     }
-    v->total_staked=total;
+    // u_root pk
+    if(!r->checkUserState(u_root_pk,NULL).valid())
+    {
+        auto u=r->getUserState(u_root_pk,NULL);
+        if(!u.valid())
+        {
+            throw CommonError("cannot find root user state");
+        }
+        u->balance=1000000;
+        u->setDirty();
+
+    }
+
+
     // logErr2("v->total_staked %lf",v->total_staked.toDouble());
 
     std::vector<std::pair<std::string, std::string>> keys=

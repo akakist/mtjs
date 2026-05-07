@@ -69,12 +69,12 @@ struct Cellable: public Refcountable
     // private:
     std::map<std::string,THASH_id > children_hashes;
     std::map<std::string, REF_getter<Cellable>> children_ptrs;
-    std::string payload_;
-    int payload_ctor_idx=hsh::HSH_END;
+    // std::string payload_;
+    unsigned int payload_ctor_idx=hsh::HSH_END;
     REF_getter<data_base> data=nullptr;
 public:
     // std::set<Cellable*> accessed;
-    bool accessed=false;
+    bool is_dirty=false;
 
     Cellable(Cellable* _parent, const std::string & id, const REF_getter<fee_calcer>& bc): parent(_parent), m_id(id)
     {
@@ -85,7 +85,7 @@ public:
     }
     void setDirty()
     {
-        accessed=true;
+        is_dirty=true;
         if(parent)
         {
             parent->setDirty();
@@ -109,8 +109,11 @@ public:
         // o<<m_id;
         o<<payload_ctor_idx;
         o<<children_hashes;
-        // data->pack(o);
-        o<<payload_;
+        bool valid=data.valid();
+        o<<valid;
+        if(valid)
+            data->pack(o);
+        // o<<payload_;
     }
     virtual void unpack(inBuffer& in)
     {
@@ -118,7 +121,22 @@ public:
         // in>>m_id;
         in>>payload_ctor_idx;
         in>>children_hashes;
-        in>>payload_;
+        bool valid;
+        in>>valid;
+        if(valid)
+        {
+            if(payload_ctor_idx<hsh::HSH_END)
+            {
+                data=db_constructors[payload_ctor_idx](this);
+                data->unpack(in);
+            }
+            else
+            {
+                throw CommonError("!if(payload_ctor_idx<hsh::HSH_END)");;
+            }   
+
+        }
+        // in>>payload_;
         // in>>payload;
     }
     std::string getBuffer()
