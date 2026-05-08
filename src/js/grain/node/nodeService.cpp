@@ -453,9 +453,9 @@ bool Node::Service::ValidateBlockRSP(const MsgEvent::ValidateBlockRSP* r, const 
         return true;
     // auto & bh=bt[bl.root_hash];
     bt.responses.push_back(r);
-    bt.stake+=root->getNode(r->node_validator,NULL)->total_stake;
+    bt.stake_validators+=root->getNode(r->node_validator,NULL)->total_stake;
     // logNode("Block staked %lf",bt.stake.toDouble());
-    if(bt.stake.toDouble() > root->getValues(NULL)->total_staked.toDouble()*QUORUM)
+    if(bt.stake_validators.toDouble() > root->getValues(NULL)->total_staked.toDouble()*QUORUM)
     {
         logNode("Block stake finalized");
         REF_getter<MsgEvent::BlockAcceptedREQ>  ba=new MsgEvent::BlockAcceptedREQ();
@@ -560,7 +560,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgEvent::BlockAcceptedRSP* r, const 
                 logNode("block_accepted_rsp: aggsig !veried");
                 return true;
             }
-            if(root->getValues(NULL)->total_staked.toDouble()*0.7 < stake.toDouble())
+            if(root->getValues(NULL)->total_staked.toDouble()*QUORUM < stake.toDouble())
             {
                 if(!bp.heart_bit_sent_on_block_accepted_rsp)
                 {

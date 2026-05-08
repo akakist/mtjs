@@ -171,14 +171,17 @@ namespace Node
 
 
 
+        struct Round
+        {
 
+        };
 
         struct block
         {
             REF_getter<MsgEvent::BlockInfo> block_payload=nullptr;
             std::vector<REF_getter<MsgEvent::ValidateBlockRSP> > responses;
-            BigInt stake;
-            std::map<NODE_id /*validator*/, blst_cpp::Signature> sigs;
+            BigInt stake_validators;
+            // std::map<NODE_id /*validator*/, blst_cpp::Signature> sigs;
 
 
 
@@ -188,6 +191,8 @@ namespace Node
             bool heart_bit_sent_on_block_accepted_rsp=false;
 
             std::map<NODE_id, REF_getter<MsgEvent::BlockAcceptedRSP> > acceptors;
+
+            int round=0;
 
         };
         _db_to_save db_to_save_Z;
