@@ -406,13 +406,14 @@ namespace MsgEvent
         {
 
         }
-        HeartBeatREQ(const BLOCK_id& _prev_block_hash, const BigInt& _epoch, const NODE_id& _node_leader):Base(msgid::HeartBeatREQ),
-        prev_block_hash(_prev_block_hash), epoch(_epoch), node_leader(_node_leader)
+        HeartBeatREQ(const BLOCK_id& _prev_block_hash, int _round, const BigInt& _epoch, const NODE_id& _node_leader):Base(msgid::HeartBeatREQ),
+        prev_block_hash(_prev_block_hash), round(_round), epoch(_epoch), node_leader(_node_leader)
         {
         }
         BLOCK_id prev_block_hash;
         BigInt epoch;
         NODE_id node_leader;
+        int round;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -421,6 +422,7 @@ namespace MsgEvent
             b<<prev_block_hash;
             b<<node_leader;
             b<<epoch;
+            b<<round;
         }
         void unpack(inBuffer& b) final
         {
@@ -429,6 +431,7 @@ namespace MsgEvent
             b>>prev_block_hash;
             b>>node_leader;
             b>>epoch;
+            b>>round;
         }
         static Base* construct()
         {
@@ -692,28 +695,43 @@ namespace MsgEvent
         {
 
         }
+        BlockAcceptedRSP(        NODE_id node_signer_,
+        BLOCK_id new_root_hash_,
+        BLOCK_id prev_root_hash_,
+        int round_
+        ):Base(msgid::BlockAcceptedRSP),node_signer(node_signer_),
+                                        new_root_hash(new_root_hash_),
+                                        prev_root_hash(prev_root_hash_),
+                                        round(round_)
+        {
+
+        }
         NODE_id node_signer;
         BLOCK_id new_root_hash;
+        BLOCK_id prev_root_hash;
+        int round;
         blst_cpp::Signature sig_bls;
         void sign(const blst_cpp::SecretKey& sk)
         {
-            sig_bls.sign(sk, new_root_hash.container);
+            // Blake2bHasher h;
+            // h.update(new_root_hash);
+            sig_bls.sign(sk, new_root_hash.container+std::to_string(round));
         }
         bool verify(const blst_cpp::PublicKey & pk) const
         {
-            return sig_bls.verify(pk,new_root_hash.container);
+            return sig_bls.verify(pk,new_root_hash.container+std::to_string(round));
         }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<new_root_hash<<sig_bls<<node_signer;
+            b<<new_root_hash<<prev_root_hash<<round<<sig_bls<<node_signer;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>new_root_hash>>sig_bls>>node_signer;
+            b>>new_root_hash>>prev_root_hash>>round>>sig_bls>>node_signer;
         }
     };
     struct GetSavedBlocksREQ: public Base

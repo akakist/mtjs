@@ -5,13 +5,22 @@
 bool Node::Service::HeartBeatRSP(const MsgEvent::HeartBeatRSP* m, const NODE_id & src_node, const route_t& route)
 {
 
-    auto &hbs=heart_beat_store;
-    auto &li=hbs.leader_info[hbs.node_leader];
+    logNode("HeartBeatRSP");
     if(prev_block_hash!=m->payload_heart_beat->prev_block_hash)
     {
         logErr2("heat beat expired %s %s",prev_block_hash.str().c_str(),m->payload_heart_beat->prev_block_hash.str().c_str());
         return false;
     }
+    // if(!heartBeatRSP_data.valid()) heartBeatRSP_data=new HeartBeatRSP_data;
+
+    auto &bl=blocks[prev_block_hash];
+    if(bl.round!=m->payload_heart_beat->round)
+    {
+        logErr2("if(bl.round!=m->payload_heart_beat->round)");
+        return true;
+    }
+    auto &hbs=bl.rounds[bl.round].heart_beat_store;
+    auto &li=hbs.leader_info[hbs.node_leader];
 
 
     auto n=root->getNode(m->node_signer,NULL);
@@ -76,7 +85,9 @@ bool Node::Service::HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::stri
 
     bool need_reply=false;
     bool need_replace=false;
-    auto &hbs=heart_beat_store;
+    auto &rn=blocks[h->prev_block_hash].rounds[h->round];
+    
+    auto &hbs=rn.heart_beat_store;
 
     if(hbs.node_leader==h->node_leader)
     {
@@ -116,7 +127,10 @@ bool Node::Service::HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::stri
 void Node::Service::do_heart_beat()
 {
     sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
-    auto &hbs=heart_beat_store;
+    auto &bl=blocks[prev_block_hash];
+    bl.round++;
+    logNode("void Node::Service::do_heart_beat()");
+    auto &hbs=bl.rounds[bl.round].heart_beat_store;
     hbs.clear();
     auto &li=hbs.leader_info[hbs.node_leader];
     li.request_for_transactions_sent=false;
@@ -148,7 +162,7 @@ void Node::Service::do_heart_beat()
     if(hbs.node_leader==this_node_name)
     {
         REF_getter<MsgEvent::HeartBeatREQ> hb_req=
-            new MsgEvent::HeartBeatREQ(prev_block_hash, 
+            new MsgEvent::HeartBeatREQ(prev_block_hash, bl.round,
                 root->getEpoch(NULL)->epoch, 
                 this_node_name);
         DBG(logNode("TIMER_HEART_BEAT broadcast heart beat as leader %s",this_node_name.container.c_str()));
@@ -164,7 +178,9 @@ void Node::Service::do_heart_beat()
 
 void Node::Service::make_leader_certificate()
 {
-    auto &hbs=heart_beat_store;
+    auto &bl=blocks[prev_block_hash];
+    
+    auto &hbs=bl.rounds[bl.round].heart_beat_store;
     auto &li=hbs.leader_info[hbs.node_leader];
     REF_getter<MsgEvent::LeaderCertificate>  lc= new MsgEvent::LeaderCertificate();
     if(li.responses.empty())
@@ -179,5 +195,6 @@ void Node::Service::make_leader_certificate()
     }
 
     li.leader_cert=lc;
+    last_leader_cert=lc;
 
 }

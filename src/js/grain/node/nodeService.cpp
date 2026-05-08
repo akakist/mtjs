@@ -132,13 +132,16 @@ void Node::Service::collectTransactions()
 void Node::Service::do_start_block()
 {
     MUTEX_INSPECTOR;
-    if(transaction_pool_of_leader.empty())
-    {
-        DBG(logErr2("if(transaction_pool_main.empty())"));
-        sendEvent(ServiceEnum::Timer,new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK,NULL,NULL, 1,this));
-        return;
-    }
-    auto &hbs=heart_beat_store;
+    logErr2("@@ %s",__FUNCTION__);
+    // if(transaction_pool_of_leader.empty())
+    // {
+    //     DBG(logErr2("if(transaction_pool_main.empty())"));
+    //     sendEvent(ServiceEnum::Timer,new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK,NULL,NULL, 1,this));
+    //     return;
+    // }
+    auto bl=blocks[prev_block_hash];
+    // bl.round++;
+    auto &hbs=bl.rounds[bl.round].heart_beat_store;
     auto &li=hbs.leader_info[hbs.node_leader];
     if(hbs.node_leader==this_node_name)
     {
@@ -151,15 +154,22 @@ void Node::Service::do_start_block()
             auto & bt=blocks[prev_block_hash];
 
             collectTransactions();
+            // if(transaction_pool_of_leader.empty())
+            // {
+            //     logErr2("transaction_pool_of_leader.empty, do heart beat");
+            //     do_heart_beat();
+            //     return;
+            // }
+            logNode("send ValidateBlockREQ");
 
             for(auto& z: transaction_pool_of_leader)
                 b->transaction_bodies.push_back(z.second);
             transaction_pool_of_leader.clear();
 
    
-            outBuffer ob;
-            b->pack(ob);
-            msg::node_message_ed nm(ob.asString()->container,this_node_name,my_sk_ed);
+            // outBuffer ob;
+            // b->pack(ob);
+            msg::node_message_ed nm(b->getBuffer(),this_node_name,my_sk_ed);
 
 
             sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
@@ -178,24 +188,13 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm* e)
     MUTEX_INSPECTOR;
     switch(e->tid)
     {
-    case timers::TIMER_RESTART_BLOCK:
-    {
-        // logNode("timers::TIMER_RESTART_BLOCK");
-        auto &hbs=heart_beat_store;
-        auto &li=hbs.leader_info[hbs.node_leader];
-        li.request_for_transactions_sent=true;
-        do_request_for_transactions(li);
-        return true;
-
-    }
-    break;
     case timers::TIMER_START_HEART_BEAT:
     {
 
-        DBG(logNode("case timers::TIMER_START_HEART_BEAT:"));
-        auto &hbs=heart_beat_store;
-        auto &li=hbs.leader_info[hbs.node_leader];
-        li.request_for_transactions_sent=false;
+        logNode("case timers::TIMER_START_HEART_BEAT:");
+        // auto &hbs=heart_beat_store;
+        // auto &li=hbs.leader_info[hbs.node_leader];
+        // li.request_for_transactions_sent=false;
 
         do_heart_beat();
         return true;
@@ -435,6 +434,7 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
 bool Node::Service::ValidateBlockRSP(const MsgEvent::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
+    logNode("ValidateBlockRSP");
     if(!r->verify(root->getNode(r->node_validator,NULL)->bls_pk))
     {
         logErr2("block response not validated");
@@ -447,10 +447,21 @@ bool Node::Service::ValidateBlockRSP(const MsgEvent::ValidateBlockRSP* r, const 
         logErr2("if(bl.prev_root_hash!=prev_block_hash)");
         return true;
     }
-    // if(bl.)
-    auto & bt=blocks[prev_block_hash];
-    if(bt.block_accepted_sent)
+    if(blocks[prev_block_hash].round!=r->payload_block->payload_heart_beat->round)
+    {
+        logErr2("round not matched");
         return true;
+    }
+    // if(bl.)
+    auto &bl=blocks[prev_block_hash];
+
+    auto & bt=bl.rounds[r->payload_block->payload_heart_beat->round];
+    auto &hbs=bt.heart_beat_store;
+    if(bt.block_accepted_sent)
+    {
+        logErr2("if(bt.block_accepted_sent)");
+        return true;
+    }
     // auto & bh=bt[bl.root_hash];
     bt.responses.push_back(r);
     bt.stake_validators+=root->getNode(r->node_validator,NULL)->total_stake;
@@ -471,7 +482,7 @@ bool Node::Service::ValidateBlockRSP(const MsgEvent::ValidateBlockRSP* r, const 
             throw CommonError("if(!bt.block_payload.valid())");
         std::vector<blst_cpp::PublicKey> agg_pk;
 
-        ba->leader_certificateZ=heart_beat_store.leader_info[heart_beat_store.node_leader].leader_cert;
+        ba->leader_certificateZ=hbs.leader_info[hbs.node_leader].leader_cert;
         for(auto& z: bt.responses)
         {
             auto n=root->getNode(z->node_validator,NULL);
@@ -492,6 +503,7 @@ bool Node::Service::ValidateBlockRSP(const MsgEvent::ValidateBlockRSP* r, const 
         // make_broadcast_message(nm.getBuffer());
         sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
 
+        logNode("bt.block_accepted_sent=true;");
         bt.block_accepted_sent=true;
     }
 
@@ -509,36 +521,56 @@ void Node::Service::do_request_for_transactions(const Node::heart_beat_node_info
 bool Node::Service::GetTransactionRSP(const MsgEvent::GetTransactionRSP* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
+    logNode("GetTransactionRSP");
             for(auto& z: r->trs)
             {
                 THASH_id h=blake2b_hash(z.container);
                 transaction_pool_of_leader.insert({h,z});
             }
-            auto &hbs=heart_beat_store;
+            auto &bl=blocks[prev_block_hash];
+            
+            auto &hbs=blocks[prev_block_hash].rounds[bl.round].heart_beat_store;
             auto &li=hbs.leader_info[hbs.node_leader];
             li.transaction_responders.insert(src_node);
             BigInt stake=0;
-            for(auto &z :li.transaction_responders)
+            std::set<NODE_id> s1;
+            for(auto& z: li.transaction_responders)
             {
-                auto n=root->getNode(z,NULL);
-                stake+=n->total_stake;
+                logErr2("li.transaction_responders %s",z.container.c_str());
+                s1.insert(z);
             }
-            if(stake.toDouble() > root->getValues(NULL)->total_staked.toDouble() * QUORUM)
+            bool complete=true;
+            for(auto& z: li.leader_cert->nodes)
             {
+                logErr2("li.leader_cert->nodes %s",z.container.c_str());
+                if(!s1.count(z))
+                    complete=false;
+            }
+            if(complete)
                 do_start_block();
-                li.transaction_responders.clear();
-            }
+            // for(auto &z :li.transaction_responders)
+            // {
+            //     logErr2("responded %s",z.container.c_str());
+            //     auto n=root->getNode(z,NULL);
+            //     stake+=n->total_stake;
+            // }
+            // if(stake.toDouble() > root->getValues(NULL)->total_staked.toDouble() * QUORUM)
+            // {
+            //     do_start_block();
+            //     li.transaction_responders.clear();
+            // }
             return true;
 }
 bool Node::Service::BlockAcceptedRSP(const MsgEvent::BlockAcceptedRSP* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
+    logNode("BlockAcceptedRSP %s round %d",src_node.container.c_str(),r->round);
             if(!r->verify(root->getNode(r->node_signer,NULL)->bls_pk))
             {
                 logErr2("block_accepted_rsp: verify failed");
                 return true;
             }
-            auto &bp=blocks[prev_block_hash];
+            auto &bp=blocks[r->prev_root_hash].rounds[r->round];
             bp.acceptors.insert({r->node_signer,r});
 
             blst_cpp::AggregateSignature agg_sig;
@@ -555,19 +587,25 @@ bool Node::Service::BlockAcceptedRSP(const MsgEvent::BlockAcceptedRSP* r, const 
                 agg_pk.push_back(n->bls_pk);
                 stake+=n->total_stake;
             }
-            if(!agg_sig.verify(agg_pk,r->new_root_hash.container))
+            if(!agg_sig.verify(agg_pk,r->new_root_hash.container+std::to_string(r->round)))
             {
                 logNode("block_accepted_rsp: aggsig !veried");
                 return true;
             }
             if(root->getValues(NULL)->total_staked.toDouble()*QUORUM < stake.toDouble())
             {
+                logNode("BlockAcceptedRSP QUORUM OK");
                 if(!bp.heart_bit_sent_on_block_accepted_rsp)
                 {
+                    logNode("bp.heart_bit_sent_on_block_accepted_rsp=true;");
                     bp.heart_bit_sent_on_block_accepted_rsp=true;
+                    logNode("do_heart_beat");
                     do_heart_beat();
 
                 }
+                else
+                    logNode("!if(!bp.heart_bit_sent_on_block_accepted_rsp)");
+
             }
             last_access_time_hbZ=time(NULL);
 
@@ -607,7 +645,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvent::GetSavedBlocksRSP* r, cons
         insert.bind(2,z.second->getBuffer());
         insert.exec();
 
-        auto new_root_hash=execute_block(root, prev_block_hash, z.second->att_data.trs,z.second->block_accepted_req->leader_certificateZ->nodes);
+        auto new_root_hash=execute_block(root, prev_block_hash, z.second->block_accepted_req->leader_certificateZ->heart_beat->round, z.second->att_data.trs,z.second->block_accepted_req->leader_certificateZ->nodes);
         if(new_root_hash==z.second->block_accepted_req->block_payload->new_root_hash1)
         {
             logNode("on_get_blocks_rsp: block executed OK on epoch %s",z.second->epoch.toString().c_str());
@@ -729,6 +767,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvent::BlockAcceptedREQ* r, const 
 {
     MUTEX_INSPECTOR;
 
+    logNode("BlockAcceptedREQ");
     if(state_Z!=State::NORMAL)
     return true;
 
@@ -779,21 +818,25 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvent::BlockAcceptedREQ* r, const 
     insert.bind(1,pb->epoch.toString());
     insert.bind(2,pb->getBuffer());
     insert.exec();
-
+    auto old_rh=prev_block_hash;
     prev_block_hash=r->block_payload->new_root_hash1;
     // root=nullptr;
-    root=getRoot(db.get());
-    init_root(root);
-    blocks.clear();
+    // root=getRoot(db.get());
+    // init_root(root);
+    // blocks.clear();
     sendEvent(ServiceEnum::TxValidator,new bcEvent::InvalidateRoot(this));
     sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::InvalidateRoot(this));
     sendEvent(ServiceEnum::GrainReader,new bcEvent::InvalidateRoot(this));
-    REF_getter<MsgEvent::BlockAcceptedRSP> br=new MsgEvent::BlockAcceptedRSP();
-    br->new_root_hash=prev_block_hash;
-    br->node_signer=this_node_name;
+    
+    REF_getter<MsgEvent::BlockAcceptedRSP> br=new MsgEvent::BlockAcceptedRSP(this_node_name,
+        prev_block_hash,r->leader_certificateZ->heart_beat->prev_block_hash,r->leader_certificateZ->heart_beat->round);
+    // br->new_root_hash=prev_block_hash;
+    // br->prev_root_hash=old_rh;
+    // br->round=blocks[old_rh].round;
+    // br->node_signer=this_node_name;
     br->sign(my_sk_bls);
-    prepared_block.clear();
-    blocks.clear();
+    // prepared_block.clear();
+    // blocks.clear();
 
     sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
 
@@ -853,8 +896,12 @@ bool Node::Service::ValidateBlockREQ(const MsgEvent::ValidateBlockREQ* r, const 
 
             MUTEX_INSPECTORS("ValidateBlockREQ");
 
+            logNode("@@ %s",__FUNCTION__);
             if(state_Z!=State::NORMAL)
+            {
+                logNode("if(state_Z!=State::NORMAL)");
                 return true;
+            }
 
             if(!root->verify_lider_certificate(r->leader_cert))
                 throw CommonError("if(!verify_lider_certificate(b.leader_cert))");
@@ -871,8 +918,7 @@ bool Node::Service::ValidateBlockREQ(const MsgEvent::ValidateBlockREQ* r, const 
 
             }
             {
-
-                auto new_root_hash=execute_block(root,prev_block_hash, r->transaction_bodies,r->leader_cert->nodes);
+                auto new_root_hash=execute_block(root,prev_block_hash, r->leader_cert->heart_beat->round, r->transaction_bodies,r->leader_cert->nodes);
                 REF_getter<MsgEvent::BlockInfo> block=new MsgEvent::BlockInfo();
                 block->prev_root_hash=prev_block_hash;
                 block->new_root_hash1=new_root_hash;
@@ -948,12 +994,12 @@ bool Node::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
     }
     return true;
 }
-BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLOCK_id & bl, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert)
+BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLOCK_id & bl, int round, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert)
 {
     MUTEX_INSPECTOR;
     _feeCalcers feeCalcers;
 
-    auto & bt=blocks[bl];
+    auto & bt=blocks[bl].rounds[round];
     if(bt.executed)
         throw CommonError("[%s] if(bt.executed) %s", this_node_name.container.c_str(),bl.str().c_str());
     bt.executed=true;
@@ -1068,7 +1114,8 @@ void Node::Service::logNode(const char* fmt, ...)
         {
             throw CommonError("if(!epoch.valid())");
         }
-        fprintf(stdout,"%ld [Node] [%s] [%s] [%s] ", time(NULL), this_node_name.container.c_str(), prev_block_hash.str().c_str(), epoch->epoch.toString().c_str());
+        auto& bl=blocks[prev_block_hash];
+        fprintf(stdout,"%ld [Node] [%s] [%s] [%s] [%d] ", time(NULL), this_node_name.container.c_str(), prev_block_hash.str().c_str(), epoch->epoch.toString().c_str(), bl.round);
         vfprintf(stdout,fmt, ap);
         fprintf(stdout,"\n");
         va_end(ap);

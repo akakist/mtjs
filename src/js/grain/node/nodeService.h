@@ -54,12 +54,18 @@ struct _feeCalcers
     }
 };
 
+struct HeartBeatRSP_data: public Refcountable
+{
+    BLOCK_id prev_root_hash;
+    int round=0;
+    std::map<NODE_id,REF_getter<MsgEvent::HeartBeatRSP> > resps;
+};
 namespace Node
 {
     enum timers
     {
         TIMER_START_HEART_BEAT,
-        TIMER_RESTART_BLOCK,
+        // TIMER_RESTART_BLOCK,
     };
     struct heart_beat_responce2
     {
@@ -146,7 +152,7 @@ namespace Node
         bool Msg(const bcEvent::Msg*, bool fromNetwork);
         bool MsgReply(const bcEvent::MsgReply*, bool fromNetwork);
 
-
+        // REF_getter<HeartBeatREQ>  heartBeatRSP_data=nullptr;
 
         void do_heart_beat();
 
@@ -173,17 +179,11 @@ namespace Node
 
         struct Round
         {
+            heart_beat_info    heart_beat_store;
 
-        };
-
-        struct block
-        {
             REF_getter<MsgEvent::BlockInfo> block_payload=nullptr;
             std::vector<REF_getter<MsgEvent::ValidateBlockRSP> > responses;
             BigInt stake_validators;
-            // std::map<NODE_id /*validator*/, blst_cpp::Signature> sigs;
-
-
 
             std::vector<std::pair<NODE_id/*node*/,blst_cpp::Signature> > signs;
             bool executed=false;
@@ -192,13 +192,17 @@ namespace Node
 
             std::map<NODE_id, REF_getter<MsgEvent::BlockAcceptedRSP> > acceptors;
 
+        };
+
+        struct block
+        {
+            std::map<int, Round> rounds;
             int round=0;
 
         };
         _db_to_save db_to_save_Z;
 
         time_t last_access_time_hbZ=0; // heart_bit last tick time
-        heart_beat_info    heart_beat_store;
         REF_getter<MsgEvent::LeaderCertificate> last_leader_cert=nullptr;
 
         std::map<THASH_id, TRANSACTION_body>  transaction_pool_of_leader;
@@ -226,7 +230,7 @@ namespace Node
         void do_start_block();
 
         void collectTransactions();
-        BLOCK_id execute_block(const REF_getter<root_data> &rt, const BLOCK_id & bl, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert);
+        BLOCK_id execute_block(const REF_getter<root_data> &rt, const BLOCK_id & bl, int round, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert);
 
         void do_sync();
 
