@@ -146,23 +146,24 @@ void Node::Service::collectTransactions()
 void Node::Service::do_start_block()
 {
     MUTEX_INSPECTOR;
+    logNode("transaction_pool_of_leader sz %d",transaction_pool_of_leader.size());
     if(transaction_pool_of_leader.empty())
     {
-        DBG(logErr2("if(transaction_pool_main.empty())"));
-        sendEvent(ServiceEnum::Timer,new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK,NULL,NULL, 1,this));
+        logNode("if(transaction_pool_main.empty())");
+        sendEvent(ServiceEnum::Timer,new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK,NULL,NULL, 0.5,this));
         return;
     }
-    auto &hbs=blocks[prev_block_hash].heart_beat_store;
-    auto &li=hbs.leader_info[hbs.node_leader];
-    if(hbs.node_leader==this_node_name)
+    auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
+    auto &li=hbs.leader_info;
+    // if(hbs.node_leader==this_node_name)
     {
         {
             make_leader_certificate();
             REF_getter<MsgEvt::ValidateBlockREQ> b= new MsgEvt::ValidateBlockREQ();
             // msg::block_request b;
-            b->leader_cert=li.leader_cert;
+            b->leader_cert=li.leader_cert_2;
 
-            auto & bt=blocks[prev_block_hash];
+            auto & bt=blocks_leader[prev_block_hash];
 
             collectTransactions();
 
@@ -180,6 +181,8 @@ void Node::Service::do_start_block()
             // make_broadcast_message(nm.getBuffer());
         }
     }
+    // else 
+    // logNode("!if(hbs.node_leader==this_node_name)");
 
 }
 bool Node::Service::on_timer(const timerEvent::TickTimer*e)
@@ -195,8 +198,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm* e)
     case timers::TIMER_RESTART_BLOCK:
     {
         // logNode("timers::TIMER_RESTART_BLOCK");
-        auto &hbs=blocks[prev_block_hash].heart_beat_store;
-        auto &li=hbs.leader_info[hbs.node_leader];
+        auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
+        auto &li=hbs.leader_info;
         li.request_for_transactions_sent=true;
         do_request_for_transactions(li);
         return true;
@@ -207,8 +210,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm* e)
     {
 
         DBG(logNode("case timers::TIMER_START_HEART_BEAT:"));
-        auto &hbs=blocks[prev_block_hash].heart_beat_store;
-        auto &li=hbs.leader_info[hbs.node_leader];
+        auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
+        auto &li=hbs.leader_info;
         li.request_for_transactions_sent=false;
 
         do_heart_beat();
@@ -452,9 +455,9 @@ void Node::Service::do_request_for_transactions(const Node::heart_beat_node_info
 {
     MUTEX_INSPECTOR;
     REF_getter<MsgEvt::GetTransactionREQ> rt=new MsgEvt::GetTransactionREQ();
-    if(!li.leader_cert.valid())
+    if(!li.leader_cert_2.valid())
         throw CommonError("if(!li.leader_cert.valid())");
-    rt->payload_lc=li.leader_cert;
+    rt->lc=li.leader_cert_2;
     msg::node_message_ed nm(rt->getBuffer(),this_node_name,my_sk_ed);
     sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
 
@@ -472,7 +475,7 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
     MUTEX_INSPECTOR;
     _feeCalcers feeCalcers;
 
-    auto & bt=blocks[bl];
+    auto & bt=blocks_leader[bl];
     if(bt.executed)
         throw CommonError("[%s] if(bt.executed) %s", this_node_name.container.c_str(),bl.str().c_str());
     bt.executed=true;
@@ -593,34 +596,36 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 }
 #include "__crc32.h"
 #include <stdlib.h>
-bool Node::Service::isNodeGreaterThanCurrentLeader(const NODE_id& node)
+bool Node::Service::isNodeGreaterOrEqual(const NODE_id& nodeLeft, const NODE_id& nodeRight)
 {
-    auto &hbs=blocks[prev_block_hash].heart_beat_store;
+    if(nodeLeft==nodeRight)
+        return true;
+    // auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
     // auto &li=hbs.leader_info[hbs.node_leader];
 
-    if(hbs.node_leader.container.empty())
-        hbs.node_leader=this_node_name;
-
-    if(!last_leader_cert.valid())
-    {
-        auto n=root->getNode(node,NULL);
-        if(!n.valid())
-            return false;
-        auto t=root->getNode(hbs.node_leader,NULL);
-        return n->total_stake>t->total_stake;
-    }
-    else
+    // if(hbs.node_leader.container.empty())
+    //     hbs.node_leader=this_node_name;
+    auto nv=root->getNodesNames(NULL);
+    // if(!last_leader_cert.valid())
+    // { 
+    //     auto nL=root->getNode(nodeLeft,NULL);
+    //     if(!nL.valid())
+    //         return false;
+    //     auto nR=root->getNode(nodeRight,NULL);
+    //     return nL->total_stake>nR->total_stake;
+    // }
+    // else
     {
         int crc=__crc32(0,prev_block_hash.container.data(),prev_block_hash.container.size());
-        int idx=crc % last_leader_cert->nodes.size();
+        int idx=crc % nv.size();
 
         int npoz=-1;
         int tpoz=-1;
-        for(int i=0;i<last_leader_cert->nodes.size();i++)
+        for(int i=0;i<nv.size();i++)
         {
-            if(node==last_leader_cert->nodes[i])
+            if(nodeLeft==nv[i])
                 npoz=i;
-            if(hbs.node_leader==last_leader_cert->nodes[i])
+            if(nodeRight==nv[i])
                 tpoz=i;
         }
         return abs(idx-npoz) < abs(idx-tpoz);
@@ -650,7 +655,7 @@ void Node::Service::logNode(const char* fmt, ...)
         {
             throw CommonError("if(!epoch.valid())");
         }
-        fprintf(stdout,"%ld [Node] [%s] [%s] [%s] ", time(NULL), this_node_name.container.c_str(), prev_block_hash.str().c_str(), epoch->epoch.toString().c_str());
+        fprintf(stdout,"%lf [Node] [%s] [%s] [%s] ", double(iUtils->getNow())/1000000., this_node_name.container.c_str(), prev_block_hash.str().c_str(), epoch->epoch.toString().c_str());
         vfprintf(stdout,fmt, ap);
         fprintf(stdout,"\n");
         va_end(ap);

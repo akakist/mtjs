@@ -425,9 +425,11 @@ namespace MsgEvt
         }
         std::string getBuffer() const
         {
-            MUTEX_INSPECTOR;
             outBuffer o;
+            XTRY;
+            MUTEX_INSPECTOR;
             pack(o);
+            XPASS;
             return o.asString()->container;
         }
 
@@ -506,22 +508,22 @@ namespace MsgEvt
     };
     struct GetTransactionREQ: public Base
     {
-        GetTransactionREQ():Base(msgid::GetTransactionREQ),payload_lc(new LeaderCertificate())
+        GetTransactionREQ():Base(msgid::GetTransactionREQ),lc(new LeaderCertificate())
         {
         }
-        REF_getter<LeaderCertificate> payload_lc;
+        REF_getter<LeaderCertificate> lc;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            payload_lc->pack(b);
+            lc->pack(b);
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            payload_lc->unpack2(b);
+            lc->unpack2(b);
         }
 
         static Base* construct()
@@ -783,19 +785,23 @@ namespace MsgEvt
         REF_getter<BlockAcceptedREQ> block_accepted_req;
         void pack(outBuffer& b) const final
         {
+            XTRY;
             MUTEX_INSPECTOR;
             Base::pack(b);
             b<<epoch;
             b<<att_data;
             block_accepted_req->pack(b);
+            XPASS;
         }
         void unpack(inBuffer& b) final
         {
+            XTRY;
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>epoch;
             b>>att_data;
             block_accepted_req->unpack2(b);
+            XPASS;
         }
 
     };

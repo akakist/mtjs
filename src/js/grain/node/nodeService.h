@@ -72,21 +72,21 @@ namespace Node
     };
     struct heart_beat_node_info
     {
-        heart_beat_node_info() : leader_cert(nullptr) {
+        heart_beat_node_info() : leader_cert_2(nullptr) {
 
             // responses.clear();
             clear();
 
         }
         bool request_for_transactions_sent=false;
-        REF_getter< MsgEvt::LeaderCertificate> leader_cert;
+        REF_getter< MsgEvt::LeaderCertificate> leader_cert_2;
         std::map<NODE_id,heart_beat_responce2> responses;
         std::set<NODE_id> transaction_responders;
 
         void clear()
         {
             request_for_transactions_sent=false;
-            leader_cert=nullptr;
+            leader_cert_2=nullptr;
             responses.clear();
             transaction_responders.clear();
         }
@@ -95,16 +95,16 @@ namespace Node
     };
     struct heart_beat_info
     {
-        NODE_id node_leader;
-        std::map<NODE_id,heart_beat_node_info> leader_info;
+        // NODE_id node_leader;
+        heart_beat_node_info leader_info;
         heart_beat_info()
         {
 
         }
         void clear()
         {
-            node_leader.container.clear();
-            leader_info.clear();
+            // node_leader.container.clear();
+            // leader_info.clear();
         }
     };
     class Service:
@@ -169,7 +169,7 @@ namespace Node
         // void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);
 
         void make_leader_certificate();
-        bool isNodeGreaterThanCurrentLeader(const NODE_id& node);
+        bool isNodeGreaterOrEqual(const NODE_id& nodeLeft, const NODE_id& nodeRight);
 
 
         void do_request_for_transactions(const Node::heart_beat_node_info& li);
@@ -207,7 +207,8 @@ namespace Node
         REF_getter<MsgEvt::LeaderCertificate> last_leader_cert=nullptr;
 
         std::map<THASH_id, TRANSACTION_body>  transaction_pool_of_leader;
-        std::map<BLOCK_id,block> blocks;
+        std::map<BLOCK_id,block> blocks_leader;
+        NODE_id node_leader_for_client;
 
         // struct _prepared_block
         // {

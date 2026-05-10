@@ -7,8 +7,8 @@ bool Node::Service::HeartBeatRSP(const MsgEvt::HeartBeatRSP* m, const NODE_id & 
     XTRY;
 
     // logNode("@@ %s",__FUNCTION__);
-    auto &hbs=blocks[prev_block_hash].heart_beat_store;
-    auto &li=hbs.leader_info[hbs.node_leader];
+    auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
+    auto &li=hbs.leader_info;
     if(prev_block_hash!=m->payload_heart_beat->prev_block_hash)
     {
         logErr2("heat beat expired %s %s",prev_block_hash.str().c_str(),m->payload_heart_beat->prev_block_hash.str().c_str());
@@ -73,7 +73,7 @@ bool Node::Service::HeartBeatRSP(const MsgEvt::HeartBeatRSP* m, const NODE_id & 
 
 void Node::Service::do_heart_beat()
 {
-    blocks.clear();
+    blocks_leader.clear();
     // logNode("@@ %s",__FUNCTION__);
     sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
     // auto &hbs=blocks[prev_block_hash].heart_beat_store;
@@ -111,7 +111,7 @@ void Node::Service::do_heart_beat()
             new MsgEvt::HeartBeatREQ(prev_block_hash, 
                 root->getEpoch(NULL)->epoch, 
                 this_node_name);
-        DBG(logNode("broadcast heart beat as leader %s",this_node_name.container.c_str()));
+        // DBG(logNode("broadcast heart beat as leader %s",this_node_name.container.c_str()));
         outBuffer o;
         hb_req->pack(o);
         msg::node_message_ed nm(o.asString()->container,this_node_name,my_sk_ed);
@@ -132,8 +132,8 @@ bool Node::Service::DoHeartBeatREQ(const MsgEvt::DoHeartBeatREQ* r, const NODE_i
 
 void Node::Service::make_leader_certificate()
 {
-    auto &hbs=blocks[prev_block_hash].heart_beat_store;
-    auto &li=hbs.leader_info[hbs.node_leader];
+    auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
+    auto &li=hbs.leader_info;
     REF_getter<MsgEvt::LeaderCertificate>  lc= new MsgEvt::LeaderCertificate();
     if(li.responses.empty())
         return;
@@ -146,7 +146,7 @@ void Node::Service::make_leader_certificate()
         lc->nodes.push_back(r.second.rsp->node_signer);
     }
 
-    li.leader_cert=lc;
+    li.leader_cert_2=lc;
     last_leader_cert=lc;
 
 }

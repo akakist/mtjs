@@ -22,13 +22,14 @@ bool Node::Service::GetTransactionRSP(const MsgEvt::GetTransactionRSP* r, const 
 {
     XTRY;
     MUTEX_INSPECTOR;
+    // logNode("GetTransactionRSP from %s", src_node.container.c_str());
             for(auto& z: r->trs)
             {
                 THASH_id h=blake2b_hash(z.container);
                 transaction_pool_of_leader.insert({h,z});
             }
-            auto &hbs=blocks[prev_block_hash].heart_beat_store;
-            auto &li=hbs.leader_info[hbs.node_leader];
+            auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
+            auto &li=hbs.leader_info;
             li.transaction_responders.insert(src_node);
             BigInt stake=0;
             for(auto &z :li.transaction_responders)
@@ -38,8 +39,17 @@ bool Node::Service::GetTransactionRSP(const MsgEvt::GetTransactionRSP* r, const 
             }
             if(stake.toDouble() > root->getValues(NULL)->total_staked.toDouble() * QUORUM)
             {
-                do_start_block();
-                li.transaction_responders.clear();
+                // for(auto &z :li.transaction_responders)
+                // {
+                //     logNode("transaction_responders %s",z.container.c_str());
+                // }
+                if(hbs.leader_info.leader_cert_2.valid() && hbs.leader_info.leader_cert_2->nodes.size()==li.transaction_responders.size())
+                {
+                    do_start_block();
+                    logNode("do_start_block();");
+                    li.transaction_responders.clear();
+
+                }
             }
     XPASS;
             return true;
@@ -53,7 +63,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgEvt::BlockAcceptedRSP* r, const NO
                 logErr2("block_accepted_rsp: verify failed");
                 return true;
             }
-            auto &bp=blocks[prev_block_hash];
+            auto &bp=blocks_leader[prev_block_hash];
             bp.acceptors.insert({r->node_signer,r});
 
             blst_cpp::AggregateSignature agg_sig;
@@ -124,7 +134,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP* r, const 
         {
             throw CommonError("on_get_blocks_rsp: !ba.agg_sig.verify");
         }
-        logNode("on_get_blocks_rsp: block verified OK");
+        // logNode("on_get_blocks_rsp: block verified OK");
 
 
         auto new_root_hash=execute_block(root, prev_block_hash, z.second->att_data.trs,z.second->block_accepted_req->leader_certificateZ->nodes);
@@ -193,7 +203,7 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP* r, const NO
         return true;
     }
     // if(bl.)
-    auto & bt=blocks[prev_block_hash];
+    auto & bt=blocks_leader[prev_block_hash];
     if(bt.responses.size())
     {
         if(bt.responses[0]->payload_block->getBuffer()!=r->payload_block->getBuffer())
@@ -229,8 +239,8 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP* r, const NO
         if(!bt.block_payload.valid())
             throw CommonError("if(!bt.block_payload.valid())");
         std::vector<blst_cpp::PublicKey> agg_pk;
-        auto & hbs=blocks[prev_block_hash].heart_beat_store;
-        ba->leader_certificateZ=hbs.leader_info[hbs.node_leader].leader_cert;
+        auto & hbs=blocks_leader[prev_block_hash].heart_beat_store;
+        ba->leader_certificateZ=hbs.leader_info.leader_cert_2;
         for(auto& z: bt.responses)
         {
             auto n=root->getNode(z->node_validator,NULL);
@@ -240,7 +250,7 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP* r, const NO
         }
         if(ba->agg_sig.verify(agg_pk,blake2b_hash(ba->block_payload->getBuffer()).container))
         {
-            // logErr2("compose block_accepted test verified OK !!!!!!!!!!!!!!!!!!!!!");
+            logErr2("ValidateBlockRSP block_accepted test verified OK !!!!!!!!!!!!!!!!!!!!!");
         }
         else
         {
@@ -250,6 +260,9 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP* r, const NO
 
             // outBuffer ba_buf;
             // ba->pack(ba_buf);
+        // logNode("leader agg_sig %s",base62::encode(ba->agg_sig.serialize()).c_str());
+        if(!ba->leader_certificateZ.valid())
+            throw CommonError("if(!ba->leader_certificateZ.valid())");
         msg::node_message_ed nm(ba->getBuffer(),this_node_name,my_sk_ed);
         // make_broadcast_message(nm.getBuffer());
         sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
