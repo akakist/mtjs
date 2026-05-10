@@ -16,10 +16,9 @@ inline std::set<EVENT_id> getEvents_blockStreamerService()
 {
 
 	std::set<EVENT_id> out;
-	out.insert(bcEventEnum::AddTx);
 	out.insert(bcEventEnum::ClientMsg);
 	out.insert(bcEventEnum::ClientMsgReply);
-	out.insert(bcEventEnum::GetTransactions);
+	// out.insert(bcEventEnum::GetTransactions);
 	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(rpcEventEnum::IncomingOnAcceptor);
@@ -33,10 +32,9 @@ inline std::set<EVENT_id> getEvents_blockStreamerService()
 
 inline void regEvents_blockStreamerService()
 {
-	iUtils->registerEvent(bcEvent::AddTx::construct);
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
-	iUtils->registerEvent(bcEvent::GetTransactions::construct);
+	// iUtils->registerEvent(bcEvent::GetTransactions::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnAcceptor::construct);

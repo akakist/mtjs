@@ -5,6 +5,7 @@ struct t_params
     t_params(const REF_getter<root_data>& r): root(r) {}
     REF_getter<root_data> root;
     std::vector<std::vector<instruction_report>> instruction_reports;
+    std::map<THASH_id,transaction_report> transaction_reports;
     void logMsg(int txId, int seqId, const char* fmt, ...)
     {
 
@@ -24,14 +25,28 @@ struct t_params
         va_start(ap, fmt);
         vsnprintf(str, sizeof(str), fmt, ap);
         va_end(ap);
-        instruction_reports[txId][seqId].err_str=str;
-        instruction_reports[txId][seqId].err_code=1;
+        auto& r=instruction_reports[txId][seqId];
+        r.err_str=str;
+        r.err_code=1;
 
     }
     void setError(int txId, int seqId,const std::string& err)
     {
-        instruction_reports[txId][seqId].err_str=err;
-        instruction_reports[txId][seqId].err_code=1;
+        auto& r=instruction_reports[txId][seqId];
+        r.err_str=err;
+        r.err_code=1;
+    }
+    void setTxError(THASH_id txHash,const std::string& err)
+    {
+        auto& r=transaction_reports[txHash];
+        r.err_str=err;
+        r.err_code=1;
+
+    }
+    void setTxSuccess(THASH_id txHash)
+    {
+        auto& r=transaction_reports[txHash];
+        r.err_code=0;
 
     }
 

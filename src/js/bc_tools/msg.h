@@ -26,6 +26,16 @@ struct instruction_report
             h.update(s);
     }
 };
+struct transaction_report
+{
+    int err_code;
+    std::string err_str;
+    void update(Blake2bHasher &h) const
+    {
+        h.update(std::to_string(err_code));
+        h.update(err_str);
+    }
+};
 
 inline outBuffer & operator<< (outBuffer& b,const instruction_report &s)
 {
@@ -41,6 +51,7 @@ struct attachment_data
 {
     std::vector<TRANSACTION_body> trs;
     std::vector<std::vector<instruction_report>> instruction_reports;
+    std::map<THASH_id,transaction_report> transaction_reports;
     std::map<std::string,BigInt> fees;
     std::map<NODE_id,BigInt> rewards;
     void clear()
@@ -98,7 +109,7 @@ namespace msgid
         user_message_req,transaction_added_rsp,
         user_request,get_user_status_req,get_user_status_rsp, HeartBeatREQ,HeartBeatRSP,
         LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
-        BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP
+        BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, PutTransactionsREQ
     };
 
 }
@@ -144,6 +155,11 @@ inline const char* msgName(int id)
         return "GetSavedBlocksREQ";
     case msgid::GetSavedBlocksRSP:
         return "GetSavedBlocksRSP";
+    case msgid::DoHeartBeatREQ:
+        return "DoHeartBeatREQ";
+    case msgid::PutTransactionsREQ:
+        return "PutTransactionsREQ";
+        
     default:
         return "unknown";
     }
@@ -367,7 +383,7 @@ namespace msg
 
 }
 
-namespace MsgEvent
+namespace MsgEvt
 {
     struct Base: public Refcountable
     {
@@ -438,11 +454,11 @@ namespace MsgEvent
     };
     struct LeaderCertificate: public Base
     {
-        LeaderCertificate():Base(msgid::LeaderCertificate), heart_beat(new MsgEvent::HeartBeatREQ())
+        LeaderCertificate():Base(msgid::LeaderCertificate), heart_beat(new MsgEvt::HeartBeatREQ())
         {
 
         }
-        REF_getter<MsgEvent::HeartBeatREQ> heart_beat;
+        REF_getter<MsgEvt::HeartBeatREQ> heart_beat;
         std::vector<NODE_id> nodes;
         blst_cpp::AggregateSignature agg_sig;
         void pack(outBuffer& b) const final
@@ -777,7 +793,7 @@ namespace MsgEvent
         {
 
         }
-        std::vector<std::pair<BigInt, REF_getter<MsgEvent::BlockDBStore>> > blocks_Z;
+        std::vector<std::pair<BigInt, REF_getter<MsgEvt::BlockDBStore>> > blocks_Z;
         BigInt lastEpoch;
         void pack(outBuffer& b) const final
         {
@@ -799,11 +815,59 @@ namespace MsgEvent
             for(int i=0;i<size;i++)            {
                 BigInt epoch;
                 b>>epoch;
-                REF_getter<MsgEvent::BlockDBStore> block_db_store(new MsgEvent::BlockDBStore());
+                REF_getter<MsgEvt::BlockDBStore> block_db_store(new MsgEvt::BlockDBStore());
                 block_db_store->unpack2(b);
                 blocks_Z.emplace_back(epoch, block_db_store);
             }
             b>>lastEpoch;
+        }
+    };
+    struct DoHeartBeatREQ: public Base
+    {
+        static Base* construct()
+        {
+            return new DoHeartBeatREQ();
+        }
+        DoHeartBeatREQ():Base(msgid::DoHeartBeatREQ),prev_leader_cert(new LeaderCertificate)
+        {
+
+        }
+        REF_getter<LeaderCertificate> prev_leader_cert;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            Base::pack(b);
+            prev_leader_cert->pack(b);
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            prev_leader_cert->unpack2(b);
+        }
+    };
+    struct PutTransactionsREQ: public Base
+    {
+        static Base* construct()
+        {
+            return new PutTransactionsREQ();
+        }
+        PutTransactionsREQ():Base(msgid::PutTransactionsREQ)
+        {
+
+        }
+        std::string msg;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            Base::pack(b);
+            b<<msg;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            b>>msg;
         }
     };
 
@@ -814,9 +878,9 @@ namespace MsgEvent
 
 class MsgFactory {
 public:
-    using Constructor = MsgEvent::Base* (*)();
+    using Constructor = MsgEvt::Base* (*)();
     
-    MsgEvent::Base* create(const int& id) {
+    MsgEvt::Base* create(const int& id) {
 
         auto it = registry.find(id);
         if(it==registry.end())

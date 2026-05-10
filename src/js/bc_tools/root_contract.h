@@ -271,7 +271,7 @@ struct root_data: public Cellable
     root_data(IDatabase *db_): Cellable(nullptr,"r",NULL),db(db_)
     {
     }
-    bool verify_lider_certificate(const REF_getter<MsgEvent::LeaderCertificate>& lc);
+    bool verify_lider_certificate(const REF_getter<MsgEvt::LeaderCertificate>& lc);
 
     std::vector<std::string> getContractPath(const std::string &name);
     std::vector<std::string> getNodePath(const std::string &name);

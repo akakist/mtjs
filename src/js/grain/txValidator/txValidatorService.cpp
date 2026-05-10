@@ -54,18 +54,10 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base>& e)
         {
         case bcEventEnum::InvalidateRoot:
             return InvalidateRoot((const bcEvent::InvalidateRoot*)e.get());
-        case bcEventEnum::GetTransactions:
-            return GetTransactions((const bcEvent::GetTransactions*)e.get());
         case bcEventEnum::ClientMsg:
             return ClientMsg((const bcEvent::ClientMsg*)e.get());
         case bcEventEnum::ServiceInit:
             return ServiceInit((const bcEvent::ServiceInit*)e.get());
-        case bcEventEnum::AddTx:
-            return AddTx((const bcEvent::AddTx*)e.get());
-        case bcEventEnum::TxValidatorStart:
-            return TxValidatorStart((const bcEvent::TxValidatorStart*)e.get());
-        case bcEventEnum::TxValidatorStop:
-            return TxValidatorStop((const bcEvent::TxValidatorStop*)e.get());
         case timerEventEnum::TickTimer:
             return on_timer((const timerEvent::TickTimer*)e.get());
         case timerEventEnum::TickAlarm:
@@ -129,21 +121,6 @@ TxValidator::Service::Service(const SERVICE_id& id, const std::string& nm,IInsta
 {
 }
 
-bool TxValidator::Service::AddTx(const bcEvent::AddTx *e)
-{
-
-    return true;
-}
-bool TxValidator::Service::TxValidatorStart(const bcEvent::TxValidatorStart *e)
-{
-
-    return true;
-}
-bool TxValidator::Service::TxValidatorStop(const bcEvent::TxValidatorStop *e)
-{
-    is_working = false;
-    return true;
-}
 bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     MUTEX_INSPECTOR;
@@ -152,21 +129,6 @@ bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
         root=getRoot(conf->db.get());
 
     init_root(root);
-    return true;
-}
-bool TxValidator::Service::GetTransactions(const bcEvent::GetTransactions*e)
-{
-    MUTEX_INSPECTOR;
-    // msg::response_with_transactions rwt;
-    REF_getter<MsgEvent::GetTransactionRSP> rsp=new MsgEvent::GetTransactionRSP();
-    for(auto& z: transaction_pool_verified)
-    {
-        rsp->trs.push_back(z.second);
-    }
-    transaction_pool_verified.clear();
-    msg::node_message_ed nm(rsp->getBuffer(),conf->this_node_name,conf->my_sk_ed);
-    passEvent(new bcEvent::MsgReply(nm.getBuffer(),poppedFrontRoute(e->route)));
-
     return true;
 }
 bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot*e)
@@ -197,31 +159,33 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
         if(!err && !um.verify())
         {
             err="verify failed";
-            return true;
+            // return true;
 
         }
-        BigInt nonce=0;
         if(!err)
-        {
-            auto u=root->getUserState(um.address_pk_ed,NULL);
-            if(u.valid())
-            {
-                nonce=u->nonce;
-            }
-        }
+            sendEvent(ServiceEnum::Node,new bcEvent::PutTransactionREQ(e->msg,this));
+        // BigInt nonce=0;
+        // if(!err)
+        // {
+        //     auto u=root->getUserState(um.address_pk_ed,NULL);
+        //     if(u.valid())
+        //     {
+        //         nonce=u->nonce;
+        //     }
+        // }
 
-        // logErr2("um.nonce %s",um.nonce.toString().c_str());
-        if(!err && nonce!=um.nonce)
-        {
-            err="invalid_nonce "+ nonce.toString()+" != "+um.nonce.toString();
-        }
-        if(!err)
-        {
-            THASH_id h=blake2b_hash(e->msg);
-            TRANSACTION_body t;
-            t.container=e->msg;
-            transaction_pool_verified.insert({h,t});
-        }
+        // // logErr2("um.nonce %s",um.nonce.toString().c_str());
+        // if(!err && nonce!=um.nonce)
+        // {
+        //     err="invalid_nonce "+ nonce.toString()+" != "+um.nonce.toString();
+        // }
+        // if(!err)
+        // {
+        //     THASH_id h=blake2b_hash(e->msg);
+        //     TRANSACTION_body t;
+        //     t.container=e->msg;
+        //     transaction_pool_verified.insert({h,t});
+        // }
         msg::transaction_added_rsp tr;
         tr.err=err.has_value();
         tr.err_str=err?*err:"transaction added to pool";

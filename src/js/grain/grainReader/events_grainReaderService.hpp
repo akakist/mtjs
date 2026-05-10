@@ -16,10 +16,9 @@ inline std::set<EVENT_id> getEvents_grainReaderService()
 {
 
 	std::set<EVENT_id> out;
-	out.insert(bcEventEnum::AddTx);
 	out.insert(bcEventEnum::ClientMsg);
 	out.insert(bcEventEnum::ClientMsgReply);
-	out.insert(bcEventEnum::GetTransactions);
+	// out.insert(bcEventEnum::GetTransactions);
 	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::MsgReply);
 	out.insert(bcEventEnum::ServiceInit);
@@ -34,10 +33,9 @@ inline std::set<EVENT_id> getEvents_grainReaderService()
 
 inline void regEvents_grainReaderService()
 {
-	iUtils->registerEvent(bcEvent::AddTx::construct);
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
-	iUtils->registerEvent(bcEvent::GetTransactions::construct);
+	// iUtils->registerEvent(bcEvent::GetTransactions::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::MsgReply::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);

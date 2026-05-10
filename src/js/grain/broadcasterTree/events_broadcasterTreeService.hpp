@@ -16,11 +16,10 @@ inline std::set<EVENT_id> getEvents_broadcasterTreeService()
 {
 
 	std::set<EVENT_id> out;
-	out.insert(bcEventEnum::AddTx);
 	out.insert(bcEventEnum::BroadcastMessage);
 	out.insert(bcEventEnum::ClientMsg);
 	out.insert(bcEventEnum::ClientMsgReply);
-	out.insert(bcEventEnum::GetTransactions);
+	// out.insert(bcEventEnum::GetTransactions);
 	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::Msg);
 	out.insert(bcEventEnum::MsgReply);
@@ -41,11 +40,10 @@ inline std::set<EVENT_id> getEvents_broadcasterTreeService()
 
 inline void regEvents_broadcasterTreeService()
 {
-	iUtils->registerEvent(bcEvent::AddTx::construct);
 	iUtils->registerEvent(bcEvent::BroadcastMessage::construct);
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
-	iUtils->registerEvent(bcEvent::GetTransactions::construct);
+	// iUtils->registerEvent(bcEvent::GetTransactions::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::Msg::construct);
 	iUtils->registerEvent(bcEvent::MsgReply::construct);

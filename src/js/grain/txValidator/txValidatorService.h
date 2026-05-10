@@ -42,12 +42,9 @@ namespace TxValidator
         bool on_alarm(const timerEvent::TickAlarm*);
         bool handleEvent(const REF_getter<Event::Base>& e);
 
-        bool AddTx(const bcEvent::AddTx *e);
-        bool TxValidatorStart(const bcEvent::TxValidatorStart *e);
-        bool TxValidatorStop(const bcEvent::TxValidatorStop *e);
         bool ServiceInit(const bcEvent::ServiceInit *e);
         bool ClientMsg(const bcEvent::ClientMsg*e);
-        bool GetTransactions(const bcEvent::GetTransactions*e);
+        // bool GetTransactions(const bcEvent::GetTransactions*e);
         bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
 
 
@@ -72,7 +69,7 @@ namespace TxValidator
 
         std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
 
-        bool is_working=false;
+        // bool is_working=false;
         REF_getter<root_data> root=NULL;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;

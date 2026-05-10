@@ -531,7 +531,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP* e)
     MUTEX_INSPECTOR;
 
     inBuffer in(e->msg);
-    REF_getter<MsgEvent::BlockDBStore>  pb=new MsgEvent::BlockDBStore();
+    REF_getter<MsgEvt::BlockDBStore>  pb=new MsgEvt::BlockDBStore();
     pb->unpack2(in);
     nlohmann::json j;
     for(size_t ti=0; ti<pb->att_data.trs.size(); ti++)

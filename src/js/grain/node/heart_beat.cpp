@@ -2,10 +2,12 @@
 #include "QUORUM.h"
 #include "tools_mt.h"
 #include "blst_cp.h"
-bool Node::Service::HeartBeatRSP(const MsgEvent::HeartBeatRSP* m, const NODE_id & src_node, const route_t& route)
+bool Node::Service::HeartBeatRSP(const MsgEvt::HeartBeatRSP* m, const NODE_id & src_node, const route_t& route)
 {
+    XTRY;
 
-    auto &hbs=heart_beat_store;
+    // logNode("@@ %s",__FUNCTION__);
+    auto &hbs=blocks[prev_block_hash].heart_beat_store;
     auto &li=hbs.leader_info[hbs.node_leader];
     if(prev_block_hash!=m->payload_heart_beat->prev_block_hash)
     {
@@ -57,101 +59,59 @@ bool Node::Service::HeartBeatRSP(const MsgEvent::HeartBeatRSP* m, const NODE_id 
         make_leader_certificate();
         if(!li.request_for_transactions_sent)
         {
-            logNode("lider approved");
+            logNode("lider approved %s",m->payload_heart_beat->node_leader.container.c_str());
             li.request_for_transactions_sent=true;
             do_request_for_transactions(li);
 
         }
     }
-
+    XPASS;
     return true;
 
 }
 
-bool Node::Service::HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route)
-{
-    MUTEX_INSPECTOR;
-
-    sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
-
-    bool need_reply=false;
-    bool need_replace=false;
-    auto &hbs=heart_beat_store;
-
-    if(hbs.node_leader==h->node_leader)
-    {
-        need_reply=true;
-    }
-    else
-    {
-        auto old_leader=root->getNode(hbs.node_leader,NULL);
-        auto new_leader=root->getNode(h->node_leader,NULL);
-        if(old_leader.valid() &&  new_leader.valid())
-        {
-            if(new_leader->total_stake>old_leader->total_stake)
-            {
-                hbs.node_leader=h->node_leader;
-                need_reply=true;
-            }
-        }
-    }
-    auto &li=hbs.leader_info[hbs.node_leader];
-    if(need_reply)
-    {
-        last_access_time_hbZ=time(NULL);
-        REF_getter<MsgEvent::HeartBeatRSP> hbr=new MsgEvent::HeartBeatRSP();
-        // msg::heart_beat_rsp hba;
-        hbr->payload_heart_beat=h;
-        hbr->node_signer=this_node_name;
-        hbr->signature.sign(my_sk_bls, blake2b_hash(heart_beat_payload).container);
-
-        msg::node_message_ed nme(hbr->getBuffer(),this_node_name,my_sk_ed);
-        // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
-        passEvent(new bcEvent::MsgReply(nme.getBuffer(),poppedFrontRoute(route)));
-
-    }
-    return true;
-}
 
 void Node::Service::do_heart_beat()
 {
+    blocks.clear();
+    // logNode("@@ %s",__FUNCTION__);
     sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
-    auto &hbs=heart_beat_store;
-    hbs.clear();
-    auto &li=hbs.leader_info[hbs.node_leader];
-    li.request_for_transactions_sent=false;
+    // auto &hbs=blocks[prev_block_hash].heart_beat_store;
+    // hbs.clear();
+    // auto &li=hbs.leader_info[hbs.node_leader];
+    // li.request_for_transactions_sent=false;
 
 
-    if(last_access_time_hbZ + HEART_BEAT_TIMEDOUT_SEC<time(NULL))
+    // if(last_access_time_hbZ + HEART_BEAT_TIMEDOUT_SEC<time(NULL))
+    // {
+    //     logNode("replace leader to %s",hbs.node_leader.container.c_str());
+    //     hbs.node_leader=this_node_name;
+    // }
+    // if(hbs.node_leader.container.empty())
+    //     hbs.node_leader=this_node_name;
+    // else if(hbs.node_leader!=this_node_name)
+    // {
+    //     auto old_leader=root->getNode(hbs.node_leader,NULL);
+    //     auto my_node=root->getNode(this_node_name,NULL);
+    //     if(!old_leader.valid())
+    //         hbs.node_leader=this_node_name;
+    //     if(!my_node.valid())
+    //         throw CommonError("if(!my_node.valid())");
+    //     if(old_leader.valid() && my_node.valid())
+    //     {
+    //         if(old_leader->total_stake<my_node->total_stake)
+    //             hbs.node_leader=this_node_name;
+    //     }
+
+    // }
+
+    // if(hbs.node_leader==this_node_name)
     {
-        logNode("replace leader to %s",hbs.node_leader.container.c_str());
-        hbs.node_leader=this_node_name;
-    }
-    if(hbs.node_leader.container.empty())
-        hbs.node_leader=this_node_name;
-    else if(hbs.node_leader!=this_node_name)
-    {
-        auto old_leader=root->getNode(hbs.node_leader,NULL);
-        auto my_node=root->getNode(this_node_name,NULL);
-        if(!old_leader.valid())
-            hbs.node_leader=this_node_name;
-        if(!my_node.valid())
-            throw CommonError("if(!my_node.valid())");
-        if(old_leader.valid() && my_node.valid())
-        {
-            if(old_leader->total_stake<my_node->total_stake)
-                hbs.node_leader=this_node_name;
-        }
-
-    }
-
-    if(hbs.node_leader==this_node_name)
-    {
-        REF_getter<MsgEvent::HeartBeatREQ> hb_req=
-            new MsgEvent::HeartBeatREQ(prev_block_hash, 
+        REF_getter<MsgEvt::HeartBeatREQ> hb_req=
+            new MsgEvt::HeartBeatREQ(prev_block_hash, 
                 root->getEpoch(NULL)->epoch, 
                 this_node_name);
-        DBG(logNode("TIMER_HEART_BEAT broadcast heart beat as leader %s",this_node_name.container.c_str()));
+        DBG(logNode("broadcast heart beat as leader %s",this_node_name.container.c_str()));
         outBuffer o;
         hb_req->pack(o);
         msg::node_message_ed nm(o.asString()->container,this_node_name,my_sk_ed);
@@ -161,12 +121,20 @@ void Node::Service::do_heart_beat()
     return;
 
 }
+bool Node::Service::DoHeartBeatREQ(const MsgEvt::DoHeartBeatREQ* r, const NODE_id & src_node, const route_t& route)
+{
+    // logNode("@@ %s",__FUNCTION__);
+    last_leader_cert=r->prev_leader_cert;
+    do_heart_beat();
+    return true;
+}
+
 
 void Node::Service::make_leader_certificate()
 {
-    auto &hbs=heart_beat_store;
+    auto &hbs=blocks[prev_block_hash].heart_beat_store;
     auto &li=hbs.leader_info[hbs.node_leader];
-    REF_getter<MsgEvent::LeaderCertificate>  lc= new MsgEvent::LeaderCertificate();
+    REF_getter<MsgEvt::LeaderCertificate>  lc= new MsgEvt::LeaderCertificate();
     if(li.responses.empty())
         return;
     auto msg=li.responses.begin()->second.rsp->payload_heart_beat;
@@ -179,5 +147,6 @@ void Node::Service::make_leader_certificate()
     }
 
     li.leader_cert=lc;
+    last_leader_cert=lc;
 
 }

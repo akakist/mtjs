@@ -13,7 +13,7 @@ namespace ServiceEnum
     const SERVICE_id BroadcasterTree(ghash("@g_BroadcasterTree"));
     const SERVICE_id GrainReader(ghash("@g_GrainReader"));
     const SERVICE_id BlockStreamer(ghash("@g_BlockStreamer"));
-    const SERVICE_id LeaderElection(ghash("@g_LeaderElection"));
+    // const SERVICE_id LeaderElection(ghash("@g_LeaderElection"));
     
     
 }
@@ -27,17 +27,18 @@ namespace bcEventEnum
     const EVENT_id ClientMsgReply(ghash("@g_bcClientMsgReply"));
     const EVENT_id ClientTxSubscribeREQ(ghash("@g_ClientTxSubscribeREQ"));
     const EVENT_id ClientTxSubscribeRSP(ghash("@g_ClientTxSubscribeRSP"));
-    const EVENT_id TxValidatorStart(ghash("@g_TxValidatorStart"));
-    const EVENT_id TxValidatorStop(ghash("@g_TxValidatorStop"));
-    const EVENT_id AddTx(ghash("@g_AddTx"));
+    // const EVENT_id TxValidatorStart(ghash("@g_TxValidatorStart"));
+    // const EVENT_id TxValidatorStop(ghash("@g_TxValidatorStop"));
+    // const EVENT_id AddTx(ghash("@g_AddTx"));
     const EVENT_id ServiceInit(ghash("@g_ServiceInit"));
-    const EVENT_id GetTransactions(ghash("@g_GetTransactions"));
+    // const EVENT_id GetTransactions(ghash("@g_GetTransactions"));
     const EVENT_id InvalidateRoot(ghash("@g_InvalidateRoot"));
     const EVENT_id BroadcastMessage(ghash("@g_BroadcastMessage"));
     const EVENT_id SendToChild(ghash("@g_SendToChild"));
     const EVENT_id SendToChildAck(ghash("@g_SendToChildAck"));
     const EVENT_id StreamBlock(ghash("@g_StreamBlock"));
     const EVENT_id HeartBeatREQ(ghash("@g_HeartBeatREQ"));
+    const EVENT_id PutTransactionREQ(ghash("@g_PutTransactionREQ"));
     
     
 }
@@ -289,46 +290,6 @@ class ClientTxSubscribeRSP: public Event::Base
 
     };
  
-class TxValidatorStart: public Event::NoPacked
-    {
-
-    public:
-        static Base* construct(const route_t &r)
-        {
-            return NULL;
-        }
-        TxValidatorStart(const REF_getter<IDatabase> &_db, const route_t& r)
-            :NoPacked(bcEventEnum::TxValidatorStart,r),db(_db) {}
-
-         REF_getter<IDatabase> db;
-
-    };
-    class TxValidatorStop: public Event::NoPacked
-    {
-
-    public:
-        static Base* construct(const route_t &r)
-        {
-            return NULL;
-        }
-        TxValidatorStop(const route_t& r)
-            :NoPacked(bcEventEnum::TxValidatorStop,r) {}
-
-    };
-    class AddTx: public Event::NoPacked
-    {
-
-    public:
-        static Base* construct(const route_t &r)
-        {
-            return NULL;
-        }
-        AddTx(const REF_getter<ClientMsg>&m, const route_t& r)
-            :NoPacked(bcEventEnum::AddTx,r), msg(m) {}
-        
-        REF_getter<ClientMsg>msg;
-
-    };
     class ServiceInit: public Event::NoPacked
     {
 
@@ -352,16 +313,16 @@ class TxValidatorStart: public Event::NoPacked
 
     };
 
-    class GetTransactions: public Event::NoPacked
-    {
-    public:
-        static Base* construct(const route_t &r)
-        {
-            return NULL;
-        }
-        GetTransactions(const route_t& r)
-            :NoPacked(bcEventEnum::GetTransactions,r){}
-    };
+    // class GetTransactions: public Event::NoPacked
+    // {
+    // public:
+    //     static Base* construct(const route_t &r)
+    //     {
+    //         return NULL;
+    //     }
+    //     GetTransactions(const route_t& r)
+    //         :NoPacked(bcEventEnum::GetTransactions,r){}
+    // };
     class InvalidateRoot: public Event::NoPacked
     {
     public:
@@ -468,9 +429,28 @@ class TxValidatorStart: public Event::NoPacked
         const std::string payload;
 
     };
-    struct NetworkBase: public Event::Base
+    // struct NetworkBase: public Event::Base
+    // {
+    //     NetworkBase(const EVENT_id& id, const route_t& r):Event::Base(id,r) {}
+    //     virtual void  hash(Blake2bHasher &h) const =0;
+    // };
+    class PutTransactionREQ: public Event::NoPacked
     {
-        NetworkBase(const EVENT_id& id, const route_t& r):Event::Base(id,r) {}
-        virtual void  hash(Blake2bHasher &h) const =0;
+
+    public:
+        static Base* construct(const route_t &r)
+        {
+            return NULL;
+        }
+        PutTransactionREQ(const std::string& _msg, const route_t& r)
+            :NoPacked(bcEventEnum::PutTransactionREQ,r),  msg(_msg) {}
+        
+        const std::string msg;
+
     };
+    // struct NetworkBase: public Event::Base
+    // {
+    //     NetworkBase(const EVENT_id& id, const route_t& r):Event::Base(id,r) {}
+    //     virtual void  hash(Blake2bHasher &h) const =0;
+    // };
 }

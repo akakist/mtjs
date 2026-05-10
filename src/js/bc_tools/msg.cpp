@@ -1,11 +1,11 @@
 #include "msg.h"
-        MsgEvent::BlockAcceptedREQ::BlockAcceptedREQ()
+        MsgEvt::BlockAcceptedREQ::BlockAcceptedREQ()
         :Base(msgid::BlockAcceptedREQ), leader_certificateZ(new LeaderCertificate()), block_payload(new BlockInfo)
         {
 
         }
 
-        void MsgEvent::BlockAcceptedREQ::pack(outBuffer& b) const 
+        void MsgEvt::BlockAcceptedREQ::pack(outBuffer& b) const 
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
@@ -13,7 +13,7 @@
             block_payload->pack(b);
             b<<node_validators<<agg_sig;
         }
-        void MsgEvent::BlockAcceptedREQ::unpack(inBuffer& b) 
+        void MsgEvt::BlockAcceptedREQ::unpack(inBuffer& b) 
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);

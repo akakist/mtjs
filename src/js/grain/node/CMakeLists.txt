@@ -16,6 +16,8 @@ add_library(node-serviceS STATIC
     nodeService.cpp
     sync.cpp
     heart_beat.cpp
+    client_node.cpp
+    leader_node.cpp
 )
 
 

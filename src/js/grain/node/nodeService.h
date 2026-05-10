@@ -64,7 +64,7 @@ namespace Node
     struct heart_beat_responce2
     {
         BigInt stake;
-        REF_getter<MsgEvent::HeartBeatRSP> rsp;
+        REF_getter<MsgEvt::HeartBeatRSP> rsp;
         heart_beat_responce2():rsp(nullptr)
         {
             stake=0;
@@ -79,7 +79,7 @@ namespace Node
 
         }
         bool request_for_transactions_sent=false;
-        REF_getter< MsgEvent::LeaderCertificate> leader_cert;
+        REF_getter< MsgEvt::LeaderCertificate> leader_cert;
         std::map<NODE_id,heart_beat_responce2> responses;
         std::set<NODE_id> transaction_responders;
 
@@ -142,30 +142,35 @@ namespace Node
 
 
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
+        bool PutTransactionREQ(const bcEvent::PutTransactionREQ* e);
         // bool ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ*);
         bool Msg(const bcEvent::Msg*, bool fromNetwork);
         bool MsgReply(const bcEvent::MsgReply*, bool fromNetwork);
 
+        void resetTimer();
 
 
         void do_heart_beat();
 
-        // bool HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
-        bool HeartBeatREQ(const MsgEvent::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
-        bool HeartBeatRSP(const MsgEvent::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
-        bool GetTransactionREQ(const MsgEvent::GetTransactionREQ* r, const NODE_id & src_node, const route_t& route);
-        bool GetTransactionRSP(const MsgEvent::GetTransactionRSP* r, const NODE_id & src_node, const route_t& route);
-        bool ValidateBlockREQ(const MsgEvent::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
-        bool ValidateBlockRSP(const MsgEvent::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
-        bool BlockAcceptedREQ(const MsgEvent::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route);
-        bool BlockAcceptedRSP(const MsgEvent::BlockAcceptedRSP* r, const NODE_id & src_node, const route_t& route);
+        // bool HeartBeatREQ(const MsgEvt::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
+        bool HeartBeatREQ(const MsgEvt::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
+        bool HeartBeatRSP(const MsgEvt::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
+        bool GetTransactionREQ(const MsgEvt::GetTransactionREQ* r, const NODE_id & src_node, const route_t& route);
+        bool GetTransactionRSP(const MsgEvt::GetTransactionRSP* r, const NODE_id & src_node, const route_t& route);
+        bool ValidateBlockREQ(const MsgEvt::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
+        bool ValidateBlockRSP(const MsgEvt::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
+        bool BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route);
+        bool BlockAcceptedRSP(const MsgEvt::BlockAcceptedRSP* r, const NODE_id & src_node, const route_t& route);
 
-        bool GetSavedBlocksRSP(const MsgEvent::GetSavedBlocksRSP* r, const NODE_id & src_node, const route_t& route);
-        bool GetSavedBlocksREQ(const MsgEvent::GetSavedBlocksREQ* r, const NODE_id & src_node, const route_t& route);
+        bool GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP* r, const NODE_id & src_node, const route_t& route);
+        bool GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ* r, const NODE_id & src_node, const route_t& route);
+        bool DoHeartBeatREQ(const MsgEvt::DoHeartBeatREQ* r, const NODE_id & src_node, const route_t& route);
 
         // void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);
 
         void make_leader_certificate();
+        bool isNodeGreaterThanCurrentLeader(const NODE_id& node);
+
 
         void do_request_for_transactions(const Node::heart_beat_node_info& li);
 
@@ -178,8 +183,8 @@ namespace Node
 
         struct block
         {
-            REF_getter<MsgEvent::BlockInfo> block_payload=nullptr;
-            std::vector<REF_getter<MsgEvent::ValidateBlockRSP> > responses;
+            REF_getter<MsgEvt::BlockInfo> block_payload=nullptr;
+            std::vector<REF_getter<MsgEvt::ValidateBlockRSP> > responses;
             BigInt stake_validators;
             // std::map<NODE_id /*validator*/, blst_cpp::Signature> sigs;
 
@@ -190,16 +195,16 @@ namespace Node
             bool block_accepted_sent=false;
             bool heart_bit_sent_on_block_accepted_rsp=false;
 
-            std::map<NODE_id, REF_getter<MsgEvent::BlockAcceptedRSP> > acceptors;
+            std::map<NODE_id, REF_getter<MsgEvt::BlockAcceptedRSP> > acceptors;
 
-            int round=0;
+            // int round_=0;
+            heart_beat_info    heart_beat_store;
 
         };
         _db_to_save db_to_save_Z;
 
-        time_t last_access_time_hbZ=0; // heart_bit last tick time
-        heart_beat_info    heart_beat_store;
-        REF_getter<MsgEvent::LeaderCertificate> last_leader_cert=nullptr;
+        // time_t last_access_time_hbZ=0; // heart_bit last tick time
+        REF_getter<MsgEvt::LeaderCertificate> last_leader_cert=nullptr;
 
         std::map<THASH_id, TRANSACTION_body>  transaction_pool_of_leader;
         std::map<BLOCK_id,block> blocks;

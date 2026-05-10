@@ -22,7 +22,7 @@ std::vector<data_base* (*)(Cellable*)> db_constructors = {
 };
 
 
-bool root_data::verify_lider_certificate(const REF_getter<MsgEvent::LeaderCertificate>& lc)
+bool root_data::verify_lider_certificate(const REF_getter<MsgEvt::LeaderCertificate>& lc)
 {
     /// проверка сертификата лидера
     {
