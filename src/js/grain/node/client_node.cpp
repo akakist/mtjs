@@ -84,22 +84,22 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ* r, const NO
     db->write_batch(db_to_save_Z);
     db_to_save_Z.clear();
 
-    REF_getter<MsgEvt::BlockDBStore> pb=new MsgEvt::BlockDBStore();
+    // REF_getter<MsgEvt::BlockDBStore> pb=new MsgEvt::BlockDBStore();
     // msg::publish_block pb;
-    pb->att_data=prepared_block.att_data;
-    outBuffer o;
-    r->pack(o);
-    pb->block_accepted_req=r;
-    pb->epoch=prepared_block.epoch;
-    sendEvent(ServiceEnum::BlockStreamer,new bcEvent::StreamBlock(pb->getBuffer(),this));
+    // pb->att_data=prepared_block.att_data;
+    // outBuffer o;
+    // r->pack(o);
+    // pb->block_accepted_req=r;
+    // pb->epoch=prepared_block.epoch;
+    sendEvent(ServiceEnum::BlockStreamer,new bcEvent::StreamBlock(prepared_block->getBuffer(),this));
     SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
     dbs.exec("CREATE TABLE IF NOT EXISTS blocks ("
              "epoch INTEGER PRIMARY KEY, "
              "data BLOB NOT NULL)");
 
     SQLite::Statement insert(dbs, "INSERT INTO blocks (epoch, data) VALUES (?, ?)");
-    insert.bind(1,pb->epoch.toString());
-    insert.bind(2,pb->getBuffer());
+    insert.bind(1,prepared_block->epoch.toString());
+    insert.bind(2,prepared_block->getBuffer());
     insert.exec();
 
     prev_block_hash=r->block_payload->new_root_hash1;
@@ -114,7 +114,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ* r, const NO
     br->new_root_hash=prev_block_hash;
     br->node_signer=this_node_name;
     br->sign(my_sk_bls);
-    prepared_block.clear();
+    // prepared_block.clear();
     blocks.clear();
 
             resetTimer();
@@ -238,7 +238,7 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ* r, const NO
                 block->new_root_hash1=new_root_hash;
 
 
-                block->attachment_hash.container=prepared_block.att_data.hash();
+                block->attachment_hash.container=prepared_block->att_data.hash();
 
                 block->payload_heart_beat=r->leader_cert->heart_beat;
 

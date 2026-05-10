@@ -26,16 +26,6 @@ struct instruction_report
             h.update(s);
     }
 };
-struct transaction_report
-{
-    int err_code;
-    std::string err_str;
-    void update(Blake2bHasher &h) const
-    {
-        h.update(std::to_string(err_code));
-        h.update(err_str);
-    }
-};
 
 inline outBuffer & operator<< (outBuffer& b,const instruction_report &s)
 {
@@ -47,17 +37,42 @@ inline inBuffer & operator>> (inBuffer& b,  instruction_report &s)
     b>>s.err_code>>s.err_str>>s.logMsgs;
     return b;
 }
+struct transaction_report
+{
+    int err_code;
+    std::string err_str;
+    std::vector<instruction_report> instruction_reports;
+    void update(Blake2bHasher &h) const
+    {
+        h.update(std::to_string(err_code));
+        h.update(err_str);
+        for(auto& z: instruction_reports)
+        {
+            z.update(h);
+        }
+    }
+};
+inline outBuffer & operator<< (outBuffer& b,const transaction_report &s)
+{
+    b<<s.err_code<<s.err_str<<s.instruction_reports;
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  transaction_report &s)
+{
+    b>>s.err_code>>s.err_str>>s.instruction_reports;
+    return b;
+}
+
 struct attachment_data
 {
     std::vector<TRANSACTION_body> trs;
-    std::vector<std::vector<instruction_report>> instruction_reports;
     std::map<THASH_id,transaction_report> transaction_reports;
     std::map<std::string,BigInt> fees;
     std::map<NODE_id,BigInt> rewards;
     void clear()
     {
         trs.clear();
-        instruction_reports.clear();
+        transaction_reports.clear();
         fees.clear();
         rewards.clear();
     }
@@ -68,12 +83,13 @@ struct attachment_data
         {
             h.update(z.container);
         }
-        for(auto &z: instruction_reports)
+        for(auto &z: transaction_reports)
         {
-            for(auto& y: z)
-            {
-                y.update(h);
-            }
+            z.second.update(h);
+            // for(auto& y: z)
+            // {
+            //     y.update(h);
+            // }
         }
         for(auto &z: fees)
         {
@@ -91,13 +107,13 @@ struct attachment_data
 inline outBuffer & operator<< (outBuffer& b,const attachment_data &s)
 {
     b<<1;
-    b<<s.trs<<s.instruction_reports<<s.fees<<s.rewards;
+    b<<s.trs<<s.transaction_reports<<s.fees<<s.rewards;
     return b;
 }
 inline inBuffer & operator>> (inBuffer& b,  attachment_data &s)
 {
     auto ver=b.get_PN();
-    b>>s.trs>>s.instruction_reports>>s.fees>>s.rewards;
+    b>>s.trs>>s.transaction_reports>>s.fees>>s.rewards;
     return b;
 }
 

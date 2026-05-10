@@ -521,10 +521,11 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
         else 
             t.setTxError(th, *t_err);
     }
-    prepared_block.epoch=rt->getEpoch(NULL)->epoch;
-    prepared_block.att_data.instruction_reports=t.instruction_reports;
-    prepared_block.att_data.transaction_reports=t.transaction_reports;
-    prepared_block.att_data.trs=trs;
+    if(!prepared_block.valid())
+    prepared_block=new MsgEvt::BlockDBStore;
+    prepared_block->epoch=rt->getEpoch(NULL)->epoch;
+    prepared_block->att_data.transaction_reports=t.transaction_reports;
+    prepared_block->att_data.trs=trs;
 
     auto newEpoch=rt->getEpoch(NULL);
     newEpoch->epoch+=1;
@@ -547,7 +548,7 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
             u->balance-=z.second->get_fee();
         }
         total_fees+=z.second->get_fee();
-        prepared_block.att_data.fees[z.first]=z.second->get_fee();
+        prepared_block->att_data.fees[z.first]=z.second->get_fee();
     }
     BigInt total_rewards=(total_fees*9)/10;
     for(auto& n : nodes_in_leader_cert)
@@ -566,7 +567,7 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
         u->balance+=amt;
         if(n==this_node_name && amt>0)
             logNode("node %s rewarded %s grans",n.container.c_str(), amt.toString().c_str());
-        prepared_block.att_data.rewards[n]=amt;
+        prepared_block->att_data.rewards[n]=amt;
     }
     new_root_hash=proceed_merkle_on_transaction_pool_hashers(rt);
     feeCalcers.clear();

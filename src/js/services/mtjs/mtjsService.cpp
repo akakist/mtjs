@@ -545,21 +545,24 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP* e)
             JSScope <10,10> scope(js_ctx);
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);
-
-            for(int ii=0; ii<pb->att_data.instruction_reports[ti].size(); ii++)
+            auto &tx_report=pb->att_data.transaction_reports[tx_hash];
+            for(int ii=0; ii<tx_report.instruction_reports.size(); ii++)
             {
                 nlohmann::json ii_json;
-                ii_json["errcode"]=pb->att_data.instruction_reports[ti][ii].err_code;
-                ii_json["errstr"]=pb->att_data.instruction_reports[ti][ii].err_str;
+                ii_json["errcode"]=tx_report.instruction_reports[ii].err_code;
+                ii_json["errstr"]=tx_report.instruction_reports[ii].err_str;
                 // logErr2("err_str %d %d %s",ti,ii,pb->att_data.instruction_reports[ti][ii].err_str.c_str());
                 nlohmann::json logmsgs_json;
-                for(int k=0; k<pb->att_data.instruction_reports[ti][ii].logMsgs.size(); k++)
+                auto &lms=tx_report.instruction_reports[ii].logMsgs;
+                for(auto& z: lms)
                 {
-                    logErr2("logmsgs %d %d %d %s",ti,ii,k,pb->att_data.instruction_reports[ti][ii].logMsgs[k].c_str());
-                    logmsgs_json.push_back( pb->att_data.instruction_reports[ti][ii].logMsgs[k]);
+                    // logErr2("logmsgs %d %d %d %s",ti,ii,k,pb->att_data.instruction_reports[ti][ii].logMsgs[k].c_str());
+                    logmsgs_json.push_back( z);
                 }
                 ii_json["logMsgs"]=logmsgs_json;
                 jtr["instructions"].push_back(ii_json);
+                jtr["errcode"].push_back(tx_report.err_code);
+                jtr["errstr"].push_back(tx_report.err_str);
 
             }
             if(!JS_IsFunction(js_ctx,opaque.tx_subscription_cb->listener))

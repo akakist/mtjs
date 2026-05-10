@@ -185,7 +185,7 @@ namespace Node
         {
             REF_getter<MsgEvt::BlockInfo> block_payload=nullptr;
             std::vector<REF_getter<MsgEvt::ValidateBlockRSP> > responses;
-            BigInt stake_validators;
+            // BigInt stake_validators;
             // std::map<NODE_id /*validator*/, blst_cpp::Signature> sigs;
 
 
@@ -209,17 +209,18 @@ namespace Node
         std::map<THASH_id, TRANSACTION_body>  transaction_pool_of_leader;
         std::map<BLOCK_id,block> blocks;
 
-        struct _prepared_block
-        {
-            attachment_data att_data;
-            BigInt epoch;
-            void clear()
-            {
-                att_data.clear();
-                epoch=0;
-            }
-        };
-        _prepared_block prepared_block;
+        // struct _prepared_block
+        // {
+        //     attachment_data att_data;
+        //     BigInt epoch;
+        //     void clear()
+        //     {
+        //         att_data.clear();
+        //         epoch=0;
+        //     }
+        // };
+        // _prepared_block prepared_block;
+        REF_getter<MsgEvt::BlockDBStore> prepared_block=nullptr;
         // void do_client_tx_report(const msg::publish_block &pb);
 // 
         void setBlockId(const BLOCK_id& b)

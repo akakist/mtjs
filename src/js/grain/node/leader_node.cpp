@@ -194,13 +194,26 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP* r, const NO
     }
     // if(bl.)
     auto & bt=blocks[prev_block_hash];
+    if(bt.responses.size())
+    {
+        if(bt.responses[0]->payload_block->getBuffer()!=r->payload_block->getBuffer())
+        {
+            logNode("if(bt.responses[0]->payload_block->getBuffer()!=r->getBuffer())");
+            return true;
+        }
+    }
     if(bt.block_accepted_sent)
         return true;
     // auto & bh=bt[bl.root_hash];
     bt.responses.push_back(r);
-    bt.stake_validators+=root->getNode(r->node_validator,NULL)->total_stake;
+    BigInt stakeVal=0;
+    for(auto& z:bt.responses)
+    {
+        stakeVal+=root->getNode(z->node_validator,NULL)->total_stake;
+    }
+    // bt.stake_validators+=root->getNode(r->node_validator,NULL)->total_stake;
     // logNode("Block staked %lf",bt.stake.toDouble());
-    if(bt.stake_validators.toDouble() > root->getValues(NULL)->total_staked.toDouble()*QUORUM)
+    if(stakeVal.toDouble() > root->getValues(NULL)->total_staked.toDouble()*QUORUM)
     {
         XTRY;
         logNode("Block stake finalized");
