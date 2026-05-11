@@ -125,7 +125,7 @@ namespace msgid
         user_message_req,transaction_added_rsp,
         user_request,get_user_status_req,get_user_status_rsp, HeartBeatREQ,HeartBeatRSP,
         LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
-        BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, PutTransactionsREQ
+        BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP
     };
 
 }
@@ -173,8 +173,8 @@ inline const char* msgName(int id)
         return "GetSavedBlocksRSP";
     case msgid::DoHeartBeatREQ:
         return "DoHeartBeatREQ";
-    case msgid::PutTransactionsREQ:
-        return "PutTransactionsREQ";
+    case msgid::ConfirmLeaderREQ:
+        return "ConfirmLeaderREQ";
         
     default:
         return "unknown";
@@ -868,28 +868,57 @@ namespace MsgEvt
             prev_leader_cert->unpack2(b);
         }
     };
-    struct PutTransactionsREQ: public Base
+    struct ConfirmLeaderREQ: public Base
     {
         static Base* construct()
         {
-            return new PutTransactionsREQ();
+            return new ConfirmLeaderREQ();
         }
-        PutTransactionsREQ():Base(msgid::PutTransactionsREQ)
+        ConfirmLeaderREQ():Base(msgid::ConfirmLeaderREQ), hb(new HeartBeatREQ)
         {
 
         }
-        std::string msg;
+        REF_getter<HeartBeatREQ> hb;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<msg;
+            hb->pack(b);
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>msg;
+            hb->unpack2(b);
+        }
+    };
+    struct ConfirmLeaderRSP: public Base
+    {
+        static Base* construct()
+        {
+            return new ConfirmLeaderRSP();
+        }
+        ConfirmLeaderRSP():Base(msgid::ConfirmLeaderRSP), hb(new HeartBeatREQ)
+        {
+
+        }
+        REF_getter<HeartBeatREQ> hb;
+        blst_cpp::Signature sig;        
+        NODE_id node_signer;
+
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            Base::pack(b);
+            hb->pack(b);
+            b<<sig<<node_signer;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            hb->unpack2(b);
+            b>>sig>>node_signer;
         }
     };
 

@@ -313,6 +313,8 @@ bool Node::Service::MsgReply(const bcEvent::MsgReply* e, bool fromNetwork)
         {
             case msgid::HeartBeatRSP:
                 return HeartBeatRSP(static_cast<const MsgEvt::HeartBeatRSP*>(m.get()),node_message_ed.src_node, e->route);
+            case msgid::ConfirmLeaderRSP:
+                return ConfirmLeaderRSP(static_cast<const MsgEvt::ConfirmLeaderRSP*>(m.get()),node_message_ed.src_node, e->route);
             case msgid::GetTransactionRSP:
                 return GetTransactionRSP(static_cast<const MsgEvt::GetTransactionRSP*>(m.get()),node_message_ed.src_node, e->route);
             case msgid::ValidateBlockRSP:

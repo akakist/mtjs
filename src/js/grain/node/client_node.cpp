@@ -188,6 +188,8 @@ bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ* r, const 
 {
             MUTEX_INSPECTOR;
             resetTimer();
+            if(r->lc->heart_beat->node_leader!=node_leader_for_client)
+                return true;
             if(!root->verify_lider_certificate(r->lc))
             {
                 logErr2("if(!verify_lider_certificate(rft.payload_lc,node_leader))");
@@ -271,7 +273,8 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ* r, const NO
 
             resetTimer();
             MUTEX_INSPECTORS("ValidateBlockREQ");
-
+            if(r->leader_cert->heart_beat->node_leader!=node_leader_for_client)
+                return true;
             if(state_Z!=State::NORMAL)
                 return true;
 
@@ -314,67 +317,6 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ* r, const NO
             }
             return true;
 
-}
-bool Node::Service::HeartBeatREQ(const MsgEvt::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route)
-{
-    MUTEX_INSPECTOR;
-    // logNode("@@ %s",__FUNCTION__);
-
-    sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
-
-    bool need_replace=false;
-    // auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
-
-    if(prev_block_hash!=h->prev_block_hash)
-    {
-        logNode("invalid root hashe, no answer");
-        return true;
-    }
-    bool need_reply=false;
-    if(node_leader_for_client.container.empty())
-        node_leader_for_client=h->node_leader;
-    if(h->node_leader!=node_leader_for_client)
-    {
-        if(isNodeGreaterOrEqual(h->node_leader,node_leader_for_client))
-        {
-            node_leader_for_client=h->node_leader;
-            need_reply=true;
-        }
-    }
-    else
-        need_reply=true;
-    // if(hbs.node_leader==h->node_leader)
-    // {
-    //     need_reply=true;
-    // }
-    // else
-    // {
-    //     auto old_leader=root->getNode(hbs.node_leader,NULL);
-    //     auto new_leader=root->getNode(h->node_leader,NULL);
-    //     if(old_leader.valid() &&  new_leader.valid())
-    //     {
-    //         if(isNodeGreaterThanCurrentLeader(h->node_leader))
-    //         {
-    //             hbs.node_leader=h->node_leader;
-    //             need_reply=true;
-    //         }
-    //     }
-    // }
-    // auto &li=hbs.leader_info[hbs.node_leader];
-    if(need_reply)
-    {
-        REF_getter<MsgEvt::HeartBeatRSP> hbr=new MsgEvt::HeartBeatRSP();
-        // msg::heart_beat_rsp hba;
-        hbr->payload_heart_beat=h;
-        hbr->node_signer=this_node_name;
-        hbr->signature.sign(my_sk_bls, blake2b_hash(heart_beat_payload).container);
-
-        msg::node_message_ed nme(hbr->getBuffer(),this_node_name,my_sk_ed);
-        // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
-        passEvent(new bcEvent::MsgReply(nme.getBuffer(),poppedFrontRoute(route)));
-
-    }
-    return true;
 }
 
 bool Node::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
@@ -425,6 +367,8 @@ bool Node::Service::Msg(const bcEvent::Msg*e, bool fromNetwork)
                 return GetSavedBlocksREQ(static_cast<const MsgEvt::GetSavedBlocksREQ*>(msg.get()),node_message_ed.src_node, e->route);
             case msgid::DoHeartBeatREQ:
                 return DoHeartBeatREQ(static_cast<const MsgEvt::DoHeartBeatREQ*>(msg.get()),node_message_ed.src_node, e->route);
+            case msgid::ConfirmLeaderREQ:
+                return ConfirmLeaderREQ(static_cast<const MsgEvt::ConfirmLeaderREQ*>(msg.get()),node_message_ed.src_node, e->route);
 
                 default: throw CommonError("unjandled MsgEvt %s",msgName(msg->type));
         }

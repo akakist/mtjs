@@ -30,10 +30,198 @@ bool Node::Service::HeartBeatRSP(const MsgEvt::HeartBeatRSP* m, const NODE_id & 
         return false;
     }
     {
-        heart_beat_responce2 hbrs2;
-        hbrs2.rsp=m;
-        hbrs2.stake=n->total_stake;
-        li.responses.insert({m->node_signer,hbrs2});
+        li.HeartBeatRSP_m.insert_or_assign(m->node_signer,m);
+
+    }
+    
+    BigInt hb_staked=0;
+    if(!li.confirm_leader_sent)
+    {
+        blst_cpp::AggregateSignature sig_agg;
+        std::vector<blst_cpp::PublicKey> pk_agg;
+        bool matched=true;
+        if(li.HeartBeatRSP_m.empty())
+            throw CommonError("if(li.responses.empty())");
+
+        {
+            for(auto &z:li.HeartBeatRSP_m)
+            {
+                auto nn=root->getNode(z.second->node_signer,NULL);
+                hb_staked+=nn->total_stake;
+                    pk_agg.push_back(nn->bls_pk);
+                    sig_agg.add(z.second->signature);
+            }
+        }
+    }
+    auto pers=(hb_staked.toDouble())/root->getValues(NULL)->total_staked.toDouble();
+
+    if(pers>QUORUM && !li.confirm_leader_sent)
+    {
+        li.confirm_leader_sent=true;
+        // make_leader_certificate();
+        // if(!li.request_for_transactions_sent)
+        {
+            // logNode("lider approved %s",m->payload_heart_beat->node_leader.container.c_str());
+            // li.request_for_transactions_sent=true;
+            // do_request_for_transactions(li);
+
+    REF_getter<MsgEvt::ConfirmLeaderREQ> rt=new MsgEvt::ConfirmLeaderREQ();
+    // rt->
+    // if(!li.leader_cert_2.valid())
+    //     throw CommonError("if(!li.leader_cert.valid())");
+    // rt->lc=li.leader_cert_2;
+    rt->hb=m->payload_heart_beat;
+    // rt->h
+    msg::node_message_ed nm(rt->getBuffer(),this_node_name,my_sk_ed);
+    sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
+
+
+        }
+    }
+    XPASS;
+    return true;
+
+}
+
+bool Node::Service::HeartBeatREQ(const MsgEvt::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route)
+{
+    MUTEX_INSPECTOR;
+    // logNode("@@ %s",__FUNCTION__);
+
+    sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
+
+    bool need_replace=false;
+    // auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
+
+    if(prev_block_hash!=h->prev_block_hash)
+    {
+        logNode("invalid root hashe, no answer");
+        return true;
+    }
+    bool need_reply=false;
+    if(node_leader_for_client.container.empty())
+        node_leader_for_client=h->node_leader;
+    if(h->node_leader!=node_leader_for_client)
+    {
+        if(isNodeGreaterOrEqual(h->node_leader,node_leader_for_client))
+        {
+            node_leader_for_client=h->node_leader;
+            need_reply=true;
+        }
+    }
+    else
+        need_reply=true;
+    // if(hbs.node_leader==h->node_leader)
+    // {
+    //     need_reply=true;
+    // }
+    // else
+    // {
+    //     auto old_leader=root->getNode(hbs.node_leader,NULL);
+    //     auto new_leader=root->getNode(h->node_leader,NULL);
+    //     if(old_leader.valid() &&  new_leader.valid())
+    //     {
+    //         if(isNodeGreaterThanCurrentLeader(h->node_leader))
+    //         {
+    //             hbs.node_leader=h->node_leader;
+    //             need_reply=true;
+    //         }
+    //     }
+    // }
+    // auto &li=hbs.leader_info[hbs.node_leader];
+    if(need_reply)
+    {
+        REF_getter<MsgEvt::HeartBeatRSP> hbr=new MsgEvt::HeartBeatRSP();
+        // msg::heart_beat_rsp hba;
+        hbr->payload_heart_beat=h;
+        hbr->node_signer=this_node_name;
+        hbr->signature.sign(my_sk_bls, blake2b_hash(heart_beat_payload).container);
+
+        msg::node_message_ed nme(hbr->getBuffer(),this_node_name,my_sk_ed);
+        // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
+        passEvent(new bcEvent::MsgReply(nme.getBuffer(),poppedFrontRoute(route)));
+
+    }
+    return true;
+}
+   bool Node::Service::ConfirmLeaderREQ(const MsgEvt::ConfirmLeaderREQ* h, const NODE_id & src_node, const route_t& route)
+
+// bool Node::Service::ConfirmLeaderREQ(const MsgEvt::ConfirmLeaderREQ* h,const std::string &heart_beat_payload, const route_t& route)
+{
+    MUTEX_INSPECTOR;
+    // logNode("@@ %s",__FUNCTION__);
+
+    sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
+
+    bool need_replace=false;
+    // auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
+
+    if(prev_block_hash!=h->hb->prev_block_hash)
+    {
+        logNode("invalid root hashe, no answer");
+        return true;
+    }
+    bool need_reply=false;
+    if(node_leader_for_client.container.empty())
+        node_leader_for_client=h->hb->node_leader;
+    if(h->hb->node_leader!=node_leader_for_client)
+    {
+        if(isNodeGreaterOrEqual(h->hb->node_leader,node_leader_for_client))
+        {
+            node_leader_for_client=h->hb->node_leader;
+            need_reply=true;
+        }
+    }
+    else
+        need_reply=true;
+
+    if(need_reply)
+    {
+        REF_getter<MsgEvt::ConfirmLeaderRSP> hbr=new MsgEvt::ConfirmLeaderRSP();
+        // msg::heart_beat_rsp hba;
+        hbr->hb=h->hb;
+        hbr->node_signer=this_node_name;
+        hbr->sig.sign(my_sk_bls, blake2b_hash(h->hb->getBuffer()).container);
+
+        msg::node_message_ed nme(hbr->getBuffer(),this_node_name,my_sk_ed);
+        // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
+        passEvent(new bcEvent::MsgReply(nme.getBuffer(),poppedFrontRoute(route)));
+
+    }
+    return true;
+}
+
+
+
+bool Node::Service::ConfirmLeaderRSP(const MsgEvt::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route)
+{
+    XTRY;
+
+    // logNode("@@ %s",__FUNCTION__);
+    auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
+    auto &li=hbs.leader_info;
+    if(prev_block_hash!=m->hb->prev_block_hash)
+    {
+        logErr2("heat beat expired %s %s",prev_block_hash.str().c_str(),m->hb->prev_block_hash.str().c_str());
+        return false;
+    }
+
+
+    auto n=root->getNode(m->node_signer,NULL);
+    if(!n.valid())
+    {
+        logErr2("if(!n.valid())");
+        return false;
+    }
+    outBuffer o;
+    m->hb->pack(o);
+    if(!m->sig.verify(n->bls_pk, blake2b_hash(o.asString()->container).container))
+    {
+        logNode("if(!sig_check.verify(n->bls_pk, blake2b_hash(mhbr.payload)))");
+        return false;
+    }
+    {
+        li.ConfirmLeaderRSP_m.insert_or_assign(m->node_signer,m);
 
     }
     BigInt hb_staked=0;
@@ -41,15 +229,15 @@ bool Node::Service::HeartBeatRSP(const MsgEvt::HeartBeatRSP* m, const NODE_id & 
         blst_cpp::AggregateSignature sig_agg;
         std::vector<blst_cpp::PublicKey> pk_agg;
         bool matched=true;
-        if(li.responses.empty())
+        if(li.ConfirmLeaderRSP_m.empty())
             throw CommonError("if(li.responses.empty())");
 
-        for(auto &z:li.responses)
+        for(auto &z:li.ConfirmLeaderRSP_m)
         {
-            sig_agg.add(z.second.rsp->signature);
-            auto nn=root->getNode(z.second.rsp->node_signer,NULL);
+            sig_agg.add(z.second->sig);
+            auto nn=root->getNode(z.second->node_signer,NULL);
             pk_agg.push_back(nn->bls_pk);
-            hb_staked+=z.second.stake;
+            hb_staked+=nn->total_stake;
         }
     }
     auto pers=(hb_staked.toDouble())/root->getValues(NULL)->total_staked.toDouble();
@@ -59,17 +247,24 @@ bool Node::Service::HeartBeatRSP(const MsgEvt::HeartBeatRSP* m, const NODE_id & 
         make_leader_certificate();
         if(!li.request_for_transactions_sent)
         {
-            logNode("lider approved %s",m->payload_heart_beat->node_leader.container.c_str());
+            logNode("lEAder approved %s",m->hb->node_leader.container.c_str());
             li.request_for_transactions_sent=true;
             do_request_for_transactions(li);
+/*
+    REF_getter<MsgEvt::GetTransactionREQ> rt=new MsgEvt::GetTransactionREQ();
+    if(!li.leader_cert_2.valid())
+        throw CommonError("if(!li.leader_cert.valid())");
+    rt->lc=li.leader_cert_2;
+    msg::node_message_ed nm(rt->getBuffer(),this_node_name,my_sk_ed);
+    sendEvent(ServiceEnum::BroadcasterTree,new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(),ListenerBase::serviceId));
 
+*/
         }
     }
     XPASS;
     return true;
 
 }
-
 
 void Node::Service::do_heart_beat()
 {
@@ -125,6 +320,9 @@ bool Node::Service::DoHeartBeatREQ(const MsgEvt::DoHeartBeatREQ* r, const NODE_i
 {
     // logNode("@@ %s",__FUNCTION__);
     last_leader_cert=r->prev_leader_cert;
+    // auto diff=nodeDistanceToLeader(this_node_name);
+    // sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,double(diff)/10.,this));
+
     do_heart_beat();
     return true;
 }
@@ -135,15 +333,15 @@ void Node::Service::make_leader_certificate()
     auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
     auto &li=hbs.leader_info;
     REF_getter<MsgEvt::LeaderCertificate>  lc= new MsgEvt::LeaderCertificate();
-    if(li.responses.empty())
+    if(li.ConfirmLeaderRSP_m.empty())
         return;
-    auto msg=li.responses.begin()->second.rsp->payload_heart_beat;
-    lc->heart_beat=li.responses.begin()->second.rsp->payload_heart_beat;
-    for(auto &r:li.responses)
+    auto msg=li.ConfirmLeaderRSP_m.begin()->second->hb;
+    lc->heart_beat=li.ConfirmLeaderRSP_m.begin()->second->hb;
+    for(auto &r:li.ConfirmLeaderRSP_m)
     {
-        lc->agg_sig.add(r.second.rsp->signature);
-        auto nn=root->getNode(r.second.rsp->node_signer,NULL);
-        lc->nodes.push_back(r.second.rsp->node_signer);
+        lc->agg_sig.add(r.second->sig);
+        auto nn=root->getNode(r.second->node_signer,NULL);
+        lc->nodes.push_back(r.second->node_signer);
     }
 
     li.leader_cert_2=lc;

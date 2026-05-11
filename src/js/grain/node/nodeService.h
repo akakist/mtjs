@@ -61,15 +61,15 @@ namespace Node
         TIMER_START_HEART_BEAT,
         TIMER_RESTART_BLOCK,
     };
-    struct heart_beat_responce2
-    {
-        BigInt stake;
-        REF_getter<MsgEvt::HeartBeatRSP> rsp;
-        heart_beat_responce2():rsp(nullptr)
-        {
-            stake=0;
-        }
-    };
+    // struct heart_beat_responce2
+    // {
+    //     BigInt stake_34;
+    //     REF_getter<MsgEvt::HeartBeatRSP> rsp;
+    //     heart_beat_responce2():rsp(nullptr)
+    //     {
+    //         stake_34=0;
+    //     }
+    // };
     struct heart_beat_node_info
     {
         heart_beat_node_info() : leader_cert_2(nullptr) {
@@ -79,15 +79,17 @@ namespace Node
 
         }
         bool request_for_transactions_sent=false;
+        bool confirm_leader_sent=false;
         REF_getter< MsgEvt::LeaderCertificate> leader_cert_2;
-        std::map<NODE_id,heart_beat_responce2> responses;
+        std::map<NODE_id,REF_getter<MsgEvt::HeartBeatRSP> > HeartBeatRSP_m;
+        std::map<NODE_id,REF_getter<MsgEvt::ConfirmLeaderRSP> > ConfirmLeaderRSP_m;
         std::set<NODE_id> transaction_responders;
 
         void clear()
         {
             request_for_transactions_sent=false;
             leader_cert_2=nullptr;
-            responses.clear();
+            HeartBeatRSP_m.clear();
             transaction_responders.clear();
         }
 
@@ -165,11 +167,16 @@ namespace Node
         bool GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP* r, const NODE_id & src_node, const route_t& route);
         bool GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ* r, const NODE_id & src_node, const route_t& route);
         bool DoHeartBeatREQ(const MsgEvt::DoHeartBeatREQ* r, const NODE_id & src_node, const route_t& route);
+        bool ConfirmLeaderREQ(const MsgEvt::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
+        bool ConfirmLeaderRSP(const MsgEvt::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
+
 
         // void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);
 
         void make_leader_certificate();
         bool isNodeGreaterOrEqual(const NODE_id& nodeLeft, const NODE_id& nodeRight);
+        int nodeDistanceToLeader(const NODE_id& node);
+
 
 
         void do_request_for_transactions(const Node::heart_beat_node_info& li);

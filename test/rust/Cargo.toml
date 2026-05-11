@@ -7,3 +7,7 @@ edition = "2021"
 
 [dependencies]
 actix-web = "4.9"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1

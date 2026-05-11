@@ -77,6 +77,8 @@ bool Node::Service::on_startService(const systemEvent::startService*)
     msgFactory.registerMsg(msgid::GetSavedBlocksREQ,MsgEvt::GetSavedBlocksREQ::construct);
     msgFactory.registerMsg(msgid::GetSavedBlocksRSP,MsgEvt::GetSavedBlocksRSP::construct);
     msgFactory.registerMsg(msgid::DoHeartBeatREQ,MsgEvt::DoHeartBeatREQ::construct);
+    msgFactory.registerMsg(msgid::ConfirmLeaderREQ,MsgEvt::ConfirmLeaderREQ::construct);
+    msgFactory.registerMsg(msgid::ConfirmLeaderRSP,MsgEvt::ConfirmLeaderRSP::construct);
     do_heart_beat();
     
 
@@ -210,9 +212,9 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm* e)
     {
 
         DBG(logNode("case timers::TIMER_START_HEART_BEAT:"));
-        auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
-        auto &li=hbs.leader_info;
-        li.request_for_transactions_sent=false;
+        // auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
+        // auto &li=hbs.leader_info;
+        // li.request_for_transactions_sent=false;
 
         do_heart_beat();
         return true;
@@ -453,6 +455,7 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
 // void Node::Service::on_blockResponse(const msg::block_response& br)
 void Node::Service::do_request_for_transactions(const Node::heart_beat_node_info& li)
 {
+    logNode("@@ %s",__FUNCTION__);
     MUTEX_INSPECTOR;
     REF_getter<MsgEvt::GetTransactionREQ> rt=new MsgEvt::GetTransactionREQ();
     if(!li.leader_cert_2.valid())
@@ -596,6 +599,20 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 }
 #include "__crc32.h"
 #include <stdlib.h>
+int Node::Service::nodeDistanceToLeader(const NODE_id& node)
+{
+    auto nv=root->getNodesNames(NULL);
+    int crc=__crc32(0,prev_block_hash.container.data(),prev_block_hash.container.size());
+    int idx=crc % nv.size();
+        int npoz=-1;
+        for(int i=0;i<nv.size();i++)
+        {
+            if(node==nv[i])
+                npoz=i;
+        }
+        return abs(idx-npoz);
+
+}
 bool Node::Service::isNodeGreaterOrEqual(const NODE_id& nodeLeft, const NODE_id& nodeRight)
 {
     if(nodeLeft==nodeRight)
