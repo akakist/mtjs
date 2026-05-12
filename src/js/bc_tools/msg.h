@@ -760,18 +760,18 @@ namespace MsgEvt
         {
             return new GetSavedBlocksREQ();
         }
-        BigInt myEpoch;
+        BigInt epoch;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<myEpoch;
+            b<<epoch;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>myEpoch;
+            b>>epoch;
         }
     };
     struct BlockDBStore: public Base

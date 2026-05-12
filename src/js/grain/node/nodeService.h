@@ -25,7 +25,7 @@
 #include "blst_cp.h"
 
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
-#define HEART_BEAT_TIMEDOUT_SEC 20
+// #define HEART_BEAT_TIMEDOUT_SEC 5
 #define HEART_BEAT_INTERVAL_SEC 5
 
 enum State
@@ -155,7 +155,7 @@ namespace Node
         void do_heart_beat();
 
         // bool HeartBeatREQ(const MsgEvt::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
-        bool HeartBeatREQ(const MsgEvt::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
+        bool HeartBeatREQ(const MsgEvt::HeartBeatREQ* h,const NODE_id &src_node, const route_t& route);
         bool HeartBeatRSP(const MsgEvt::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
         bool GetTransactionREQ(const MsgEvt::GetTransactionREQ* r, const NODE_id & src_node, const route_t& route);
         bool GetTransactionRSP(const MsgEvt::GetTransactionRSP* r, const NODE_id & src_node, const route_t& route);
@@ -170,6 +170,7 @@ namespace Node
         bool ConfirmLeaderREQ(const MsgEvt::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
         bool ConfirmLeaderRSP(const MsgEvt::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
 
+        void initDB();
 
         // void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);
 
@@ -230,19 +231,22 @@ namespace Node
         // _prepared_block prepared_block;
         REF_getter<MsgEvt::BlockDBStore> prepared_block=nullptr;
         // void do_client_tx_report(const msg::publish_block &pb);
-// 
-        void setBlockId(const BLOCK_id& b)
-        {
-            prev_block_hash=b;
-            auto err=db->put_cell("#root_hash#",b.container);
-        }
-        BLOCK_id prev_block_hash;
+//
+        // void setBlockId(const BLOCK_id& b)
+        // {
+        //     prev_block_hash_Z=b;
+        //     auto err=db->put_cell("#root_hash#",b.container);
+        // }
+        BLOCK_id prev_block_hash_Z;
         void do_start_block();
 
         void collectTransactions();
         BLOCK_id execute_block(const REF_getter<root_data> &rt, const BLOCK_id & bl, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert);
 
-        void do_sync();
+        void do_sync(const NODE_id &src_node);
+
+        bool CheckState(const MsgEvt::HeartBeatREQ *r, const NODE_id & src_node);
+
 
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
 
