@@ -17,16 +17,16 @@
 #include "ioBuffer.h"
 #include "nodeService.h"
 #include "route_t.h"
+#include "t_params.h"
 #include "tools_mt.h"
 #include <SQLiteCpp/Database.h>
 #include <vector>
-
 
 bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
     XTRY;
-    if(CheckState(r->leader_certificateZ->heart_beat.get(), src_node))
+    if (CheckState(r->leader_certificateZ->heart_beat.get(), src_node))
         return true;
     // logErr2("")
     if (state_Z != State::NORMAL)
@@ -39,10 +39,11 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
     // }
 
     resetTimer();
-    if (!prepared_block.valid())
-        prepared_block = new MsgEvt::BlockDBStore;
+    if (!blockDBStore.valid())
+        throw CommonError("if (!blockDBStore.valid())");
+        // prepared_block = new MsgEvt::BlockDBStore;
     // sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT,NULL, NULL,HEART_BEAT_INTERVAL_SEC,this));
-    prepared_block->block_accepted_req = r;
+    blockDBStore->block_accepted_req = r;
     std::vector<blst_cpp::PublicKey> agg_pk;
     for (auto &z : r->node_validators)
     {
@@ -111,15 +112,15 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
         //     dbs.exec("CREATE INDEX IF NOT EXISTS   idx_prev_hash ON blocks(prev_root_hash);");
 
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
-        insert.bind(1, prepared_block->epoch.toString());
-        insert.bind(2, base62::encode(prepared_block->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash.container));
+        insert.bind(1, blockDBStore->epoch.toString());
+        insert.bind(2, base62::encode(blockDBStore->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash.container));
         insert.bind(3, time(NULL));
-        insert.bind(4, base62::encode(prepared_block->getBuffer()));
+        insert.bind(4, base62::encode(blockDBStore->getBuffer()));
         insert.exec();
         XPASS;
     }
 
-    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(prepared_block->getBuffer(), this));
+    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(blockDBStore->getBuffer(), this));
 
     // logNode("prev_block_hash_Z = r->block_payload->new_root_hash1;");
     prev_block_hash_Z = r->block_payload->new_root_hash1;
@@ -149,8 +150,8 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
     }
     iUtils->getNow();
 
-    logErr2("trs size %d", prepared_block->att_data.trs.size());
-    for (auto &z : prepared_block->att_data.trs)
+    logErr2("trs size %d", blockDBStore->att_data.trs.size());
+    for (auto &z : blockDBStore->att_data.trs)
     {
         XTRY;
         auto h = blake2b_hash(z.container);
@@ -163,7 +164,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
         // else logNode("remove tx failed %s",base62::encode(h.container).c_str());
         XPASS;
     }
-    prepared_block = nullptr;
+    blockDBStore = nullptr;
     {
         XTRY;
         do_heart_beat();
@@ -175,11 +176,11 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
 bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
-        if(CheckState(r->lc->heart_beat.get(),src_node))
+    if (CheckState(r->lc->heart_beat.get(), src_node))
         return true;
 
-        // if(state_Z!=NORMAL)
-        // return true;
+    // if(state_Z!=NORMAL)
+    // return true;
 
     resetTimer();
     if (r->lc->heart_beat->node_leader != node_leader_for_client)
@@ -264,7 +265,7 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
 {
     // if(state_Z!=NORMAL)
     //     return true;
-    if(CheckState(r->leader_cert->heart_beat.get(),src_node))
+    if (CheckState(r->leader_cert->heart_beat.get(), src_node))
         return true;
 
     resetTimer();
@@ -288,12 +289,17 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
     }
     {
 
-        auto new_root_hash = execute_block(root, prev_block_hash_Z, r->transaction_bodies, r->leader_cert->nodes);
+        // auto new_root_hash =
+        t_params t(root);
+        execute_block(t, root, prev_block_hash_Z, r->transaction_bodies, r->leader_cert->nodes);
+        blockDBStore = prepareBlockDBStore(r->transaction_bodies, t, r->leader_cert->nodes);
+        auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
+
         REF_getter<MsgEvt::BlockInfo> block = new MsgEvt::BlockInfo();
         block->prev_root_hash = prev_block_hash_Z;
         block->new_root_hash1 = new_root_hash;
 
-        block->attachment_hash.container = prepared_block->att_data.hash();
+        block->attachment_hash.container = blockDBStore->att_data.hash();
 
         block->payload_heart_beat = r->leader_cert->heart_beat;
 

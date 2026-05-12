@@ -32,27 +32,6 @@ enum State
 {
     NORMAL,SYNCING
 };
-struct _feeCalcers
-{
-    std::map<std::string /*pk*/,REF_getter<fee_calcer>> calcers;
-    REF_getter<fee_calcer> get(const std::string &pk)
-    {
-        auto it=calcers.find(pk);
-        if(it==calcers.end())
-        {
-            calcers.insert({pk,new fee_calcer});
-            it=calcers.find(pk);
-            if(it==calcers.end())
-                throw CommonError("if(it==calcers.end())");
-
-        }
-        return it->second;
-    }
-    void clear()
-    {
-        calcers.clear();
-    }
-};
 
 namespace Node
 {
@@ -210,6 +189,7 @@ namespace Node
 
         };
         _db_to_save db_to_save_Z;
+        REF_getter<MsgEvt::BlockDBStore> prepareBlockDBStore(const std::vector<TRANSACTION_body> &trs, const t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert);
 
         // time_t last_access_time_hbZ=0; // heart_bit last tick time
         REF_getter<MsgEvt::LeaderCertificate> last_leader_cert=nullptr;
@@ -229,7 +209,7 @@ namespace Node
         //     }
         // };
         // _prepared_block prepared_block;
-        REF_getter<MsgEvt::BlockDBStore> prepared_block=nullptr;
+        REF_getter<MsgEvt::BlockDBStore> blockDBStore=nullptr;
         // void do_client_tx_report(const msg::publish_block &pb);
 //
         // void setBlockId(const BLOCK_id& b)
@@ -241,7 +221,7 @@ namespace Node
         void do_start_block();
 
         void collectTransactions();
-        BLOCK_id execute_block(const REF_getter<root_data> &rt, const BLOCK_id & bl, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert);
+        void execute_block(t_params &t,const REF_getter<root_data> &rt, const BLOCK_id & bl, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert);
 
         void do_sync(const NODE_id &src_node);
 

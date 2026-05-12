@@ -499,16 +499,15 @@ void Node::Service::resetTimer()
 {
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 }
-BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLOCK_id &bl, const std::vector<TRANSACTION_body> &trs, const std::vector<NODE_id> &nodes_in_leader_cert)
+void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, const BLOCK_id &bl, const std::vector<TRANSACTION_body> &trs, const std::vector<NODE_id> &nodes_in_leader_cert)
 {
     MUTEX_INSPECTOR;
-    _feeCalcers feeCalcers;
 
-    auto &bt = blocks_leader[bl];
-    if (bt.executed)
-        throw CommonError("[%s] if(bt.executed) %s", this_node_name.container.c_str(), bl.str().c_str());
-    bt.executed = true;
-    t_params t(rt);
+    // auto &bt = blocks_leader[bl];
+    // if (bt.executed)
+    //     throw CommonError("[%s] if(bt.executed) %s", this_node_name.container.c_str(), bl.str().c_str());
+    // bt.executed = true;
+    // t_params t(rt);
     // std::vector<std::string> errs;
     outBuffer o;
     t.instruction_reports.resize(trs.size());
@@ -517,7 +516,7 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
         std::optional<std::string> t_err;
         THASH_id th = blake2b_hash(trs[ti].container);
         msg::user_message_req ur(trs[ti]);
-        REF_getter<fee_calcer> by = feeCalcers.get(ur.address_pk_ed);
+        REF_getter<fee_calcer> by = t.feeCalcers.get(ur.address_pk_ed);
         // if(!u.valid())
         //     throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
         if (!ur.verify())
@@ -550,58 +549,65 @@ BLOCK_id Node::Service::execute_block(const REF_getter<root_data> &rt, const BLO
         else
             t.setTxError(th, *t_err);
     }
-    if (!prepared_block.valid())
-        prepared_block = new MsgEvt::BlockDBStore;
-    prepared_block->epoch = rt->getEpoch(NULL)->epoch;
-    prepared_block->att_data.transaction_reports = t.transaction_reports;
-    prepared_block->att_data.trs = trs;
 
-    auto newEpoch = rt->getEpoch(NULL);
+    // feeCalcers.clear();
+    // return new_root_hash;
+}
+REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const std::vector<TRANSACTION_body> &trs, const t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert)
+{
+    // if (!prepared_block.valid())
+    REF_getter<MsgEvt::BlockDBStore>    pb = new MsgEvt::BlockDBStore;
+    pb->epoch = root->getEpoch(NULL)->epoch;
+    pb->att_data.transaction_reports = t.transaction_reports;
+    pb->att_data.trs = trs;
+
+    auto newEpoch = root->getEpoch(NULL);
     newEpoch->epoch += 1;
     newEpoch->setDirty();
 
-    auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(rt);
+    auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
     BigInt total_fees;
-    for (auto &z : feeCalcers.calcers)
+    for (auto &z : t.feeCalcers.calcers)
     {
-        auto u = rt->getUserState(z.first, NULL);
+        auto u = root->getUserState(z.first, NULL);
         if (!u.valid())
             throw CommonError("if(!u.valid()) 334455");
         if (u->balance < z.second->get_fee())
         {
             u->balance = 0;
+            u->setDirty();
         }
         else
         {
             logErr2("balance deduct %s fee %s", u->balance.toString().c_str(), z.second->get_fee().toString().c_str());
             u->balance -= z.second->get_fee();
+            u->setDirty();
         }
         total_fees += z.second->get_fee();
-        prepared_block->att_data.fees[z.first] = z.second->get_fee();
+        pb->att_data.fees[z.first] = z.second->get_fee();
     }
     BigInt total_rewards = (total_fees * 9) / 10;
     for (auto &n : nodes_in_leader_cert)
     {
-        auto node = rt->getNode(n, NULL);
+        auto node = root->getNode(n, NULL);
         if (!node.valid())
             throw CommonError("if(!node.valid()) 556677");
         auto owner = node->owner_ed_pk;
-        auto u = rt->getUserState(owner, NULL);
+        auto u = root->getUserState(owner, NULL);
         if (!u.valid())
         {
             throw CommonError("if(!u.valid()) 778899");
             // u=root->addUser(upk,NULL);
         }
-        BigInt amt = (total_rewards * node->total_stake) / rt->getValues(NULL)->total_staked;
+        BigInt amt = (total_rewards * node->total_stake) / root->getValues(NULL)->total_staked;
         u->balance += amt;
+        u->setDirty();
         if (n == this_node_name && amt > 0)
             logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
-        prepared_block->att_data.rewards[n] = amt;
+        pb->att_data.rewards[n] = amt;
     }
-    new_root_hash = proceed_merkle_on_transaction_pool_hashers(rt);
-    feeCalcers.clear();
-    return new_root_hash;
+    return pb;
 }
 BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)
 {

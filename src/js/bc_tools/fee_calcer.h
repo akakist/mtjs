@@ -19,3 +19,26 @@ public:
     }
 
 };
+
+
+struct _feeCalcers
+{
+    std::map<std::string /*pk*/,REF_getter<fee_calcer>> calcers;
+    REF_getter<fee_calcer> get(const std::string &pk)
+    {
+        auto it=calcers.find(pk);
+        if(it==calcers.end())
+        {
+            calcers.insert({pk,new fee_calcer});
+            it=calcers.find(pk);
+            if(it==calcers.end())
+                throw CommonError("if(it==calcers.end())");
+
+        }
+        return it->second;
+    }
+    void clear()
+    {
+        calcers.clear();
+    }
+};

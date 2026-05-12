@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstddef>
 #include <SQLiteCpp/Database.h>
+#include "t_params.h"
 #include "tools_mt.h"
 #include "init_root.h"
 
@@ -47,8 +48,8 @@ bool Node::Service::GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ *r, const 
 
     BigInt epoch = 0;
     {
-        logNode("Query FROM epoch %s",r->epoch.toString().c_str());
-        SQLite::Statement query1(dbs, "SELECT epoch, data FROM blocks WHERE epoch>="+r->epoch.toString()+" LIMIT 20");
+        logNode("Query FROM epoch %s", r->epoch.toString().c_str());
+        SQLite::Statement query1(dbs, "SELECT epoch, data FROM blocks WHERE epoch>=" + r->epoch.toString() + " LIMIT 20");
         // query1.bind(1, r->epoch.toString());
         bool found = false;
         while (query1.executeStep())
@@ -80,9 +81,9 @@ bool Node::Service::GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ *r, const 
     //     REF_getter<MsgEvt::BlockDBStore> bds = new MsgEvt::BlockDBStore();
     //     bds->unpack2(in);
     //     ret->blocks_Z.push_back({epoch, bds});
-        
+
     // }
-    logNode("QUERY RESULTS %d",ret->blocks_Z.size());
+    logNode("QUERY RESULTS %d", ret->blocks_Z.size());
 
     ret->lastEpoch = root->getEpoch(NULL)->epoch;
     msg::node_message_ed nm(ret->getBuffer(), this_node_name, my_sk_ed);
@@ -90,7 +91,6 @@ bool Node::Service::GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ *r, const 
 
     return true;
 }
-
 
 bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const NODE_id &src_node, const route_t &route)
 {
@@ -102,7 +102,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const 
         // if(z.second->epoch!=z.first)
         //     throw CommonError("if(hb.epoch!=z.first)");
         logNode("recv block epoch %s", z.second->block_accepted_req->leader_certificateZ->heart_beat->epoch.toString().c_str());
-        logNode("cur epoch %s",root->getEpoch(NULL)->epoch.toString().c_str());
+        logNode("cur epoch %s", root->getEpoch(NULL)->epoch.toString().c_str());
         if (z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash != prev_block_hash_Z)
         {
 
@@ -125,30 +125,43 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const 
             throw CommonError("on_get_blocks_rsp: !ba.agg_sig.verify");
         }
         // logNode("on_get_blocks_rsp: block verified OK");
+        t_params t(root);
+        execute_block(t, root, prev_block_hash_Z, z.second->att_data.trs, z.second->block_accepted_req->leader_certificateZ->nodes);
+        blockDBStore = prepareBlockDBStore(z.second->att_data.trs, t, z.second->block_accepted_req->leader_certificateZ->nodes);
+        // auto ep=root->getEpoch(NULL);
+        // ep->epoch+=1;
+        // ep->setDirty();
+        auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
-        auto new_root_hash = execute_block(root, prev_block_hash_Z, z.second->att_data.trs, z.second->block_accepted_req->leader_certificateZ->nodes);
         if (new_root_hash == z.second->block_accepted_req->block_payload->new_root_hash1)
         {
             logNode("on_get_blocks_rsp: block executed OK on epoch %s", z.second->epoch.toString().c_str());
-            auto epoch = root->getEpoch(NULL);
+            // auto epoch = root->getEpoch(NULL);
             // auto new_epoch=epoch->copy();
-            epoch->epoch = z.second->epoch + 1;
-            epoch->setDirty();
+            // epoch->epoch = z.second->epoch + 1;
+            // epoch->setDirty();
             // root->setEpoch(new_epoch);
             // db->write_batch(db_to_save_Z);
             // db_to_save_Z.clear();
-            proceed_merkle_on_transaction_pool_hashers(root);
+            // proceed_merkle_on_transaction_pool_hashers(root);
 
-            logNode("db->write_batch(db_to_save_Z); %d",db_to_save_Z.cells.size());
+            logNode("db->write_batch(db_to_save_Z); %d", db_to_save_Z.cells.size());
             db->write_batch(db_to_save_Z);
             db_to_save_Z.clear();
             // this->Set
             // logNode("prev_block_hash_Z = new_root_hash;");
             prev_block_hash_Z = new_root_hash;
+            // auto e=root->getEpoch(NULL)->epoch;
+            // root->getEpoch(NULL)->epoch=e+1;
+            // root->getEpoch(NULL)->setDirty();
+            // new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
+            // prev_block_hash_Z=new_root_hash;
+            // db->write_batch(db_to_save_Z);
+            // db_to_save_Z.clear();
         }
         else
         {
-            root=new root_data(db.get());
+            root = new root_data(db.get());
             init_root(root);
             do_sync(src_node);
             logNode("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z.second->block_accepted_req->block_payload->new_root_hash1.str().c_str());
