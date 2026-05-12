@@ -52,7 +52,7 @@ bool Node::Service::GetTransactionRSP(const MsgEvt::GetTransactionRSP *r, const 
         if (hbs.leader_info.leader_cert_2.valid() && hbs.leader_info.leader_cert_2->nodes.size() == li.transaction_responders.size())
         {
             do_start_block();
-            logNode("do_start_block();");
+            // logNode("do_start_block();");
             li.transaction_responders.clear();
         }
     }
@@ -131,86 +131,6 @@ bool Node::Service::CheckState(const MsgEvt::HeartBeatREQ *r, const NODE_id & sr
     return 0;
 }
 
-bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const NODE_id &src_node, const route_t &route)
-{
-    XTRY;
-    MUTEX_INSPECTOR;
-    logNode("prev_block_hash %s", prev_block_hash_Z.str().c_str());
-    for (auto &z : r->blocks_Z)
-    {
-        // if(z.second->epoch!=z.first)
-        //     throw CommonError("if(hb.epoch!=z.first)");
-        logErr2("recv block epoch %s", z.second->block_accepted_req->leader_certificateZ->heart_beat->epoch.toString().c_str());
-        if (z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash != prev_block_hash_Z)
-        {
-
-            logNode("inval root hash %s %s", z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash.str().c_str(), prev_block_hash_Z.str().c_str());
-            logNode("received invalid block %s", z.second->epoch.toString().c_str());
-            continue;
-        }
-        else
-            logNode("ok received block %s", z.second->epoch.toString().c_str());
-        // throw CommonError("if(hb.epoch!=root->getValues(NULL)->epoch) %s %s",z.second->epoch.toString().c_str(), root->getEpoch(NULL)->epoch.toString().c_str()   );
-
-        std::vector<blst_cpp::PublicKey> agg_pk;
-        for (auto &k : z.second->block_accepted_req->node_validators)
-        {
-            auto n = root->getNode(k, NULL);
-            agg_pk.push_back(n->bls_pk);
-        }
-        if (!z.second->block_accepted_req->agg_sig.verify(agg_pk, blake2b_hash(z.second->block_accepted_req->block_payload->getBuffer()).container))
-        {
-            throw CommonError("on_get_blocks_rsp: !ba.agg_sig.verify");
-        }
-        // logNode("on_get_blocks_rsp: block verified OK");
-
-        auto new_root_hash = execute_block(root, prev_block_hash_Z, z.second->att_data.trs, z.second->block_accepted_req->leader_certificateZ->nodes);
-        if (new_root_hash == z.second->block_accepted_req->block_payload->new_root_hash1)
-        {
-            logNode("on_get_blocks_rsp: block executed OK on epoch %s", z.second->epoch.toString().c_str());
-            auto epoch = root->getEpoch(NULL);
-            // auto new_epoch=epoch->copy();
-            epoch->epoch = z.second->epoch + 1;
-            epoch->setDirty();
-            // root->setEpoch(new_epoch);
-            db->write_batch(db_to_save_Z);
-            db_to_save_Z.clear();
-            logNode("prev_block_hash_Z = new_root_hash;");
-            prev_block_hash_Z = new_root_hash;
-        }
-        else
-        {
-            throw CommonError("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z.second->block_accepted_req->block_payload->new_root_hash1.str().c_str());
-        }
-
-        SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-
-        logNode("insert epoch %s", z.second->epoch.toString().c_str());
-        // SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, data) VALUES (?, ?)");
-        // insert.bind(1, z.second->epoch.toString());
-        // insert.bind(2, z.second->getBuffer());
-        // insert.exec();
-        ///////////
-        SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
-        insert.bind(1, z.second->epoch.toString());
-        insert.bind(2, base62::encode(z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash.container));
-        insert.bind(3, time(NULL));
-        insert.bind(4, base62::encode(z.second->getBuffer()));
-        insert.exec();
-    }
-    if (r->lastEpoch > root->getEpoch(NULL)->epoch)
-    {
-        logNode("call3 do_sync();");
-
-        logNode("do_sync again: r.lastEpoch %s > root->getValues(NULL)->epoch %s", r->lastEpoch.toString().c_str(), root->getEpoch(NULL)->epoch.toString().c_str());
-        do_sync(src_node);
-        return true;
-    }
-    state_Z = State::NORMAL;
-    logNode("State::NORMAL");
-    XPASS;
-    return true;
-}
 
 bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
 {

@@ -1,5 +1,8 @@
 #pragma once
 #include <string>
+#include <vector>
+#include <stdint.h>
+#include <stdexcept>
 namespace base62
 {
     // std::string encode(const std::string& data);

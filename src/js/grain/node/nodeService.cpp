@@ -191,10 +191,9 @@ void Node::Service::initDB()
 void Node::Service::do_start_block()
 {
     MUTEX_INSPECTOR;
-    logNode("transaction_pool_of_leader sz %d", transaction_pool_of_leader.size());
+    // logNode("transaction_pool_of_leader sz %d", transaction_pool_of_leader.size());
     if (transaction_pool_of_leader.empty())
     {
-        logNode("if(transaction_pool_main.empty())");
         sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK, NULL, NULL, 0.5, this));
         return;
     }
@@ -485,7 +484,7 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
 // void Node::Service::on_blockResponse(const msg::block_response& br)
 void Node::Service::do_request_for_transactions(const Node::heart_beat_node_info &li)
 {
-    logNode("@@ %s", __FUNCTION__);
+    // logNode("@@ %s", __FUNCTION__);
     MUTEX_INSPECTOR;
     REF_getter<MsgEvt::GetTransactionREQ> rt = new MsgEvt::GetTransactionREQ();
     if (!li.leader_cert_2.valid())

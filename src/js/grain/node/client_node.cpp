@@ -121,7 +121,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
 
     sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(prepared_block->getBuffer(), this));
 
-    logNode("prev_block_hash_Z = r->block_payload->new_root_hash1;");
+    // logNode("prev_block_hash_Z = r->block_payload->new_root_hash1;");
     prev_block_hash_Z = r->block_payload->new_root_hash1;
     // root=nullptr;
     // root=getRoot(db.get());
