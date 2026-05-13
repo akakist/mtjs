@@ -276,6 +276,8 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
     //     passEvent(e);
     //     return true;
     // }
+    if(iUtils->isTerminating())
+        return true;
     try
     {
         MUTEX_INSPECTOR;

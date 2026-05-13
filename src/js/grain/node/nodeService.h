@@ -24,7 +24,7 @@
 #include "db_to_save.h"
 #include "blst_cp.h"
 
-#define BROADCAST_ACK_TIMEDOUT_SEC 0.2
+// #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 // #define HEART_BEAT_TIMEDOUT_SEC 5
 #define HEART_BEAT_INTERVAL_SEC 5
 
@@ -172,8 +172,6 @@ namespace Node
         {
             REF_getter<MsgEvt::BlockInfo> block_payload=nullptr;
             std::vector<REF_getter<MsgEvt::ValidateBlockRSP> > responses;
-            // BigInt stake_validators;
-            // std::map<NODE_id /*validator*/, blst_cpp::Signature> sigs;
 
 
 
@@ -184,7 +182,6 @@ namespace Node
 
             std::map<NODE_id, REF_getter<MsgEvt::BlockAcceptedRSP> > acceptors;
 
-            // int round_=0;
             heart_beat_info    heart_beat_store;
 
         };
@@ -198,25 +195,7 @@ namespace Node
         std::map<BLOCK_id,block> blocks_leader;
         NODE_id node_leader_for_client;
 
-        // struct _prepared_block
-        // {
-        //     attachment_data att_data;
-        //     BigInt epoch;
-        //     void clear()
-        //     {
-        //         att_data.clear();
-        //         epoch=0;
-        //     }
-        // };
-        // _prepared_block prepared_block;
         REF_getter<MsgEvt::BlockDBStore> blockDBStore=nullptr;
-        // void do_client_tx_report(const msg::publish_block &pb);
-//
-        // void setBlockId(const BLOCK_id& b)
-        // {
-        //     prev_block_hash_Z=b;
-        //     auto err=db->put_cell("#root_hash#",b.container);
-        // }
         BLOCK_id prev_block_hash_Z;
         void do_start_block();
 

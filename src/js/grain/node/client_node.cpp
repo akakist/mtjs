@@ -31,12 +31,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
     // logErr2("")
     if (state_Z != State::NORMAL)
         return true;
-    // if(r->leader_certificateZ->heart_beat->prev_block_hash!=prev_block_hash_Z)
-    // {
-    //     logNode("if(r->leader_certificateZ->heart_beat->prev_block_hash!=prev_block_hash_Z) %s %s", r->leader_certificateZ->heart_beat->prev_block_hash.str().c_str(),prev_block_hash_Z.str().c_str());
-    //     do_sync();
-    //     return true;
-    // }
 
     resetTimer();
     if (!blockDBStore.valid())
@@ -87,29 +81,10 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
     db->write_batch(db_to_save_Z);
     db_to_save_Z.clear();
 
-    // REF_getter<MsgEvt::BlockDBStore> pb=new MsgEvt::BlockDBStore();
-    // msg::publish_block pb;
-    // pb->att_data=prepared_block.att_data;
-    // outBuffer o;
-    // r->pack(o);
-    // pb->block_accepted_req=r;
-    // pb->epoch=prepared_block.epoch;
 
     {
         XTRY;
         SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-        // dbs.exec("CREATE TABLE IF NOT EXISTS blocks ("
-        //          "epoch INTEGER PRIMARY KEY, "
-        //          "data BLOB NOT NULL)");
-
-        //     dbs.exec(R"( CREATE TABLE IF NOT EXISTS  blocks (
-        // epoch INTEGER PRIMARY KEY,  -- номер блока (0,1,2...)
-        // prev_root_hash BLOB NOT NULL,
-        // data BLOB NOT NULL,
-        // date INTEGER NOT NULL
-        //     )
-        //     )");
-        //     dbs.exec("CREATE INDEX IF NOT EXISTS   idx_prev_hash ON blocks(prev_root_hash);");
 
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
         insert.bind(1, blockDBStore->epoch.toString());
@@ -122,11 +97,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
 
     sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(blockDBStore->getBuffer(), this));
 
-    // logNode("prev_block_hash_Z = r->block_payload->new_root_hash1;");
     prev_block_hash_Z = r->block_payload->new_root_hash1;
-    // root=nullptr;
-    // root=getRoot(db.get());
-    // init_root(root);
     blocks_leader.clear();
     node_leader_for_client.container.clear();
     sendEvent(ServiceEnum::TxValidator, new bcEvent::InvalidateRoot(this));
@@ -161,7 +132,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
             transaction_pool_of_leader.erase(it);
             logNode("removed tx %s", base62::encode(h.container).c_str());
         }
-        // else logNode("remove tx failed %s",base62::encode(h.container).c_str());
         XPASS;
     }
     blockDBStore = nullptr;
@@ -191,30 +161,12 @@ bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ *r, const 
         return true;
     }
     last_leader_cert = r->lc;
-    // if (root->getEpoch(NULL)->epoch < r->lc->heart_beat->epoch)
-    // {
-    //     if (state_Z != State::SYNCING)
-    //     {
-    //         // logNode("do_sync()");
-    //         state_Z = State::SYNCING;
-    //         logNode("call1 do_sync();");
-    //         do_sync();
-    //         return true;
-    //     }
-    // }
-    // if(src_node!=r->payload_lc->heart_beat->node_leader)
-    // {
-    //     logNode("messag src node != node leader %s %s",src_node.container.c_str(),r->payload_lc->heart_beat->node_leader.container.c_str());
-    //     return true;
-    // }
     if (node_leader_for_client != r->lc->heart_beat->node_leader)
     {
         if (isNodeGreaterOrEqual(r->lc->heart_beat->node_leader, node_leader_for_client))
         {
             node_leader_for_client = r->lc->heart_beat->node_leader;
 
-            // blocks[prev_block_hash].heart_beat_store.node_leader=r->lc->heart_beat->node_leader;
-            // blocks[prev_block_hash].heart_beat_store.leader_info[r->lc->heart_beat->node_leader].leader_cert=r->lc;
         }
         else
         {
@@ -225,30 +177,6 @@ bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ *r, const 
     }
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
-    // last_access_time_hbZ=time(NULL);
-
-    // if (r->lc->heart_beat->prev_block_hash != prev_block_hash_Z) /// todo непонятно как нода узнает достоверно, что предложенный hb.prev_block_hash валиден
-    // {
-    //     auto epoch = root->getEpoch(NULL);
-    //     logNode("root->getValues(NULL)->epoch<hb.epoch %s %s", root->getEpoch(NULL)->epoch.toString().c_str(), r->lc->heart_beat->epoch.toString().c_str());
-    //     if (epoch->epoch < r->lc->heart_beat->epoch)
-    //     {
-    //         logNode("if(root->getValues(NULL)->epoch<hb.epoch)");
-    //         if (state_Z != State::SYNCING)
-    //         {
-    //             // logNode("do_sync()");
-    //             state_Z = State::SYNCING;
-    //             last_leader_cert = r->lc;
-    //             logNode("call2 do_sync();");
-    //             do_sync();
-    //         }
-    //     }
-    //     else
-    //     {
-    //         logNode("invalid epoch, skipping");
-    //         return true;
-    //     }
-    // }
     REF_getter<MsgEvt::GetTransactionRSP> rsp = new MsgEvt::GetTransactionRSP;
     for (auto &z : transaction_pool_of_leader)
     {

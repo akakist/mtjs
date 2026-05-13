@@ -1,67 +1,164 @@
 #include "IInstance.h"
+#include "colorOutput.h"
 #include "configObj.h"
 #include "CUtils.h"
+#include <cstdio>
+#include <ctime>
+#include <exception>
+#include <string>
 #include <unistd.h>
 #include "commonError.h"
 #include <iostream>
+#include <signal.h>
 #include "common/mtjsEvent.h"
-void registerRPCService(const char* pn);
+// #include <sanitizer/lsan_interface.h>
+void registerRPCService(const char *pn);
 #ifdef __linux__
 #endif
-void registerMTJSModule(const char* pn);
-void registerSocketModule(const char* pn);
-void registerTimerService(const char* pn);
-void registerOscarModule(const char* pn);
-void registerHTTPModule(const char* pn);
-void registerMysqlModule(const char*pn);
-void registerWebHandlerModule(const char* pn);
-void registerTelnetService(const char*);
-void registerMTJSModule(const char* );
-void registerNodeService(const char* pn);
-void registerTxValidatorService(const char* pn);
-void registerBlockValidatorService(const char* pn);
-void registerBroadcasterTreeService(const char* pn);
-void registerGrainReaderService(const char* pn);
-void registerBlockStreamerService(const char* pn);
-struct par {
+void registerMTJSModule(const char *pn);
+void registerSocketModule(const char *pn);
+void registerTimerService(const char *pn);
+void registerOscarModule(const char *pn);
+void registerHTTPModule(const char *pn);
+void registerMysqlModule(const char *pn);
+void registerWebHandlerModule(const char *pn);
+void registerTelnetService(const char *);
+void registerMTJSModule(const char *);
+void registerNodeService(const char *pn);
+void registerTxValidatorService(const char *pn);
+void registerBlockValidatorService(const char *pn);
+void registerBroadcasterTreeService(const char *pn);
+void registerGrainReaderService(const char *pn);
+void registerBlockStreamerService(const char *pn);
+struct par
+{
     int n; /// n defises
     bool hasParam;
     std::string name;
     std::string default_v;
     std::string *varString;
     bool *varBool;
-    const char* descr;
+    const char *descr;
 };
 
-void help(const std::vector<par>& v)
+void help(const std::vector<par> &v)
 {
 
-
     // std::cout<< h;
-    std::cout<< "mtjs - JavaScript Engine\n\n";
-    std::cout<< "Usage:\n"
-             "\tmtjs [options] [script.js]\n";
+    std::cout << "mtjs - JavaScript Engine\n\n";
+    std::cout << "Usage:\n"
+                 "\tmtjs [options] [script.js]\n";
 
-    std::cout<< "Options:\n\n";
-    for(auto &z: v)
+    std::cout << "Options:\n\n";
+    for (auto &z : v)
     {
-        for(int i=0; i<z.n; i++)
-            std::cout<<"-";
-        if(z.descr) {
-            std::cout << z.name  << z.descr;
-            std::cout<< "\n";
+        for (int i = 0; i < z.n; i++)
+            std::cout << "-";
+        if (z.descr)
+        {
+            std::cout << z.name << z.descr;
+            std::cout << "\n";
         }
     }
     exit(1);
 }
+static bool ex = false;
+static time_t exTime = 0;
 
-int mainMTJS(int argc, char** argv )
+bool is_term = false;
+void onterm(int signum)
+{
+    if (is_term)
+        return;
+    is_term = true;
+    printf("\n@@ %s\n", __FUNCTION__);
+
+    // printf("call __lsan_do_leak_check();");
+    // __lsan_do_leak_check();
+    // __lsan_do_recoverable_leak_check();
+    // printf("... done\n");
+    // exit(1);
+    static std::string ss;
+    char s[200];
+    snprintf(s, sizeof(s), RED("Terminating on SIGNAL %d"), signum);
+    if (ss != s)
+    {
+        logErr2("%s", s);
+        ss = s;
+    }
+
+    // printf("ex %d \n",ex);
+    try
+    {
+
+        if (!ex || time(NULL) - exTime > 2)
+        {
+//    	    exTime=time(NULL);
+#ifndef WIN32
+
+            if (!iUtils)
+                return;
+            auto tc = iUtils->getIThreadNameController();
+            if (!tc)
+                return;
+            if (signum == SIGHUP)
+            {
+                tc->print_term(signum);
+                return;
+            }
+#endif
+
+            exTime = time(NULL);
+            ex = true;
+            printf("iUtils->setTerminate(1);");
+            iUtils->setTerminate(1);
+            // printf("            iUtils->setTerminate(1);\n");
+            tc->print_term(signum);
+            //            if(iUtils)
+            //                delete iUtils;
+
+            //            mega.stop();
+
+            printf(RED("Terminating on SIGNAL %d"), signum);
+            //            exit(1);
+        }
+    }
+    catch (const std::exception &e)
+    {
+        //        delete cFactory;
+        printf("onterm exception: %s\n", e.what());
+    }
+    catch (...)
+    {
+        //        delete cFactory;
+        printf("--Error: unknow error in on_term()\n");
+    }
+}
+
+int mainMTJS(int argc, char **argv)
 {
     // curl_global_init(CURL_GLOBAL_DEFAULT);
 
-    try {
-        iUtils=new CUtils(argc, argv, "mtjs");
-
+    try
+    {
+#ifdef KALL
+#ifndef _WIN32
+        signal(SIGPIPE, SIG_IGN);
+#endif
+        signal(SIGABRT, onterm);
+        signal(SIGTERM, onterm);
+        signal(SIGINT, onterm);
+        signal(SIGSEGV, onterm);
+        signal(SIGFPE, onterm);
+        signal(SIGILL, onterm);
+#ifndef _WIN32
+        signal(SIGQUIT, onterm);
+        signal(SIGBUS, onterm);
+        signal(SIGHUP, onterm);
+#endif
+        signal(10, onterm);
+#endif
+        iUtils = new CUtils(argc, argv, "mtjs");
 
         registerOscarModule(NULL);
         registerHTTPModule(NULL);
@@ -76,85 +173,81 @@ int mainMTJS(int argc, char** argv )
         registerBlockValidatorService(NULL);
         registerBroadcasterTreeService(NULL);
         registerGrainReaderService(NULL);
-	    registerBlockStreamerService(NULL);
-
-
+        registerBlockStreamerService(NULL);
 
 #ifdef WEBDUMP
         registerWebHandlerModule(NULL);
 #endif
 
-
 #ifdef __linux__
         // registerMysqlModule(NULL);
 #endif
 
-        std::string mtjs_STACK_SIZE="8388608";
-        std::string mtjs_pool_size="10";
+        std::string mtjs_STACK_SIZE = "8388608";
+        std::string mtjs_pool_size = "10";
         std::string js;
-        std::string SocketIO_n_workers="10";
-        std::string SocketIO_epoll_timeout_millisec="2000";
-        std::string mtjs_pending_timeout="0.200000";
+        std::string SocketIO_n_workers = "10";
+        std::string SocketIO_epoll_timeout_millisec = "2000";
+        std::string mtjs_pending_timeout = "0.200000";
 
-
-        bool isDaemon=false;
-        bool isHelp=false;
-        bool isVersion=false;
+        bool isDaemon = false;
+        bool isHelp = false;
+        bool isVersion = false;
         std::vector<par> v =
-        {
-            {   1,true,"e","",& js,nullptr,R"(, --eval <code>
+            {
+                {1, true, "e", "", &js, nullptr, R"(, --eval <code>
     Execute JavaScript code passed as <code> from the command line.
     Useful for quick tests or inline scripts.
 )"},
-{1,false,"d","",nullptr,&isDaemon,R"(, --daemon
+                {1, false, "d", "", nullptr, &isDaemon, R"(, --daemon
     Run mtjs as a daemon (in the background). The process will detach from the console.
 )"},
-{2,false,"daemon","",nullptr,&isDaemon,nullptr},
-{1,false,"h","",nullptr,&isHelp,R"(, --help
+                {2, false, "daemon", "", nullptr, &isDaemon, nullptr},
+                {1, false, "h", "", nullptr, &isHelp, R"(, --help
       Display this help message and exit.
-)"},        
-{2,false,"help","",nullptr,&isHelp,nullptr},
-{1,false,"v","",nullptr,&isVersion,R"(, --version
+)"},
+                {2, false, "help", "", nullptr, &isHelp, nullptr},
+                {1, false, "v", "", nullptr, &isVersion, R"(, --version
     Print mtjs version information and exit.
 )"},
-{2,false,"version","",nullptr,&isVersion,nullptr},
+                {2, false, "version", "", nullptr, &isVersion, nullptr},
 
-          };
+            };
 
-          // EAGAIN
+        // EAGAIN
         std::vector<std::string> unpaired;
         std::deque<std::string> dq;
-        for(int i=1;i<argc;i++)
+        for (int i = 1; i < argc; i++)
         {
             dq.push_back(argv[i]);
         }
 
-        while(dq.size())
+        while (dq.size())
         {
-            auto s=dq[0];
+            auto s = dq[0];
             dq.pop_front();
-            bool used=false;
-            for(auto & z: v)
+            bool used = false;
+            for (auto &z : v)
             {
                 std::string defises;
-                for(int j=0;j<z.n;j++)
-                    defises+="-";
-                
-                if(defises+z.name==s)
+                for (int j = 0; j < z.n; j++)
+                    defises += "-";
+
+                if (defises + z.name == s)
                 {
-                    used=true;
-                    if(z.hasParam)
+                    used = true;
+                    if (z.hasParam)
                     {
 
-                        if(!dq.size())
+                        if (!dq.size())
                         {
                             help(v);
                         }
-                        auto p=dq[0];
+                        auto p = dq[0];
                         dq.pop_front();
-                        if(z.varString)
+                        if (z.varString)
                         {
-                            *z.varString=p;
+                            *z.varString = p;
                         }
                         else
                         {
@@ -163,99 +256,98 @@ int mainMTJS(int argc, char** argv )
                     }
                     else
                     {
-                        if(z.varBool)    
-                        *z.varBool=true;
+                        if (z.varBool)
+                            *z.varBool = true;
                     }
                 }
             }
-            if(!used)
+            if (!used)
                 unpaired.push_back(s);
-            
-
         }
-        if(isVersion)
+        if (isVersion)
         {
-          #define mtjs_VERSION "0.1.0"
-            std::cout<< "mtjs - JavaScript Engine\n";
-            std::cout<< "mtjs version: "<<mtjs_VERSION<<std::endl;
-            std::cout<< "mtjs build date: "<<__DATE__<<std::endl;
-            std::cout<< "mtjs build time: "<<__TIME__<<std::endl;
+#define mtjs_VERSION "0.1.0"
+            std::cout << "mtjs - JavaScript Engine\n";
+            std::cout << "mtjs version: " << mtjs_VERSION << std::endl;
+            std::cout << "mtjs build date: " << __DATE__ << std::endl;
+            std::cout << "mtjs build time: " << __TIME__ << std::endl;
             exit(0);
         }
-        if(isHelp)
+        if (isHelp)
         {
             help(v);
         }
-        if(unpaired.size()>1)
+        if (unpaired.size() > 1)
         {
-          std::cout<< "To many scripts\n";
-          exit(1);
+            std::cout << "To many scripts\n";
+            exit(1);
             // help(v);
         }
-        if(unpaired.size() && !js.empty())
+        if (unpaired.size() && !js.empty())
         {
-          std::cout<< "To many scripts\n";
-          exit(1);
+            std::cout << "To many scripts\n";
+            exit(1);
         }
-        if(unpaired.size()==1 && js.empty())
-            js=iUtils->load_file(unpaired[0]);
+        if (unpaired.size() == 1 && js.empty())
+            js = iUtils->load_file(unpaired[0]);
 
-        if(js.empty())
+        if (js.empty())
         {
-            std::cout<< "No script specified\n";
+            std::cout << "No script specified\n";
             help(v);
             exit(1);
-          }
-        if(isDaemon)
+        }
+        if (isDaemon)
         {
-          if (fork()) exit(1);
+            if (fork())
+                exit(1);
         }
 
         {
-            IInstance *instance1=iUtils->createNewInstance("MTJS");
-            ConfigObj *cnf1=new ConfigObj("MTJS",
-        				    (std::string)
-                                          "\nStart=MTJS"+
-                                          #ifdef __linux__
-//                                          ",DataFeedMWReader"+
-                                          #endif
-                                          "\nMTJS_STACK_SIZE="+mtjs_STACK_SIZE+
-                                          "\nMTJS_THREAD_POOL_SIZE="+mtjs_pool_size+
-                                          "\nmtjs_deviceName=Device"
-                                          "\nSocketIO_listen_backlog=128"
-                                          "\nSocketIO_size=1024"
-                                          "\nSocketIO_epoll_timeout_millisec="+SocketIO_epoll_timeout_millisec+
-                                          "\nSocketIO_n_workers="+SocketIO_n_workers+
-                                          "\nOscar_maxPacketSize=33554432"
-                                          "\nMTJS_JS_FN="+std::string(argv[1])+""
-#ifdef WEBDUMP                                        
-                                          "\nWebHandler_bindAddr=INADDR_ANY:5555"
+            IInstance *instance1 = iUtils->createNewInstance("MTJS");
+            ConfigObj *cnf1 = new ConfigObj("MTJS",
+                                            (std::string) "\nStart=MTJS" +
+#ifdef __linux__
+            //                                          ",DataFeedMWReader"+
 #endif
-                                          "\nHTTP_max_post=1000000"
-                                          "\nHTTP_doc_urls=/pics,/html,/css"
-                                          "\nHTTP_document_root=./www"
-                                          "\nMTJS_PENDING_TIMEOUT="+mtjs_pending_timeout+
-					    ""
-                                          
-                                         );
+                                                "\nMTJS_STACK_SIZE=" + mtjs_STACK_SIZE +
+                                                "\nMTJS_THREAD_POOL_SIZE=" + mtjs_pool_size +
+                                                "\nmtjs_deviceName=Device"
+                                                "\nSocketIO_listen_backlog=128"
+                                                "\nSocketIO_size=1024"
+                                                "\nSocketIO_epoll_timeout_millisec=" +
+                                                SocketIO_epoll_timeout_millisec +
+                                                "\nSocketIO_n_workers=" + SocketIO_n_workers +
+                                                "\nOscar_maxPacketSize=33554432"
+                                                "\nMTJS_JS_FN=" +
+                                                std::string(argv[1]) + ""
+#ifdef WEBDUMP
+                                                                       "\nWebHandler_bindAddr=INADDR_ANY:5555"
+#endif
+                                                                       "\nHTTP_max_post=1000000"
+                                                                       "\nHTTP_doc_urls=/pics,/html,/css"
+                                                                       "\nHTTP_document_root=./www"
+                                                                       "\nMTJS_PENDING_TIMEOUT=" +
+                                                mtjs_pending_timeout +
+                                                ""
+
+            );
             instance1->setConfig(cnf1);
             instance1->initServices();
 
-            instance1->sendEvent(ServiceEnum::mtjs,new mtjsEvent::Eval(js,{}));
+            instance1->sendEvent(ServiceEnum::mtjs, new mtjsEvent::Eval(js, {}));
         }
 
-        
-
         sleep(2);
-//        system("mtjs 127.0.0.1 8081");
-        while(!iUtils->isTerminating())
+        //        system("mtjs 127.0.0.1 8081");
+        while (!iUtils->isTerminating())
             sleep(1);
         delete iUtils;
         return 0;
-
-    } catch (CommonError& e)
+    }
+    catch (CommonError &e)
     {
-        printf("CommonError %s\n",e.what());
+        printf("CommonError %s\n", e.what());
     }
     // curl_global_cleanup();
 

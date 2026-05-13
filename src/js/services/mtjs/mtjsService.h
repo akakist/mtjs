@@ -87,23 +87,48 @@ namespace MTJS
     public:
         void stop()
         {
-            opaque.async_deque->stop();
+            printf("KALL %s %d\n",__FILE__,__LINE__);
+            if(opaque.async_deque.valid())
+                opaque.async_deque->stop();
+            printf("KALL %s %d\n",__FILE__,__LINE__);
             for(auto& t:thread_pool)
             {
                 pthread_join(t,NULL);
             }
+            printf("KALL %s %d\n",__FILE__,__LINE__);
             thread_pool.clear();
+            printf("KALL %s %d\n",__FILE__,__LINE__);
             rconf=nullptr;
+            printf("KALL %s %d\n",__FILE__,__LINE__);
             opaque.clear();
+            printf("KALL %s %d\n",__FILE__,__LINE__);
+
+        //     for (;;) {
+        //         int job_count = JS_ExecutePendingJob(js_rt, &js_ctx);
+        //         if (job_count <= 0) break;
+        // // Даем возможность другим операциям выполниться, если нужно
+        // // usleep(1000);
+        //     }
+    
+    // // Шаг 2: (Опционально) Принудительно запускаем GC
+    //         JS_RunGC(js_rt);
             JS_FreeContext(js_ctx);
+            printf("KALL %s %d\n",__FILE__,__LINE__);
             JS_FreeRuntime(js_rt);
             // printf("allocs sz %ld\n",allocs.size());
 
         }
         void deinit()
         {
+            printf("KALL %s %d\n",__FILE__,__LINE__);
+            printf("@@ MTJS %s\n",__FUNCTION__);
+            printf("KALL %s %d\n",__FILE__,__LINE__);
+            printf("listenToEvent(NULL);");
+            // listenToEvent(NULL);
             ListenerBuffered1Thread::deinit();
+            printf("KALL %s %d\n",__FILE__,__LINE__);
             stop();
+            printf("KALL %s %d\n",__FILE__,__LINE__);
         }
 
         Service(const SERVICE_id &svs, const std::string&  nm,IInstance* ifa);
