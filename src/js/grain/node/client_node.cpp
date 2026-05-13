@@ -117,6 +117,8 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
         insert.bind(3, time(NULL));
         insert.bind(4, base62::encode(blockDBStore->getBuffer()));
         insert.exec();
+
+        printf("@@@ %s",getAllocsInfo().c_str());
         XPASS;
     }
 

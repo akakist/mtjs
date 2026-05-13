@@ -177,8 +177,7 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     m.amount.from_string(std::string(_amount));
 
     msg::user_message_req um;
-    // if(um.payload.size()==1)
-    // crypto_sign_ed25519_sk_to_seed(seed, sk.data());
+
     if(sk.size()!=crypto_sign_SECRETKEYBYTES)
         return JS_ThrowRangeError(ctx, "if(sk.size()!=crypto_sign_SECRETKEYBYTES)");
     unsigned char extracted_public[crypto_sign_PUBLICKEYBYTES];
@@ -187,22 +186,16 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     um.address_pk_ed=pk;
     um.payload.push_back(m.getBuffer());
     um.nonce.from_string((std::string)_nonce);
-    // auto skk=iUtils->hex2bin(_sk);
-    // if(skk.size()!=crypto_sign_SECRETKEYBYTES)
-    //     return JS_ThrowInternalError(ctx, "sk size invalid");
 
 
 
 
-    // um.pk.resize(crypto_sign_PUBLICKEYBYTES);
-    // crypto_sign_ed25519_sk_to_pk((uint8_t*)um.pk.data(), (unsigned char*)skk.data());
     um.sign(sk);
 
     auto buf=um.getBuffer();
     auto hash=blake2b_hash(buf);
     op->broadcaster->sendEvent(node_addr,ServiceEnum::TxValidator, new bcEvent::ClientMsg(buf, op->listener_->serviceId));
 
-    // logErr2("setalarm %lf",to);
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT,toRef(hash.container),NULL,to,op->listener_));
 
 

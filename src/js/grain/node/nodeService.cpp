@@ -143,29 +143,6 @@ void Node::Service::collectTransactions()
                 transaction_pool_of_leader.insert({blake2b_hash(z.container), z});
         }
     }
-    // transaction_pool_of_leader=std::move(ordered);
-    // for(auto& z: rm)
-    // {
-    //     transaction_pool_of_leader.erase(z);
-    // }
-    // rm.clear();
-
-    // for(auto& z: cnt)
-    // {
-    //     if(z.second.size()>1)
-    //     {
-    //         for(auto &k: z.second)
-    //         {
-    //             logErr2("tr: %s declined due multiple transaction from one sender",base62::encode(z.first).c_str());
-    //             rm.insert(k);
-    //         }
-    //     }
-    // }
-    // for(auto& z: rm)
-    // {
-    //     transaction_pool_of_leader.erase(z);
-    // }
-    // rm.clear();
 }
 // void
 
@@ -510,7 +487,7 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
     // t_params t(rt);
     // std::vector<std::string> errs;
     outBuffer o;
-    t.instruction_reports.resize(trs.size());
+    // t.instruction_reports.resize(trs.size());
     for (int ti = 0; ti < trs.size(); ti++)
     {
         std::optional<std::string> t_err;
@@ -535,8 +512,8 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
                     t_err = "invalid nonce";
                 if (!t_err)
                 {
-                    t.instruction_reports[ti].resize(ur.payload.size());
-                    execute_transaction(ti, t, ur.address_pk_ed, ur.payload, by);
+                    // t.instruction_reports[ti].resize(ur.payload.size());
+                    execute_transaction(th, t, ur.address_pk_ed, ur.payload, by);
                     // BigInt one;
                     // one=1;
                     u->nonce += 1;

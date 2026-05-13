@@ -13,6 +13,14 @@
 #include "s_ed.h"
 #include "NODE_id.h"
 #include "blst_cp.h"
+void inc_alloc(const std::string& s);
+void dec_alloc(const std::string& s);
+std::string getAllocsInfo();
+#define INC_ALLOC(s) inc_alloc(s)
+#define DEC_ALLOC(s) dec_alloc(s)
+
+
+
 struct instruction_report
 {
     int err_code;
@@ -24,6 +32,21 @@ struct instruction_report
         h.update(err_str);
         for(auto &s: logMsgs)
             h.update(s);
+    }
+    instruction_report()
+    {
+        INC_ALLOC("instruction_report");
+    }
+    instruction_report(const instruction_report& c)
+    {
+        INC_ALLOC("instruction_report");
+        err_code=c.err_code;
+        err_str=c.err_str;
+        logMsgs=c.logMsgs;
+    }
+    ~instruction_report()
+    {
+        DEC_ALLOC("instruction_report");
     }
 };
 
@@ -39,16 +62,30 @@ inline inBuffer & operator>> (inBuffer& b,  instruction_report &s)
 }
 struct transaction_report
 {
+    transaction_report()
+    {
+        INC_ALLOC("transaction_report");
+    }
+    ~transaction_report()
+    {
+        DEC_ALLOC("transaction_report");
+    }
+    transaction_report(const transaction_report& other) {
+        INC_ALLOC("transaction_report");
+        err_code=other.err_code;
+        err_str=other.err_str;
+        instruction_reports=other.instruction_reports;
+    }
     int err_code;
     std::string err_str;
-    std::vector<instruction_report> instruction_reports;
+    std::map<int,instruction_report> instruction_reports;
     void update(Blake2bHasher &h) const
     {
         h.update(std::to_string(err_code));
         h.update(err_str);
         for(auto& z: instruction_reports)
         {
-            z.update(h);
+            z.second.update(h);
         }
     }
 };
@@ -65,6 +102,14 @@ inline inBuffer & operator>> (inBuffer& b,  transaction_report &s)
 
 struct attachment_data
 {
+    attachment_data()
+    {
+        INC_ALLOC("attachment_data");
+    }
+    ~attachment_data()
+    {
+        DEC_ALLOC("attachment_data");
+    }
     std::vector<TRANSACTION_body> trs;
     std::map<THASH_id,transaction_report> transaction_reports;
     std::map<std::string,BigInt> fees;
@@ -185,8 +230,14 @@ namespace msg
     struct message_base
     {
         int type;
-        message_base(int type_):type(type_) {}
-        virtual ~message_base() {}
+        message_base(int type_):type(type_) {
+            INC_ALLOC("message_base");
+
+        }
+        virtual ~message_base() {
+            DEC_ALLOC("message_base");
+
+        }
         virtual void pack(outBuffer& b) const
         {
             MUTEX_INSPECTOR;
@@ -211,16 +262,24 @@ namespace msg
 
     struct user_message_req: public message_base
     {
-        user_message_req():message_base(msgid::user_message_req) {}
+        user_message_req():message_base(msgid::user_message_req) {
+            INC_ALLOC("user_message_req");
+        }
         user_message_req(inBuffer &in):message_base(msgid::user_message_req) {
+            INC_ALLOC("user_message_req");
             unpack(in);
         }
         user_message_req(const TRANSACTION_body& s):message_base(msgid::user_message_req) {
+            INC_ALLOC("user_message_req");
             inBuffer in(s.container);
             int t=in.get_PN();
             if(t!=msgid::user_message_req)
                 throw CommonError("if(t!=msgid::user_message_req)");
             unpack(in);
+        }
+        ~user_message_req()
+        {
+            DEC_ALLOC("user_message_req");
         }
         std::vector<std::string> payload;
         BigInt nonce;
@@ -265,7 +324,14 @@ namespace msg
     };
     struct transaction_added_rsp: public message_base
     {
-        transaction_added_rsp():message_base(msgid::transaction_added_rsp) {}
+        transaction_added_rsp():message_base(msgid::transaction_added_rsp) {
+
+            INC_ALLOC("transaction_added_rsp");
+        }
+        ~transaction_added_rsp()
+        {
+            DEC_ALLOC("transaction_added_rsp");
+        }
         int err;
         std::string err_str;
         THASH_id tx_hash;
@@ -290,10 +356,17 @@ namespace msg
 
     struct user_request: public message_base
     {
-        user_request():message_base(msgid::user_request) {}
+        user_request():message_base(msgid::user_request) {
+            INC_ALLOC("user_request");
+        }
         user_request(inBuffer& in):message_base(msgid::user_request)
         {
+            INC_ALLOC("user_request");
             unpack(in);
+        }
+        ~user_request()
+        {
+            DEC_ALLOC("user_request");
         }
         std::string payload;
         std::string rnd;
@@ -317,11 +390,16 @@ namespace msg
     {
         get_user_status_req():message_base(msgid::get_user_status_req)
         {
-
+            INC_ALLOC("get_user_status_req");
         }
         get_user_status_req(inBuffer &in):message_base(msgid::get_user_status_req)
         {
+            INC_ALLOC("get_user_status_req");
             unpack(in);
+        }
+        ~get_user_status_req()
+        {
+            DEC_ALLOC("get_user_status_req");
         }
         std::string address_pk_ed;
         void pack(outBuffer& b) const final
@@ -346,7 +424,11 @@ namespace msg
         BigInt balance;
         get_user_status_rsp():message_base(msgid::get_user_status_rsp)
         {
-
+                INC_ALLOC("get_user_status_rsp");
+        }
+        ~get_user_status_rsp()
+        {
+            DEC_ALLOC("get_user_status_rsp");
         }
         void pack(outBuffer& b) const final
         {
@@ -365,15 +447,23 @@ namespace msg
     struct node_message_ed: public message_base
     {
 
-        node_message_ed():message_base(msgid::node_message_ed) {}
+        node_message_ed():message_base(msgid::node_message_ed) {
+            INC_ALLOC("node_message_ed");
+        }
         node_message_ed(inBuffer& in):message_base(msgid::node_message_ed)
         {
+            INC_ALLOC("node_message_ed");
             unpack(in);
         }
         node_message_ed(const std::string _payload, const NODE_id & _src_node, const std::string& sk ):message_base(msgid::node_message_ed),
             payload(_payload),src_node(_src_node)
         {
+            INC_ALLOC("node_message_ed");
             signature=sign_ed(sk,blake2b_hash(_payload).container);
+        }
+        ~node_message_ed()
+        {
+            DEC_ALLOC("node_message_ed");
         }
         bool verify(const std::string & pk)
         {
@@ -401,11 +491,17 @@ namespace msg
 
 namespace MsgEvt
 {
+
     struct Base: public Refcountable
     {
         int type;
-        Base(int type_):type(type_) {}
-        virtual ~Base() {}
+        Base(int type_):type(type_) {
+            INC_ALLOC("Base");
+
+        }
+        virtual ~Base() {
+            DEC_ALLOC("Base");
+        }
         virtual void pack(outBuffer& b) const
         {
             MUTEX_INSPECTOR;
@@ -438,11 +534,18 @@ namespace MsgEvt
     {
         HeartBeatREQ():Base(msgid::HeartBeatREQ)
         {
+            INC_ALLOC("HeartBeatREQ");
 
         }
+
         HeartBeatREQ(const BLOCK_id& _prev_block_hash, const BigInt& _epoch, const NODE_id& _node_leader):Base(msgid::HeartBeatREQ),
         prev_block_hash(_prev_block_hash), epoch(_epoch), node_leader(_node_leader)
         {
+            INC_ALLOC("HeartBeatREQ");
+        }
+        ~HeartBeatREQ()
+        {
+            DEC_ALLOC("HeartBeatREQ");
         }
         BLOCK_id prev_block_hash;
         BigInt epoch;
@@ -474,7 +577,11 @@ namespace MsgEvt
     {
         LeaderCertificate():Base(msgid::LeaderCertificate), heart_beat(new MsgEvt::HeartBeatREQ())
         {
-
+            INC_ALLOC("LeaderCertificate");
+        }
+        ~LeaderCertificate()
+        {
+            DEC_ALLOC("LeaderCertificate");
         }
         REF_getter<MsgEvt::HeartBeatREQ> heart_beat;
         std::vector<NODE_id> nodes;
@@ -510,6 +617,11 @@ namespace MsgEvt
     {
         GetTransactionREQ():Base(msgid::GetTransactionREQ),lc(new LeaderCertificate())
         {
+            INC_ALLOC("GetTransactionREQ");
+        }
+        ~GetTransactionREQ()
+        {
+            DEC_ALLOC("GetTransactionREQ");
         }
         REF_getter<LeaderCertificate> lc;
         void pack(outBuffer& b) const final
@@ -535,6 +647,11 @@ namespace MsgEvt
     {
         ValidateBlockREQ():Base(msgid::ValidateBlockREQ),leader_cert(new LeaderCertificate())
         {
+            INC_ALLOC("ValidateBlockREQ");
+        }
+        ~ValidateBlockREQ()
+        {
+            DEC_ALLOC("ValidateBlockREQ");
         }
         static Base* construct()
         {
@@ -564,6 +681,10 @@ namespace MsgEvt
     struct BlockAcceptedREQ: public Base
     {
         BlockAcceptedREQ();
+        ~BlockAcceptedREQ()
+        {
+            DEC_ALLOC("BlockAcceptedREQ");
+        }
         static Base* construct()
         {
             return new BlockAcceptedREQ();
@@ -579,6 +700,11 @@ namespace MsgEvt
     {
         HeartBeatRSP():Base(msgid::HeartBeatRSP), payload_heart_beat(new HeartBeatREQ())
         {
+            INC_ALLOC("HeartBeatRSP");
+        }
+        ~HeartBeatRSP()
+        {
+            DEC_ALLOC("HeartBeatRSP");
         }
         REF_getter<HeartBeatREQ> payload_heart_beat;
         NODE_id node_signer;
@@ -613,11 +739,16 @@ namespace MsgEvt
         }
         GetTransactionRSP():Base(msgid::GetTransactionRSP)
         {
-            
+            INC_ALLOC("GetTransactionRSP");
         }
         GetTransactionRSP(inBuffer &in):Base(msgid::GetTransactionRSP)
         {
+            INC_ALLOC("GetTransactionRSP");
             unpack(in);
+        }
+        ~GetTransactionRSP()
+        {
+            DEC_ALLOC("GetTransactionRSP");
         }
 
         std::vector<TRANSACTION_body>  trs;
@@ -644,7 +775,11 @@ namespace MsgEvt
         }
         BlockInfo():Base(msgid::BlockInfo),payload_heart_beat(new HeartBeatREQ())
         {
-
+            INC_ALLOC("BlockInfo");
+        }
+        ~BlockInfo()
+        {
+            DEC_ALLOC("BlockInfo");
         }
         BigInt prev_epoch;
         BLOCK_id prev_root_hash;
@@ -682,7 +817,11 @@ namespace MsgEvt
         }
         ValidateBlockRSP(): Base(msgid::ValidateBlockRSP), payload_block(new BlockInfo())
         {
-
+            INC_ALLOC("ValidateBlockRSP");
+        }
+        ~ValidateBlockRSP()
+        {
+            DEC_ALLOC("ValidateBlockRSP");
         }
         REF_getter<BlockInfo> payload_block;
         blst_cpp::Signature sig;
@@ -724,7 +863,11 @@ namespace MsgEvt
         }
         BlockAcceptedRSP():Base(msgid::BlockAcceptedRSP)
         {
-
+            INC_ALLOC("BlockAcceptedRSP");
+        }
+        ~BlockAcceptedRSP()
+        {
+            DEC_ALLOC("BlockAcceptedRSP");
         }
         NODE_id node_signer;
         BLOCK_id new_root_hash;
@@ -754,7 +897,11 @@ namespace MsgEvt
     {
         GetSavedBlocksREQ():Base(msgid::GetSavedBlocksREQ)
         {
-
+            INC_ALLOC("GetSavedBlocksREQ");
+        }
+        ~GetSavedBlocksREQ()
+        {
+            DEC_ALLOC("GetSavedBlocksREQ");
         }
         static Base* construct()
         {
@@ -778,7 +925,11 @@ namespace MsgEvt
     {
         BlockDBStore():Base(msgid::BlockDBStore), block_accepted_req(new BlockAcceptedREQ())
         {
-
+                INC_ALLOC("BlockDBStore");
+        }
+        ~BlockDBStore()
+        {
+            DEC_ALLOC("BlockDBStore");
         }
         BigInt epoch;
         attachment_data att_data;
@@ -813,7 +964,11 @@ namespace MsgEvt
         }
         GetSavedBlocksRSP():Base(msgid::GetSavedBlocksRSP)
         {
-
+            INC_ALLOC("GetSavedBlocksRSP");
+        }
+        ~GetSavedBlocksRSP()
+        {
+            DEC_ALLOC("GetSavedBlocksRSP");
         }
         std::vector<std::pair<BigInt, REF_getter<MsgEvt::BlockDBStore>> > blocks_Z;
         BigInt lastEpoch;
@@ -851,8 +1006,12 @@ namespace MsgEvt
             return new DoHeartBeatREQ();
         }
         DoHeartBeatREQ():Base(msgid::DoHeartBeatREQ),prev_leader_cert(new LeaderCertificate)
+        {   
+            INC_ALLOC("DoHeartBeatREQ");
+        }
+        ~DoHeartBeatREQ()
         {
-
+            DEC_ALLOC("DoHeartBeatREQ");
         }
         REF_getter<LeaderCertificate> prev_leader_cert;
         void pack(outBuffer& b) const final
@@ -876,7 +1035,11 @@ namespace MsgEvt
         }
         ConfirmLeaderREQ():Base(msgid::ConfirmLeaderREQ), hb(new HeartBeatREQ)
         {
-
+                INC_ALLOC("ConfirmLeaderREQ");
+        }
+        ~ConfirmLeaderREQ()
+        {
+            DEC_ALLOC("ConfirmLeaderREQ");
         }
         REF_getter<HeartBeatREQ> hb;
         void pack(outBuffer& b) const final
@@ -900,7 +1063,11 @@ namespace MsgEvt
         }
         ConfirmLeaderRSP():Base(msgid::ConfirmLeaderRSP), hb(new HeartBeatREQ)
         {
-
+            INC_ALLOC("ConfirmLeaderRSP");
+        }
+        ~ConfirmLeaderRSP()
+        {
+            DEC_ALLOC("ConfirmLeaderRSP");
         }
         REF_getter<HeartBeatREQ> hb;
         blst_cpp::Signature sig;        
