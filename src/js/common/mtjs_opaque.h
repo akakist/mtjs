@@ -6,17 +6,17 @@
 #include <optional>
 #include <quickjs.h>
 #include "THASH_id.h"
-
+#include "jsValueGuard.h"
 struct JSPromise
 {
     JSContext *ctx;
     // JSValue promise_data[2];
-    JSValue resolve;
-    JSValue reject;
+    JSValueGuard resolve;
+    JSValueGuard reject;
     ~JSPromise()
     {
-        JS_FreeValue(ctx, resolve);
-        JS_FreeValue(ctx, reject);
+        // JS_FreeValue(ctx, resolve);
+        // JS_FreeValue(ctx, reject);
     }
 };
 struct mtjs_opaque

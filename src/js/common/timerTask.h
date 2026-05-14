@@ -2,22 +2,23 @@
 #include <quickjs.h>
 #include "REF.h"
 #include <vector>
+#include "jsValueGuard.h"
 struct TimerTask: public Refcountable
 {
     JSContext *ctx;
     bool isInterval;
-    JSValue cb;
+    JSValueGuard cb;
     double timeout;
     bool unrefed=false;
     uint64_t timerId;
-    std::vector<JSValue> fargs;
+    std::vector<JSValueGuard> fargs;
     ~TimerTask()
     {
-        JS_FreeValue(ctx,cb);
-        for(auto &z: fargs)
-        {
-            JS_FreeValue(ctx,z);
-        }
+        // JS_FreeValue(ctx,cb);
+        // for(auto &z: fargs)
+        // {
+        //     JS_FreeValue(ctx,z);
+        // }
     }
 
 };

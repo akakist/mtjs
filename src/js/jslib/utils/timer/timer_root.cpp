@@ -1,3 +1,4 @@
+#include "jsValueGuard.h"
 #include "quickjs.h"
 #include "common/mtjs_opaque.h"
 #include "Events/System/timerEvent.h"
@@ -5,35 +6,38 @@
 #include "common/jsscope.h"
 #include "common/timers.h"
 
-
 extern JSClassID js_timeout_class_id;
 
-static uint64_t idGen=0;
+static uint64_t idGen = 0;
 static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueConst *argv, bool isInterval)
 {
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    JSScope <10,10> scope(ctx);
+    JSScope<10, 10> scope(ctx);
 
-    if (argc < 1) {
+    if (argc < 1)
+    {
         logErr2("if(argc<1)");
         return JS_ThrowTypeError(ctx, "if(argc<1) js_setCommon");
     }
 
-    JSValue cb = JS_DupValue(ctx, argv[0]);
+    JSValueGuard cb(ctx, JS_DupValue(ctx, argv[0]));
     // scope.addValue(cb);
-    if (!JS_IsFunction(ctx, cb)) {
+    if (!JS_IsFunction(ctx, cb.get()))
+    {
         logErr2("if(!JS_IsFunction(ctx,cb))");
         return JS_EXCEPTION;
     }
 
     int64_t to;
-    if (argc > 1) {
+    if (argc > 1)
+    {
         if (JS_ToInt64(ctx, &to, argv[1]))
             return JS_EXCEPTION;
     }
-    std::vector<JSValue> fargs;
-    for (int i = 2; i < argc; i++) {
-        JSValue arg = JS_DupValue(ctx, argv[i]);
+    std::vector<JSValueGuard> fargs;
+    for (int i = 2; i < argc; i++)
+    {
+        JSValueGuard arg(ctx, JS_DupValue(ctx, argv[i]));
         // scope.addValue(arg);
         fargs.push_back(arg);
         // scope.detach(arg); // Передаём владение аргументом в fargs
@@ -41,19 +45,17 @@ static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueC
 
     // uint64_t timerId = idGen++;
     REF_getter<TimerTask> t = new TimerTask;
-    t->timerId=idGen++;
+    t->timerId = idGen++;
     t->ctx = ctx;
     t->isInterval = isInterval;
     t->fargs = std::move(fargs);
     t->timeout = double(to) / 1000.;
     t->cb = cb;
-    for(auto& z: t->fargs)
-    {
-        JS_DupValue(ctx, z);
-
-    }
-    JS_DupValue(ctx, t->cb);
-
+    // for (auto &z : t->fargs)
+    // {
+    //     JS_DupValue(ctx, z);
+    // }
+    // JS_DupValue(ctx, t->cb);
 
     // scope.detach(cb); // Передаём владение cb в t->cb
     op->rcf->timers.timers_refed.insert({t->timerId, t});
@@ -61,19 +63,22 @@ static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueC
     JSValue jsTimeout = JS_NewObjectClass(ctx, js_timeout_class_id);
 
     // scope.addValue(jsTimeout);
-    Timeout* timeout = new Timeout(t, op->rcf);
+    Timeout *timeout = new Timeout(t, op->rcf);
 
     JS_SetOpaque(jsTimeout, timeout);
     // scope.detach(jsTimeout); // Отсоединяем jsTimeout, так как оно возвращается
 
-    if (isInterval) {
-        logErr2("setTimer %lld %lf", t->timerId,t->timeout);
+    if (isInterval)
+    {
+        logErr2("setTimer %lld %lf", t->timerId, t->timeout);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(
-                                       Timers::TIMER_INTERVAL, toRef(std::to_string(t->timerId)), t.get(), t->timeout, op->listener_));
-    } else {
-        logErr2("SetAlarm %lld %lf", t->timerId,t->timeout);
+                                                           Timers::TIMER_INTERVAL, toRef(std::to_string(t->timerId)), t.get(), t->timeout, op->listener_));
+    }
+    else
+    {
+        logErr2("SetAlarm %lld %lf", t->timerId, t->timeout);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(
-                                       Timers::TIMER_TIMER, toRef(std::to_string(t->timerId)), t.get(), t->timeout, op->listener_));
+                                                           Timers::TIMER_TIMER, toRef(std::to_string(t->timerId)), t.get(), t->timeout, op->listener_));
     }
 
     return jsTimeout;
@@ -82,28 +87,33 @@ static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueC
 static JSValue js_clearCommon(JSContext *ctx, JSValueConst val, int argc, JSValueConst *argv, bool isInterval)
 {
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    JSScope <10,10> scope(ctx);
+    JSScope<10, 10> scope(ctx);
 
-    if (argc < 1) {
+    if (argc < 1)
+    {
         logErr2("if(argc<1)");
         return JS_ThrowTypeError(ctx, "if(argc<1) js_clearCommon");
     }
     // Извлечение Timeout из первого аргумента
-    Timeout* timeoutObj = static_cast<Timeout*>(JS_GetOpaque(argv[0], js_timeout_class_id));
-    if (!timeoutObj) {
+    Timeout *timeoutObj = static_cast<Timeout *>(JS_GetOpaque(argv[0], js_timeout_class_id));
+    if (!timeoutObj)
+    {
         logErr2("Expected Timeout object as first argument");
         return JS_ThrowTypeError(ctx, "Expected Timeout object as first argument");
     }
     uint64_t timerId = timeoutObj->timerTask->timerId;
 
-    if (isInterval) {
+    if (isInterval)
+    {
         logErr2("StopTimer %lld", timerId);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::StopTimer(
-                                       Timers::TIMER_INTERVAL, toRef(std::to_string(timerId)), op->listener_));
-    } else {
+                                                           Timers::TIMER_INTERVAL, toRef(std::to_string(timerId)), op->listener_));
+    }
+    else
+    {
         logErr2("StopAlarm %lld", timerId);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(
-                                       Timers::TIMER_TIMER, toRef(std::to_string(timerId)), op->listener_));
+                                                           Timers::TIMER_TIMER, toRef(std::to_string(timerId)), op->listener_));
     }
     op->rcf->timers.timers_refed.erase(timerId);
     op->rcf->timers.timers_unrefed.erase(timerId);
@@ -113,24 +123,23 @@ static JSValue js_clearCommon(JSContext *ctx, JSValueConst val, int argc, JSValu
 
 static JSValue js_setTimeout(JSContext *ctx, JSValueConst val, int argc, JSValueConst *argv)
 {
-    return js_setCommon(ctx,val,argc,argv,false);
+    return js_setCommon(ctx, val, argc, argv, false);
 }
 static JSValue js_setInterval(JSContext *ctx, JSValueConst val, int argc, JSValueConst *argv)
 {
-    return js_setCommon(ctx,val,argc,argv,true);
+    return js_setCommon(ctx, val, argc, argv, true);
 }
-
 
 static JSValue js_clearTimeout(JSContext *ctx, JSValueConst val, int argc, JSValueConst *argv)
 {
-    return js_clearCommon(ctx,val,argc,argv,false);
+    return js_clearCommon(ctx, val, argc, argv, false);
 }
 static JSValue js_clearInterval(JSContext *ctx, JSValueConst val, int argc, JSValueConst *argv)
 {
-    return js_clearCommon(ctx,val,argc,argv,true);
+    return js_clearCommon(ctx, val, argc, argv, true);
 }
 
-void register_timeout_class(JSContext* ctx);
+void register_timeout_class(JSContext *ctx);
 
 void init_timer(JSRuntime *rt, JSContext *gCtx)
 {
@@ -144,5 +153,4 @@ void init_timer(JSRuntime *rt, JSContext *gCtx)
     JS_FreeValue(gCtx, gObj);
 
     register_timeout_class(gCtx);
-
 }

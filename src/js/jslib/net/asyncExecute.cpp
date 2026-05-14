@@ -5,6 +5,7 @@
 #include "common/async_task.h"
 #include "common/jsscope.h"
 #include "common/mtjs_opaque.h"
+#include "jsValueGuard.h"
 
 
 
@@ -23,7 +24,8 @@ struct execute_task: public async_task
 
     void finalize(JSContext* ctx);
 
-    JSValue promise_data[2];
+    JSValueGuard g_resolve;
+    JSValueGuard g_reject;
 
     int rv=0;
     std::string error_str;
@@ -48,8 +50,12 @@ JSValue js_execute_async(JSContext *ctx, JSValueConst this_val, int argc, JSValu
         JSScope <10,10> scope(ctx);
 
         REF_getter<execute_task> task=new execute_task(op->listener_);
+        JSValue prom[2];
+        JSValue promise = JS_NewPromiseCapability(ctx, prom);
+        JSValueGuard g_resolve(ctx,prom[0]);
+        JSValueGuard g_reject(ctx,prom[1]);
+        JSValueGuard g_prom(ctx,promise);
 
-        JSValue promise = JS_NewPromiseCapability(ctx, task->promise_data);
         if (JS_IsException(promise)) {
             return JS_ThrowInternalError(ctx,"JS_NewPromiseCapability error");
         }
@@ -58,7 +64,7 @@ JSValue js_execute_async(JSContext *ctx, JSValueConst this_val, int argc, JSValu
 
         op->async_deque->push(task.get());
 
-        return promise;
+        return g_prom.release();
     } catch(std::exception &e)
     {
         logErr2("exception %s",e.what());
@@ -84,16 +90,15 @@ void execute_task::finalize(JSContext* ctx)
     JSScope <10,10> scope(ctx);
     if(rv==0)
     {
-        auto ret=JS_Call(ctx, promise_data[0], JS_UNDEFINED, 0, nullptr);
+        auto ret=JS_Call(ctx, g_resolve.get(), JS_UNDEFINED, 0, nullptr);
         scope.addValue(ret);
     } else {
         JSValue str=JS_NewString(ctx, error_str.c_str());
-
         scope.addValue(str);
-        auto ret=JS_Call(ctx, promise_data[1], JS_UNDEFINED, 1, &str);
+        auto ret=JS_Call(ctx, g_reject.get(), JS_UNDEFINED, 1, &str);
         scope.addValue(ret);
     }
-    qjs::free_promise_callbacks(ctx,promise_data);
+    // qjs::free_promise_callbacks(ctx,promise_data);
 
 
 }
