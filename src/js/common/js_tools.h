@@ -95,19 +95,21 @@ namespace qjs
     }
     inline JSValue json_to_jsobject(JSContext *ctx, const char *json_str, size_t len)
     {
+        JSScope<10,10> scope(ctx);
         JSValue val = JS_ParseJSON(ctx, json_str, len, "<json>");
-
+        scope.addValue(val);
         if (JS_IsException(val)) {
             JSValue err = JS_GetException(ctx);
-            const char *err_msg = JS_ToCString(ctx, err);
-            std::string error = err_msg ? err_msg : "Unknown JSON parsing error";
-            JS_FreeCString(ctx, err_msg);
-            JS_FreeValue(ctx, err);
+            scope.addValue(err);
+            auto err_msg = scope.toStdString(err);
+            std::string error = err_msg.size() ? err_msg : "Unknown JSON parsing error";
+            // JS_FreeCString(ctx, err_msg);
+            // JS_FreeValue(ctx, err);
             throw std::runtime_error("Failed to parse JSON: " + error);
         }
 
         if (!JS_IsObject(val)) {
-            JS_FreeValue(ctx, val);
+            // JS_FreeValue(ctx, val);
             throw std::runtime_error("Parsed JSON is not an object");
         }
 

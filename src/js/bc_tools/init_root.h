@@ -72,7 +72,7 @@ inline void init_root(const REF_getter<root_data> &r)
         if(n.valid()) continue;
 
         REF_getter<bc_node> nn=r->addNode(name,NULL);
-        nn->name=name;
+        nn->name_=name;
         nn->owner_ed_pk=u_root_pk;
         nn->total_stake=stakes[i];//.from_decimal(std::to_string(stakes[i]));
         nn->bls_pk.deserializeBase62Str(getenv2(keys[i].first));

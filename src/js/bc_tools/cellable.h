@@ -20,7 +20,8 @@ struct data_base : public Refcountable
 {
     int type;
     Cellable *parent;
-    data_base(int t, Cellable* _parent): type(t), parent(_parent) {}
+    data_base(int t, Cellable* _parent): Refcountable("data_base"),
+     type(t), parent(_parent) {}
     ~data_base()
     {
     }
@@ -49,6 +50,7 @@ extern std::vector< data_base* (*)(Cellable*)> db_constructors;
 
 struct Cellable: public Refcountable
 {
+        
     Cellable()= delete;
     Cellable& operator=(const Cellable&) = delete;
     static Cellable* construct(Cellable *p, const std::string& id, const REF_getter<fee_calcer>& bc)
@@ -71,7 +73,7 @@ struct Cellable: public Refcountable
 public:
     bool is_dirty=false;
 
-    Cellable(Cellable* _parent, const std::string & id, const REF_getter<fee_calcer>& bc): parent(_parent), m_id(id)
+    Cellable(Cellable* _parent, const std::string & id, const REF_getter<fee_calcer>& bc):Refcountable("cellable"),  parent(_parent), m_id(id)
     {
         if(bc.valid())
         {

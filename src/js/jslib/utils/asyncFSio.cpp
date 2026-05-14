@@ -41,6 +41,8 @@ static void file_handle_finalizer(JSRuntime *rt, JSValue val)
 
 struct c_js_fs_access: public async_task
 {
+            
+
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -108,6 +110,8 @@ JSValue js_fs_access(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
 struct c_js_fs_appendFile: public async_task
 {
+            
+
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -192,6 +196,8 @@ JSValue js_fs_appendFile(JSContext *ctx, JSValueConst this_val, int argc, JSValu
 }
 struct c_js_fs_chmod: public async_task
 {
+            
+
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -269,6 +275,8 @@ JSValue js_fs_chmod(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
 
 struct c_js_fs_chown: public async_task
 {
+            
+
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -348,6 +356,8 @@ JSValue js_fs_chown(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
 }
 struct c_js_fs_copyFile: public async_task
 {
+            
+
     int rv=-1;
     std::string errstr;
     std::string src,dst;
@@ -454,6 +464,8 @@ JSValue js_fs_copyFile(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
 
 struct c_js_fs_mkdir: public async_task
 {
+            
+
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -529,6 +541,8 @@ JSValue js_fs_mkdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
 }
 struct c_js_fs_mkdtemp: public async_task
 {
+            
+
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -604,6 +618,8 @@ JSValue js_fs_mkdtemp(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
 }
 struct filehandle_readFile: public async_task
 {
+            
+
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -695,6 +711,7 @@ JSValue js_fs_readFile(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
 
 struct filehandle_readdir: public async_task
 {
+        
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -783,6 +800,7 @@ JSValue js_fs_readdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
 
 struct filehandle_rmdir: public async_task
 {
+        
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -850,6 +868,7 @@ JSValue js_fs_rmdir(JSContext *ctx, JSValueConst this_val, int argc, JSValueCons
 
 struct filehandle_rename: public async_task
 {
+        
     int rv=-1;
     std::string errstr;
     std::string path1,path2;
@@ -919,6 +938,7 @@ JSValue js_fs_rename(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 }
 struct filehandle_unlink: public async_task
 {
+        
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -988,6 +1008,7 @@ JSValue js_fs_unlink(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
 struct filehandle_stat: public async_task
 {
+        
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -1075,6 +1096,7 @@ JSValue js_fs_stat(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
 }
 struct filehandle_symlink: public async_task
 {
+        
     int rv=-1;
     std::string errstr;
     std::string path1,path2;
@@ -1144,6 +1166,7 @@ JSValue js_fs_symlink(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
 }
 struct filehandle_truncate: public async_task
 {
+        
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -1217,6 +1240,7 @@ JSValue js_fs_truncate(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
 }
 struct filehandle_utimes: public async_task
 {
+        
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -1303,6 +1327,7 @@ JSValue js_fs_utimes(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 }
 struct filehandle_writeFile: public async_task
 {
+        
     int rv=-1;
     std::string errstr;
     std::string path;
@@ -1385,6 +1410,7 @@ JSValue js_fs_writeFile(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 
 struct filehandle_open: public async_task
 {
+        
     int fd;
     int rv=-1;
     std::string errstr;
@@ -1482,6 +1508,7 @@ JSValue js_fs_open(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
 
 struct filehandle_read: public async_task
 {
+        
     int fd;
     int rv=-1;
     std::string errstr;
@@ -1573,6 +1600,7 @@ JSValue js_filehandle_read(JSContext *ctx, JSValueConst this_val, int argc, JSVa
 
 struct filehandle_write: public async_task
 {
+        
     int fd;
     int rv=-1;
     std::string errstr;
@@ -1666,6 +1694,7 @@ JSValue js_filehandle_write(JSContext *ctx, JSValueConst this_val, int argc, JSV
 
 struct filehandle_close: public async_task
 {
+        
     int fd;
     int rv=-1;
     std::string errstr;

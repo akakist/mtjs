@@ -50,6 +50,7 @@ namespace bcEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new Msg(r);
@@ -81,6 +82,7 @@ namespace bcEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new Msg2(r);
@@ -112,6 +114,7 @@ namespace bcEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new MsgReply(r);
@@ -143,6 +146,7 @@ namespace bcEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new MsgReply2(r);
@@ -175,6 +179,7 @@ namespace bcEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new ClientMsg(r);
@@ -204,6 +209,7 @@ namespace bcEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new ClientMsgReply(r);
@@ -237,6 +243,7 @@ namespace bcEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new ClientTxSubscribeREQ(r);
@@ -262,6 +269,7 @@ class ClientTxSubscribeRSP: public Event::Base
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new ClientTxSubscribeRSP(r);
@@ -294,6 +302,7 @@ class ClientTxSubscribeRSP: public Event::Base
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return NULL;
@@ -326,6 +335,7 @@ class ClientTxSubscribeRSP: public Event::Base
     class InvalidateRoot: public Event::NoPacked
     {
     public:
+        
         static Base* construct(const route_t &r)
         {
             return NULL;
@@ -338,6 +348,7 @@ class ClientTxSubscribeRSP: public Event::Base
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return NULL;
@@ -353,6 +364,7 @@ class ClientTxSubscribeRSP: public Event::Base
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new SendToChild(r);
@@ -391,6 +403,7 @@ class ClientTxSubscribeRSP: public Event::Base
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new SendToChildAck(r);
@@ -419,6 +432,7 @@ class ClientTxSubscribeRSP: public Event::Base
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return NULL;
@@ -438,6 +452,7 @@ class ClientTxSubscribeRSP: public Event::Base
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return NULL;

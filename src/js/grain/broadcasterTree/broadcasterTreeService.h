@@ -33,6 +33,7 @@
     };
     struct TIMER_BROADCAST_ACK_TIMEDOUT_cookie: public Refcountable
     {
+        TIMER_BROADCAST_ACK_TIMEDOUT_cookie(): Refcountable("TIMER_BROADCAST_ACK_TIMEDOUT_cookie"){}
         SERVICE_id dstService;
         NODE_id dstName_;
         BroadcasterTree::TreeNode tree;

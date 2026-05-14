@@ -79,7 +79,7 @@ static JSValue js_on(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     {
         if (!JS_IsFunction(ctx, argv[i]))
             return JS_ThrowTypeError(ctx, "callback must be a function");
-        s->emitter->on(std::string(eventName), argv[i]);
+        s->emitter->on(std::string(eventName), JSValueGuard(ctx, JS_DupValue(ctx,argv[i])));
     }
 
     return JS_DupValue(ctx, this_val);
@@ -102,31 +102,31 @@ static JSValue js_emit(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
 
     return JS_NewBool(ctx, cnt>0);
 }
-static JSValue vectorToJSArray(JSContext *ctx, const std::vector<JSValue> &vec) {
+static JSValueGuard vectorToJSArray(JSContext *ctx, const std::vector<JSValueGuard> &vec) {
     JSValue jsArray = JS_NewArray(ctx);  // Создаём новый JS-массив
 
     for (size_t i = 0; i < vec.size(); ++i) {
         // Устанавливаем элемент в массив (индекс, значение)
-        JS_SetPropertyUint32(ctx, jsArray, i, JS_DupValue(ctx, vec[i]));
+        JS_SetPropertyUint32(ctx, jsArray, i, JS_DupValue(ctx, vec[i].get()));
     }
 
-    return jsArray;  // Возвращаем JS-массив
+    return JSValueGuard(ctx,jsArray);  // Возвращаем JS-массив
 }
-static JSValue js_get_listeners(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+static JSValueGuard js_get_listeners(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     JSEventEmitterData *s = (JSEventEmitterData *)JS_GetOpaque2(ctx, this_val, js_event_emitter_class_id);
     if (!s)
-        return JS_ThrowInternalError(ctx, "js_get_listeners: if(!s)");
+        return JSValueGuard(ctx,JS_ThrowInternalError(ctx, "js_get_listeners: if(!s)"));
     JSScope <10,10> scope(ctx);
-    if (argc != 1) return JS_ThrowTypeError(ctx, "js_get_listeners argc must be 1");
+    if (argc != 1) return JSValueGuard(ctx,JS_ThrowTypeError(ctx, "js_get_listeners argc must be 1"));
 
-    if (!JS_IsString(argv[0])) return JS_ThrowTypeError(ctx, "eventName must be a string");
+    if (!JS_IsString(argv[0])) return JSValueGuard(ctx,JS_ThrowTypeError(ctx, "eventName must be a string"));
     auto eventName=scope.toStdStringView(argv[0]);
-    if (eventName.empty()) return JS_ThrowTypeError(ctx, "eventName must not be empty");
+    if (eventName.empty()) return JSValueGuard(ctx,JS_ThrowTypeError(ctx, "eventName must not be empty"));
 
     auto listeners=s->emitter->listeners(std::string(eventName));
 
-    JSValue arr = vectorToJSArray(ctx, listeners);
+    auto arr = vectorToJSArray(ctx, listeners);
 
     return arr;
 

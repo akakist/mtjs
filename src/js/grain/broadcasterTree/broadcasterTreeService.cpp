@@ -180,10 +180,10 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
     {
         auto nn = root->getNode(nd, NULL);
         BroadcasterTree::Node n;
-        n.name = nn->name;
+        n.name = nn->name_;
         n.stake = nn->total_stake;
         n.ip = nn->ip;
-        nodes[nn->name] = n;
+        nodes[nn->name_] = n;
     }
     if (nodes.size() == 0)
         return true;

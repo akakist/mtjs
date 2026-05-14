@@ -7,22 +7,25 @@
 #include "jsscope.h"
 #include "js_tools.h"
 #include "jHolder.h"
+#include "jsValueGuard.h"
 
 
 struct EventEmitter: public Refcountable
 {
+        
     int maxListeners=10;
-    std::map<std::string, std::set<JHolder>> m_listeners;
+    std::map<std::string, std::set<JSValueGuard>> m_listeners;
     JSContext* ctx;
     const char *comment;
-    EventEmitter(JSContext* _ctx, const char* _comment) : ctx(_ctx),  comment(_comment)
+    EventEmitter(JSContext* _ctx, const char* _comment) : Refcountable("EventEmitter"),
+        ctx(_ctx),  comment(_comment)
     {
     }
 
     int emit(const std::string& event, int argc, JSValue *argv);
 
-    void on(const std::string& event, JSValue listener);
-    std::vector<JSValue> listeners(const std::string& event);
+    void on(const std::string& event, const JSValueGuard& listener);
+    std::vector<JSValueGuard> listeners(const std::string& event);
 
     ~EventEmitter()
     {

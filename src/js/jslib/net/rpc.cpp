@@ -168,9 +168,9 @@ static JSValue js_rpc_on_server(JSContext *ctx, JSValueConst this_val, int argc,
         return JS_ThrowTypeError(ctx, "callback must be a function");
     }
 
-    auto method = scope.toStdStringView(argv[0]);
+    auto method = scope.toStdString(argv[0]);
 
-    op->rpc_on_srv_callbacks.insert({std::string(method),JHolder(ctx, argv[1])});
+    op->rpc_on_srv_callbacks.insert({method,JSValueGuard(ctx, JS_DupValue(ctx, argv[1]))});
 
     return JS_UNDEFINED;
 }
@@ -199,9 +199,9 @@ static JSValue js_rpc_on_client(JSContext *ctx, JSValueConst this_val, int argc,
         return JS_ThrowTypeError(ctx, "callback must be a function");
     }
 
-    auto method = scope.toStdStringView(argv[0]);
+    auto method = scope.toStdString(argv[0]);
 
-    op->rpc_on_cli_callbacks.insert({std::string (method),JHolder(ctx, argv[1])});
+    op->rpc_on_cli_callbacks.insert({method,JSValueGuard(ctx, JS_DupValue(ctx,argv[1]))});
 
     return JS_UNDEFINED;
 }

@@ -18,7 +18,7 @@ struct server_conf_base: public Refcountable
         TYPE_HTTP, TYPE_RPC, TYPE_NONE
     };
     server_conf_base(TYPE t, JSContext*c)
-        :typ(t), ctx(c)
+        : Refcountable("server_conf_base"), typ(t), ctx(c)
     {
     }
     TYPE typ;
@@ -32,6 +32,7 @@ struct server_conf_base: public Refcountable
 };
 struct server_conf_http: public server_conf_base
 {
+        
     /// WS
     std::map<std::string,JSValue> ws_callbacks;
     JSValue callback;
@@ -53,6 +54,7 @@ struct server_conf_http: public server_conf_base
 
 struct RCF: public Refcountable
 {
+        
     std::map<msockaddr_in,REF_getter<server_conf_base> > servers;
 
 
@@ -63,7 +65,7 @@ struct RCF: public Refcountable
     __timers timers;
 
     JSContext *ctx=nullptr;
-    RCF(JSContext* c):ctx(c) {
+    RCF(JSContext* c):Refcountable("RCF"), ctx(c) {
     }
     ~RCF()
     {

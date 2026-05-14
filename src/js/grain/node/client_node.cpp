@@ -260,6 +260,8 @@ bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ *r, const 
     // sendEvent(ServiceEnum::Node,new bcEvent::GetTransactions(route));
     return true;
 }
+int get_global_refcount();
+
 
 bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
 {
@@ -312,6 +314,7 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
         msg::node_message_ed nn(rsp->getBuffer(), this_node_name, my_sk_ed);
         passEvent(new bcEvent::MsgReply(nn.getBuffer(), poppedFrontRoute(route)));
     }
+    logNode("!!!!!!!!!!!!!! global REF count %d",get_global_refcount());
     return true;
 }
 

@@ -5,6 +5,7 @@
 #include "timeout.h"
 #include "common/jsscope.h"
 #include "common/timers.h"
+#include "jsscope.h"
 
 extern JSClassID js_timeout_class_id;
 
@@ -143,14 +144,15 @@ void register_timeout_class(JSContext *ctx);
 
 void init_timer(JSRuntime *rt, JSContext *gCtx)
 {
+    JSScope<10,10> scope(gCtx);
     JSValue gObj = JS_GetGlobalObject(gCtx);
+    scope.addValue(gObj);
     JS_DefinePropertyValueStr(gCtx, gObj, "setTimeout", JS_NewCFunction(gCtx, js_setTimeout, "setTimeout", 1), JS_PROP_C_W_E);
     JS_DefinePropertyValueStr(gCtx, gObj, "setInterval", JS_NewCFunction(gCtx, js_setInterval, "setInterval", 1), JS_PROP_C_W_E);
 
     JS_DefinePropertyValueStr(gCtx, gObj, "clearTimeout", JS_NewCFunction(gCtx, js_clearTimeout, "clearTimeout", 1), JS_PROP_C_W_E);
     JS_DefinePropertyValueStr(gCtx, gObj, "clearInterval", JS_NewCFunction(gCtx, js_clearInterval, "clearInterval", 1), JS_PROP_C_W_E);
 
-    JS_FreeValue(gCtx, gObj);
 
     register_timeout_class(gCtx);
 }

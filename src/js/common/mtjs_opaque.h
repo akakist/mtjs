@@ -28,11 +28,11 @@ struct mtjs_opaque
     REF_getter<RCF> rcf=nullptr;
     REF_getter< op_deque> async_deque=new op_deque;
 
-    std::map<std::string, JHolder> rpc_on_srv_callbacks;
-    std::map<std::string, JHolder> rpc_on_cli_callbacks;
-    std::optional<JHolder> telnet_callback;
+    std::map<std::string, JSValueGuard> rpc_on_srv_callbacks;
+    std::map<std::string, JSValueGuard> rpc_on_cli_callbacks;
+    std::optional<JSValueGuard> telnet_callback;
     std::map<THASH_id, JSPromise > node_req_promises;
-    std::optional<JHolder> tx_subscription_cb;
+    std::optional<JSValueGuard> tx_subscription_cb;
 
     void clear()
     {

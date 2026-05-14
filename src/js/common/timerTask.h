@@ -5,6 +5,7 @@
 #include "jsValueGuard.h"
 struct TimerTask: public Refcountable
 {
+        
     JSContext *ctx;
     bool isInterval;
     JSValueGuard cb;
@@ -12,6 +13,7 @@ struct TimerTask: public Refcountable
     bool unrefed=false;
     uint64_t timerId;
     std::vector<JSValueGuard> fargs;
+    TimerTask():Refcountable("ToimerTask"){}
     ~TimerTask()
     {
         // JS_FreeValue(ctx,cb);

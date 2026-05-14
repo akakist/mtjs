@@ -67,3 +67,10 @@ public:
         val = JS_UNDEFINED;
     }
 };
+
+inline int operator< (const JSValueGuard &a, const JSValueGuard &b)
+{
+    if(a.get().tag != b.get().tag) return a.get().tag < b.get().tag;
+    if(a.get().u.ptr != b.get().u.ptr) return  a.get().u.ptr < b.get().u.ptr;
+    return false;
+}

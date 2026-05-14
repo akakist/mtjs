@@ -404,7 +404,8 @@ namespace MsgEvt
     struct Base: public Refcountable
     {
         int type;
-        Base(int type_):type(type_) {}
+        Base(int type_):Refcountable("MsgEvt::Base"),
+        type(type_) {}
         virtual ~Base() {}
         virtual void pack(outBuffer& b) const
         {
@@ -436,6 +437,7 @@ namespace MsgEvt
     };
     struct HeartBeatREQ: public Base
     {
+        
         HeartBeatREQ():Base(msgid::HeartBeatREQ)
         {
 
@@ -472,6 +474,7 @@ namespace MsgEvt
     };
     struct LeaderCertificate: public Base
     {
+        
         LeaderCertificate():Base(msgid::LeaderCertificate), heart_beat(new MsgEvt::HeartBeatREQ())
         {
 
@@ -508,6 +511,7 @@ namespace MsgEvt
     };
     struct GetTransactionREQ: public Base
     {
+        
         GetTransactionREQ():Base(msgid::GetTransactionREQ),lc(new LeaderCertificate())
         {
         }
@@ -533,6 +537,7 @@ namespace MsgEvt
     };
     struct ValidateBlockREQ: public Base
     {
+        
         ValidateBlockREQ():Base(msgid::ValidateBlockREQ),leader_cert(new LeaderCertificate())
         {
         }
@@ -563,6 +568,7 @@ namespace MsgEvt
     struct BlockInfo;
     struct BlockAcceptedREQ: public Base
     {
+        
         BlockAcceptedREQ();
         static Base* construct()
         {
@@ -577,6 +583,7 @@ namespace MsgEvt
     };
     struct HeartBeatRSP: public Base
     {
+        
         HeartBeatRSP():Base(msgid::HeartBeatRSP), payload_heart_beat(new HeartBeatREQ())
         {
         }
@@ -607,6 +614,7 @@ namespace MsgEvt
     };
     struct GetTransactionRSP: public Base
     {
+        
         static Base* construct()
         {
             return new GetTransactionRSP();
@@ -638,6 +646,7 @@ namespace MsgEvt
     };
     struct BlockInfo: public Base
     {
+        
         static Base* construct()
         {
             return new BlockInfo();
@@ -676,6 +685,7 @@ namespace MsgEvt
     
     struct ValidateBlockRSP: public Base
     {
+        
         static Base* construct()
         {
             return new ValidateBlockRSP();
@@ -718,6 +728,7 @@ namespace MsgEvt
     };
     struct BlockAcceptedRSP: public Base
     {
+        
         static Base* construct()
         {
             return new BlockAcceptedRSP();
@@ -752,6 +763,7 @@ namespace MsgEvt
     };
     struct GetSavedBlocksREQ: public Base
     {
+        
         GetSavedBlocksREQ():Base(msgid::GetSavedBlocksREQ)
         {
 
@@ -776,6 +788,7 @@ namespace MsgEvt
     };
     struct BlockDBStore: public Base
     {
+        
         BlockDBStore():Base(msgid::BlockDBStore), block_accepted_req(new BlockAcceptedREQ())
         {
 
@@ -807,6 +820,7 @@ namespace MsgEvt
     };
     struct GetSavedBlocksRSP: public Base
     {
+        
         static Base* construct()
         {
             return new GetSavedBlocksRSP();
@@ -846,6 +860,7 @@ namespace MsgEvt
     };
     struct DoHeartBeatREQ: public Base
     {
+        
         static Base* construct()
         {
             return new DoHeartBeatREQ();
@@ -870,6 +885,7 @@ namespace MsgEvt
     };
     struct ConfirmLeaderREQ: public Base
     {
+        
         static Base* construct()
         {
             return new ConfirmLeaderREQ();
@@ -894,6 +910,7 @@ namespace MsgEvt
     };
     struct ConfirmLeaderRSP: public Base
     {
+        
         static Base* construct()
         {
             return new ConfirmLeaderRSP();

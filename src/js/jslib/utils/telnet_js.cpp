@@ -30,7 +30,7 @@ static JSValue js_telnet_set_callback(JSContext *ctx, JSValueConst this_val, int
         return JS_ThrowSyntaxError(ctx, "required 1 params");
     if(!JS_IsFunction(ctx,argv[0]))
         return JS_ThrowTypeError(ctx,"arg must be function");
-    op->telnet_callback.emplace(JHolder(ctx,argv[0]));
+    op->telnet_callback.emplace(JSValueGuard(ctx, JS_DupValue(ctx,argv[0])));
     return JS_UNDEFINED;
 }
 static JSValue js_telnet_listen(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)

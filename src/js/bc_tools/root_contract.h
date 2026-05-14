@@ -16,28 +16,29 @@
 
 struct bc_contract:  public data_base
 {
+        
     bc_contract(Cellable *p):data_base(hsh::bc_contract,p) {}
-    std::string name;
+    std::string name_;
     std::string owner;
     std::string src;
     void pack(outBuffer&b) const final
     {
         data_base::pack(b);
         b<<1;
-        b<<name<<owner<<src;
+        b<<name_<<owner<<src;
 
     }
     void unpack(inBuffer&b) final
     {
         data_base::unpack(b);
         auto v=b.get_PN();
-        b>>name>>owner>>src;
+        b>>name_>>owner>>src;
 
     }
     std::string dump() final
     {
         std::ostringstream o;
-        o<<"Contract: "  << name << std::endl;
+        o<<"Contract: "  << name_ << std::endl;
         o<< "Owner: " << base62::encode(owner) << std::endl;
         o<< "Src: " << src << std::endl;
 
@@ -46,6 +47,7 @@ struct bc_contract:  public data_base
 };
 struct bc_user: public data_base
 {
+        
     bc_user(Cellable* p): data_base(hsh::bc_user,p) {
     }
     std::string pkbin_еd;
@@ -98,6 +100,7 @@ struct bc_user: public data_base
 };
 struct bc_user_state: public data_base
 {
+        
     bc_user_state(Cellable* p): data_base(hsh::bc_user_state,p) {
         nonce=0;
         balance=0;
@@ -131,10 +134,11 @@ struct bc_user_state: public data_base
 struct bc_node: public data_base
 {
 
+        
     bc_node(Cellable *p):data_base(hsh::bc_node,p) {
         total_stake=0;
     }
-    NODE_id name;
+    NODE_id name_;
     std::string owner_ed_pk;
     blst_cpp::PublicKey bls_pk;
     std::string ed_pk;
@@ -145,19 +149,19 @@ struct bc_node: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<name<<owner_ed_pk<<bls_pk<<ed_pk<<ip<<stakes<<total_stake;
+        o<<name_<<owner_ed_pk<<bls_pk<<ed_pk<<ip<<stakes<<total_stake;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>total_stake;
+        o>>name_>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>total_stake;
     }
     std::string dump() final
     {
         std::ostringstream o;
-        o<< "Node: "<< name.container << std::endl;
+        o<< "Node: "<< name_.container << std::endl;
         o<< "Owner: "<< base62::encode(owner_ed_pk) << std::endl;
         o<< "bls_pk: "<< base62::encode(bls_pk.serialize()) << std::endl;
         o<< "ed_pk: "<< base62::encode(ed_pk) << std::endl;
@@ -175,6 +179,7 @@ struct bc_node: public data_base
 
 struct bc_values: public data_base
 {
+        
     enum __fee_types
     {
         contract_deploy,
@@ -237,6 +242,7 @@ struct bc_values: public data_base
 
 struct bc_epoch: public data_base
 {
+        
     bc_epoch(Cellable* p): data_base(hsh::bc_epoch,p) {
         epoch=0;
     }
@@ -267,6 +273,7 @@ REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vect
 
 struct root_data: public Cellable
 {
+        
     REF_getter<IDatabase> db;
     root_data(IDatabase *db_): Cellable(nullptr,"r",NULL),db(db_)
     {

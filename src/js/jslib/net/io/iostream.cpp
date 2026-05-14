@@ -10,6 +10,7 @@
 
 struct ConstReadableStringStream: public Stream
 {
+        
     std::string buf;
     std::string read(size_t n) final
     {
@@ -52,6 +53,7 @@ struct ConstReadableStringStream: public Stream
 };
 struct WriteableStringStream: public Stream
 {
+        
     std::deque<std::string> buf;
     MutexC mutex;
     Condition cond;
@@ -126,6 +128,7 @@ struct WriteableStringStream: public Stream
 
 struct FileReadableStream: public Stream
 {
+        
     FILE *fp;
     size_t content_length=0;
     std::string filename;
@@ -170,6 +173,7 @@ struct FileReadableStream: public Stream
 };
 struct FileWriteableStream: public Stream
 {
+        
     FILE *fp;
     FileWriteableStream(const std::string &fn): Stream("FileWriteableStream")
     {
@@ -217,6 +221,7 @@ struct FileWriteableStream: public Stream
 };
 struct EventEmitterStream: public Stream
 {
+        
     REF_getter<EventEmitter> emitter;
     std::deque<std::string> buf;
     bool streamEnded=false;
@@ -292,9 +297,9 @@ static JSValue js_WriteableStringStream_ctor(JSContext *ctx,
 
     s->stream=new WriteableStringStream();
     JSValue proto = JS_GetPropertyStr(ctx, new_target, "prototype");
+    scope.addValue(proto);
     if (JS_IsException(proto))
         return JS_EXCEPTION;
-    scope.addValue(proto);
     obj = JS_NewObjectProtoClass(ctx, proto, js_stream_class_id);
     if (JS_IsException(obj))
         return JS_EXCEPTION;
@@ -457,7 +462,7 @@ static JSValue js_stream_on(JSContext *ctx, JSValueConst this_val,
     if(!JS_IsString(argv[0])) return JS_ThrowSyntaxError(ctx, "event name must be string");
     if(!JS_IsFunction(ctx, argv[1])) return JS_ThrowSyntaxError(ctx, "callback must be function");
     auto eventName=scope.toStdStringView(argv[0]);
-    JSValue callback=argv[1];
+    JSValueGuard callback(ctx, JS_DupValue(ctx,argv[1]));
     EventEmitterStream *emitterStream=dynamic_cast<EventEmitterStream *>(s->stream.get());
     if(!emitterStream)
     {

@@ -38,6 +38,7 @@ namespace mtjsEvent
     class AsyncExecuted: public Event::NoPacked
     {
     public:
+        
         static Base* construct(const route_t &r)
         {
             return nullptr;
@@ -60,6 +61,7 @@ namespace mtjsEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new Eval(r);
@@ -87,6 +89,7 @@ namespace mtjsEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return nullptr;
@@ -104,6 +107,7 @@ namespace mtjsEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new mtjsRpcREQ(r);
@@ -128,6 +132,7 @@ namespace mtjsEvent
     {
 
     public:
+        
         static Base* construct(const route_t &r)
         {
             return new mtjsRpcRSP(r);

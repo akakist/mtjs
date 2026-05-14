@@ -9,6 +9,7 @@ struct fee_calcer: public Refcountable
 private:
     BigInt fee;
 public:
+    fee_calcer():Refcountable("feecalcer"){}
     void add(const BigInt &f)
     {
         fee+=f;

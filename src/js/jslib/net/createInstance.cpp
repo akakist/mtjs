@@ -122,8 +122,8 @@ JSValue js_tx_subscribe(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     if (!JS_IsFunction(ctx, argv[1]))
         return JS_ThrowInternalError(ctx, "callback not specified");
     std::string node_addr = (std::string)scope.toStdStringView(argv[0]);
-    JSValue cb = argv[1];
-    op->tx_subscription_cb.emplace(JHolder(ctx, cb));
+    // JSValue cb = argv[1];
+    op->tx_subscription_cb.emplace(JSValueGuard(ctx, JS_DupValue(ctx, argv[1])));
 
     op->broadcaster->sendEvent(node_addr, ServiceEnum::BlockStreamer, new bcEvent::ClientTxSubscribeREQ(op->listener_->serviceId));
 
@@ -148,10 +148,6 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     std::string node_addr = scope.toStdString(argv[0]);
     std::string sk = base62::decode(scope.toStdString(argv[1]));
 
-    // JSValue sk = JS_GetPropertyStr(ctx, argv[2], "sk");
-    // scope.addValue(sk);
-    // if(!JS_IsString(sk))
-    //     return JS_ThrowInternalError(ctx, "msg wrong param sk");
     JSValue amount = JS_GetPropertyStr(ctx, argv[2], "amount");
     scope.addValue(amount);
     if (!JS_IsString(amount))
@@ -402,16 +398,6 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
             m.src = src;
             um.payload.push_back(m.getBuffer());
         }
-        // if(type=="register_user")
-        // {
-        //     JSValue _name=JS_GetPropertyStr(ctx,item,"nick");
-        //     scope.addValue(_name);
-        //     if(!JS_IsString(_name))
-        //         return JS_ThrowSyntaxError(ctx, "name not specified");
-        //     tx::registerUser m;
-        //     m.nickName=scope.toStdString(_name);
-        //     um.payload.push_back(m.getBuffer());
-        // }
     }
     um.nonce.from_string(nonce);
     um.sign(sk);
@@ -461,25 +447,6 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     if (JS_ToFloat64(ctx, &to, argv[2]))
         return JS_ThrowInternalError(ctx, "timeout parse error");
 
-    //  JSValue sk = JS_GetPropertyStr(ctx, argv[1], "sk");
-    //  scope.addValue(sk);
-    //  JSValue nick = JS_GetPropertyStr(ctx, argv[1], "nick");
-    //  scope.addValue(nick);
-    //  JSValue timeout = JS_GetPropertyStr(ctx, argv[1], "timeout");
-    //  scope.addValue(timeout);
-    //  if(!JS_IsString(sk))
-    //  {
-    //     return JS_ThrowInternalError(ctx, "sk not found");
-    //  }
-    //  if(!JS_IsString(nick))
-    //  {
-    //     return JS_ThrowInternalError(ctx, "nick not found");
-    //  }
-    //  if( !JS_IsNumber(timeout))
-    //  {
-    //     return JS_ThrowInternalError(ctx, "timeout not found");
-    //  }
-    //  auto _sk=scope.toStdStringView(sk);
 
     msg::user_request ur;
     ur.rnd.resize(10);

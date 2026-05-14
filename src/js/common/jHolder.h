@@ -1,3 +1,4 @@
+#ifdef KALL
 #pragma once
 #include "commonError.h"
 #include <quickjs.h>
@@ -32,3 +33,4 @@ inline int operator< (const JHolder &a, const JHolder &b)
     return false;
 }
 
+#endif

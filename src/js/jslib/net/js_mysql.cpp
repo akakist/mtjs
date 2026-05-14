@@ -244,8 +244,8 @@ static int js_init_mysql(JSContext *ctx, JSValue global)
 }
 int js_init_module_mysql(JSContext *ctx)
 {
-    JSValue global = JS_GetGlobalObject(ctx);
     JSScope <10,10> scope(ctx);
+    JSValue global = JS_GetGlobalObject(ctx);
     scope.addValue(global);
     // return
     js_init_mysql(ctx, global);

@@ -8,5 +8,5 @@ struct IDatabase: public Refcountable
     virtual int put_cell(const std::string& k, const std::string& v)=0;
     virtual int get_cell(const std::string& k, std::string* v)=0;
     virtual int write_batch(const _db_to_save &v)=0;
-
+    IDatabase():Refcountable("Idatabse"){}
 };

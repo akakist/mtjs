@@ -314,8 +314,7 @@ void MTJS::Service::executePending()
 {
     for (;;)
     {
-        JSContext *ctx1;
-        int r = JS_ExecutePendingJob(js_rt, &ctx1);
+        int r = JS_ExecutePendingJob(js_rt, NULL);
         if (r < 0)
         {
             fprintf(stderr, "[Loop] JS_ExecutePendingJob => error.\n");
@@ -444,13 +443,13 @@ bool MTJS::Service::CommandEntered(const telnetEvent::CommandEntered *e)
     if (opaque.telnet_callback.has_value())
     {
         JSScope<10, 10> scope(js_ctx);
-        JSValue telnetCallback = opaque.telnet_callback->listener;
-        if (JS_IsFunction(js_ctx, telnetCallback))
+        JSValueGuard telnetCallback = *opaque.telnet_callback;
+        if (JS_IsFunction(js_ctx, telnetCallback.get()))
         {
 
             JSValue args = js_telnet_request_new(js_ctx, e);
             scope.addValue(args);
-            JSValue result = JS_Call(js_ctx, telnetCallback, JS_UNDEFINED, 1, &args);
+            JSValue result = JS_Call(js_ctx, telnetCallback.get(), JS_UNDEFINED, 1, &args);
             scope.addValue(result);
             qjs::checkForException(js_ctx, result, "CommandEntered: JS_Call");
         }
@@ -567,7 +566,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
                 jtr["errcode"].push_back(tx_report.err_code);
                 jtr["errstr"].push_back(tx_report.err_str);
             }
-            if (!JS_IsFunction(js_ctx, opaque.tx_subscription_cb->listener))
+            if (!JS_IsFunction(js_ctx, opaque.tx_subscription_cb->get()))
             {
                 throw CommonError("callback not a function");
             }
@@ -577,7 +576,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
             scope.addValue(obj);
             JSValue argv[1];
             argv[0] = obj;
-            JSValue func_result = JS_Call(js_ctx, opaque.tx_subscription_cb->listener, global_obj, 1, argv);
+            JSValue func_result = JS_Call(js_ctx, opaque.tx_subscription_cb->get(), global_obj, 1, argv);
             scope.addValue(func_result);
             qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
         }

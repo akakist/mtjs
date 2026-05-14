@@ -11,9 +11,10 @@ int EventEmitter::emit(const std::string& event, int argc, JSValue *argv)
         if (it != m_listeners.end()) {
             for (const auto& listener : it->second) {
                 res++;
-                auto ret=JS_Call(ctx, listener.listener, JS_UNDEFINED, argc, argv);
-                qjs::checkForException(ctx,ret,"EventEmitter:emit::JSCall");
-                JS_FreeValue(ctx, ret);
+                auto ret=JS_Call(ctx, listener.get(), JS_UNDEFINED, argc, argv);
+                JSValueGuard g_ret(ctx,ret);
+                qjs::checkForException(ctx,g_ret.get(),"EventEmitter:emit::JSCall");
+                // JS_FreeValue(ctx, ret);
             }
         }
         else
@@ -23,25 +24,25 @@ int EventEmitter::emit(const std::string& event, int argc, JSValue *argv)
     }
     return res;
 }
-void EventEmitter::on(const std::string& event, JSValue listener)
+void EventEmitter::on(const std::string& event, const JSValueGuard &listener)
 {
     MUTEX_INSPECTOR;
     if(m_listeners[event].size() >= maxListeners) {
         throw CommonError( "EventEmitter: too many listeners for event %s", event.c_str());
     }
-    m_listeners[event].insert(JHolder(ctx,listener));
+    m_listeners[event].insert(listener);
 }
 
-std::vector<JSValue> EventEmitter::listeners(const std::string& event)
+std::vector<JSValueGuard> EventEmitter::listeners(const std::string& event)
 {
     MUTEX_INSPECTOR;
-    std::vector<JSValue> ret;
+    std::vector<JSValueGuard> ret;
     {
         auto it = m_listeners.find(event);
         if (it != m_listeners.end()) {
             for(auto &z: it->second)
             {
-                ret.push_back(z.listener);
+                ret.push_back(z);
             }
         }
     }

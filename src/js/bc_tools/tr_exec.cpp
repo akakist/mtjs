@@ -83,7 +83,7 @@ std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t
     cc=t.root->addContract(c.name,by);
     
     cc->owner=senderAddress;
-    cc->name=c.name;
+    cc->name_=c.name;
     cc->src=c.src;
 
     u->contracts.insert(c.name);
@@ -192,7 +192,7 @@ std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,c
     u->nodes.insert(c.name);
 
     auto n=t.root->addNode(c.name,by);
-    n->name=c.name;
+    n->name_=c.name;
     n->ip=c.ip;
     n->ed_pk=c.pk_ed;
     n->bls_pk=c.pk_bls;

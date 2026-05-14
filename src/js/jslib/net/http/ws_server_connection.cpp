@@ -39,7 +39,7 @@ static JSValue js_ws_server_connection_on(JSContext *ctx, JSValueConst this_val,
 
 
     auto key=scope.toStdStringView(argv[0]);
-    conn->emitter->on(std::string(key),argv[1]);
+    conn->emitter->on(std::string(key),JSValueGuard(ctx, JS_DupValue(ctx, argv[1])));
 
 
     return JS_UNDEFINED;
