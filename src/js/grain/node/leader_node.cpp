@@ -40,10 +40,10 @@ bool Node::Service::GetTransactionRSP(const MsgEvt::GetTransactionRSP *r, const 
     BigInt stake = 0;
     for (auto &z : li.transaction_responders)
     {
-        auto n = root->getNode(z, NULL);
+        auto n = root->getNode(z);
         stake += n->total_stake;
     }
-    if (stake.toDouble() > root->getValues(NULL)->total_staked.toDouble() * QUORUM)
+    if (stake.toDouble() > root->getValues()->total_staked.toDouble() * QUORUM)
     {
         // for(auto &z :li.transaction_responders)
         // {
@@ -66,7 +66,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgEvt::BlockAcceptedRSP *r, const NO
     if (state_Z != NORMAL)
         return true;
 
-    if (!r->verify(root->getNode(r->node_signer, NULL)->bls_pk))
+    if (!r->verify(root->getNode(r->node_signer)->bls_pk))
     {
         logErr2("block_accepted_rsp: verify failed");
         return true;
@@ -81,7 +81,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgEvt::BlockAcceptedRSP *r, const NO
     for (auto &z : bp.acceptors)
     {
         agg_sig.add(z.second->sig_bls);
-        auto n = root->getNode(z.first, NULL);
+        auto n = root->getNode(z.first);
         if (!n.valid())
             throw CommonError("if(!n.valid())");
 
@@ -93,7 +93,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgEvt::BlockAcceptedRSP *r, const NO
         logNode("block_accepted_rsp: aggsig !veried");
         return true;
     }
-    if (root->getValues(NULL)->total_staked.toDouble() * QUORUM < stake.toDouble())
+    if (root->getValues()->total_staked.toDouble() * QUORUM < stake.toDouble())
     {
         if (!bp.heart_bit_sent_on_block_accepted_rsp)
         {
@@ -119,7 +119,7 @@ bool Node::Service::CheckState(const MsgEvt::HeartBeatREQ *r, const NODE_id & sr
     {
         if(state_Z==NORMAL)    
         {
-            if(r->epoch > root->getEpoch(NULL)->epoch)
+            if(r->epoch > root->getEpoch()->epoch)
             {
                 do_sync(src_node);
                 state_Z=SYNCING;
@@ -139,7 +139,7 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP *r, const NO
     if (state_Z != NORMAL)
         return true;
 
-    if (!r->verify(root->getNode(r->node_validator, NULL)->bls_pk))
+    if (!r->verify(root->getNode(r->node_validator)->bls_pk))
     {
         logErr2("block response not validated");
         return true;
@@ -168,11 +168,11 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP *r, const NO
     BigInt stakeVal = 0;
     for (auto &z : bt.responses)
     {
-        stakeVal += root->getNode(z->node_validator, NULL)->total_stake;
+        stakeVal += root->getNode(z->node_validator)->total_stake;
     }
     // bt.stake_validators+=root->getNode(r->node_validator,NULL)->total_stake;
     // logNode("Block staked %lf",bt.stake.toDouble());
-    if (stakeVal.toDouble() > root->getValues(NULL)->total_staked.toDouble() * QUORUM)
+    if (stakeVal.toDouble() > root->getValues()->total_staked.toDouble() * QUORUM)
     {
         XTRY;
         logNode("Block stake finalized");
@@ -192,7 +192,7 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP *r, const NO
         ba->leader_certificateZ = hbs.leader_info.leader_cert_2;
         for (auto &z : bt.responses)
         {
-            auto n = root->getNode(z->node_validator, NULL);
+            auto n = root->getNode(z->node_validator);
             agg_pk.push_back(n->bls_pk);
             ba->agg_sig.add(z->sig);
             ba->node_validators.push_back(z->node_validator);
@@ -206,10 +206,6 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP *r, const NO
             logErr2("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
             return true;
         }
-
-        // outBuffer ba_buf;
-        // ba->pack(ba_buf);
-        // logNode("leader agg_sig %s",base62::encode(ba->agg_sig.serialize()).c_str());
         if (!ba->leader_certificateZ.valid())
             throw CommonError("if(!ba->leader_certificateZ.valid())");
         msg::node_message_ed nm(ba->getBuffer(), this_node_name, my_sk_ed);
@@ -244,7 +240,7 @@ bool Node::Service::MsgReply(const bcEvent::MsgReply *e, bool fromNetwork)
 
         msg::node_message_ed node_message_ed;
         node_message_ed.unpack(in);
-        auto n = root->getNode(node_message_ed.src_node, NULL);
+        auto n = root->getNode(node_message_ed.src_node);
         if (!n.valid())
             throw CommonError("invalid node AAA " + node_message_ed.src_node.container);
         if (!node_message_ed.verify(n->ed_pk))

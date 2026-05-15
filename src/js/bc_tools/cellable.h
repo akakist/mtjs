@@ -25,7 +25,7 @@ struct data_base : public Refcountable
     ~data_base()
     {
     }
-    void setDirty();
+    void setDirty(const REF_getter<fee_calcer>& bc);
     virtual void pack(outBuffer& o) const
     {
         o<<1;
@@ -53,9 +53,9 @@ struct Cellable: public Refcountable
         
     Cellable()= delete;
     Cellable& operator=(const Cellable&) = delete;
-    static Cellable* construct(Cellable *p, const std::string& id, const REF_getter<fee_calcer>& bc)
+    static Cellable* construct(Cellable *p, const std::string& id)
     {
-        return new Cellable(p,id,bc);
+        return new Cellable(p,id);
     }
     ~Cellable()
     {
@@ -70,22 +70,36 @@ struct Cellable: public Refcountable
     std::map<std::string, REF_getter<Cellable>> children_ptrs;
     unsigned int payload_ctor_idx=hsh::HSH_END;
     REF_getter<data_base> data=nullptr;
+    void print_calcers(std::vector<std::string> &v)
+    {
+        if(calcers_Z.size())
+        {
+            v.push_back(getDbId());
+        }
+        for(auto& z: children_ptrs)
+        {
+            z.second->print_calcers(v);
+        }
+
+    }
 public:
     bool is_dirty=false;
 
-    Cellable(Cellable* _parent, const std::string & id, const REF_getter<fee_calcer>& bc):Refcountable("cellable"),  parent(_parent), m_id(id)
+    Cellable(Cellable* _parent, const std::string & id):Refcountable("cellable"),  parent(_parent), m_id(id)
     {
-        if(bc.valid())
-        {
-            calcers_Z.insert(bc);
-        }
+        // if(bc.valid())
+        // {
+        //     calcers_Z.insert(bc);
+        // }
     }
-    void setDirty()
+    void setDirty(const REF_getter<fee_calcer>& bc)
     {
         is_dirty=true;
+        if(bc.valid())
+            calcers_Z.insert(bc);
         if(parent)
         {
-            parent->setDirty();
+            parent->setDirty(bc);
         }
     }
     std::string dump();
@@ -150,8 +164,8 @@ public:
     }
 
 
-    REF_getter<Cellable> getLeafOrCreate(const std::string& id, IDatabase* db, const REF_getter<fee_calcer>& bc);
-    REF_getter<Cellable> getLeafNoCreate(const std::string& id, IDatabase* db, const REF_getter<fee_calcer>& bc);
+    REF_getter<Cellable> getLeafOrCreate(const std::string& id, IDatabase* db);
+    REF_getter<Cellable> getLeafNoCreate(const std::string& id, IDatabase* db);
 
     void calc_tree_hash(_db_to_save &db_dump);
 

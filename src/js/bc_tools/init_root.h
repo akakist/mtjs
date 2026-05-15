@@ -7,9 +7,9 @@ inline void init_root(const REF_getter<root_data> &r)
 {
     std::vector<int> stakes= {100,200,300,400,500};
     std::string u_root_pk=base62::decode(getenv2("k_root_ed_pk"));
-    if(!r->checkValues(NULL).valid())
+    if(!r->checkValues().valid())
     {
-        auto v=r->getValues(NULL);
+        auto v=r->getValues();
         if(!v->emitters.count(u_root_pk))
             v->emitters.insert(u_root_pk);
 
@@ -19,18 +19,18 @@ inline void init_root(const REF_getter<root_data> &r)
             total+=z;
         }
         v->total_staked=total;
-        v->setDirty();
+        v->setDirty(NULL);
     }
     // u_root pk
-    if(!r->checkUserState(u_root_pk,NULL).valid())
+    if(!r->checkUserState(u_root_pk).valid())
     {
-        auto u=r->getUserState(u_root_pk,NULL);
+        auto u=r->getUserState(u_root_pk);
         if(!u.valid())
         {
             throw CommonError("cannot find root user state");
         }
         u->balance=1000000;
-        u->setDirty();
+        u->setDirty(NULL);
 
     }
 
@@ -68,7 +68,7 @@ inline void init_root(const REF_getter<root_data> &r)
     {
         NODE_id name;
         name.container="n"+std::to_string(i);
-        auto n=r->getNode(name,NULL);
+        auto n=r->getNode(name);
         if(n.valid()) continue;
 
         REF_getter<bc_node> nn=r->addNode(name,NULL);
@@ -80,7 +80,7 @@ inline void init_root(const REF_getter<root_data> &r)
         nn->ed_pk=base62::decode(getenv2(keys[i].second));
 
         nn->ip="127.0.0.1:"+std::to_string(2300+i);
-        nn->setDirty();
+        nn->setDirty(NULL);
         // r->;
 
     }

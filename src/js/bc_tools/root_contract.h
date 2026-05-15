@@ -267,15 +267,15 @@ struct bc_epoch: public data_base
 
 };
 
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db, const REF_getter<fee_calcer>& bc);
-REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db, const REF_getter<fee_calcer>& bc);
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db);
+REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db);
 
 
 struct root_data: public Cellable
 {
         
     REF_getter<IDatabase> db;
-    root_data(IDatabase *db_): Cellable(nullptr,"r",NULL),db(db_)
+    root_data(IDatabase *db_): Cellable(nullptr,"r"),db(db_)
     {
     }
     bool verify_lider_certificate(const REF_getter<MsgEvt::LeaderCertificate>& lc);
@@ -285,25 +285,25 @@ struct root_data: public Cellable
     std::vector<std::string> getUserPath(const std::string &pk);
     std::vector<std::string> getUserStatePath(const std::string &pk);
 
-    REF_getter<bc_contract> getContract(const std::string &name, const REF_getter<fee_calcer>& bc);
+    REF_getter<bc_contract> getContract(const std::string &name);
     REF_getter<bc_contract> addContract(const std::string &name, const REF_getter<fee_calcer>& bca);
 
-    REF_getter<bc_values> getValues(const REF_getter<fee_calcer>& bc);
-    REF_getter<bc_values> checkValues(const REF_getter<fee_calcer>& bc);
+    REF_getter<bc_values> getValues();
+    REF_getter<bc_values> checkValues();
 
-    REF_getter<bc_epoch> getEpoch(const REF_getter<fee_calcer>& bc);
-
-
-
-    REF_getter<bc_user> getUser(const std::string &pk, const REF_getter<fee_calcer>& bc);
-
-    REF_getter<bc_user_state> getUserState(const std::string &pk, const REF_getter<fee_calcer>& bc);
-    REF_getter<bc_user_state>   checkUserState(const std::string &pk, const REF_getter<fee_calcer>& bc);
+    REF_getter<bc_epoch> getEpoch();
 
 
-    std::vector<NODE_id> getNodesNames( const REF_getter<fee_calcer>& bc);
 
-    REF_getter<bc_node> getNode(const NODE_id &name, const REF_getter<fee_calcer>& bc);
+    REF_getter<bc_user> getUser(const std::string &pk);
+
+    REF_getter<bc_user_state> getUserState(const std::string &pk);
+    REF_getter<bc_user_state>   checkUserState(const std::string &pk);
+
+
+    std::vector<NODE_id> getNodesNames();
+
+    REF_getter<bc_node> getNode(const NODE_id &name);
     REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc);
 
 

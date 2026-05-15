@@ -29,11 +29,11 @@ void Node::Service::do_sync(const NODE_id &src_node)
     // }
     // auto nn = node_names[rand() % last_leader_cert->nodes.size()];
     // logNode("selected node %s", nn.container.c_str());
-    auto n = root->getNode(src_node, NULL);
+    auto n = root->getNode(src_node);
     if (!n.valid())
         throw CommonError("if(!n.valid())");
     REF_getter<MsgEvt::GetSavedBlocksREQ> gbr = new MsgEvt::GetSavedBlocksREQ();
-    gbr->epoch = root->getEpoch(NULL)->epoch;
+    gbr->epoch = root->getEpoch()->epoch;
     logNode("@@@@@@@@@@@@@@@@ REQUEST for blocks since %s", gbr->epoch.toString().c_str());
     msg::node_message_ed nm(gbr->getBuffer(), this_node_name, my_sk_ed);
     sendEvent(n->ip, ServiceEnum::Node, new bcEvent::Msg(nm.getBuffer(), ListenerBase::serviceId));
@@ -85,7 +85,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ *r, const 
     // }
     logNode("QUERY RESULTS %d", ret->blocks_Z.size());
 
-    ret->lastEpoch = root->getEpoch(NULL)->epoch;
+    ret->lastEpoch = root->getEpoch()->epoch;
     msg::node_message_ed nm(ret->getBuffer(), this_node_name, my_sk_ed);
     passEvent(new bcEvent::MsgReply(nm.getBuffer(), poppedFrontRoute(route)));
 
@@ -102,7 +102,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const 
         // if(z.second->epoch!=z.first)
         //     throw CommonError("if(hb.epoch!=z.first)");
         logNode("recv block epoch %s", z.second->block_accepted_req->leader_certificateZ->heart_beat->epoch.toString().c_str());
-        logNode("cur epoch %s", root->getEpoch(NULL)->epoch.toString().c_str());
+        logNode("cur epoch %s", root->getEpoch()->epoch.toString().c_str());
         if (z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash != prev_block_hash_Z)
         {
 
@@ -117,7 +117,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const 
         std::vector<blst_cpp::PublicKey> agg_pk;
         for (auto &k : z.second->block_accepted_req->node_validators)
         {
-            auto n = root->getNode(k, NULL);
+            auto n = root->getNode(k);
             agg_pk.push_back(n->bls_pk);
         }
         if (!z.second->block_accepted_req->agg_sig.verify(agg_pk, blake2b_hash(z.second->block_accepted_req->block_payload->getBuffer()).container))
@@ -183,11 +183,11 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const 
         insert.bind(4, base62::encode(z.second->getBuffer()));
         insert.exec();
     }
-    if (r->lastEpoch > root->getEpoch(NULL)->epoch)
+    if (r->lastEpoch > root->getEpoch()->epoch)
     {
         logNode("call3 do_sync();");
 
-        logNode("do_sync again: r.lastEpoch %s > root->getValues(NULL)->epoch %s", r->lastEpoch.toString().c_str(), root->getEpoch(NULL)->epoch.toString().c_str());
+        logNode("do_sync again: r.lastEpoch %s > root->getValues(NULL)->epoch %s", r->lastEpoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str());
         do_sync(src_node);
         return true;
     }

@@ -24,34 +24,26 @@ std::string Cellable::dump()
 
 }
 
-REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string& id, IDatabase* db, const REF_getter<fee_calcer>& bc)
+REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string& id, IDatabase* db)
 {
     MUTEX_INSPECTOR;
-    if(bc.valid())
-    {
-        calcers_Z.insert(bc);
-    }
     auto it=children_hashes.find(id);
     if(it!=children_hashes.end())
-        return getLeafNoCreate(id,db,bc);
+        return getLeafNoCreate(id,db);
 
 
     children_hashes[id].container="";
     auto it2=children_ptrs.find(id);
     if(it2!=children_ptrs.end())
         throw CommonError("if(it!=children_ptrs.end())");
-    REF_getter<Cellable> c=new Cellable(this,id,bc);
+    REF_getter<Cellable> c=new Cellable(this,id);
     children_ptrs.insert({id,c});
     return c;
 }
 
-REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string& id, IDatabase* db, const REF_getter<fee_calcer>& bc)
+REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string& id, IDatabase* db)
 {
     MUTEX_INSPECTOR;
-    if(bc.valid())
-    {
-        calcers_Z.insert(bc);
-    }
     auto it=children_hashes.find(id);
     if(it==children_hashes.end())
         return NULL;
@@ -60,15 +52,11 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string& id, IDatabase*
     auto ip=children_ptrs.find(id);
     if(ip!=children_ptrs.end())
     {
-        if(bc.valid())
-        {
-            ip->second->calcers_Z.insert(bc);
-        }
 
         return ip->second;
 
     }
-    REF_getter<Cellable> cc=new Cellable(this,id,bc);
+    REF_getter<Cellable> cc=new Cellable(this,id);
 
     children_ptrs.insert({id,cc});
 
@@ -137,7 +125,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     }
     is_dirty=false;
 }
-void data_base::setDirty()
+void data_base::setDirty(const REF_getter<fee_calcer>& bc)
 {
-    parent->setDirty();
+    parent->setDirty(bc);
 }

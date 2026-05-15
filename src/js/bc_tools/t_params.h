@@ -7,6 +7,8 @@ struct t_params
     REF_getter<root_data> root;
     std::vector<std::vector<instruction_report>> instruction_reports;
     std::map<THASH_id,transaction_report> transaction_reports;
+    _feeCalcers feeCalcers;
+
 
     void logMsg(int txId, int seqId, const char* fmt, ...)
     {

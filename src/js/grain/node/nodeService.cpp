@@ -112,27 +112,11 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 void Node::Service::collectTransactions()
 {
     MUTEX_INSPECTOR;
-    // std::map<std::string, std::set<THASH_id>> cnt;
-    // std::set<THASH_id> rm;
     std::map<std::string /*user addr*/, std::map<BigInt /*nonce*/, std::vector<TRANSACTION_body>>> ordered;
     for (auto &z : transaction_pool_of_leader)
     {
         msg::user_message_req ur(z.second);
         ordered[ur.address_pk_ed][ur.nonce].push_back(z.second);
-        // // cnt[ur.address_pk_ed].insert(z.first);
-        // // BigInt nonce=0;
-        // // auto u=root->getUserState(ur.address_pk_ed,NULL);
-        // // if(u.valid())
-        // // {
-        // //     nonce=u->nonce;
-        // // }
-        //     // throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
-        // if(nonce!=ur.nonce)
-        // {
-        //     // logErr2("tr: %s nonce %s %s",u->nonce.toString().c_str(), ur.nonce.toString().c_str());
-        //     logErr2("tr: %s declined due invalid nonce",base62::encode(z.first.str()).c_str());
-        //     rm.insert(z.first);
-        // }
     }
     transaction_pool_of_leader.clear();
     for (auto &x : ordered)
@@ -143,31 +127,7 @@ void Node::Service::collectTransactions()
                 transaction_pool_of_leader.insert({blake2b_hash(z.container), z});
         }
     }
-    // transaction_pool_of_leader=std::move(ordered);
-    // for(auto& z: rm)
-    // {
-    //     transaction_pool_of_leader.erase(z);
-    // }
-    // rm.clear();
-
-    // for(auto& z: cnt)
-    // {
-    //     if(z.second.size()>1)
-    //     {
-    //         for(auto &k: z.second)
-    //         {
-    //             logErr2("tr: %s declined due multiple transaction from one sender",base62::encode(z.first).c_str());
-    //             rm.insert(k);
-    //         }
-    //     }
-    // }
-    // for(auto& z: rm)
-    // {
-    //     transaction_pool_of_leader.erase(z);
-    // }
-    // rm.clear();
 }
-// void
 
 void Node::Service::initDB()
 {
@@ -220,11 +180,8 @@ void Node::Service::do_start_block()
             msg::node_message_ed nm(ob.asString()->container, this_node_name, my_sk_ed);
 
             sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
-            // make_broadcast_message(nm.getBuffer());
         }
     }
-    // else
-    // logNode("!if(hbs.node_leader==this_node_name)");
 }
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
@@ -241,7 +198,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     {
         if(state_Z!=NORMAL)
         return true;
-        // logNode("timers::TIMER_RESTART_BLOCK");
         auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
         auto &li = hbs.leader_info;
         li.request_for_transactions_sent = true;
@@ -255,9 +211,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         return true;
 
         DBG(logNode("case timers::TIMER_START_HEART_BEAT:"));
-        // auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
-        // auto &li=hbs.leader_info;
-        // li.request_for_transactions_sent=false;
 
         do_heart_beat();
         return true;
@@ -375,7 +328,7 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 
     if (match(ds, e->command, tokens))
     {
-        auto cc = getByPathNoCreate(root.get(), telnet_data_path, db.get(), NULL);
+        auto cc = getByPathNoCreate(root.get(), telnet_data_path, db.get());
         if (cc.valid())
         {
             sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, cc->dump() + "\n", this));
@@ -389,7 +342,7 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
         {
             sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "if(tokens.size()==2)\n", this));
             telnet_data_path.push_back(tokens[1]);
-            auto cc = getByPathNoCreate(root.get(), telnet_data_path, db.get(), NULL);
+            auto cc = getByPathNoCreate(root.get(), telnet_data_path, db.get());
             if (cc.valid())
             {
                 sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "OK, current path: " + cc->getDbId() + "\n", this));
@@ -404,7 +357,7 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
     if (match(back, e->command, tokens))
     {
         telnet_data_path.pop_back();
-        auto cc = getByPathNoCreate(root.get(), telnet_data_path, db.get(), NULL);
+        auto cc = getByPathNoCreate(root.get(), telnet_data_path, db.get());
         if (cc.valid())
         {
             sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "OK, current path: " + cc->getDbId() + "\n", this));
@@ -468,7 +421,7 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
     HTTP::Response r(e->req);
     auto uri = (std::string)e->req->url;
     auto da = iUtils->splitString("/", uri);
-    auto c = getByPathNoCreate(root.get(), da, db.get(), NULL);
+    auto c = getByPathNoCreate(root.get(), da, db.get());
     if (!c.valid())
     {
         r.make_response("<pre> if(!c.valid()) </pre>");
@@ -503,12 +456,6 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
 {
     MUTEX_INSPECTOR;
 
-    // auto &bt = blocks_leader[bl];
-    // if (bt.executed)
-    //     throw CommonError("[%s] if(bt.executed) %s", this_node_name.container.c_str(), bl.str().c_str());
-    // bt.executed = true;
-    // t_params t(rt);
-    // std::vector<std::string> errs;
     outBuffer o;
     t.instruction_reports.resize(trs.size());
     for (int ti = 0; ti < trs.size(); ti++)
@@ -516,7 +463,7 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
         std::optional<std::string> t_err;
         THASH_id th = blake2b_hash(trs[ti].container);
         msg::user_message_req ur(trs[ti]);
-        REF_getter<fee_calcer> by = feeCalcers.get(ur.address_pk_ed);
+        REF_getter<fee_calcer> by = t.feeCalcers.get(ur.address_pk_ed);
         // if(!u.valid())
         //     throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
         if (!ur.verify())
@@ -524,7 +471,7 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
         // // BigInt nonce=0;
         if (!t_err)
         {
-            auto u = rt->getUserState(ur.address_pk_ed, by);
+            auto u = rt->getUserState(ur.address_pk_ed);
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -540,7 +487,7 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
                     // BigInt one;
                     // one=1;
                     u->nonce += 1;
-                    u->setDirty();
+                    u->setDirty(by);
                 }
             }
         }
@@ -557,32 +504,32 @@ REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const std::v
 {
     // if (!prepared_block.valid())
     REF_getter<MsgEvt::BlockDBStore>    pb = new MsgEvt::BlockDBStore;
-    pb->epoch = root->getEpoch(NULL)->epoch;
+    pb->epoch = root->getEpoch()->epoch;
     pb->att_data.transaction_reports = t.transaction_reports;
     pb->att_data.trs = trs;
 
-    auto newEpoch = root->getEpoch(NULL);
+    auto newEpoch = root->getEpoch();
     newEpoch->epoch += 1;
-    newEpoch->setDirty();
+    newEpoch->setDirty(NULL);
 
     auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
     BigInt total_fees;
-    for (auto &z : feeCalcers.calcers)
+    for (auto &z : t.feeCalcers.calcers)
     {
-        auto u = root->getUserState(z.first, NULL);
+        auto u = root->getUserState(z.first);
         if (!u.valid())
             throw CommonError("if(!u.valid()) 334455");
         if (u->balance < z.second->get_fee())
         {
             u->balance = 0;
-            u->setDirty();
+            u->setDirty(NULL);
         }
         else
         {
             logErr2("balance deduct %s fee %s", u->balance.toString().c_str(), z.second->get_fee().toString().c_str());
             u->balance -= z.second->get_fee();
-            u->setDirty();
+            u->setDirty(NULL);
         }
         total_fees += z.second->get_fee();
         pb->att_data.fees[z.first] = z.second->get_fee();
@@ -591,19 +538,19 @@ REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const std::v
     BigInt total_rewards = (total_fees * 9) / 10;
     for (auto &n : nodes_in_leader_cert)
     {
-        auto node = root->getNode(n, NULL);
+        auto node = root->getNode(n);
         if (!node.valid())
             throw CommonError("if(!node.valid()) 556677");
         auto owner = node->owner_ed_pk;
-        auto u = root->getUserState(owner, NULL);
+        auto u = root->getUserState(owner);
         if (!u.valid())
         {
             throw CommonError("if(!u.valid()) 778899");
             // u=root->addUser(upk,NULL);
         }
-        BigInt amt = (total_rewards * node->total_stake) / root->getValues(NULL)->total_staked;
+        BigInt amt = (total_rewards * node->total_stake) / root->getValues()->total_staked;
         u->balance += amt;
-        u->setDirty();
+        u->setDirty(NULL);
         if (n == this_node_name && amt > 0)
             logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
         pb->att_data.rewards[n] = amt;
@@ -616,6 +563,7 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
     // auto &bt=blocks[prev_block_hash];
 
     r->calc_tree_hash(db_to_save_Z);
+    r->calcers_Z.clear();
 
     auto root_buf = r->getBuffer();
     auto root_hash = blake2b_hash(root_buf);
@@ -629,7 +577,7 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 #include <stdlib.h>
 int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 {
-    auto nv = root->getNodesNames(NULL);
+    auto nv = root->getNodesNames();
     int crc = __crc32(0, prev_block_hash_Z.container.data(), prev_block_hash_Z.container.size());
     int idx = crc % nv.size();
     int npoz = -1;
@@ -644,21 +592,7 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 {
     if (nodeLeft == nodeRight)
         return true;
-    // auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
-    // auto &li=hbs.leader_info[hbs.node_leader];
-
-    // if(hbs.node_leader.container.empty())
-    //     hbs.node_leader=this_node_name;
-    auto nv = root->getNodesNames(NULL);
-    // if(!last_leader_cert.valid())
-    // {
-    //     auto nL=root->getNode(nodeLeft,NULL);
-    //     if(!nL.valid())
-    //         return false;
-    //     auto nR=root->getNode(nodeRight,NULL);
-    //     return nL->total_stake>nR->total_stake;
-    // }
-    // else
+    auto nv = root->getNodesNames();
     {
         int crc = __crc32(0, prev_block_hash_Z.container.data(), prev_block_hash_Z.container.size());
         int idx = crc % nv.size();
@@ -691,7 +625,7 @@ void Node::Service::logNode(const char *fmt, ...)
     {
         va_list ap;
         va_start(ap, fmt);
-        auto epoch = root->getEpoch(NULL);
+        auto epoch = root->getEpoch();
         if (!epoch.valid())
         {
             throw CommonError("if(!epoch.valid())");
