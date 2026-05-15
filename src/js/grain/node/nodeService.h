@@ -256,6 +256,9 @@ namespace Node
 
         MsgFactory msgFactory;
 
+        _feeCalcers feeCalcers;
+
+
     };
 
 }

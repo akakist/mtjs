@@ -29,7 +29,7 @@ REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string& id, IDatabase*
     MUTEX_INSPECTOR;
     if(bc.valid())
     {
-        calcers.insert(bc);
+        calcers_Z.insert(bc);
     }
     auto it=children_hashes.find(id);
     if(it!=children_hashes.end())
@@ -50,7 +50,7 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string& id, IDatabase*
     MUTEX_INSPECTOR;
     if(bc.valid())
     {
-        calcers.insert(bc);
+        calcers_Z.insert(bc);
     }
     auto it=children_hashes.find(id);
     if(it==children_hashes.end())
@@ -62,7 +62,7 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string& id, IDatabase*
     {
         if(bc.valid())
         {
-            ip->second->calcers.insert(bc);
+            ip->second->calcers_Z.insert(bc);
         }
 
         return ip->second;
@@ -107,28 +107,28 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
         {
 
             c->calc_tree_hash(db_dump);
-            for(auto& bc: c->calcers)
+            for(auto& bc: c->calcers_Z)
             {
                 if(bc.valid())
-                    calcers.insert(bc);
+                    calcers_Z.insert(bc);
             }
             auto child_buf=c->getBuffer();
             auto ch=blake2b_hash(child_buf);
             if(ch!=children_hashes[cid])
             {
                 db_dump.add(c->getDbId(),child_buf);
-                if(c->calcers.size()>0)
+                if(c->calcers_Z.size()>0)
                 {
-                    auto portion=child_buf.size()/c->calcers.size();
-                    for(auto& bc: c->calcers)
+                    auto portion=child_buf.size()/c->calcers_Z.size();
+                    for(auto& bc: c->calcers_Z)
                     {
                         if(bc.valid())
                         {
                             bc->add(portion);
-                            calcers.insert(bc);
+                            calcers_Z.insert(bc);
                         }
                     }
-                    c->calcers.clear();
+                    c->calcers_Z.clear();
                 }
                 children_hashes[cid]=ch;
             }

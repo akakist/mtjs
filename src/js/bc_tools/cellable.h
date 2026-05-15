@@ -63,7 +63,7 @@ struct Cellable: public Refcountable
 
     Cellable * parent=nullptr;
     const std::string m_id;
-    std::set<REF_getter<fee_calcer>> calcers;
+    std::set<REF_getter<fee_calcer>> calcers_Z;
 
     // private:
     std::map<std::string,THASH_id > children_hashes;
@@ -77,7 +77,7 @@ public:
     {
         if(bc.valid())
         {
-            calcers.insert(bc);
+            calcers_Z.insert(bc);
         }
     }
     void setDirty()

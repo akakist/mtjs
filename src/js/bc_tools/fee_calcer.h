@@ -18,6 +18,10 @@ public:
     {
         return fee;
     }
+    void reset()
+    {
+        fee=0;
+    }
 
 };
 

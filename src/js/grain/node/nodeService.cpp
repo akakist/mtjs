@@ -516,7 +516,7 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
         std::optional<std::string> t_err;
         THASH_id th = blake2b_hash(trs[ti].container);
         msg::user_message_req ur(trs[ti]);
-        REF_getter<fee_calcer> by = t.feeCalcers.get(ur.address_pk_ed);
+        REF_getter<fee_calcer> by = feeCalcers.get(ur.address_pk_ed);
         // if(!u.valid())
         //     throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
         if (!ur.verify())
@@ -568,7 +568,7 @@ REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const std::v
     auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
     BigInt total_fees;
-    for (auto &z : t.feeCalcers.calcers)
+    for (auto &z : feeCalcers.calcers)
     {
         auto u = root->getUserState(z.first, NULL);
         if (!u.valid())
@@ -586,6 +586,7 @@ REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const std::v
         }
         total_fees += z.second->get_fee();
         pb->att_data.fees[z.first] = z.second->get_fee();
+        z.second->reset();
     }
     BigInt total_rewards = (total_fees * 9) / 10;
     for (auto &n : nodes_in_leader_cert)

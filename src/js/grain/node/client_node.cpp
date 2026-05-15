@@ -314,7 +314,9 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
         msg::node_message_ed nn(rsp->getBuffer(), this_node_name, my_sk_ed);
         passEvent(new bcEvent::MsgReply(nn.getBuffer(), poppedFrontRoute(route)));
     }
+#ifdef MEMLEACK_CHECK
     logNode("!!!!!!!!!!!!!! global REF count %d",get_global_refcount());
+#endif
     return true;
 }
 
