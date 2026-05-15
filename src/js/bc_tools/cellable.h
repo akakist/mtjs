@@ -65,7 +65,6 @@ struct Cellable: public Refcountable
     const std::string m_id;
     std::set<REF_getter<fee_calcer>> calcers_Z;
 
-    // private:
     std::map<std::string,THASH_id > children_hashes;
     std::map<std::string, REF_getter<Cellable>> children_ptrs;
     unsigned int payload_ctor_idx=hsh::HSH_END;
@@ -87,10 +86,6 @@ public:
 
     Cellable(Cellable* _parent, const std::string & id):Refcountable("cellable"),  parent(_parent), m_id(id)
     {
-        // if(bc.valid())
-        // {
-        //     calcers_Z.insert(bc);
-        // }
     }
     void setDirty(const REF_getter<fee_calcer>& bc)
     {

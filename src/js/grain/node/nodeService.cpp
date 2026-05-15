@@ -484,8 +484,6 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
                 {
                     t.instruction_reports[ti].resize(ur.payload.size());
                     execute_transaction(ti, t, ur.address_pk_ed, ur.payload, by);
-                    // BigInt one;
-                    // one=1;
                     u->nonce += 1;
                     u->setDirty(by);
                 }
@@ -497,8 +495,6 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
             t.setTxError(th, *t_err);
     }
 
-    // feeCalcers.clear();
-    // return new_root_hash;
 }
 REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const std::vector<TRANSACTION_body> &trs, const t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert)
 {

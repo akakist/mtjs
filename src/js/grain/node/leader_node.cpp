@@ -45,10 +45,6 @@ bool Node::Service::GetTransactionRSP(const MsgEvt::GetTransactionRSP *r, const 
     }
     if (stake.toDouble() > root->getValues()->total_staked.toDouble() * QUORUM)
     {
-        // for(auto &z :li.transaction_responders)
-        // {
-        //     logNode("transaction_responders %s",z.container.c_str());
-        // }
         if (hbs.leader_info.leader_cert_2.valid() && hbs.leader_info.leader_cert_2->nodes.size() == li.transaction_responders.size())
         {
             do_start_block();

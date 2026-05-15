@@ -106,8 +106,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
         br->new_root_hash = prev_block_hash_Z;
         br->node_signer = this_node_name;
         br->sign(my_sk_bls);
-        // prepared_block.clear();
-        // blocks_leader.clear();
 
         resetTimer();
 
