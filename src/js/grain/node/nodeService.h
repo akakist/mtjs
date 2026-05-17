@@ -189,9 +189,9 @@ namespace Node
 
         };
         _db_to_save db_to_save_Z;
-        REF_getter<MsgEvt::BlockDBStore> prepareBlockDBStore(const std::vector<TRANSACTION_body> &trs, const t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert);
+        REF_getter<MsgEvt::BlockDBStore> prepareBlockDBStore(const t_params& t);
 
-        // time_t last_access_time_hbZ=0; // heart_bit last tick time
+        // time_t last_access_time_hbZ=0; // heart-_bit last tick time
         REF_getter<MsgEvt::LeaderCertificate> last_leader_cert=nullptr;
 
         std::map<THASH_id, TRANSACTION_body>  transaction_pool_of_leader;
@@ -221,12 +221,13 @@ namespace Node
         void do_start_block();
 
         void collectTransactions();
-        void execute_block(t_params &t,const REF_getter<root_data> &rt, const BLOCK_id & bl, const std::vector<TRANSACTION_body >& trs, const std::vector<NODE_id> &nodes_in_leader_cert);
+        void execute_block(t_params &t,const REF_getter<root_data> &rt, const BLOCK_id & bl,  const std::vector<NODE_id> &nodes_in_leader_cert);
 
         void do_sync(const NODE_id &src_node);
 
         bool CheckState(const MsgEvt::HeartBeatREQ *r, const NODE_id & src_node);
 
+        void calc_fee_and_rewards(t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert);
 
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
 

@@ -245,7 +245,7 @@ void Node::Service::do_heart_beat()
     {
         REF_getter<MsgEvt::HeartBeatREQ> hb_req =
             new MsgEvt::HeartBeatREQ(prev_block_hash_Z,
-                                     root->getEpoch()->epoch,
+                                     root->getEpoch()->epoch+1,
                                      this_node_name);
         // DBG(logNode("broadcast heart beat as leader %s",this_node_name.container.c_str()));
         outBuffer o;

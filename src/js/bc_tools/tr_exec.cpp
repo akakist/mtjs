@@ -4,7 +4,7 @@
 #include "tr_exec.h"
 #include "msg_tx.h"
 
-std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v=t.root->getValues();
     auto it=v->emitters.find(senderAddress);
@@ -29,7 +29,7 @@ std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std
 }
 
 
-std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v=t.root->getValues();
 
@@ -68,7 +68,7 @@ std::optional<std::string> TR::execute(const tx::unstake &c, t_params & t,const 
     return std::nullopt;
 
 }
-std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v=t.root->getValues();
     auto u=t.root->getUser(senderAddress);
@@ -98,7 +98,7 @@ std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t
     return std::nullopt;
 }
 
-std::optional<std::string> TR::execute(const tx::transfer &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::transfer &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v=t.root->getValues();
     auto from=t.root->getUserState(senderAddress);
@@ -127,7 +127,7 @@ std::optional<std::string> TR::execute(const tx::transfer &c, t_params & t,const
 
 
 
-std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v=t.root->getValues();
     if(!v.valid())
@@ -164,7 +164,7 @@ std::optional<std::string> TR::execute(const tx::stake &c, t_params & t,const st
 }
 
 
-std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, int txid, int seqId)
+std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v=t.root->getValues();
     for(auto &z: c.name.container)

@@ -168,8 +168,9 @@ void Node::Service::do_start_block()
             b->leader_cert = li.leader_cert_2;
 
             auto &bt = blocks_leader[prev_block_hash_Z];
-
+            logNode("before collectTransactions sz %d",transaction_pool_of_leader.size());
             collectTransactions();
+            logNode("AFTER collectTransactions sz %d",transaction_pool_of_leader.size());
 
             for (auto &z : transaction_pool_of_leader)
                 b->transaction_bodies.push_back(z.second);
@@ -452,17 +453,17 @@ void Node::Service::resetTimer()
 {
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 }
-void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, const BLOCK_id &bl, const std::vector<TRANSACTION_body> &trs, const std::vector<NODE_id> &nodes_in_leader_cert)
+void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, const BLOCK_id &bl, const std::vector<NODE_id> &nodes_in_leader_cert)
 {
     MUTEX_INSPECTOR;
 
     outBuffer o;
-    t.instruction_reports.resize(trs.size());
-    for (int ti = 0; ti < trs.size(); ti++)
+    // t.instruction_reports.resize(trs.size());
+    for (int ti = 0; ti < t.att_data.trs.size(); ti++)
     {
         std::optional<std::string> t_err;
-        THASH_id th = blake2b_hash(trs[ti].container);
-        msg::user_message_req ur(trs[ti]);
+        THASH_id th = blake2b_hash(t.att_data.trs[ti].container);
+        msg::user_message_req ur(t.att_data.trs[ti]);
         REF_getter<fee_calcer> by = t.feeCalcers.get(ur.address_pk_ed);
         // if(!u.valid())
         //     throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
@@ -482,8 +483,8 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
                     t_err = "invalid nonce";
                 if (!t_err)
                 {
-                    t.instruction_reports[ti].resize(ur.payload.size());
-                    execute_transaction(ti, t, ur.address_pk_ed, ur.payload, by);
+                    // t.instruction_reports[ti].resize(ur.payload.size());
+                    execute_transaction(th, t, ur.address_pk_ed, ur.payload, by);
                     u->nonce += 1;
                     u->setDirty(by);
                 }
@@ -496,18 +497,8 @@ void Node::Service::execute_block(t_params &t,const REF_getter<root_data> &rt, c
     }
 
 }
-REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const std::vector<TRANSACTION_body> &trs, const t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert)
+void Node::Service::calc_fee_and_rewards(t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert)
 {
-    // if (!prepared_block.valid())
-    REF_getter<MsgEvt::BlockDBStore>    pb = new MsgEvt::BlockDBStore;
-    pb->epoch = root->getEpoch()->epoch;
-    pb->att_data.transaction_reports = t.transaction_reports;
-    pb->att_data.trs = trs;
-
-    auto newEpoch = root->getEpoch();
-    newEpoch->epoch += 1;
-    newEpoch->setDirty(NULL);
-
     auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
     BigInt total_fees;
@@ -528,7 +519,7 @@ REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const std::v
             u->setDirty(NULL);
         }
         total_fees += z.second->get_fee();
-        pb->att_data.fees[z.first] = z.second->get_fee();
+        t.att_data.fees[z.first] = z.second->get_fee();
         z.second->reset();
     }
     BigInt total_rewards = (total_fees * 9) / 10;
@@ -549,8 +540,19 @@ REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const std::v
         u->setDirty(NULL);
         if (n == this_node_name && amt > 0)
             logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
-        pb->att_data.rewards[n] = amt;
+        t.att_data.rewards[n] = amt;
     }
+
+}
+REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const t_params& t)
+{
+    // if (!prepared_block.valid())
+    REF_getter<MsgEvt::BlockDBStore>    pb = new MsgEvt::BlockDBStore;
+    pb->epoch = root->getEpoch()->epoch;
+    pb->att_data = t.att_data;
+
+
+    /// вычисление первичных данных, надо для вычисления фее.
     return pb;
 }
 BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)

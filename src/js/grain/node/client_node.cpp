@@ -201,8 +201,9 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
 
     if (r->leader_cert->heart_beat->prev_block_hash != prev_block_hash_Z)
     {
-        if (root->getEpoch()->epoch < r->leader_cert->heart_beat->epoch)
+        if (root->getEpoch()->epoch+1 != r->leader_cert->heart_beat->new_epoch)
         {
+            logNode("if (root->getEpoch()->epoch+1 < r->leader_cert->heart_beat->new_epoch)");
             // setBlockId(r->leader_cert->heart_beat->prev_block_hash);
             return true;
         }
@@ -212,16 +213,24 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
 
         // auto new_root_hash =
         t_params t(root);
-        execute_block(t, root, prev_block_hash_Z, r->transaction_bodies, r->leader_cert->nodes);
-        blockDBStore = prepareBlockDBStore(r->transaction_bodies, t, r->leader_cert->nodes);
+        t.att_data.trs=r->transaction_bodies;
+        execute_block(t, root, prev_block_hash_Z,  r->leader_cert->nodes);
+        calc_fee_and_rewards(t,r->leader_cert->nodes);
+
+        auto newEpoch = root->getEpoch();
+        newEpoch->epoch += 1;
+        newEpoch->setDirty(NULL);
+
+
+        blockDBStore = prepareBlockDBStore(t);
+
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
         REF_getter<MsgEvt::BlockInfo> block = new MsgEvt::BlockInfo();
         block->prev_root_hash = prev_block_hash_Z;
         block->new_root_hash1 = new_root_hash;
 
-        block->attachment_hash.container = blockDBStore->att_data.hash();
-
+        block->attachment_hash.container = t.att_data.hash();
         block->payload_heart_beat = r->leader_cert->heart_beat;
 
         REF_getter<MsgEvt::ValidateBlockRSP> rsp = new MsgEvt::ValidateBlockRSP();

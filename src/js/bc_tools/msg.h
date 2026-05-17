@@ -41,14 +41,14 @@ struct transaction_report
 {
     int err_code;
     std::string err_str;
-    std::vector<instruction_report> instruction_reports;
+    std::map<int, instruction_report> instruction_reports;
     void update(Blake2bHasher &h) const
     {
         h.update(std::to_string(err_code));
         h.update(err_str);
         for(auto& z: instruction_reports)
         {
-            z.update(h);
+            z.second.update(h);
         }
     }
 };
@@ -442,12 +442,12 @@ namespace MsgEvt
         {
 
         }
-        HeartBeatREQ(const BLOCK_id& _prev_block_hash, const BigInt& _epoch, const NODE_id& _node_leader):Base(msgid::HeartBeatREQ),
-        prev_block_hash(_prev_block_hash), epoch(_epoch), node_leader(_node_leader)
+        HeartBeatREQ(const BLOCK_id& _prev_block_hash, const BigInt& _newepoch, const NODE_id& _node_leader):Base(msgid::HeartBeatREQ),
+        prev_block_hash(_prev_block_hash), new_epoch(_newepoch), node_leader(_node_leader)
         {
         }
         BLOCK_id prev_block_hash;
-        BigInt epoch;
+        BigInt new_epoch;
         NODE_id node_leader;
         void pack(outBuffer& b) const final
         {
@@ -456,7 +456,7 @@ namespace MsgEvt
             Base::pack(b);
             b<<prev_block_hash;
             b<<node_leader;
-            b<<epoch;
+            b<<new_epoch;
         }
         void unpack(inBuffer& b) final
         {
@@ -464,7 +464,7 @@ namespace MsgEvt
             Base::unpack(b);
             b>>prev_block_hash;
             b>>node_leader;
-            b>>epoch;
+            b>>new_epoch;
         }
         static Base* construct()
         {

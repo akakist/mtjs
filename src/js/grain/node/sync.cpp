@@ -39,7 +39,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ *r, const 
     BigInt epoch = 0;
     {
         logNode("Query FROM epoch %s", r->epoch.toString().c_str());
-        SQLite::Statement query1(dbs, "SELECT epoch, data FROM blocks WHERE epoch>=" + r->epoch.toString() + " LIMIT 20");
+        SQLite::Statement query1(dbs, "SELECT epoch, data FROM blocks WHERE epoch>" + r->epoch.toString() + " LIMIT 20");
         // query1.bind(1, r->epoch.toString());
         bool found = false;
         while (query1.executeStep())
@@ -78,7 +78,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const 
     {
         // if(z.second->epoch!=z.first)
         //     throw CommonError("if(hb.epoch!=z.first)");
-        logNode("recv block epoch %s", z.second->block_accepted_req->leader_certificateZ->heart_beat->epoch.toString().c_str());
+        logNode("recv block epoch %s", z.second->block_accepted_req->leader_certificateZ->heart_beat->new_epoch.toString().c_str());
         logNode("cur epoch %s", root->getEpoch()->epoch.toString().c_str());
         if (z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash != prev_block_hash_Z)
         {
@@ -103,8 +103,9 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const 
         }
         // logNode("on_get_blocks_rsp: block verified OK");
         t_params t(root);
-        execute_block(t, root, prev_block_hash_Z, z.second->att_data.trs, z.second->block_accepted_req->leader_certificateZ->nodes);
-        blockDBStore = prepareBlockDBStore(z.second->att_data.trs, t, z.second->block_accepted_req->leader_certificateZ->nodes);
+        t.att_data.trs=z.second->att_data.trs;
+        execute_block(t, root, prev_block_hash_Z,  z.second->block_accepted_req->leader_certificateZ->nodes);
+        blockDBStore = prepareBlockDBStore(t);
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
         if (new_root_hash == z.second->block_accepted_req->block_payload->new_root_hash1)
@@ -144,6 +145,9 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const 
         do_sync(src_node);
         return true;
     }
+    else 
+        logNode("ERR %s %d",__FILE__,__LINE__);
+
     state_Z = State::NORMAL;
     logNode("State::NORMAL");
     XPASS;

@@ -43,12 +43,18 @@ bool Node::Service::GetTransactionRSP(const MsgEvt::GetTransactionRSP *r, const 
         auto n = root->getNode(z);
         stake += n->total_stake;
     }
+    // logNode("TRS %d",transaction_pool_of_leader.size());
     if (stake.toDouble() > root->getValues()->total_staked.toDouble() * QUORUM)
     {
         if (hbs.leader_info.leader_cert_2.valid() && hbs.leader_info.leader_cert_2->nodes.size() == li.transaction_responders.size())
         {
+            // if(transaction_pool_of_leader.empty())
+            // {
+            //     sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(TIMER_RESTART_BLOCK,NULL,NULL,1.,this));
+            //     return true;
+            // }
             do_start_block();
-            // logNode("do_start_block();");
+            logNode("do_start_block();");
             li.transaction_responders.clear();
         }
     }
@@ -115,7 +121,7 @@ bool Node::Service::CheckState(const MsgEvt::HeartBeatREQ *r, const NODE_id & sr
     {
         if(state_Z==NORMAL)    
         {
-            if(r->epoch > root->getEpoch()->epoch)
+            if(r->new_epoch > root->getEpoch()->epoch+1)
             {
                 do_sync(src_node);
                 state_Z=SYNCING;
