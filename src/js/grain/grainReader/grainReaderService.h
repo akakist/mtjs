@@ -41,9 +41,7 @@ namespace GrainReader
         bool on_alarm(const timerEvent::TickAlarm*);
         bool handleEvent(const REF_getter<Event::Base>& e);
 
-        // bool AddTx(const bcEvent::AddTx *e);
         bool ServiceInit(const bcEvent::ServiceInit *e);
-        // bool GetTransactions(const bcEvent::GetTransactions*e);
         bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
         bool ClientMsg(const bcEvent::ClientMsg*e);
 

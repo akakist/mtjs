@@ -17,6 +17,7 @@
 #include "ioBuffer.h"
 #include "nodeService.h"
 #include "route_t.h"
+#include "s_ed.h"
 #include "t_params.h"
 #include "tools_mt.h"
 #include <SQLiteCpp/Database.h>
@@ -77,7 +78,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
     db->write_batch(db_to_save_Z);
     db_to_save_Z.clear();
 
-
     {
         XTRY;
         SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
@@ -108,9 +108,10 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
         br->sign(my_sk_bls);
 
         resetTimer();
-
-        msg::node_message_ed nm(br->getBuffer(), this_node_name, my_sk_ed);
-        passEvent(new bcEvent::MsgReply(nm.getBuffer(), poppedFrontRoute(route)));
+        pass_NodeMsgRSP(br.get(), route);
+        // auto buffer = br->getBuffer();
+        // auto signature = sign_ed(my_sk_ed, buffer);
+        // passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(route)));
         XPASS;
     }
     iUtils->getNow();
@@ -143,7 +144,6 @@ bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ *r, const 
     if (CheckState(r->lc->heart_beat.get(), src_node))
         return true;
 
-
     resetTimer();
     if (r->lc->heart_beat->node_leader != node_leader_for_client)
         return true;
@@ -158,7 +158,6 @@ bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ *r, const 
         if (isNodeGreaterOrEqual(r->lc->heart_beat->node_leader, node_leader_for_client))
         {
             node_leader_for_client = r->lc->heart_beat->node_leader;
-
         }
         else
         {
@@ -173,14 +172,18 @@ bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ *r, const 
     {
         rsp->trs.push_back(z.second);
     }
-    msg::node_message_ed nn(rsp->getBuffer(), this_node_name, my_sk_ed);
-    passEvent(new bcEvent::MsgReply(nn.getBuffer(), poppedFrontRoute(route)));
-
-    // sendEvent(ServiceEnum::Node,new bcEvent::GetTransactions(route));
+    pass_NodeMsgRSP(rsp.get(),route);
     return true;
 }
-int get_global_refcount();
+void Node::Service::pass_NodeMsgRSP(const MsgEvt::Base *e,const route_t& r)
+{
+    auto buffer = e->getBuffer();
+    auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
+    passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
 
+}
+
+int get_global_refcount();
 
 bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
 {
@@ -201,7 +204,7 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
 
     if (r->leader_cert->heart_beat->prev_block_hash != prev_block_hash_Z)
     {
-        if (root->getEpoch()->epoch+1 != r->leader_cert->heart_beat->new_epoch)
+        if (root->getEpoch()->epoch + 1 != r->leader_cert->heart_beat->new_epoch)
         {
             logNode("if (root->getEpoch()->epoch+1 < r->leader_cert->heart_beat->new_epoch)");
             // setBlockId(r->leader_cert->heart_beat->prev_block_hash);
@@ -213,14 +216,13 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
 
         // auto new_root_hash =
         t_params t(root);
-        t.att_data.trs=r->transaction_bodies;
-        execute_block(t, root, prev_block_hash_Z,  r->leader_cert->nodes);
-        calc_fee_and_rewards(t,r->leader_cert->nodes);
+        t.att_data.trs = r->transaction_bodies;
+        execute_block(t, root, prev_block_hash_Z, r->leader_cert->nodes);
+        calc_fee_and_rewards(t, r->leader_cert->nodes);
 
         auto newEpoch = root->getEpoch();
         newEpoch->epoch += 1;
         newEpoch->setDirty(NULL);
-
 
         blockDBStore = prepareBlockDBStore(t);
 
@@ -239,16 +241,17 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
         rsp->payload_block = block;
         rsp->sign(my_sk_bls);
 
-        msg::node_message_ed nn(rsp->getBuffer(), this_node_name, my_sk_ed);
-        passEvent(new bcEvent::MsgReply(nn.getBuffer(), poppedFrontRoute(route)));
+        pass_NodeMsgRSP(rsp.get(),route);
+        // msg::node_message_ed nn(rsp->getBuffer(), this_node_name, my_sk_ed);
+        // passEvent(new bcEvent::MsgReply(nn.getBuffer(), poppedFrontRoute(route)));
     }
 #ifdef MEMLEACK_CHECK
-    logNode("!!!!!!!!!!!!!! global REF count %d",get_global_refcount());
+    logNode("!!!!!!!!!!!!!! global REF count %d", get_global_refcount());
     std::vector<std::string> v;
     root->print_calcers(v);
-    for(auto& z:v)
+    for (auto &z : v)
     {
-        printf("calcer %s\n",z.c_str());
+        printf("calcer %s\n", z.c_str());
     }
 #endif
     return true;
@@ -263,8 +266,11 @@ bool Node::Service::Msg(const bcEvent::Msg *e, bool fromNetwork)
     inBuffer in(e->msg);
 
     auto p = in.get_PN();
+    auto ev=msgFactory.create(p);
+    ev->unpack(in);
     switch (p)
     {
+#ifdef KALL
     case msgid::node_message_ed:
     {
         MUTEX_INSPECTOR;
@@ -310,6 +316,7 @@ bool Node::Service::Msg(const bcEvent::Msg *e, bool fromNetwork)
         }
     }
     break;
+#endif
     default:
         throw CommonError("unhabdled Zp11 %s", msgName(p));
     }

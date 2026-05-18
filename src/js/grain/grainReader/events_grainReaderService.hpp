@@ -3,6 +3,7 @@
 
 
 #include "Events/System/Net/rpcEvent.h"
+#include "Events/System/Run/startServiceEvent.h"
 #include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
 #include "Events/System/Run/startServiceEvent.h"
@@ -18,9 +19,7 @@ inline std::set<EVENT_id> getEvents_grainReaderService()
 	std::set<EVENT_id> out;
 	out.insert(bcEventEnum::ClientMsg);
 	out.insert(bcEventEnum::ClientMsgReply);
-	// out.insert(bcEventEnum::GetTransactions);
 	out.insert(bcEventEnum::InvalidateRoot);
-	out.insert(bcEventEnum::MsgReply);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(rpcEventEnum::IncomingOnAcceptor);
 	out.insert(rpcEventEnum::IncomingOnConnector);
@@ -35,9 +34,7 @@ inline void regEvents_grainReaderService()
 {
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
-	// iUtils->registerEvent(bcEvent::GetTransactions::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
-	iUtils->registerEvent(bcEvent::MsgReply::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnAcceptor::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnConnector::construct);

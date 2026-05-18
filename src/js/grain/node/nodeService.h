@@ -149,6 +149,9 @@ namespace Node
         bool ConfirmLeaderREQ(const MsgEvt::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
         bool ConfirmLeaderRSP(const MsgEvt::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
 
+        bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
+        bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);
+        
         void initDB();
 
         // void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);
@@ -161,6 +164,8 @@ namespace Node
 
         void do_request_for_transactions(const Node::heart_beat_node_info& li);
 
+        void broadcast_MsgEvent(const REF_getter<MsgEvt::Base>& p);
+        void pass_NodeMsgRSP(const MsgEvt::Base *e,const route_t& r);
 
 
         struct Round

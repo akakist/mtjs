@@ -3,6 +3,7 @@
 
 
 #include "Events/System/Net/rpcEvent.h"
+#include "Events/System/Run/startServiceEvent.h"
 #include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
 #include "Events/System/Run/startServiceEvent.h"
@@ -16,11 +17,11 @@ inline std::set<EVENT_id> getEvents_blockStreamerService()
 {
 
 	std::set<EVENT_id> out;
-	out.insert(bcEventEnum::ClientMsg);
-	out.insert(bcEventEnum::ClientMsgReply);
-	// out.insert(bcEventEnum::GetTransactions);
+	out.insert(bcEventEnum::ClientTxSubscribeREQ);
+	out.insert(bcEventEnum::ClientTxSubscribeRSP);
 	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::ServiceInit);
+	out.insert(bcEventEnum::StreamBlock);
 	out.insert(rpcEventEnum::IncomingOnAcceptor);
 	out.insert(rpcEventEnum::IncomingOnConnector);
 	out.insert(systemEventEnum::startService);
@@ -32,11 +33,11 @@ inline std::set<EVENT_id> getEvents_blockStreamerService()
 
 inline void regEvents_blockStreamerService()
 {
-	iUtils->registerEvent(bcEvent::ClientMsg::construct);
-	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
-	// iUtils->registerEvent(bcEvent::GetTransactions::construct);
+	iUtils->registerEvent(bcEvent::ClientTxSubscribeREQ::construct);
+	iUtils->registerEvent(bcEvent::ClientTxSubscribeRSP::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
+	iUtils->registerEvent(bcEvent::StreamBlock::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnAcceptor::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnConnector::construct);
 	iUtils->registerEvent(systemEvent::startService::construct);

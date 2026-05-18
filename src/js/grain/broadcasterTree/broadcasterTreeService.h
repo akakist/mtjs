@@ -53,13 +53,13 @@ namespace BroadcasterTree
         public ListenerBuffered1Thread,
         public Broadcaster
     {
+        bool NodeMsgRSP(const bcEvent::NodeMsgRSP*);
         bool on_startService(const systemEvent::startService*);
         bool on_timer(const timerEvent::TickTimer*);
         bool on_alarm(const timerEvent::TickAlarm*);
         bool handleEvent(const REF_getter<Event::Base>& e);
 
         bool ServiceInit(const bcEvent::ServiceInit *e);
-        // bool GetTransactions(const bcEvent::GetTransactions*e);
         bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
         bool MsgReply(const bcEvent::MsgReply* e, bool fromNetwork);
 
@@ -74,7 +74,8 @@ namespace BroadcasterTree
         Service(const SERVICE_id&, const std::string&  nm, IInstance *ins);
         ~Service();
 
-        void make_broadcast_message_to_tree(SERVICE_id dstService,const std::string & msg, const BroadcasterTree::TreeNode& root, const route_t& route);
+        // void make_broadcast_message_to_tree(SERVICE_id dstService,const std::string & msg, const BroadcasterTree::TreeNode& root, const route_t& route);
+        void make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id& node_signer, const std::string& signature, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route);
 
 
     public:

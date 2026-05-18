@@ -362,6 +362,8 @@ namespace msg
         }
 
     };
+
+#ifdef KALL    
     struct node_message_ed: public message_base
     {
 
@@ -395,7 +397,7 @@ namespace msg
         }
 
     };
-
+#endif
 
 }
 

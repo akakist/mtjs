@@ -54,7 +54,7 @@ bool BroadcasterTree::Service::on_alarm(const timerEvent::TickAlarm *e)
 
         logErr2("TIMER_BROADCAST_ACK_TIMEDOUT %s", c->dstNodeName.container.c_str());
 
-        make_broadcast_message_to_tree(c->dst_service, c->payload, c->bt, c->route);
+        make_broadcast_message_to_tree(c->dst_service,c->node_signer,c->payload_signature,  c->payload, c->bt, c->route);
 
         return true;
     }
@@ -75,6 +75,8 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base> &e)
         auto &ID = e->id;
         switch (ID)
         {
+        case bcEventEnum::NodeMsgRSP:
+            return NodeMsgRSP((const bcEvent::NodeMsgRSP *)e.get());
         case bcEventEnum::InvalidateRoot:
             return InvalidateRoot((const bcEvent::InvalidateRoot *)e.get());
         case bcEventEnum::BroadcastMessage:
@@ -101,6 +103,8 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base> &e)
 
             switch (IDA)
             {
+            case bcEventEnum::NodeMsgRSP:
+                return NodeMsgRSP((const bcEvent::NodeMsgRSP *)ev->e.get());
             case bcEventEnum::MsgReply:
                 return MsgReply(static_cast<const bcEvent::MsgReply *>(ev->e.get()), true);
             case bcEventEnum::SendToChild:
@@ -119,6 +123,8 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base> &e)
             auto &IDC = ev->e->id;
             switch (IDC)
             {
+            case bcEventEnum::NodeMsgRSP:
+                return NodeMsgRSP((const bcEvent::NodeMsgRSP *)ev->e.get());
             case bcEventEnum::MsgReply:
                 return MsgReply(static_cast<const bcEvent::MsgReply *>(ev->e.get()), true);
             case bcEventEnum::SendToChild:
@@ -189,18 +195,18 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
         return true;
     BroadcasterTree::TreeNode root = BroadcasterTree::buildTree(nodes, conf->this_node_name);
 
-    make_broadcast_message_to_tree(e->dstService, e->msg, root, e->route);
+    make_broadcast_message_to_tree(e->dstService,e->node_signer,e->signature_pl, e->msg, root, e->route);
     return true;
 }
-void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route)
+void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id & node_signer, const std::string& signature, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route)
 {
     MUTEX_INSPECTOR;
     auto &ch = root.children;
     for (auto it = ch.begin(); it != ch.end(); it++)
     {
         MUTEX_INSPECTOR;
-        REF_getter<bcEvent::SendToChild> e1 = new bcEvent::SendToChild(msg, *it, dstService, it->node.name, route);
-        REF_getter<bcEvent::SendToChild> e2 = new bcEvent::SendToChild(msg, *it, dstService, it->node.name, route);
+        REF_getter<bcEvent::SendToChild> e1 = new bcEvent::SendToChild(node_signer,signature, msg, *it, dstService, it->node.name, route);
+        REF_getter<bcEvent::SendToChild> e2 = new bcEvent::SendToChild(node_signer,signature, msg, *it, dstService, it->node.name, route);
         sendEvent(it->node.ip, ServiceEnum::BroadcasterTree, e1.get());
 
         sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(TIMER_BROADCAST_ACK_TIMEDOUT,
@@ -209,6 +215,18 @@ void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstServ
 }
 
 bool BroadcasterTree::Service::MsgReply(const bcEvent::MsgReply *e, bool fromNetwork)
+{
+    // logNode("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Service::Msg ")
+    if (e->route.size())
+    {
+        passEvent(e);
+        return true;
+    }
+    else
+        throw CommonError("if(e->route.size())");
+    return true;
+}
+bool BroadcasterTree::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *e)
 {
     if (e->route.size())
     {
@@ -253,9 +271,9 @@ void registerBroadcasterTreeService(const char *pn)
 
 bool BroadcasterTree::Service::SendToChild(const bcEvent::SendToChild *e, bool fromNetwork)
 {
-    sendEvent(e->dst_service, new bcEvent::Msg(e->payload, e->route));
+    sendEvent(e->dst_service, new bcEvent::NodeMsgREQ(e->node_signer,e->payload_signature, e->payload, e->route));
     passEvent(new bcEvent::SendToChildAck(e->hash(), poppedFrontRoute(e->route)));
-    make_broadcast_message_to_tree(e->dst_service, e->payload, e->bt, e->route);
+    make_broadcast_message_to_tree(e->dst_service, e->node_signer,e->payload_signature, e->payload, e->bt, e->route);
     return true;
 }
 bool BroadcasterTree::Service::SendToChildAck(const bcEvent::SendToChildAck *e, bool fromNetwork)

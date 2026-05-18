@@ -104,9 +104,9 @@ bool Node::Service::BlockAcceptedRSP(const MsgEvt::BlockAcceptedRSP *r, const NO
             if (!last_leader_cert.valid())
                 throw CommonError("if(!last_leader_cert.valid())");
             rt->prev_leader_cert = last_leader_cert;
-            msg::node_message_ed nm(rt->getBuffer(), this_node_name, my_sk_ed);
-            sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
-
+            // msg::node_message_ed nm(rt->getBuffer(), this_node_name, my_sk_ed);
+            // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
+            broadcast_MsgEvent(rt.get());
             // do_heart_beat();
         }
     }
@@ -115,16 +115,16 @@ bool Node::Service::BlockAcceptedRSP(const MsgEvt::BlockAcceptedRSP *r, const NO
     XPASS;
     return true;
 }
-bool Node::Service::CheckState(const MsgEvt::HeartBeatREQ *r, const NODE_id & src_node) // 1 если невалидно
+bool Node::Service::CheckState(const MsgEvt::HeartBeatREQ *r, const NODE_id &src_node) // 1 если невалидно
 {
-    if(r->prev_block_hash!=prev_block_hash_Z)
+    if (r->prev_block_hash != prev_block_hash_Z)
     {
-        if(state_Z==NORMAL)    
+        if (state_Z == NORMAL)
         {
-            if(r->new_epoch > root->getEpoch()->epoch+1)
+            if (r->new_epoch > root->getEpoch()->epoch + 1)
             {
                 do_sync(src_node);
-                state_Z=SYNCING;
+                state_Z = SYNCING;
             }
             return 1;
         }
@@ -132,7 +132,6 @@ bool Node::Service::CheckState(const MsgEvt::HeartBeatREQ *r, const NODE_id & sr
     }
     return 0;
 }
-
 
 bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
 {
@@ -210,9 +209,10 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP *r, const NO
         }
         if (!ba->leader_certificateZ.valid())
             throw CommonError("if(!ba->leader_certificateZ.valid())");
-        msg::node_message_ed nm(ba->getBuffer(), this_node_name, my_sk_ed);
+        // msg::node_message_ed nm(ba->getBuffer(), this_node_name, my_sk_ed);
         // make_broadcast_message(nm.getBuffer());
-        sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
+        // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
+        broadcast_MsgEvent(ba.get());
 
         bt.block_accepted_sent = true;
         XPASS;
@@ -235,6 +235,7 @@ bool Node::Service::MsgReply(const bcEvent::MsgReply *e, bool fromNetwork)
     auto p = in.get_PN();
     switch (p)
     {
+#ifdef KALL
     case msgid::node_message_ed:
     {
         MUTEX_INSPECTOR;
@@ -274,6 +275,7 @@ bool Node::Service::MsgReply(const bcEvent::MsgReply *e, bool fromNetwork)
         }
     }
     break;
+#endif
     default:
         throw CommonError("unhandled11 p %s", msgName(p));
     }

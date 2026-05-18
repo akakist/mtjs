@@ -1,4 +1,5 @@
 #include "base62.h"
+#include "blake2bHasher.h"
 #include "commonError.h"
 #include "NODE_id.h"
 #include "REF.h"
@@ -25,8 +26,13 @@ void Node::Service::do_sync(const NODE_id &src_node)
     REF_getter<MsgEvt::GetSavedBlocksREQ> gbr = new MsgEvt::GetSavedBlocksREQ();
     gbr->epoch = root->getEpoch()->epoch;
     logNode("@@@@@@@@@@@@@@@@ REQUEST for blocks since %s", gbr->epoch.toString().c_str());
-    msg::node_message_ed nm(gbr->getBuffer(), this_node_name, my_sk_ed);
-    sendEvent(n->ip, ServiceEnum::Node, new bcEvent::Msg(nm.getBuffer(), ListenerBase::serviceId));
+    // msg::node_message_ed nm(gbr->getBuffer(), this_node_name, my_sk_ed);
+    // broadcast_MsgEvent(gbr);
+    // send
+    auto buffer = gbr->getBuffer();
+
+    sendEvent(n->ip, ServiceEnum::Node,
+              new bcEvent::NodeMsgREQ(this_node_name, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 }
 
 bool Node::Service::GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ *r, const NODE_id &src_node, const route_t &route)
@@ -63,8 +69,11 @@ bool Node::Service::GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ *r, const 
     logNode("QUERY RESULTS %d", ret->blocks_Z.size());
 
     ret->lastEpoch = root->getEpoch()->epoch;
-    msg::node_message_ed nm(ret->getBuffer(), this_node_name, my_sk_ed);
-    passEvent(new bcEvent::MsgReply(nm.getBuffer(), poppedFrontRoute(route)));
+    // msg::node_message_ed nm(ret->getBuffer(), this_node_name, my_sk_ed);
+    pass_NodeMsgRSP(ret.get(),route);
+    // auto buf=ret->getBuffer();
+    // auto sig=sign_ed(my_sk_ed,blake2b_hash(buf).container);
+    // passEvent(new bcEvent::NodeMsgRSP(this_node_name,sig, buf, poppedFrontRoute(route)));
 
     return true;
 }
@@ -103,8 +112,8 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const 
         }
         // logNode("on_get_blocks_rsp: block verified OK");
         t_params t(root);
-        t.att_data.trs=z.second->att_data.trs;
-        execute_block(t, root, prev_block_hash_Z,  z.second->block_accepted_req->leader_certificateZ->nodes);
+        t.att_data.trs = z.second->att_data.trs;
+        execute_block(t, root, prev_block_hash_Z, z.second->block_accepted_req->leader_certificateZ->nodes);
         blockDBStore = prepareBlockDBStore(t);
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
@@ -145,8 +154,8 @@ bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const 
         do_sync(src_node);
         return true;
     }
-    else 
-        logNode("ERR %s %d",__FILE__,__LINE__);
+    else
+        logNode("ERR %s %d", __FILE__, __LINE__);
 
     state_Z = State::NORMAL;
     logNode("State::NORMAL");

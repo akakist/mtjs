@@ -2,15 +2,20 @@
 #define __________nodeService_EventInfo__HH
 
 
-#include "Events/System/Net/rpcEvent.h"
 #include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
-#include "Events/System/Net/rpcEvent.h"
+#include "bcEvent.h"
+#include "Events/System/timerEvent.h"
 #include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
+#include "Events/System/Net/httpEvent.h"
 #include "Events/System/Net/rpcEvent.h"
+#include "Events/System/Run/startServiceEvent.h"
 #include "Events/System/timerEvent.h"
+#include "Events/Tools/telnetEvent.h"
+#include "Events/Tools/webHandlerEvent.h"
 #include "Event/bcEvent.h"
+#include "bcEvent.h"
 #include "Events/System/Run/startServiceEvent.h"
 #include "Events/Tools/telnetEvent.h"
 #include "Events/Tools/webHandlerEvent.h"
@@ -25,10 +30,12 @@ inline std::set<EVENT_id> getEvents_nodeService()
 	out.insert(bcEventEnum::BroadcastMessage);
 	out.insert(bcEventEnum::ClientMsgReply);
 	out.insert(bcEventEnum::ClientTxSubscribeREQ);
-	// out.insert(bcEventEnum::GetTransactions);
 	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::Msg);
 	out.insert(bcEventEnum::MsgReply);
+	out.insert(bcEventEnum::NodeMsgREQ);
+	out.insert(bcEventEnum::NodeMsgRSP);
+	out.insert(bcEventEnum::PutTransactionREQ);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(bcEventEnum::StreamBlock);
 	out.insert(httpEventEnum::DoListen);
@@ -54,10 +61,12 @@ inline void regEvents_nodeService()
 	iUtils->registerEvent(bcEvent::BroadcastMessage::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
 	iUtils->registerEvent(bcEvent::ClientTxSubscribeREQ::construct);
-	// iUtils->registerEvent(bcEvent::GetTransactions::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::Msg::construct);
 	iUtils->registerEvent(bcEvent::MsgReply::construct);
+	iUtils->registerEvent(bcEvent::NodeMsgREQ::construct);
+	iUtils->registerEvent(bcEvent::NodeMsgRSP::construct);
+	iUtils->registerEvent(bcEvent::PutTransactionREQ::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(bcEvent::StreamBlock::construct);
 	iUtils->registerEvent(httpEvent::DoListen::construct);

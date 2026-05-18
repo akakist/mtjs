@@ -507,6 +507,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         return true;
     }
     break;
+#ifdef KALL    
     case msgid::node_message_ed:
     {
         msg::node_message_ed nm;
@@ -520,6 +521,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         return true;
     }
     break;
+#endif
     default:
         logErr2("unhandled msg Z %d", p);
     }

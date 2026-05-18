@@ -72,8 +72,9 @@ bool Node::Service::HeartBeatRSP(const MsgEvt::HeartBeatRSP *m, const NODE_id &s
 
             REF_getter<MsgEvt::ConfirmLeaderREQ> rt = new MsgEvt::ConfirmLeaderREQ();
             rt->hb = m->payload_heart_beat;
-            msg::node_message_ed nm(rt->getBuffer(), this_node_name, my_sk_ed);
-            sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
+            broadcast_MsgEvent(rt.get());
+            // msg::node_message_ed nm(rt->getBuffer(), this_node_name, my_sk_ed);
+            // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
         }
     }
     XPASS;
@@ -120,9 +121,13 @@ bool Node::Service::HeartBeatREQ(const MsgEvt::HeartBeatREQ *h, const NODE_id &s
         hbr->node_signer = this_node_name;
         hbr->signature.sign(my_sk_bls, blake2b_hash(h->getBuffer()).container);
 
-        msg::node_message_ed nme(hbr->getBuffer(), this_node_name, my_sk_ed);
+        pass_NodeMsgRSP(hbr.get(),route);
+        // auto buf=hbr->getBuffer();
+        // auto sig=sign_ed(my_sk_ed,blake2b_hash(buf).container);
+
+        // msg::node_message_ed nme(hbr->getBuffer(), this_node_name, my_sk_ed);
         // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
-        passEvent(new bcEvent::MsgReply(nme.getBuffer(), poppedFrontRoute(route)));
+        // passEvent(new bcEvent::NodeMsgRSP(this_node_name,sig,buf, poppedFrontRoute(route)));
     }
     return true;
 }
@@ -167,9 +172,13 @@ bool Node::Service::ConfirmLeaderREQ(const MsgEvt::ConfirmLeaderREQ *h, const NO
         hbr->node_signer = this_node_name;
         hbr->sig.sign(my_sk_bls, blake2b_hash(h->hb->getBuffer()).container);
 
-        msg::node_message_ed nme(hbr->getBuffer(), this_node_name, my_sk_ed);
+        
+        // msg::node_message_ed nme(hbr->getBuffer(), this_node_name, my_sk_ed);
         // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
-        passEvent(new bcEvent::MsgReply(nme.getBuffer(), poppedFrontRoute(route)));
+        pass_NodeMsgRSP(hbr.get(),route);
+        // auto buf=hbr->getBuffer();
+        // auto sig=sign_ed(my_sk_ed,blake2b_hash(buf).container);
+        // passEvent(new bcEvent::NodeMsgRSP(this_node_name,sig,buf, poppedFrontRoute(route)));
     }
     return true;
 }
@@ -248,10 +257,13 @@ void Node::Service::do_heart_beat()
                                      root->getEpoch()->epoch+1,
                                      this_node_name);
         // DBG(logNode("broadcast heart beat as leader %s",this_node_name.container.c_str()));
-        outBuffer o;
-        hb_req->pack(o);
-        msg::node_message_ed nm(o.asString()->container, this_node_name, my_sk_ed);
-        sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
+
+        broadcast_MsgEvent(hb_req.get());
+        // outBuffer o;
+        // hb_req->pack(o);
+
+        // msg::node_message_ed nm(o.asString()->container, this_node_name, my_sk_ed);
+        // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
     }
 
     return;
