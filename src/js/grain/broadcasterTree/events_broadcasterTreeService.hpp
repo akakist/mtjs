@@ -19,8 +19,8 @@ inline std::set<EVENT_id> getEvents_broadcasterTreeService()
 	std::set<EVENT_id> out;
 	out.insert(bcEventEnum::BroadcastMessage);
 	out.insert(bcEventEnum::InvalidateRoot);
-	out.insert(bcEventEnum::MsgReply);
 	out.insert(bcEventEnum::NodeMsgREQ);
+	out.insert(bcEventEnum::NodeMsgRSP);
 	out.insert(bcEventEnum::SendToChild);
 	out.insert(bcEventEnum::SendToChildAck);
 	out.insert(bcEventEnum::ServiceInit);
@@ -39,8 +39,8 @@ inline void regEvents_broadcasterTreeService()
 {
 	iUtils->registerEvent(bcEvent::BroadcastMessage::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
-	iUtils->registerEvent(bcEvent::MsgReply::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgREQ::construct);
+	iUtils->registerEvent(bcEvent::NodeMsgRSP::construct);
 	iUtils->registerEvent(bcEvent::SendToChild::construct);
 	iUtils->registerEvent(bcEvent::SendToChildAck::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);

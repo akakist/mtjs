@@ -124,9 +124,6 @@ namespace Node
 
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
         bool PutTransactionREQ(const bcEvent::PutTransactionREQ* e);
-        // bool ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ*);
-        bool Msg(const bcEvent::Msg*, bool fromNetwork);
-        bool MsgReply(const bcEvent::MsgReply*, bool fromNetwork);
 
         void resetTimer();
 

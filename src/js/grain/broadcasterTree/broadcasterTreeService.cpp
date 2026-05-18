@@ -89,8 +89,6 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base> &e)
             return on_alarm((const timerEvent::TickAlarm *)e.get());
         case systemEventEnum::startService:
             return on_startService((const systemEvent::startService *)e.get());
-        case bcEventEnum::MsgReply:
-            return MsgReply(static_cast<const bcEvent::MsgReply *>(e.get()), false);
         case bcEventEnum::SendToChild:
             return SendToChild(static_cast<const bcEvent::SendToChild *>(e.get()), false);
         case bcEventEnum::SendToChildAck:
@@ -105,8 +103,6 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base> &e)
             {
             case bcEventEnum::NodeMsgRSP:
                 return NodeMsgRSP((const bcEvent::NodeMsgRSP *)ev->e.get());
-            case bcEventEnum::MsgReply:
-                return MsgReply(static_cast<const bcEvent::MsgReply *>(ev->e.get()), true);
             case bcEventEnum::SendToChild:
                 return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
             case bcEventEnum::SendToChildAck:
@@ -125,8 +121,6 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base> &e)
             {
             case bcEventEnum::NodeMsgRSP:
                 return NodeMsgRSP((const bcEvent::NodeMsgRSP *)ev->e.get());
-            case bcEventEnum::MsgReply:
-                return MsgReply(static_cast<const bcEvent::MsgReply *>(ev->e.get()), true);
             case bcEventEnum::SendToChild:
                 return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
             case bcEventEnum::SendToChildAck:
@@ -214,18 +208,6 @@ void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstServ
     }
 }
 
-bool BroadcasterTree::Service::MsgReply(const bcEvent::MsgReply *e, bool fromNetwork)
-{
-    // logNode("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Service::Msg ")
-    if (e->route.size())
-    {
-        passEvent(e);
-        return true;
-    }
-    else
-        throw CommonError("if(e->route.size())");
-    return true;
-}
 bool BroadcasterTree::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *e)
 {
     if (e->route.size())

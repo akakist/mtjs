@@ -61,7 +61,6 @@ namespace BroadcasterTree
 
         bool ServiceInit(const bcEvent::ServiceInit *e);
         bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
-        bool MsgReply(const bcEvent::MsgReply* e, bool fromNetwork);
 
         bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
         bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);

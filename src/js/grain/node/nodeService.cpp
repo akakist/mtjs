@@ -271,10 +271,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         case bcEventEnum::ClientMsgReply:
             passEvent(e);
             return true;
-        case bcEventEnum::Msg:
-            return Msg(static_cast<const bcEvent::Msg *>(e.get()), false);
-        case bcEventEnum::MsgReply:
-            return MsgReply(static_cast<const bcEvent::MsgReply *>(e.get()), false);
         case httpEventEnum::RequestIncoming:
             return RequestIncoming(static_cast<const httpEvent::RequestIncoming *>(e.get()));
         case rpcEventEnum::IncomingOnAcceptor:
@@ -288,10 +284,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return NodeMsgREQ((const bcEvent::NodeMsgREQ *)ev->e.get());
             case bcEventEnum::NodeMsgRSP:
                 return NodeMsgRSP((const bcEvent::NodeMsgRSP *)ev->e.get());
-            case bcEventEnum::Msg:
-                return Msg(static_cast<const bcEvent::Msg *>(ev->e.get()), true);
-            case bcEventEnum::MsgReply:
-                return MsgReply(static_cast<const bcEvent::MsgReply *>(ev->e.get()), true);
             default:
                 throw CommonError("unhabdled ev %d %s", IDA, iUtils->genum_name(IDA));
             }
@@ -307,10 +299,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return NodeMsgREQ((const bcEvent::NodeMsgREQ *)ev->e.get());
             case bcEventEnum::NodeMsgRSP:
                 return NodeMsgRSP((const bcEvent::NodeMsgRSP *)ev->e.get());
-            case bcEventEnum::Msg:
-                return Msg(static_cast<const bcEvent::Msg *>(ev->e.get()), true);
-            case bcEventEnum::MsgReply:
-                return MsgReply(static_cast<const bcEvent::MsgReply *>(ev->e.get()), true);
 
             default:
                 throw CommonError("unhabdled ev %d %s", IDC, iUtils->genum_name(IDC));

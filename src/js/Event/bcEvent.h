@@ -18,12 +18,8 @@ namespace ServiceEnum
 }
 namespace bcEventEnum
 {
-    const EVENT_id Msg(ghash("@g_bcMsg"));
     const EVENT_id NodeMsgREQ(ghash("@g_NodeMsgREQ"));
     const EVENT_id NodeMsgRSP(ghash("@g_NodeMsgRSP"));
-    const EVENT_id Msg2(ghash("@g_bcMsg2"));
-    const EVENT_id MsgReply(ghash("@g_bcMsgReply"));
-    const EVENT_id MsgReply2(ghash("@g_bcMsgReply2"));
     const EVENT_id ClientMsg(ghash("@g_bcClientMsg"));
     const EVENT_id ClientMsgReply(ghash("@g_bcClientMsgReply"));
     const EVENT_id ClientTxSubscribeREQ(ghash("@g_ClientTxSubscribeREQ"));
@@ -42,35 +38,6 @@ namespace bcEventEnum
 namespace bcEvent
 {
 
-    class Msg : public Event::Base
-    {
-
-    public:
-        static Base *construct(const route_t &r)
-        {
-            return new Msg(r);
-        }
-        std::string msg;
-
-        Msg(const std::string &_msg, const route_t &r)
-            : Base(bcEventEnum::Msg, r),
-              msg(_msg)
-        {
-        }
-
-        Msg(const route_t &r)
-            : Base(bcEventEnum::Msg, r) {}
-        void unpack(inBuffer &o)
-        {
-
-            o >> msg;
-        }
-        void pack(outBuffer &o) const
-        {
-
-            o << msg;
-        }
-    };
     class NodeMsgREQ : public Event::Base
     {
 
@@ -138,93 +105,6 @@ namespace bcEvent
         }
     };
 
-    class Msg2 : public Event::Base
-    {
-
-    public:
-        static Base *construct(const route_t &r)
-        {
-            return new Msg2(r);
-        }
-        std::string msg;
-
-        Msg2(const std::string &_msg, const route_t &r)
-            : Base(bcEventEnum::Msg2, r),
-              msg(_msg)
-        {
-        }
-
-        Msg2(const route_t &r)
-            : Base(bcEventEnum::Msg2, r) {}
-        void unpack(inBuffer &o)
-        {
-
-            o >> msg;
-        }
-        void pack(outBuffer &o) const
-        {
-
-            o << msg;
-        }
-    };
-    class MsgReply : public Event::Base
-    {
-
-    public:
-        static Base *construct(const route_t &r)
-        {
-            return new MsgReply(r);
-        }
-        std::string msg;
-
-        MsgReply(const std::string &_msg, const route_t &r)
-            : Base(bcEventEnum::MsgReply, r),
-              msg(_msg)
-        {
-        }
-
-        MsgReply(const route_t &r)
-            : Base(bcEventEnum::MsgReply, r) {}
-        void unpack(inBuffer &o)
-        {
-
-            o >> msg;
-        }
-        void pack(outBuffer &o) const
-        {
-
-            o << msg;
-        }
-    };
-    class MsgReply2 : public Event::Base
-    {
-
-    public:
-        static Base *construct(const route_t &r)
-        {
-            return new MsgReply2(r);
-        }
-        std::string msg;
-
-        MsgReply2(const std::string &_msg, const route_t &r)
-            : Base(bcEventEnum::MsgReply2, r),
-              msg(_msg)
-        {
-        }
-
-        MsgReply2(const route_t &r)
-            : Base(bcEventEnum::MsgReply2, r) {}
-        void unpack(inBuffer &o)
-        {
-
-            o >> msg;
-        }
-        void pack(outBuffer &o) const
-        {
-
-            o << msg;
-        }
-    };
 
     class ClientMsg : public Event::Base
     {
