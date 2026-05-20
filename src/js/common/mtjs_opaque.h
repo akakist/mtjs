@@ -31,7 +31,7 @@ struct mtjs_opaque
     std::map<std::string, JSValueGuard> rpc_on_srv_callbacks;
     std::map<std::string, JSValueGuard> rpc_on_cli_callbacks;
     std::optional<JSValueGuard> telnet_callback;
-    std::map<THASH_id, JSPromise > node_req_promises;
+    std::map<std::string/*hash*/, JSPromise > node_req_promises;
     std::optional<JSValueGuard> tx_subscription_cb;
 
     void clear()

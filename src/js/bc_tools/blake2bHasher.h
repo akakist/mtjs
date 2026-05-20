@@ -42,7 +42,7 @@ public:
     std::string final() {
         unsigned char out[outlen_];
         if (crypto_generichash_final(&state_, out, outlen_) != 0) {
-            throw std::runtime_error("crypto_generichash_final failed");
+            throw std::runtime_error("crypto_generichash_final failed"+_DMI());
         }
         return {(char*)out,outlen_};
     }

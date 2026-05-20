@@ -52,6 +52,8 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base>& e)
         auto& ID=e->id;
         switch(ID)
         {
+        case bcEventEnum::AddTxREQ:
+            return AddTxREQ((const bcEvent::AddTxREQ*)e.get());
         case bcEventEnum::InvalidateRoot:
             return InvalidateRoot((const bcEvent::InvalidateRoot*)e.get());
         case bcEventEnum::ClientMsg:
@@ -71,6 +73,8 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base>& e)
 
             switch(IDA)
             {
+            case bcEventEnum::AddTxREQ:
+                return AddTxREQ((const bcEvent::AddTxREQ*)ev->e.get());
             case bcEventEnum::ClientMsg:
                 return ClientMsg((const bcEvent::ClientMsg*)ev->e.get());
             default:
@@ -84,6 +88,8 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base>& e)
             auto &IDC=ev->e->id;
             switch(IDC)
             {
+            case bcEventEnum::AddTxREQ:
+                return AddTxREQ((const bcEvent::AddTxREQ*)ev->e.get());
             case bcEventEnum::ClientMsg:
                 return ClientMsg((const bcEvent::ClientMsg*)ev->e.get());
 
@@ -136,6 +142,10 @@ bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot*e)
     MUTEX_INSPECTOR;
     root=getRoot(conf->db.get());
     init_root(root);
+    return true;
+}
+bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ*e)
+{
     return true;
 }
 

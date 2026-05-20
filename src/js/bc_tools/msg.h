@@ -13,6 +13,10 @@
 #include "s_ed.h"
 #include "NODE_id.h"
 #include "blst_cp.h"
+#include "msgFactory.h"
+extern thread_local MsgFactory msgFactory;
+const char* msgName(int id);
+
 struct instruction_report
 {
     int err_code;
@@ -76,9 +80,8 @@ struct attachment_data
         fees.clear();
         rewards.clear();
     }
-    std::string hash()
+    void hash(Blake2bHasher &h)
     {
-        Blake2bHasher h;
         for(auto &z:trs)
         {
             h.update(z.container);
@@ -101,7 +104,6 @@ struct attachment_data
             h.update(z.first.container);
             h.update(z.second.toString());
         }
-        return h.final();
     }
 };
 inline outBuffer & operator<< (outBuffer& b,const attachment_data &s)
@@ -125,60 +127,9 @@ namespace msgid
         user_message_req,transaction_added_rsp,
         user_request,get_user_status_req,get_user_status_rsp, HeartBeatREQ,HeartBeatRSP,
         LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
-        BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP
+        BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP, InstructionList,TX,TxMint
     };
 
-}
-inline const char* msgName(int id)
-{
-    switch(id)
-    {
-    case msgid::node_message_ed:
-        return "node_message_ed";
-    case msgid::user_message_req:
-        return "user_message_req";
-    case msgid::transaction_added_rsp:
-        return "transaction_added_rsp";
-    case msgid::user_request:
-        return "user_request";
-    case msgid::get_user_status_req:
-        return "get_user_status_req";
-    case msgid::get_user_status_rsp:
-        return "get_user_status_rsp";
-    case msgid::HeartBeatREQ:
-        return "HeartBeatREQ";
-    case msgid::HeartBeatRSP:
-        return "HeartBeatRSP";
-    case msgid::LeaderCertificate:
-        return "LeaderCertificate";
-    case msgid::ValidateBlockREQ:
-        return "ValidateBlockREQ";
-    case msgid::ValidateBlockRSP:
-        return "ValidateBlockRSP";
-    case msgid::BlockInfo:
-        return "BlockInfo";
-    case msgid::BlockAcceptedREQ:
-        return "BlockAcceptedREQ";
-    case msgid::BlockAcceptedRSP:
-        return "BlockAcceptedRSP";
-    case msgid::GetTransactionREQ:
-        return "GetTransactionREQ";
-    case msgid::GetTransactionRSP:
-        return "GetTransactionRSP";
-    case msgid::BlockDBStore:
-        return "BlockDBStore";
-    case msgid::GetSavedBlocksREQ:
-        return "GetSavedBlocksREQ";
-    case msgid::GetSavedBlocksRSP:
-        return "GetSavedBlocksRSP";
-    case msgid::DoHeartBeatREQ:
-        return "DoHeartBeatREQ";
-    case msgid::ConfirmLeaderREQ:
-        return "ConfirmLeaderREQ";
-        
-    default:
-        return "unknown";
-    }
 }
 namespace msg
 {
@@ -435,8 +386,11 @@ namespace MsgEvt
             XPASS;
             return o.asString()->container;
         }
+        virtual void hash(Blake2bHasher& h)=0;
 
     };
+
+
     struct HeartBeatREQ: public Base
     {
         
@@ -451,6 +405,12 @@ namespace MsgEvt
         BLOCK_id prev_block_hash;
         BigInt new_epoch;
         NODE_id node_leader;
+        void hash(Blake2bHasher& h)
+        {
+            h.update(prev_block_hash.container);
+            h.update(new_epoch.toString());
+            h.update(node_leader.container);
+        }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -484,6 +444,15 @@ namespace MsgEvt
         REF_getter<MsgEvt::HeartBeatREQ> heart_beat;
         std::vector<NODE_id> nodes;
         blst_cpp::AggregateSignature agg_sig;
+        void hash(Blake2bHasher& h)
+        {
+            heart_beat->hash(h);
+            for(auto& z: nodes)
+            {
+                h.update(z.container);
+            }
+        }
+
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -518,6 +487,11 @@ namespace MsgEvt
         {
         }
         REF_getter<LeaderCertificate> lc;
+        void hash(Blake2bHasher& h)
+        {
+            lc->hash(h);
+        }
+
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -550,6 +524,15 @@ namespace MsgEvt
 
         REF_getter<LeaderCertificate>  leader_cert;
         std::vector<TRANSACTION_body> transaction_bodies;
+        void hash(Blake2bHasher& h)
+        {
+            leader_cert->hash(h);
+            for(auto& z: transaction_bodies)
+            {
+                h.update(z.container);
+            }
+        }
+
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -580,6 +563,7 @@ namespace MsgEvt
         REF_getter<BlockInfo> block_payload;
         std::vector<NODE_id> node_validators;
         blst_cpp::AggregateSignature agg_sig;
+        void hash(Blake2bHasher& h);
         void pack(outBuffer& b) const final;
         void unpack(inBuffer& b) final;
     };
@@ -592,6 +576,11 @@ namespace MsgEvt
         REF_getter<HeartBeatREQ> payload_heart_beat;
         NODE_id node_signer;
         blst_cpp::Signature signature;
+        void hash(Blake2bHasher& h)
+        {
+            payload_heart_beat->hash(h);
+            h.update(node_signer.container);
+        }
         static Base* construct()
         {
             return new HeartBeatRSP();
@@ -631,6 +620,12 @@ namespace MsgEvt
         }
 
         std::vector<TRANSACTION_body>  trs;
+        void hash(Blake2bHasher& h)
+        {
+            for(auto& z:trs )
+                h.update(z.container);
+        }
+
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -662,6 +657,15 @@ namespace MsgEvt
         BLOCK_id new_root_hash1;
         THASH_id attachment_hash;
         REF_getter<HeartBeatREQ> payload_heart_beat;
+        void hash(Blake2bHasher& h)
+        {
+            h.update(prev_epoch.toString());
+            h.update(prev_root_hash.container);
+            h.update(new_root_hash1.container);
+            h.update(attachment_hash.container);
+            payload_heart_beat->hash(h);
+        }
+
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -699,6 +703,11 @@ namespace MsgEvt
         REF_getter<BlockInfo> payload_block;
         blst_cpp::Signature sig;
         NODE_id node_validator;
+        void hash(Blake2bHasher& h)
+        {
+            payload_block->hash(h);
+            h.update(node_validator.container);
+        }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -742,6 +751,12 @@ namespace MsgEvt
         NODE_id node_signer;
         BLOCK_id new_root_hash;
         blst_cpp::Signature sig_bls;
+        void hash(Blake2bHasher& h)
+        {
+            h.update(node_signer.container);
+            h.update(new_root_hash.container);
+        }
+
         void sign(const blst_cpp::SecretKey& sk)
         {
             sig_bls.sign(sk, new_root_hash.container);
@@ -775,6 +790,10 @@ namespace MsgEvt
             return new GetSavedBlocksREQ();
         }
         BigInt epoch;
+        void hash(Blake2bHasher& h)
+        {
+            h.update(epoch.toString());
+        }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -798,6 +817,12 @@ namespace MsgEvt
         BigInt epoch;
         attachment_data att_data;
         REF_getter<BlockAcceptedREQ> block_accepted_req;
+        void hash(Blake2bHasher& h)
+        {
+            h.update(epoch.toString());
+            att_data.hash(h);
+            block_accepted_req->hash(h);
+        }
         void pack(outBuffer& b) const final
         {
             XTRY;
@@ -833,6 +858,10 @@ namespace MsgEvt
         }
         std::vector<std::pair<BigInt, REF_getter<MsgEvt::BlockDBStore>> > blocks_Z;
         BigInt lastEpoch;
+        void hash(Blake2bHasher& h)
+        {
+            throw CommonError("unimp");
+        }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -872,6 +901,10 @@ namespace MsgEvt
 
         }
         REF_getter<LeaderCertificate> prev_leader_cert;
+        void hash(Blake2bHasher& h)
+        {
+            throw CommonError("unimp");
+        }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -897,6 +930,10 @@ namespace MsgEvt
 
         }
         REF_getter<HeartBeatREQ> hb;
+        void hash(Blake2bHasher& h)
+        {
+            throw CommonError("unimp");
+        }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -924,6 +961,10 @@ namespace MsgEvt
         REF_getter<HeartBeatREQ> hb;
         blst_cpp::Signature sig;        
         NODE_id node_signer;
+        void hash(Blake2bHasher& h)
+        {
+            throw CommonError("unimp");
+        }
 
         void pack(outBuffer& b) const final
         {
@@ -940,32 +981,130 @@ namespace MsgEvt
             b>>sig>>node_signer;
         }
     };
+    struct InstructionList: public Base
+    {
+        
+        static Base* construct()
+        {
+            return new InstructionList();
+        }
+        InstructionList():Base(msgid::InstructionList)
+        {
+
+        }
+        std::vector<REF_getter<MsgEvt::Base>> instructions;
+
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+
+            Base::pack(b);
+            b<<instructions.size();
+            for(auto& z: instructions)
+            {
+                z->pack(b);
+            }
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            auto n=b.get_PN();
+            for(int i=0;i<n;i++)
+            {
+                auto m=b.get_PN();
+                REF_getter<MsgEvt::Base> msg=msgFactory.create(m);
+                msg->unpack(b);
+                instructions.push_back(msg);
+
+            }
+        }
+        void hash(Blake2bHasher& h)
+        {
+            for(auto& z: instructions)
+            {
+                z->hash(h);
+                // h.update(z);
+            }
+        }
+    };
+    struct TX: public Base
+    {
+        
+        static Base* construct()
+        {
+            return new TX();
+        }
+        TX():Base(msgid::TX), instructions(new InstructionList())
+        {
+
+        }
+        REF_getter<InstructionList> instructions;
+        std::string user_pk_ed;
+        std::string sig_ed;
+        BigInt nonce;
+        void pack(outBuffer& b) const final
+        {
+            MUTEX_INSPECTOR;
+            Base::pack(b);
+            instructions->pack(b);
+            b<<user_pk_ed<<sig_ed<<nonce;
+        }
+        void unpack(inBuffer& b) final
+        {
+            MUTEX_INSPECTOR;
+            Base::unpack(b);
+            instructions->unpack2(b);
+            b>>user_pk_ed>>sig_ed>>nonce;
+        }
+        void hash(Blake2bHasher &h)
+        {
+            instructions->hash(h);
+            h.update(user_pk_ed);
+            h.update(nonce.toString());
+        }
+        void sign(const std::string& sk)
+        {
+            Blake2bHasher h;
+            hash(h);
+            sig_ed=sign_ed(sk,h.final());
+        }
+        bool verify()
+        {
+            Blake2bHasher h;
+            hash(h);
+            return verify_ed_pk(user_pk_ed,sig_ed,h.final());
+        }
+    };
+
+    struct TxMint: public Base
+    {
+        TxMint():Base(msgid::TxMint) {}
+        BigInt amount;
+        static Base* construct()
+        {
+            return new TxMint();
+        }
+
+        void hash(Blake2bHasher &h)
+        {
+            h.update(amount.toString());
+        }
+
+        void pack(outBuffer& b) const final
+        {
+            Base::pack(b);
+            b<<amount;
+        }
+        void unpack(inBuffer& b) final
+        {
+            Base::unpack(b);
+            b>>amount;
+        }
+    };
 
 
 }
 
 
-
-class MsgFactory {
-public:
-    using Constructor = MsgEvt::Base* (*)();
-    
-    MsgEvt::Base* create(const int& id) {
-
-        auto it = registry.find(id);
-        if(it==registry.end())
-        {
-            throw CommonError("Message type not found %d %s", id,msgName(id));
-        }
-        return it->second();
-    }
-    
-    bool registerMsg(const int& id, Constructor ctor) {
-        registry[id] = ctor;
-        return true;
-    }
-    
-private:
-        std::map<int, Constructor> registry;
-};
 

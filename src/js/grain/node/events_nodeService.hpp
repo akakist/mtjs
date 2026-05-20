@@ -29,7 +29,6 @@ inline std::set<EVENT_id> getEvents_nodeService()
 	std::set<EVENT_id> out;
 	out.insert(bcEventEnum::BroadcastMessage);
 	out.insert(bcEventEnum::ClientMsgReply);
-	out.insert(bcEventEnum::ClientTxSubscribeREQ);
 	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::NodeMsgREQ);
 	out.insert(bcEventEnum::NodeMsgRSP);
@@ -58,7 +57,6 @@ inline void regEvents_nodeService()
 {
 	iUtils->registerEvent(bcEvent::BroadcastMessage::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
-	iUtils->registerEvent(bcEvent::ClientTxSubscribeREQ::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgREQ::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgRSP::construct);

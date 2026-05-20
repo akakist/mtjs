@@ -5,6 +5,7 @@
 #include "blst_cp.h"
 #include "NODE_id.h"
 #include "tree.h"
+#include "msg.h"
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
@@ -18,6 +19,8 @@ namespace ServiceEnum
 }
 namespace bcEventEnum
 {
+    const EVENT_id AddTxREQ(ghash("@g_AddTxREQ"));
+    const EVENT_id AddTxRSP(ghash("@g_AddTxRSP"));
     const EVENT_id NodeMsgREQ(ghash("@g_NodeMsgREQ"));
     const EVENT_id NodeMsgRSP(ghash("@g_NodeMsgRSP"));
     const EVENT_id ClientMsg(ghash("@g_bcClientMsg"));
@@ -366,7 +369,34 @@ namespace bcEvent
 
         const std::string msg;
     };
-    // struct NetworkBase: public Event::Base
+    class AddTxREQ : public Event::Base
+    {
+
+    public:
+        static Base *construct(const route_t &r)
+        {
+            return new AddTxREQ(r);
+        }
+        AddTxREQ(const REF_getter<MsgEvt::TX> &_tx, const route_t &r)
+            : Base(bcEventEnum::AddTxREQ, r), tx(_tx) {}
+
+        REF_getter<MsgEvt::TX> tx;
+
+        AddTxREQ(const route_t &r)
+            : Base(bcEventEnum::AddTxREQ, r), tx(new MsgEvt::TX) {}
+
+        void unpack(inBuffer &o)
+        {
+
+            tx->unpack(o);
+        }
+        void pack(outBuffer &o) const
+        {
+
+            tx->pack(o);
+        }
+    };
+   // struct NetworkBase: public Event::Base
     // {
     //     NetworkBase(const EVENT_id& id, const route_t& r):Event::Base(id,r) {}
     //     virtual void  hash(Blake2bHasher &h) const =0;

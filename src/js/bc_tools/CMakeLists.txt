@@ -21,6 +21,7 @@ tr_exec.cpp
 cellable.cpp
 execute_transaction.cpp
 msg.cpp
+msgFactory.cpp
 )
 
 

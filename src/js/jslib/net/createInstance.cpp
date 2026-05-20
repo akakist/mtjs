@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "REF.h"
 #include "blake2bHasher.h"
 #include "common/async_task.h"
 #include "common/jsscope.h"
@@ -173,10 +174,18 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     if (JS_ToFloat64(ctx, &to, timeout))
         return JS_ThrowInternalError(ctx, "timeout parse error");
 
-    tx::mint m;
-    m.amount.from_string(std::string(_amount));
+    // tx::mint m;
+    // m.amount.from_string(std::string(_amount));
 
-    msg::user_message_req um;
+    REF_getter<MsgEvt::TxMint> q(new MsgEvt::TxMint());
+    q->amount.from_string(std::string(_amount));
+
+    REF_getter<MsgEvt::TX> tx(new MsgEvt::TX());
+    tx->instructions->instructions.push_back(q.get());
+
+    // tx->user_pk_ed = std::string((char *)extracted_public, crypto_sign_PUBLICKEYBYTES);
+    // REF_getter<bcEvent::AddTxREQ> q1 = new bcEvent::AddTxREQ(tx);
+        // msg::user_message_req um;
     // if(um.payload.size()==1)
     // crypto_sign_ed25519_sk_to_seed(seed, sk.data());
     if (sk.size() != crypto_sign_SECRETKEYBYTES)
@@ -184,25 +193,32 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     unsigned char extracted_public[crypto_sign_PUBLICKEYBYTES];
     crypto_sign_ed25519_sk_to_pk(extracted_public, (uint8_t *)sk.data());
     auto pk = std::string((char *)extracted_public, crypto_sign_PUBLICKEYBYTES);
-    um.address_pk_ed = pk;
-    um.payload.push_back(m.getBuffer());
-    um.nonce.from_string((std::string)_nonce);
+
+    tx->user_pk_ed = pk;
+    tx->sign(sk);
+    tx->nonce.from_string(std::string(_nonce));
+    //  msg::user_message_req um;
+    // um.address_pk_ed = pk;
+    // um.payload.push_back(m.getBuffer());
+    // um.nonce.from_string((std::string)_nonce);
     // auto skk=iUtils->hex2bin(_sk);
     // if(skk.size()!=crypto_sign_SECRETKEYBYTES)
     //     return JS_ThrowInternalError(ctx, "sk size invalid");
 
     // um.pk.resize(crypto_sign_PUBLICKEYBYTES);
     // crypto_sign_ed25519_sk_to_pk((uint8_t*)um.pk.data(), (unsigned char*)skk.data());
-    um.sign(sk);
+    // um.sign(sk);
 
-    auto buf = um.getBuffer();
-    auto hash = blake2b_hash(buf);
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::ClientMsg(buf, op->listener_->serviceId));
+    // auto buf = um.getBuffer();
+    // auto hash = blake2b_hash(buf);
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(tx, op->listener_->serviceId));
 
     // logErr2("setalarm %lf",to);
-    op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+    Blake2bHasher h;
+    tx->hash(h);
+    op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(h.final()), NULL, to, op->listener_));
 
-    auto &pd = op->node_req_promises[hash];
+    auto &pd = op->node_req_promises[h.final()];
     pd.ctx = ctx;
     JSValue prom[2];
     JSValue promise = JS_NewPromiseCapability(ctx, prom);
@@ -407,13 +423,13 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, timeout, op->listener_));
 
-    auto &pd = op->node_req_promises[hash];
+    auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
     JSValue prom[2];
     JSValue promise = JS_NewPromiseCapability(ctx, prom);
-    JSValueGuard g_resolve(ctx,prom[0]);
-    JSValueGuard g_reject(ctx,prom[0]);
-    JSValueGuard g_prom(ctx,promise);
+    JSValueGuard g_resolve(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[0]);
+    JSValueGuard g_prom(ctx, promise);
     if (JS_IsException(promise))
     {
         return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
@@ -447,7 +463,6 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     if (JS_ToFloat64(ctx, &to, argv[2]))
         return JS_ThrowInternalError(ctx, "timeout parse error");
 
-
     msg::user_request ur;
     ur.rnd.resize(10);
     RAND_bytes((unsigned char *)ur.rnd.data(), 10);
@@ -461,14 +476,14 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
 
-    auto &pd = op->node_req_promises[hash];
+    auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
 
     JSValue prom[2];
     JSValue promise = JS_NewPromiseCapability(ctx, prom);
-    JSValueGuard g_resolve(ctx,prom[0]);
-    JSValueGuard g_reject(ctx,prom[1]);
-    JSValueGuard g_prom(ctx,promise);
+    JSValueGuard g_resolve(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[1]);
+    JSValueGuard g_prom(ctx, promise);
     if (JS_IsException(promise))
     {
         return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");

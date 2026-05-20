@@ -268,8 +268,8 @@ bool MTJS::Service::TickAlarm(const timerEvent::TickAlarm *e)
     {
         // logErr2("if(e->tid==Timers::TIMER_ClientMsg_TIMEDOUT)");
         JSScope<10, 10> scope(js_ctx);
-        THASH_id h;
-        h.container = e->data.get()->container;
+        std::string h;
+        h = e->data.get()->container;
         auto it = opaque.node_req_promises.find(h);
         if (it == opaque.node_req_promises.end())
             throw CommonError("if(i!=opaque.node_req_promises.end())");
@@ -464,7 +464,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
 {
     MUTEX_INSPECTOR;
 
-    auto it = opaque.node_req_promises.find(e->hash_of_request);
+    auto it = opaque.node_req_promises.find(e->hash_of_request.container);
     if (it == opaque.node_req_promises.end())
         throw CommonError("if(it==opaque.node_req_promises.end())");
 
@@ -484,7 +484,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, r.nonce.toString().c_str()));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
         scope.addValue(ret);
-        opaque.node_req_promises.erase(e->hash_of_request);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
         sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
         return true;
     }
@@ -502,7 +502,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JS_SetPropertyStr(ctx, obj, "tx_hash", JS_NewString(ctx, base62::encode(r.tx_hash.container).c_str()));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
         scope.addValue(ret);
-        opaque.node_req_promises.erase(e->hash_of_request);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
         sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
         return true;
     }

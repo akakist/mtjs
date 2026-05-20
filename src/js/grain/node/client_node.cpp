@@ -232,7 +232,9 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
         block->prev_root_hash = prev_block_hash_Z;
         block->new_root_hash1 = new_root_hash;
 
-        block->attachment_hash.container = t.att_data.hash();
+        Blake2bHasher h;
+        t.att_data.hash(h);
+        block->attachment_hash.container = h.final();
         block->payload_heart_beat = r->leader_cert->heart_beat;
 
         REF_getter<MsgEvt::ValidateBlockRSP> rsp = new MsgEvt::ValidateBlockRSP();
