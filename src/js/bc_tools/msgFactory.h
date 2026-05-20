@@ -2,16 +2,16 @@
 #include "commonError.h"
 const char* msgName(int id);
 
-namespace MsgEvt
+namespace MsgData
 {
 class Base;
 }
 
 class MsgFactory {
 public:
-    using Constructor = MsgEvt::Base* (*)();
+    using Constructor = MsgData::Base* (*)();
     
-    MsgEvt::Base* create(const int& id) {
+    MsgData::Base* create(const int& id) {
 
         auto it = registry.find(id);
         if(it==registry.end())

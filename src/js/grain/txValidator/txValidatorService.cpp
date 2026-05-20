@@ -146,6 +146,11 @@ bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot*e)
 }
 bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ*e)
 {
+    MUTEX_INSPECTOR;
+    if(!e->tx->verify())
+    {
+
+    }
     return true;
 }
 
@@ -174,28 +179,6 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
         }
         if(!err)
             sendEvent(ServiceEnum::Node,new bcEvent::PutTransactionREQ(e->msg,this));
-        // BigInt nonce=0;
-        // if(!err)
-        // {
-        //     auto u=root->getUserState(um.address_pk_ed,NULL);
-        //     if(u.valid())
-        //     {
-        //         nonce=u->nonce;
-        //     }
-        // }
-
-        // // logErr2("um.nonce %s",um.nonce.toString().c_str());
-        // if(!err && nonce!=um.nonce)
-        // {
-        //     err="invalid_nonce "+ nonce.toString()+" != "+um.nonce.toString();
-        // }
-        // if(!err)
-        // {
-        //     THASH_id h=blake2b_hash(e->msg);
-        //     TRANSACTION_body t;
-        //     t.container=e->msg;
-        //     transaction_pool_verified.insert({h,t});
-        // }
         msg::transaction_added_rsp tr;
         tr.err=err.has_value();
         tr.err_str=err?*err:"transaction added to pool";

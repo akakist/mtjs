@@ -2,21 +2,21 @@
 #include "msg.h"
 MsgFactory::MsgFactory() 
 {
-    registerMsg(msgid::HeartBeatREQ, MsgEvt::HeartBeatREQ::construct);
-    registerMsg(msgid::HeartBeatRSP, MsgEvt::HeartBeatRSP::construct);
-    registerMsg(msgid::GetTransactionREQ, MsgEvt::GetTransactionREQ::construct);
-    registerMsg(msgid::GetTransactionRSP, MsgEvt::GetTransactionRSP::construct);
-    registerMsg(msgid::ValidateBlockREQ, MsgEvt::ValidateBlockREQ::construct);
-    registerMsg(msgid::ValidateBlockRSP, MsgEvt::ValidateBlockRSP::construct);
-    registerMsg(msgid::BlockAcceptedREQ, MsgEvt::BlockAcceptedREQ::construct);
-    registerMsg(msgid::BlockAcceptedRSP, MsgEvt::BlockAcceptedRSP::construct);
-    registerMsg(msgid::GetSavedBlocksREQ, MsgEvt::GetSavedBlocksREQ::construct);
-    registerMsg(msgid::GetSavedBlocksRSP, MsgEvt::GetSavedBlocksRSP::construct);
-    registerMsg(msgid::DoHeartBeatREQ, MsgEvt::DoHeartBeatREQ::construct);
-    registerMsg(msgid::ConfirmLeaderREQ, MsgEvt::ConfirmLeaderREQ::construct);
-    registerMsg(msgid::ConfirmLeaderRSP, MsgEvt::ConfirmLeaderRSP::construct);
-    registerMsg(msgid::InstructionList, MsgEvt::InstructionList::construct);
-    registerMsg(msgid::TX, MsgEvt::TX::construct);
-    registerMsg(msgid::TxMint, MsgEvt::TxMint::construct);
+    registerMsg(msgid::HeartBeatREQ, MsgData::HeartBeatREQ::construct);
+    registerMsg(msgid::HeartBeatRSP, MsgData::HeartBeatRSP::construct);
+    registerMsg(msgid::GetTransactionREQ, MsgData::GetTransactionREQ::construct);
+    registerMsg(msgid::GetTransactionRSP, MsgData::GetTransactionRSP::construct);
+    registerMsg(msgid::ValidateBlockREQ, MsgData::ValidateBlockREQ::construct);
+    registerMsg(msgid::ValidateBlockRSP, MsgData::ValidateBlockRSP::construct);
+    registerMsg(msgid::BlockAcceptedREQ, MsgData::BlockAcceptedREQ::construct);
+    registerMsg(msgid::BlockAcceptedRSP, MsgData::BlockAcceptedRSP::construct);
+    registerMsg(msgid::GetSavedBlocksREQ, MsgData::GetSavedBlocksREQ::construct);
+    registerMsg(msgid::GetSavedBlocksRSP, MsgData::GetSavedBlocksRSP::construct);
+    registerMsg(msgid::DoHeartBeatREQ, MsgData::DoHeartBeatREQ::construct);
+    registerMsg(msgid::ConfirmLeaderREQ, MsgData::ConfirmLeaderREQ::construct);
+    registerMsg(msgid::ConfirmLeaderRSP, MsgData::ConfirmLeaderRSP::construct);
+    registerMsg(msgid::InstructionList, MsgData::InstructionList::construct);
+    registerMsg(msgid::TX, MsgData::TX::construct);
+    registerMsg(msgid::TxMint, MsgData::TxMint::construct);
 
 }

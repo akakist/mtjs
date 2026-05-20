@@ -6,6 +6,7 @@
 #include "NODE_id.h"
 #include "tree.h"
 #include "msg.h"
+#include "md/md_TX.h"
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
@@ -354,7 +355,7 @@ namespace bcEvent
     // struct NetworkBase: public Event::Base
     // {
     //     NetworkBase(const EVENT_id& id, const route_t& r):Event::Base(id,r) {}
-    //     virtual void  hash(Blake2bHasher &h) const =0;
+    //     virtual void  update(Blake2bHasher &h) const =0;
     // };
     class PutTransactionREQ : public Event::NoPacked
     {
@@ -364,10 +365,10 @@ namespace bcEvent
         {
             return NULL;
         }
-        PutTransactionREQ(const std::string &_msg, const route_t &r)
-            : NoPacked(bcEventEnum::PutTransactionREQ, r), msg(_msg) {}
+        PutTransactionREQ(const REF_getter<MsgData::TX>& _tx, const route_t &r)
+            : NoPacked(bcEventEnum::PutTransactionREQ, r), tx(_tx) {}
 
-        const std::string msg;
+        const REF_getter<MsgData::TX> tx;
     };
     class AddTxREQ : public Event::Base
     {
@@ -377,18 +378,18 @@ namespace bcEvent
         {
             return new AddTxREQ(r);
         }
-        AddTxREQ(const REF_getter<MsgEvt::TX> &_tx, const route_t &r)
+        AddTxREQ(const REF_getter<MsgData::TX> &_tx, const route_t &r)
             : Base(bcEventEnum::AddTxREQ, r), tx(_tx) {}
 
-        REF_getter<MsgEvt::TX> tx;
+        REF_getter<MsgData::TX> tx;
 
         AddTxREQ(const route_t &r)
-            : Base(bcEventEnum::AddTxREQ, r), tx(new MsgEvt::TX) {}
+            : Base(bcEventEnum::AddTxREQ, r), tx(new MsgData::TX) {}
 
         void unpack(inBuffer &o)
         {
 
-            tx->unpack(o);
+            tx->unpack2(o);
         }
         void pack(outBuffer &o) const
         {
@@ -399,6 +400,6 @@ namespace bcEvent
    // struct NetworkBase: public Event::Base
     // {
     //     NetworkBase(const EVENT_id& id, const route_t& r):Event::Base(id,r) {}
-    //     virtual void  hash(Blake2bHasher &h) const =0;
+    //     virtual void  update(Blake2bHasher &h) const =0;
     // };
 }

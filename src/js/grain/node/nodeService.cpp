@@ -91,19 +91,19 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^go\\s+(.+)$", "go to child element", ListenerBase::serviceId));
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^back$", "go to parent", ListenerBase::serviceId));
 
-    msgFactory.registerMsg(msgid::HeartBeatREQ, MsgEvt::HeartBeatREQ::construct);
-    msgFactory.registerMsg(msgid::HeartBeatRSP, MsgEvt::HeartBeatRSP::construct);
-    msgFactory.registerMsg(msgid::GetTransactionREQ, MsgEvt::GetTransactionREQ::construct);
-    msgFactory.registerMsg(msgid::GetTransactionRSP, MsgEvt::GetTransactionRSP::construct);
-    msgFactory.registerMsg(msgid::ValidateBlockREQ, MsgEvt::ValidateBlockREQ::construct);
-    msgFactory.registerMsg(msgid::ValidateBlockRSP, MsgEvt::ValidateBlockRSP::construct);
-    msgFactory.registerMsg(msgid::BlockAcceptedREQ, MsgEvt::BlockAcceptedREQ::construct);
-    msgFactory.registerMsg(msgid::BlockAcceptedRSP, MsgEvt::BlockAcceptedRSP::construct);
-    msgFactory.registerMsg(msgid::GetSavedBlocksREQ, MsgEvt::GetSavedBlocksREQ::construct);
-    msgFactory.registerMsg(msgid::GetSavedBlocksRSP, MsgEvt::GetSavedBlocksRSP::construct);
-    msgFactory.registerMsg(msgid::DoHeartBeatREQ, MsgEvt::DoHeartBeatREQ::construct);
-    msgFactory.registerMsg(msgid::ConfirmLeaderREQ, MsgEvt::ConfirmLeaderREQ::construct);
-    msgFactory.registerMsg(msgid::ConfirmLeaderRSP, MsgEvt::ConfirmLeaderRSP::construct);
+    msgFactory.registerMsg(msgid::HeartBeatREQ, MsgData::HeartBeatREQ::construct);
+    msgFactory.registerMsg(msgid::HeartBeatRSP, MsgData::HeartBeatRSP::construct);
+    msgFactory.registerMsg(msgid::GetTransactionREQ, MsgData::GetTransactionREQ::construct);
+    msgFactory.registerMsg(msgid::GetTransactionRSP, MsgData::GetTransactionRSP::construct);
+    msgFactory.registerMsg(msgid::ValidateBlockREQ, MsgData::ValidateBlockREQ::construct);
+    msgFactory.registerMsg(msgid::ValidateBlockRSP, MsgData::ValidateBlockRSP::construct);
+    msgFactory.registerMsg(msgid::BlockAcceptedREQ, MsgData::BlockAcceptedREQ::construct);
+    msgFactory.registerMsg(msgid::BlockAcceptedRSP, MsgData::BlockAcceptedRSP::construct);
+    msgFactory.registerMsg(msgid::GetSavedBlocksREQ, MsgData::GetSavedBlocksREQ::construct);
+    msgFactory.registerMsg(msgid::GetSavedBlocksRSP, MsgData::GetSavedBlocksRSP::construct);
+    msgFactory.registerMsg(msgid::DoHeartBeatREQ, MsgData::DoHeartBeatREQ::construct);
+    msgFactory.registerMsg(msgid::ConfirmLeaderREQ, MsgData::ConfirmLeaderREQ::construct);
+    msgFactory.registerMsg(msgid::ConfirmLeaderRSP, MsgData::ConfirmLeaderRSP::construct);
 
     do_heart_beat();
 
@@ -113,11 +113,12 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 void Node::Service::collectTransactions()
 {
     MUTEX_INSPECTOR;
-    std::map<std::string /*user addr*/, std::map<BigInt /*nonce*/, std::vector<TRANSACTION_body>>> ordered;
+    std::map<std::string /*user addr*/, 
+        std::map<BigInt /*nonce*/, std::vector<REF_getter<MsgData::TX>>>> ordered;
     for (auto &z : transaction_pool_of_leader)
     {
-        msg::user_message_req ur(z.second);
-        ordered[ur.address_pk_ed][ur.nonce].push_back(z.second);
+        // msg::user_message_req ur(z.second);
+        ordered[z.second->user_pk_ed][z.second->nonce].push_back(z.second);
     }
     transaction_pool_of_leader.clear();
     for (auto &x : ordered)
@@ -125,7 +126,9 @@ void Node::Service::collectTransactions()
         for (auto &y : x.second)
         {
             for (auto &z : y.second)
-                transaction_pool_of_leader.insert({blake2b_hash(z.container), z});
+            {
+                transaction_pool_of_leader.insert_or_assign(z->getHash(), z);
+            }
         }
     }
 }
@@ -163,7 +166,7 @@ void Node::Service::do_start_block()
     {
         {
             make_leader_certificate();
-            REF_getter<MsgEvt::ValidateBlockREQ> b = new MsgEvt::ValidateBlockREQ();
+            REF_getter<MsgData::ValidateBlockREQ> b = new MsgData::ValidateBlockREQ();
             // msg::block_request b;
             b->leader_cert = li.leader_cert_2;
 
@@ -190,7 +193,7 @@ void Node::Service::do_start_block()
         }
     }
 }
-void Node::Service::broadcast_MsgEvent(const REF_getter<MsgEvt::Base>& b)
+void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b)
 {
             auto msg=b->getBuffer();
 
@@ -456,7 +459,7 @@ void Node::Service::do_request_for_transactions(const Node::heart_beat_node_info
 {
     // logNode("@@ %s", __FUNCTION__);
     MUTEX_INSPECTOR;
-    REF_getter<MsgEvt::GetTransactionREQ> rt = new MsgEvt::GetTransactionREQ();
+    REF_getter<MsgData::GetTransactionREQ> rt = new MsgData::GetTransactionREQ();
     if (!li.leader_cert_2.valid())
         throw CommonError("if(!li.leader_cert.valid())");
     rt->lc = li.leader_cert_2;
@@ -559,10 +562,10 @@ void Node::Service::calc_fee_and_rewards(t_params &t, const std::vector<NODE_id>
         t.att_data.rewards[n] = amt;
     }
 }
-REF_getter<MsgEvt::BlockDBStore> Node::Service::prepareBlockDBStore(const t_params &t)
+REF_getter<MsgData::BlockDBStore> Node::Service::prepareBlockDBStore(const t_params &t)
 {
     // if (!prepared_block.valid())
-    REF_getter<MsgEvt::BlockDBStore> pb = new MsgEvt::BlockDBStore;
+    REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore;
     pb->epoch = root->getEpoch()->epoch;
     pb->att_data = t.att_data;
 
@@ -625,9 +628,9 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 {
     MUTEX_INSPECTOR;
-    TRANSACTION_body tr;
-    tr.container = e->msg;
-    transaction_pool_of_leader.insert({blake2b_hash(e->msg), tr});
+    // TRANSACTION_body tr;
+    // tr.container = e->msg;
+    transaction_pool_of_leader.insert_or_assign(e->tx->getHash(),e->tx);
     return true;
 }
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
@@ -641,28 +644,28 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     inBuffer in(m->msg_payload);
     auto id = in.get_PN();
 
-    REF_getter<MsgEvt::Base> msg = msgFactory.create(id);
+    REF_getter<MsgData::Base> msg = msgFactory.create(id);
     msg->unpack(in);
 
         switch (msg->type)
         {
         case msgid::GetTransactionREQ:
-            return GetTransactionREQ(static_cast<const MsgEvt::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
+            return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::HeartBeatREQ:
-            return HeartBeatREQ(static_cast<const MsgEvt::HeartBeatREQ *>(msg.get()), m->node_signer, m->route);
+            return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::ValidateBlockREQ:
-            return ValidateBlockREQ(static_cast<const MsgEvt::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
+            return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::BlockAcceptedREQ:
-            return BlockAcceptedREQ(static_cast<const MsgEvt::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
+            return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::GetSavedBlocksREQ:
-            return GetSavedBlocksREQ(static_cast<const MsgEvt::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
+            return GetSavedBlocksREQ(static_cast<const MsgData::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::DoHeartBeatREQ:
-            return DoHeartBeatREQ(static_cast<const MsgEvt::DoHeartBeatREQ *>(msg.get()), m->node_signer, m->route);
+            return DoHeartBeatREQ(static_cast<const MsgData::DoHeartBeatREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::ConfirmLeaderREQ:
-            return ConfirmLeaderREQ(static_cast<const MsgEvt::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
+            return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
 
         default:
-            throw CommonError("unjandled MsgEvt %s", msgName(msg->type));
+            throw CommonError("unjandled MsgData %s", msgName(msg->type));
         }
 
     return true;
@@ -678,23 +681,23 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
     inBuffer in(m->msg_payload);
     auto id = in.get_PN();
 
-    REF_getter<MsgEvt::Base> ee = msgFactory.create(id);
+    REF_getter<MsgData::Base> ee = msgFactory.create(id);
     ee->unpack(in);
 
     switch (id)
     {
     case msgid::HeartBeatRSP:
-        return HeartBeatRSP(static_cast<const MsgEvt::HeartBeatRSP *>(ee.get()), m->node_signer, m->route);
+        return HeartBeatRSP(static_cast<const MsgData::HeartBeatRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderRSP:
-        return ConfirmLeaderRSP(static_cast<const MsgEvt::ConfirmLeaderRSP *>(ee.get()), m->node_signer, m->route);
+        return ConfirmLeaderRSP(static_cast<const MsgData::ConfirmLeaderRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::GetTransactionRSP:
-        return GetTransactionRSP(static_cast<const MsgEvt::GetTransactionRSP *>(ee.get()), m->node_signer, m->route);
+        return GetTransactionRSP(static_cast<const MsgData::GetTransactionRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ValidateBlockRSP:
-        return ValidateBlockRSP(static_cast<const MsgEvt::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
+        return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::BlockAcceptedRSP:
-        return BlockAcceptedRSP(static_cast<const MsgEvt::BlockAcceptedRSP *>(ee.get()), m->node_signer, m->route);
+        return BlockAcceptedRSP(static_cast<const MsgData::BlockAcceptedRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::GetSavedBlocksRSP:
-        return GetSavedBlocksRSP(static_cast<const MsgEvt::GetSavedBlocksRSP *>(ee.get()), m->node_signer, m->route);
+        return GetSavedBlocksRSP(static_cast<const MsgData::GetSavedBlocksRSP *>(ee.get()), m->node_signer, m->route);
     default:
         throw CommonError("unhandled22 p020 %s", msgName(id));
         break;

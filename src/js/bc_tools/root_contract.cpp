@@ -27,7 +27,7 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
     { return new bc_epoch(p); }};
 
-bool root_data::verify_lider_certificate(const REF_getter<MsgEvt::LeaderCertificate> &lc)
+bool root_data::verify_lider_certificate(const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     /// проверка сертификата лидера
     {

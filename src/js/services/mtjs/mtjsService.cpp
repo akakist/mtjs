@@ -23,6 +23,8 @@
 #include "errcodes.h"
 
 #include "sv.h"
+#include "md/md_BlockDBStore.h"
+#include "md/md_attachment_data.h"
 extern "C"
 {
 }
@@ -535,7 +537,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     MUTEX_INSPECTOR;
 
     inBuffer in(e->msg);
-    REF_getter<MsgEvt::BlockDBStore> pb = new MsgEvt::BlockDBStore();
+    REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore();
     pb->unpack2(in);
     nlohmann::json j;
     for (size_t ti = 0; ti < pb->att_data.trs.size(); ti++)
@@ -543,7 +545,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
         nlohmann::json jtr;
         if (opaque.tx_subscription_cb.has_value())
         {
-            THASH_id tx_hash = blake2b_hash(pb->att_data.trs[ti].container);
+            THASH_id tx_hash = pb->att_data.trs[ti]->getHash();
             jtr["tx_hash"] = base62::encode(tx_hash.container);
             // logErr2("ClientTxSubscribeRSP: tx_hash %s",base62::encode(tx_hash.container).c_str());
             JSScope<10, 10> scope(js_ctx);

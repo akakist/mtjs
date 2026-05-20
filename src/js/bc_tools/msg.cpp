@@ -1,11 +1,11 @@
 #include "msg.h"
 #include "blake2bHasher.h"
 thread_local  MsgFactory msgFactory;
-MsgEvt::BlockAcceptedREQ::BlockAcceptedREQ()
+MsgData::BlockAcceptedREQ::BlockAcceptedREQ()
     : Base(msgid::BlockAcceptedREQ), leader_certificateZ(new LeaderCertificate()), block_payload(new BlockInfo)
 {
 }
-void MsgEvt::BlockAcceptedREQ::pack(outBuffer &b) const
+void MsgData::BlockAcceptedREQ::pack(outBuffer &b) const
 {
     XTRY;
     MUTEX_INSPECTOR;
@@ -15,7 +15,7 @@ void MsgEvt::BlockAcceptedREQ::pack(outBuffer &b) const
     b << node_validators << agg_sig;
     XPASS;
 }
-void MsgEvt::BlockAcceptedREQ::unpack(inBuffer &b)
+void MsgData::BlockAcceptedREQ::unpack(inBuffer &b)
 {
     XTRY;
     MUTEX_INSPECTOR;
@@ -26,7 +26,7 @@ void MsgEvt::BlockAcceptedREQ::unpack(inBuffer &b)
     XPASS;
 }
 
-void MsgEvt::BlockAcceptedREQ::hash(Blake2bHasher &h)
+void MsgData::BlockAcceptedREQ::update(Blake2bHasher &h) const
 {
     leader_certificateZ->hash(h);
     block_payload->hash(h);

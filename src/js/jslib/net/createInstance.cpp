@@ -177,10 +177,10 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     // tx::mint m;
     // m.amount.from_string(std::string(_amount));
 
-    REF_getter<MsgEvt::TxMint> q(new MsgEvt::TxMint());
+    REF_getter<MsgData::TxMint> q(new MsgData::TxMint());
     q->amount.from_string(std::string(_amount));
 
-    REF_getter<MsgEvt::TX> tx(new MsgEvt::TX());
+    REF_getter<MsgData::TX> tx(new MsgData::TX());
     tx->instructions->instructions.push_back(q.get());
 
     // tx->user_pk_ed = std::string((char *)extracted_public, crypto_sign_PUBLICKEYBYTES);

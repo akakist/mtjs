@@ -23,7 +23,7 @@
 #include <SQLiteCpp/Database.h>
 #include <vector>
 
-bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
     XTRY;
@@ -102,7 +102,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
 
     {
         XTRY;
-        REF_getter<MsgEvt::BlockAcceptedRSP> br = new MsgEvt::BlockAcceptedRSP();
+        REF_getter<MsgData::BlockAcceptedRSP> br = new MsgData::BlockAcceptedRSP();
         br->new_root_hash = prev_block_hash_Z;
         br->node_signer = this_node_name;
         br->sign(my_sk_bls);
@@ -138,7 +138,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgEvt::BlockAcceptedREQ *r, const NO
     XPASS;
     return true;
 }
-bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
     if (CheckState(r->lc->heart_beat.get(), src_node))
@@ -167,7 +167,7 @@ bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ *r, const 
     }
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
-    REF_getter<MsgEvt::GetTransactionRSP> rsp = new MsgEvt::GetTransactionRSP;
+    REF_getter<MsgData::GetTransactionRSP> rsp = new MsgData::GetTransactionRSP;
     for (auto &z : transaction_pool_of_leader)
     {
         rsp->trs.push_back(z.second);
@@ -175,7 +175,7 @@ bool Node::Service::GetTransactionREQ(const MsgEvt::GetTransactionREQ *r, const 
     pass_NodeMsgRSP(rsp.get(),route);
     return true;
 }
-void Node::Service::pass_NodeMsgRSP(const MsgEvt::Base *e,const route_t& r)
+void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r)
 {
     auto buffer = e->getBuffer();
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
@@ -185,7 +185,7 @@ void Node::Service::pass_NodeMsgRSP(const MsgEvt::Base *e,const route_t& r)
 
 int get_global_refcount();
 
-bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
 {
     // if(state_Z!=NORMAL)
     //     return true;
@@ -228,7 +228,7 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
 
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
-        REF_getter<MsgEvt::BlockInfo> block = new MsgEvt::BlockInfo();
+        REF_getter<MsgData::BlockInfo> block = new MsgData::BlockInfo();
         block->prev_root_hash = prev_block_hash_Z;
         block->new_root_hash1 = new_root_hash;
 
@@ -237,7 +237,7 @@ bool Node::Service::ValidateBlockREQ(const MsgEvt::ValidateBlockREQ *r, const NO
         block->attachment_hash.container = h.final();
         block->payload_heart_beat = r->leader_cert->heart_beat;
 
-        REF_getter<MsgEvt::ValidateBlockRSP> rsp = new MsgEvt::ValidateBlockRSP();
+        REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
         // msg::block_response br;
         rsp->node_validator = this_node_name;
         rsp->payload_block = block;

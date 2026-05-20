@@ -3,7 +3,7 @@
 cmake_minimum_required (VERSION 3.16)
 
 
-include_directories(common quickjs . bc_tools Event)
+include_directories(common quickjs . bc_tools Event bc_tools/md)
 
 #ADD_SUBDIRECTORY(megatron)
 

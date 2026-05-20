@@ -21,7 +21,7 @@
 #include <SQLiteCpp/Database.h>
 #include <vector>
 
-bool Node::Service::GetTransactionRSP(const MsgEvt::GetTransactionRSP *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
     MUTEX_INSPECTOR;
@@ -61,7 +61,7 @@ bool Node::Service::GetTransactionRSP(const MsgEvt::GetTransactionRSP *r, const 
     XPASS;
     return true;
 }
-bool Node::Service::BlockAcceptedRSP(const MsgEvt::BlockAcceptedRSP *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
     MUTEX_INSPECTOR;
@@ -100,7 +100,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgEvt::BlockAcceptedRSP *r, const NO
         if (!bp.heart_bit_sent_on_block_accepted_rsp)
         {
             bp.heart_bit_sent_on_block_accepted_rsp = true;
-            REF_getter<MsgEvt::DoHeartBeatREQ> rt = new MsgEvt::DoHeartBeatREQ();
+            REF_getter<MsgData::DoHeartBeatREQ> rt = new MsgData::DoHeartBeatREQ();
             if (!last_leader_cert.valid())
                 throw CommonError("if(!last_leader_cert.valid())");
             rt->prev_leader_cert = last_leader_cert;
@@ -115,7 +115,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgEvt::BlockAcceptedRSP *r, const NO
     XPASS;
     return true;
 }
-bool Node::Service::CheckState(const MsgEvt::HeartBeatREQ *r, const NODE_id &src_node) // 1 если невалидно
+bool Node::Service::CheckState(const MsgData::HeartBeatREQ *r, const NODE_id &src_node) // 1 если невалидно
 {
     if (r->prev_block_hash != prev_block_hash_Z)
     {
@@ -133,7 +133,7 @@ bool Node::Service::CheckState(const MsgEvt::HeartBeatREQ *r, const NODE_id &src
     return 0;
 }
 
-bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
     MUTEX_INSPECTOR;
@@ -177,7 +177,7 @@ bool Node::Service::ValidateBlockRSP(const MsgEvt::ValidateBlockRSP *r, const NO
     {
         XTRY;
         logNode("Block stake finalized");
-        REF_getter<MsgEvt::BlockAcceptedREQ> ba = new MsgEvt::BlockAcceptedREQ();
+        REF_getter<MsgData::BlockAcceptedREQ> ba = new MsgData::BlockAcceptedREQ();
         if (!bt.block_payload.valid())
         {
             bt.block_payload = r->payload_block;

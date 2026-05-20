@@ -23,7 +23,7 @@ void Node::Service::do_sync(const NODE_id &src_node)
     auto n = root->getNode(src_node);
     if (!n.valid())
         throw CommonError("if(!n.valid())");
-    REF_getter<MsgEvt::GetSavedBlocksREQ> gbr = new MsgEvt::GetSavedBlocksREQ();
+    REF_getter<MsgData::GetSavedBlocksREQ> gbr = new MsgData::GetSavedBlocksREQ();
     gbr->epoch = root->getEpoch()->epoch;
     logNode("@@@@@@@@@@@@@@@@ REQUEST for blocks since %s", gbr->epoch.toString().c_str());
     // msg::node_message_ed nm(gbr->getBuffer(), this_node_name, my_sk_ed);
@@ -35,12 +35,12 @@ void Node::Service::do_sync(const NODE_id &src_node)
               new bcEvent::NodeMsgREQ(this_node_name, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 }
 
-bool Node::Service::GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
     SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READONLY);
 
-    REF_getter<MsgEvt::GetSavedBlocksRSP> ret = new MsgEvt::GetSavedBlocksRSP();
+    REF_getter<MsgData::GetSavedBlocksRSP> ret = new MsgData::GetSavedBlocksRSP();
 
     BigInt epoch = 0;
     {
@@ -58,7 +58,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ *r, const 
             logNode("loaded from DB block epoch %s", epoch_.c_str());
             std::string data = base62::decode(query1.getColumn(1).getString());
             inBuffer in(data);
-            REF_getter<MsgEvt::BlockDBStore> bds = new MsgEvt::BlockDBStore();
+            REF_getter<MsgData::BlockDBStore> bds = new MsgData::BlockDBStore();
             bds->unpack2(in);
             ret->blocks_Z.push_back({epoch, bds});
         }
@@ -78,7 +78,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgEvt::GetSavedBlocksREQ *r, const 
     return true;
 }
 
-bool Node::Service::GetSavedBlocksRSP(const MsgEvt::GetSavedBlocksRSP *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
     MUTEX_INSPECTOR;

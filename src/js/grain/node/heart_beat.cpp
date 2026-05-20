@@ -15,7 +15,7 @@
 #include "route_t.h"
 #include <cstddef>
 #include <vector>
-bool Node::Service::HeartBeatRSP(const MsgEvt::HeartBeatRSP *m, const NODE_id &src_node, const route_t &route)
+bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
 
@@ -70,7 +70,7 @@ bool Node::Service::HeartBeatRSP(const MsgEvt::HeartBeatRSP *m, const NODE_id &s
         li.confirm_leader_sent = true;
         {
 
-            REF_getter<MsgEvt::ConfirmLeaderREQ> rt = new MsgEvt::ConfirmLeaderREQ();
+            REF_getter<MsgData::ConfirmLeaderREQ> rt = new MsgData::ConfirmLeaderREQ();
             rt->hb = m->payload_heart_beat;
             broadcast_MsgEvent(rt.get());
             // msg::node_message_ed nm(rt->getBuffer(), this_node_name, my_sk_ed);
@@ -81,7 +81,7 @@ bool Node::Service::HeartBeatRSP(const MsgEvt::HeartBeatRSP *m, const NODE_id &s
     return true;
 }
 
-bool Node::Service::HeartBeatREQ(const MsgEvt::HeartBeatREQ *h, const NODE_id &src_node, const route_t &route)
+bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
     // logNode("@@ %s",__FUNCTION__);
@@ -115,7 +115,7 @@ bool Node::Service::HeartBeatREQ(const MsgEvt::HeartBeatREQ *h, const NODE_id &s
         need_reply = true;
     if (need_reply)
     {
-        REF_getter<MsgEvt::HeartBeatRSP> hbr = new MsgEvt::HeartBeatRSP();
+        REF_getter<MsgData::HeartBeatRSP> hbr = new MsgData::HeartBeatRSP();
         // msg::heart_beat_rsp hba;
         hbr->payload_heart_beat = h;
         hbr->node_signer = this_node_name;
@@ -131,9 +131,9 @@ bool Node::Service::HeartBeatREQ(const MsgEvt::HeartBeatREQ *h, const NODE_id &s
     }
     return true;
 }
-bool Node::Service::ConfirmLeaderREQ(const MsgEvt::ConfirmLeaderREQ *h, const NODE_id &src_node, const route_t &route)
+bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const NODE_id &src_node, const route_t &route)
 
-// bool Node::Service::ConfirmLeaderREQ(const MsgEvt::ConfirmLeaderREQ* h,const std::string &heart_beat_payload, const route_t& route)
+// bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* h,const std::string &heart_beat_payload, const route_t& route)
 {
     MUTEX_INSPECTOR;
     // logNode("@@ %s",__FUNCTION__);
@@ -166,7 +166,7 @@ bool Node::Service::ConfirmLeaderREQ(const MsgEvt::ConfirmLeaderREQ *h, const NO
 
     if (need_reply)
     {
-        REF_getter<MsgEvt::ConfirmLeaderRSP> hbr = new MsgEvt::ConfirmLeaderRSP();
+        REF_getter<MsgData::ConfirmLeaderRSP> hbr = new MsgData::ConfirmLeaderRSP();
         // msg::heart_beat_rsp hba;
         hbr->hb = h->hb;
         hbr->node_signer = this_node_name;
@@ -183,7 +183,7 @@ bool Node::Service::ConfirmLeaderREQ(const MsgEvt::ConfirmLeaderREQ *h, const NO
     return true;
 }
 
-bool Node::Service::ConfirmLeaderRSP(const MsgEvt::ConfirmLeaderRSP *m, const NODE_id &src_node, const route_t &route)
+bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
     if(state_Z!=NORMAL)
@@ -252,8 +252,8 @@ void Node::Service::do_heart_beat()
     // logNode("@@ %s",__FUNCTION__);
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
     {
-        REF_getter<MsgEvt::HeartBeatREQ> hb_req =
-            new MsgEvt::HeartBeatREQ(prev_block_hash_Z,
+        REF_getter<MsgData::HeartBeatREQ> hb_req =
+            new MsgData::HeartBeatREQ(prev_block_hash_Z,
                                      root->getEpoch()->epoch+1,
                                      this_node_name);
         // DBG(logNode("broadcast heart beat as leader %s",this_node_name.container.c_str()));
@@ -268,7 +268,7 @@ void Node::Service::do_heart_beat()
 
     return;
 }
-bool Node::Service::DoHeartBeatREQ(const MsgEvt::DoHeartBeatREQ *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::DoHeartBeatREQ(const MsgData::DoHeartBeatREQ *r, const NODE_id &src_node, const route_t &route)
 {
         if(state_Z!=NORMAL)
         return true;
@@ -283,7 +283,7 @@ void Node::Service::make_leader_certificate()
 {
     auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
-    REF_getter<MsgEvt::LeaderCertificate> lc = new MsgEvt::LeaderCertificate();
+    REF_getter<MsgData::LeaderCertificate> lc = new MsgData::LeaderCertificate();
     if (li.ConfirmLeaderRSP_m.empty())
         return;
     auto msg = li.ConfirmLeaderRSP_m.begin()->second->hb;
