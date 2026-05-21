@@ -14,8 +14,14 @@
 #  base62.cpp
 #  mcrypto.cpp
  )
+ add_executable(test_qjs
+  test_qjs.cpp
+#  base62.cpp
+#  mcrypto.cpp
+ )
 target_link_libraries(keygen blst crypto sodium)
 target_link_libraries(keygen2 blst crypto sodium)
+target_link_libraries(test_qjs quickjs)
 # add_executable(client
   # client.cpp
 #  base62.cpp
