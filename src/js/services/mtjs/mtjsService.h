@@ -75,6 +75,7 @@ namespace MTJS
 #endif
         bool ClientMsgReply(const bcEvent::ClientMsgReply*);
         bool ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP*);
+        bool AddTxRSP(const bcEvent::AddTxRSP*);
 
         void load_config();
         void executePending();

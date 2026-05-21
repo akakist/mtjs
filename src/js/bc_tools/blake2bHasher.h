@@ -40,6 +40,7 @@ public:
 
     // Финализация и получение результата в виде hex‑строки
     std::string final() {
+        MUTEX_INSPECTOR;
         unsigned char out[outlen_];
         if (crypto_generichash_final(&state_, out, outlen_) != 0) {
             throw std::runtime_error("crypto_generichash_final failed"+_DMI());

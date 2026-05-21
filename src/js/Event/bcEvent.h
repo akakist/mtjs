@@ -285,6 +285,7 @@ namespace bcEvent
 
         std::string hash() const
         {
+            MUTEX_INSPECTOR;
             Blake2bHasher h;
             h.update(node_signer.container);
             h.update(payload_signature);
@@ -388,13 +389,39 @@ namespace bcEvent
 
         void unpack(inBuffer &o)
         {
-
-            tx->unpack2(o);
+            o>>tx;
         }
         void pack(outBuffer &o) const
         {
+            o<<tx;
+        }
+    };
+    class AddTxRSP : public Event::Base
+    {
 
-            tx->pack(o);
+    public:
+        static Base *construct(const route_t &r)
+        {
+            return new AddTxRSP(r);
+        }
+        AddTxRSP(const THASH_id& h, int ec, const std::string &em, const route_t &r)
+            : Base(bcEventEnum::AddTxRSP, r), tx_hash(h),errcode(ec), errmsg(em) {}
+
+        // REF_getter<MsgData::TX> tx;
+        THASH_id tx_hash;
+        int errcode;
+        std::string errmsg;
+
+        AddTxRSP(const route_t &r)
+            : Base(bcEventEnum::AddTxRSP, r) {}
+
+        void unpack(inBuffer &o)
+        {
+            o>>tx_hash>>errcode>>errmsg;
+        }
+        void pack(outBuffer &o) const
+        {
+            o<<tx_hash<<errcode<<errmsg;
         }
     };
    // struct NetworkBase: public Event::Base

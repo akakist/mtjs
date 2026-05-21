@@ -50,7 +50,7 @@ inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::ValidateBl
     s->pack(b);
     return b;
 }
-inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData  ::ValidateBlockREQ> &s)
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::ValidateBlockREQ> &s)
 {
     auto ver=b.get_PN();
     if(!s.valid())

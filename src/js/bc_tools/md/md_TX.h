@@ -40,12 +40,14 @@ namespace MsgData
         }
         void sign(const std::string& sk)
         {
+            MUTEX_INSPECTOR;
             Blake2bHasher h;
             update(h);
             sig_ed=sign_ed(sk,h.final());
         }
         bool verify()
         {
+            MUTEX_INSPECTOR;
             Blake2bHasher h;
             update(h);
             return verify_ed_pk(user_pk_ed,sig_ed,h.final());

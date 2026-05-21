@@ -8,17 +8,17 @@
 #include <vector>
 void execute_transaction(const THASH_id& tx_id, t_params &t, const std::string &senderAddress, const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by)
 {
-    for (int ii = 0; ii < tx->instructions->instructions.size(); ii++)
+    for (int ii = 0; ii < tx->instructions->container.size(); ii++)
     {
         // auto h=blake2b_hash(payloads[ii]);
         // inBuffer i2(payloads[ii]);
         // int ty2 = i2.get_PN();
-        auto &ins = tx->instructions->instructions[ii];
+        auto &ins = tx->instructions->container[ii];
         switch (ins->type)
         {
         case msgid::TxMint:
         {
-            MsgData::TxMint *m=dynamic_cast<MsgData::TxMint*>(tx.get());
+            MsgData::TxMint *m=dynamic_cast<MsgData::TxMint*>(ins.get());
             if(!m) throw CommonError("if(!m) 334455");
             // tx::mint mint;
             // mint.unpack(i2);

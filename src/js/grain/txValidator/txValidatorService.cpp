@@ -147,10 +147,26 @@ bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot*e)
 bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ*e)
 {
     MUTEX_INSPECTOR;
-    if(!e->tx->verify())
-    {
+        std::optional<std::string> err;
+        if(!err)
+        {
+            if(!e->tx->verify())
+            {
+                    err="verify failed";
 
-    }
+            }
+        }
+        if(!err)
+            sendEvent(ServiceEnum::Node,new bcEvent::PutTransactionREQ(e->tx,this));
+        
+        passEvent(
+            new bcEvent::AddTxRSP(e->tx->getHash(), err.has_value(), err?*err:"transaction added to pool", poppedFrontRoute(e->route)));
+        // msg::transaction_added_rsp tr;
+        // tr.err=err.has_value();
+        // tr.err_str=err?*err:"transaction added to pool";
+        // tr.tx_hash=blake2b_hash(e->msg);
+        // passEvent(new bcEvent::ClientMsgReply(hash, tr.getBuffer(),poppedFrontRoute(e->route)));
+    // }
     return true;
 }
 

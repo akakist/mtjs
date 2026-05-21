@@ -173,6 +173,9 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base> &e)
     case bcEventEnum::ClientTxSubscribeRSP:
         return ClientTxSubscribeRSP((const bcEvent::ClientTxSubscribeRSP *)e.get());
 
+    case bcEventEnum::AddTxRSP:
+        return AddTxRSP((const bcEvent::AddTxRSP *)e.get());
+
 #ifdef WEBDUMP
     case webHandlerEventEnum::RequestIncoming:
         return RequestIncoming((const webHandlerEvent::RequestIncoming *)e.get());
@@ -185,6 +188,8 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base> &e)
         auto &IDC = E->e->id;
         switch (IDC)
         {
+        case bcEventEnum::AddTxRSP:
+            return AddTxRSP((const bcEvent::AddTxRSP *)E->e.get());
         case mtjsEventEnum::mtjsRpcREQ:
             return mtjsRpcREQ((mtjsEvent::mtjsRpcREQ *)E->e.get(), E->esi);
         case mtjsEventEnum::mtjsRpcRSP:
@@ -208,6 +213,8 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base> &e)
         auto &IDA = E->e->id;
         switch (IDA)
         {
+        case bcEventEnum::AddTxRSP:
+            return AddTxRSP((const bcEvent::AddTxRSP *)E->e.get());
         case mtjsEventEnum::mtjsRpcREQ:
             return mtjsRpcREQ((mtjsEvent::mtjsRpcREQ *)E->e.get(), E->esi);
         case mtjsEventEnum::mtjsRpcRSP:
@@ -332,6 +339,7 @@ bool MTJS::Service::TickTimer(const timerEvent::TickTimer *e)
     JSScope<10, 10> scope(js_ctx);
     if (e->tid == Timers::TIMER_INTERVAL)
     {
+        MUTEX_INSPECTOR;
         TimerTask *t = (TimerTask *)e->cookie.get();
         logErr2("TickTimer: %lld", std::stoll(e->data->container));
         JSValue global_obj = JS_GetGlobalObject(js_ctx);
@@ -349,6 +357,7 @@ bool MTJS::Service::TickTimer(const timerEvent::TickTimer *e)
     }
     else if (e->tid == Timers::TIMER_POLL)
     {
+        MUTEX_INSPECTOR;
         executePending();
         checkForExit();
 
@@ -461,6 +470,28 @@ bool MTJS::Service::CommandEntered(const telnetEvent::CommandEntered *e)
 
 #include "msg.h"
 // #include "quickjspp.hpp"
+bool MTJS::Service::AddTxRSP(const bcEvent::AddTxRSP* e)
+{
+    auto it = opaque.node_req_promises.find(e->tx_hash.container);
+    if (it == opaque.node_req_promises.end())
+        throw CommonError("if(it==opaque.node_req_promises.end())");
+
+        // msg::transaction_added_rsp r;
+        // r.unpack(in);
+        auto *ctx = it->second.ctx;
+        JSScope<20, 20> scope(it->second.ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "err", JS_NewInt32(ctx, e->errcode));
+        JS_SetPropertyStr(ctx, obj, "err_str", JS_NewString(ctx, e->errmsg.c_str()));
+        JS_SetPropertyStr(ctx, obj, "tx_hash", JS_NewString(ctx, base62::encode(e->tx_hash.container).c_str()));
+        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->tx_hash.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->tx_hash.container), this));
+        return true;
+    
+}
 
 bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
 {

@@ -134,6 +134,7 @@ JSValue js_tx_subscribe(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 }
 JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
+    MUTEX_INSPECTOR;
 
     JSScope<10, 10> scope(ctx);
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
@@ -182,7 +183,8 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     q->amount.from_string(std::string(_amount));
 
     REF_getter<MsgData::TX> tx(new MsgData::TX());
-    tx->instructions->instructions.push_back(q.get());
+    tx->instructions->container.push_back(q.get());
+    // tx->instructions->instructions.push_back(q.get());
 
     // tx->user_pk_ed = std::string((char *)extracted_public, crypto_sign_PUBLICKEYBYTES);
     // REF_getter<bcEvent::AddTxREQ> q1 = new bcEvent::AddTxREQ(tx);
@@ -196,8 +198,8 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     auto pk = std::string((char *)extracted_public, crypto_sign_PUBLICKEYBYTES);
 
     tx->user_pk_ed = pk;
-    tx->sign(sk);
     tx->nonce.from_string(std::string(_nonce));
+    tx->sign(sk);
     //  msg::user_message_req um;
     // um.address_pk_ed = pk;
     // um.payload.push_back(m.getBuffer());
@@ -215,11 +217,12 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(tx, op->listener_->serviceId));
 
     // logErr2("setalarm %lf",to);
-    Blake2bHasher h;
-    tx->update(h);
-    op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(h.final()), NULL, to, op->listener_));
+    auto th=tx->getHash();
+    // Blake2bHasher h;
+    // tx->update(h);
+    op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(th.container), NULL, to, op->listener_));
 
-    auto &pd = op->node_req_promises[h.final()];
+    auto &pd = op->node_req_promises[th.container];
     pd.ctx = ctx;
     JSValue prom[2];
     JSValue promise = JS_NewPromiseCapability(ctx, prom);

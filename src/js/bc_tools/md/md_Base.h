@@ -43,6 +43,7 @@ namespace MsgData
 
         THASH_id getHash() const
         {
+            MUTEX_INSPECTOR;
             Blake2bHasher h;
             update(h);
             THASH_id r;

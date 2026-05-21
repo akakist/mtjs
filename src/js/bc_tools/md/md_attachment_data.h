@@ -79,7 +79,7 @@ inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::attachment_data>
     auto ver=b.get_PN();
     if(!s.valid())
         s=new MsgData::attachment_data();
-    s->unpack(b);
+    s->unpack2(b);
     return b;
 }
 

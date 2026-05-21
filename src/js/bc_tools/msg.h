@@ -130,6 +130,7 @@ namespace msg
         std::string address_pk_ed;
         bool verify()
         {
+            MUTEX_INSPECTOR;
             Blake2bHasher h;
             for(auto& z:payload)
                 h.update(z);
@@ -138,6 +139,7 @@ namespace msg
         }
         void sign(const std::string &sk)
         {
+            MUTEX_INSPECTOR;
             Blake2bHasher h;
             for(auto& z:payload)
                 h.update(z);

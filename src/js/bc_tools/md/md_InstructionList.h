@@ -13,25 +13,25 @@ namespace MsgData
         {
 
         }
-        std::vector<REF_getter<MsgData::Base>> instructions;
+        std::vector<REF_getter<MsgData::Base>> container;
 
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<instructions;
+            b<<container;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>instructions;
+            b>>container;
         }
         void update(Blake2bHasher& h) const
         {
             MUTEX_INSPECTOR;
-            for(auto& z: instructions)
+            for(auto& z: container)
             {
                 z->update(h);
                 // h.update(z);
