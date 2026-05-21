@@ -1,5 +1,6 @@
 #include "msg.h"
 #include "blake2bHasher.h"
+#include "md/md_BlockAcceptedREQ.h"
 thread_local  MsgFactory msgFactory;
 MsgData::BlockAcceptedREQ::BlockAcceptedREQ()
     : Base(msgid::BlockAcceptedREQ), leader_certificateZ(new LeaderCertificate()), block_payload(new BlockInfo)
@@ -28,8 +29,8 @@ void MsgData::BlockAcceptedREQ::unpack(inBuffer &b)
 
 void MsgData::BlockAcceptedREQ::update(Blake2bHasher &h) const
 {
-    leader_certificateZ->hash(h);
-    block_payload->hash(h);
+    leader_certificateZ->update(h);
+    block_payload->update(h);
     for (auto &z : node_validators)
     {
         h.update(z.container);
@@ -88,6 +89,9 @@ const char *msgName(int id)
         return "TX";
     case msgid::TxMint:
         return "TxMint";
+    case msgid::attachment_data:
+        return "attachment_data";
+        
 
     default:
         return "unknown";

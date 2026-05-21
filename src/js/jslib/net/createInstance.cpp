@@ -26,6 +26,7 @@
 #include "Events/System/timerEvent.h"
 #include "timers.h"
 #include "jsValueGuard.h"
+#include "md/md_TxMint.h"
 // #include ""
 
 static std::string js_obj_to_kv(JSContext *ctx,
@@ -215,7 +216,7 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
 
     // logErr2("setalarm %lf",to);
     Blake2bHasher h;
-    tx->hash(h);
+    tx->update(h);
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(h.final()), NULL, to, op->listener_));
 
     auto &pd = op->node_req_promises[h.final()];

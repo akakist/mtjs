@@ -27,16 +27,31 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            hb->pack(b);
+            b<<hb;
             b<<sig<<node_signer;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            hb->unpack2(b);
+            b>>hb;
             b>>sig>>node_signer;
         }
     };
 
+}
+
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::ConfirmLeaderRSP> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::ConfirmLeaderRSP> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::ConfirmLeaderRSP();
+    s->unpack2(b);
+    return b;
 }

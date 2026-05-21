@@ -25,7 +25,7 @@ namespace MsgData
             h.update(prev_root_hash.container);
             h.update(new_root_hash1.container);
             h.update(attachment_hash.container);
-            payload_heart_beat->hash(h);
+            payload_heart_beat->update(h);
         }
 
         void pack(outBuffer& b) const final
@@ -36,7 +36,7 @@ namespace MsgData
             b<<prev_root_hash;
             b<<new_root_hash1;
             b<<attachment_hash;
-            payload_heart_beat->pack(b);
+            b<<payload_heart_beat;
         }
         void unpack(inBuffer& b) final
         {
@@ -46,9 +46,23 @@ namespace MsgData
             b>>prev_root_hash;
             b>>new_root_hash1;
             b>>attachment_hash;
-            payload_heart_beat->unpack2(b);
+            b>>payload_heart_beat;
         }
 
     };
 
+}
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::BlockInfo> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::BlockInfo> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::BlockInfo();
+    s->unpack2(b);
+    return b;
 }

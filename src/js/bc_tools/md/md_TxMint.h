@@ -30,3 +30,17 @@ namespace MsgData
 
 
 }
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::TxMint> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData  ::TxMint> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::TxMint();
+    s->unpack2(b);
+    return b;
+}   

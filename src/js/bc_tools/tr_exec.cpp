@@ -4,7 +4,7 @@
 #include "tr_exec.h"
 #include "msg_tx.h"
 
-std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+std::optional<std::string> TR::execute(const MsgData::TxMint* c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v=t.root->getValues();
     auto it=v->emitters.find(senderAddress);
@@ -17,13 +17,13 @@ std::optional<std::string> TR::execute(const tx::mint &c, t_params & t,const std
     {
         throw CommonError("if(!u.valid())");
     }
-    u->balance+=c.amount;
+    u->balance+=c->amount;
     u->setDirty(by);
     
 
     t.fee[senderAddress]+=v->fees[bc_values::mint];
 
-    t.logMsg(txid,seqId,"amount %s sucessfully minted on your balance",c.amount.toString().c_str());
+    t.logMsg(txid,seqId,"amount %s sucessfully minted on your balance",c->amount.toString().c_str());
 
     return std::nullopt;
 }

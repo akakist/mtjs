@@ -112,7 +112,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         }
         // logNode("on_get_blocks_rsp: block verified OK");
         t_params t(root);
-        t.att_data.trs = z.second->att_data.trs;
+        t.att_data->trs = z.second->att_data->trs;
         execute_block(t, root, prev_block_hash_Z, z.second->block_accepted_req->leader_certificateZ->nodes);
         blockDBStore = prepareBlockDBStore(t);
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);

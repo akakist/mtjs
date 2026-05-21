@@ -47,3 +47,17 @@ namespace MsgData
     };
 
 }
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::HeartBeatREQ> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::HeartBeatREQ> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::HeartBeatREQ();
+    s->unpack2(b);
+    return b;
+}

@@ -116,11 +116,11 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     }
     iUtils->getNow();
 
-    logErr2("trs size %d", blockDBStore->att_data.trs.size());
-    for (auto &z : blockDBStore->att_data.trs)
+    logErr2("trs size %d", blockDBStore->att_data->trs.size());
+    for (auto &z : blockDBStore->att_data->trs)
     {
         XTRY;
-        auto h = blake2b_hash(z.container);
+        auto h = z->getHash();
         auto it = transaction_pool_of_leader.find(h);
         if (it != transaction_pool_of_leader.end())
         {
@@ -216,7 +216,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
         // auto new_root_hash =
         t_params t(root);
-        t.att_data.trs = r->transaction_bodies;
+        t.att_data->trs = r->transaction_bodies;
         execute_block(t, root, prev_block_hash_Z, r->leader_cert->nodes);
         calc_fee_and_rewards(t, r->leader_cert->nodes);
 
@@ -232,9 +232,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         block->prev_root_hash = prev_block_hash_Z;
         block->new_root_hash1 = new_root_hash;
 
-        Blake2bHasher h;
-        t.att_data.hash(h);
-        block->attachment_hash.container = h.final();
+        block->attachment_hash = t.att_data->getHash();
         block->payload_heart_beat = r->leader_cert->heart_beat;
 
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();

@@ -1,7 +1,8 @@
 #pragma once
 #include "md_Base.h"
-namespace MsgData
 #include "md_BlockDBStore.h"
+
+namespace MsgData
 {
     struct GetSavedBlocksRSP: public Base
     {
@@ -24,28 +25,30 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<blocks_Z.size();
-            for(auto &z: blocks_Z)
-            {
-                b<<z.first;
-                z.second->pack(b);
-            }
+            b<<blocks_Z;
             b<<lastEpoch;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            int size=b.get_PN();
-            for(int i=0;i<size;i++)            {
-                BigInt epoch;
-                b>>epoch;
-                REF_getter<MsgData::BlockDBStore> block_db_store(new MsgData::BlockDBStore());
-                block_db_store->unpack2(b);
-                blocks_Z.emplace_back(epoch, block_db_store);
-            }
+            b>>blocks_Z;
             b>>lastEpoch;
         }
     };
 
+}
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetSavedBlocksRSP> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetSavedBlocksRSP> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::GetSavedBlocksRSP();
+    s->unpack2(b);
+    return b;
 }

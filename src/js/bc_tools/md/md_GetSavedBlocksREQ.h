@@ -33,3 +33,17 @@ namespace MsgData
     };
 
 }
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetSavedBlocksREQ> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetSavedBlocksREQ> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::GetSavedBlocksREQ();
+    s->unpack2(b);
+    return b;
+}

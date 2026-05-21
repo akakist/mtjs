@@ -29,7 +29,7 @@ namespace MsgData
             Base::pack(b);
             b<<epoch;
             b<<att_data;
-            block_accepted_req->pack(b);
+            b<<block_accepted_req;
             XPASS;
         }
         void unpack(inBuffer& b) final
@@ -39,10 +39,24 @@ namespace MsgData
             Base::unpack(b);
             b>>epoch;
             b>>att_data;
-            block_accepted_req->unpack2(b);
+            b>>block_accepted_req;
             XPASS;
         }
 
     };
 
+}
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::BlockDBStore> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::BlockDBStore> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::BlockDBStore();
+    s->unpack2(b);
+    return b;
 }

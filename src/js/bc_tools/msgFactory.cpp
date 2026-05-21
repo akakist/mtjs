@@ -1,5 +1,22 @@
 #include "msgFactory.h"
 #include "msg.h"
+#include "md/md_HeartBeatREQ.h"
+#include "md/md_HeartBeatRSP.h" 
+#include "md/md_GetTransactionREQ.h"
+#include "md/md_GetTransactionRSP.h"
+#include "md/md_ValidateBlockREQ.h"
+#include "md/md_ValidateBlockRSP.h"
+#include "md/md_BlockAcceptedREQ.h"
+#include "md/md_BlockAcceptedRSP.h"
+#include "md/md_GetSavedBlocksREQ.h"
+#include "md/md_GetSavedBlocksRSP.h"
+#include "md/md_DoHeartBeatREQ.h"
+#include "md/md_ConfirmLeaderREQ.h"
+#include "md/md_ConfirmLeaderRSP.h"
+#include "md/md_InstructionList.h"
+#include "md/md_TX.h"
+#include "md/md_TxMint.h"
+
 MsgFactory::MsgFactory() 
 {
     registerMsg(msgid::HeartBeatREQ, MsgData::HeartBeatREQ::construct);

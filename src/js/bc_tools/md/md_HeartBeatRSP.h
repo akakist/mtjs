@@ -14,7 +14,7 @@ namespace MsgData
         blst_cpp::Signature signature;
         void update(Blake2bHasher& h) const
         {
-            payload_heart_beat->hash(h);
+            payload_heart_beat->update(h);
             h.update(node_signer.container);
         }
         static Base* construct()
@@ -26,7 +26,7 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            payload_heart_beat->pack(b);
+            b<<payload_heart_beat;
             b<<node_signer;
             b<<signature;
         }
@@ -34,10 +34,24 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            payload_heart_beat->unpack2(b);
+            b>>payload_heart_beat;
             b>>node_signer;
             b>>signature;
         }
     };
 
+}
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::HeartBeatRSP> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::HeartBeatRSP> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::HeartBeatRSP();
+    s->unpack2(b);
+    return b;
 }

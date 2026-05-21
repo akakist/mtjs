@@ -23,7 +23,7 @@ namespace MsgData
         void update(Blake2bHasher& h) const
         {
             for(auto& z:trs )
-                z->hash(h);
+                z->update(h);
         }
 
         void pack(outBuffer& b) const final
@@ -31,26 +31,31 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<trs.size();
-            for(auto& z: trs)
-            {
-                z->pack(b);
-            }
+            b<<trs;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            int n=b.get_PN();
-            for(int i=0;i<n;i++)
-            {
-                REF_getter<MsgData::TX> tx=new TX;
-                tx->unpack2(b);
-                trs.push_back(tx);
-            }
+            b>>trs;
         }
 
     };
 
 
 }
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetTransactionRSP> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetTransactionRSP> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::GetTransactionRSP();
+    s->unpack2(b);
+    return b;
+}
+

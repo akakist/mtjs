@@ -1,5 +1,10 @@
 #pragma once
 #include "md_Base.h"
+#include "md_LeaderCertificate.h"
+#include "md_BlockInfo.h"
+#include "md_TX.h"
+#include "blst_cp.h"
+#include "NODE_id.h"
 namespace MsgData
 {
     struct ValidateBlockRSP: public Base
@@ -18,7 +23,7 @@ namespace MsgData
         NODE_id node_validator;
         void update(Blake2bHasher& h) const
         {
-            payload_block->hash(h);
+            payload_block->update(h);
             h.update(node_validator.container);
         }
         void pack(outBuffer& b) const final
@@ -26,7 +31,7 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            payload_block->pack(b);
+            b<<payload_block;
             b<<sig;
             b<<node_validator;
         }
@@ -34,14 +39,12 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            payload_block->unpack2(b);
+            b>>payload_block;
             b>>sig;
             b>>node_validator;
         }
         void sign(const blst_cpp::SecretKey &sk)
         {
-            // Blake2bHasher h;
-            // h.update(payload_block);
             sig.sign(sk, blake2b_hash(payload_block->getBuffer()).container);
         }
         bool verify(const blst_cpp::PublicKey &pk) const
@@ -52,3 +55,17 @@ namespace MsgData
     };
 
 }
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::ValidateBlockRSP> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::ValidateBlockRSP> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::ValidateBlockRSP();
+    s->unpack2(b);
+    return b;
+}   

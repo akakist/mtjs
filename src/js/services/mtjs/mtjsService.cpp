@@ -540,18 +540,18 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore();
     pb->unpack2(in);
     nlohmann::json j;
-    for (size_t ti = 0; ti < pb->att_data.trs.size(); ti++)
+    for (size_t ti = 0; ti < pb->att_data->trs.size(); ti++)
     {
         nlohmann::json jtr;
         if (opaque.tx_subscription_cb.has_value())
         {
-            THASH_id tx_hash = pb->att_data.trs[ti]->getHash();
+            THASH_id tx_hash = pb->att_data->trs[ti]->getHash();
             jtr["tx_hash"] = base62::encode(tx_hash.container);
             // logErr2("ClientTxSubscribeRSP: tx_hash %s",base62::encode(tx_hash.container).c_str());
             JSScope<10, 10> scope(js_ctx);
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);
-            auto &tx_report = pb->att_data.transaction_reports[tx_hash];
+            auto &tx_report = pb->att_data->transaction_reports[tx_hash];
             for (int ii = 0; ii < tx_report.instruction_reports.size(); ii++)
             {
                 nlohmann::json ii_json;

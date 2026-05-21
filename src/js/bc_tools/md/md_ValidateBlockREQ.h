@@ -18,10 +18,10 @@ namespace MsgData
         std::vector<REF_getter<TX> > transaction_bodies;
         void update(Blake2bHasher& h) const
         {
-            leader_cert->hash(h);
+            leader_cert->update(h);
             for(auto& z: transaction_bodies)
             {
-                z->hash(h);
+                z->update(h);
             }
         }
 
@@ -30,29 +30,31 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            leader_cert->pack(b);
-            b<<transaction_bodies.size();
-            for(auto& z:transaction_bodies)
-            {
-                z->pack(b);
-            }
-            // b<<transaction_bodies;
+            b<<leader_cert;
+            b<<transaction_bodies;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            leader_cert->unpack2(b);
-            int n=b.get_PN();
-            for(int i=0;i<n;i++)
-            {
-                REF_getter<TX> tx=new TX;
-                tx->unpack2(b);
-                transaction_bodies.push_back(tx);
-            }
-            // b>>transaction_bodies;
+            b>>leader_cert;
+            b>>transaction_bodies;
         }
 
     };
 
 }
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::ValidateBlockREQ> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData  ::ValidateBlockREQ> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::ValidateBlockREQ();
+    s->unpack2(b);
+    return b;
+}   

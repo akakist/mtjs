@@ -4,21 +4,25 @@
 #include "msg_tx.h"
 #include "t_params.h"
 #include "tr_exec.h"
+#include "md/md_TxMint.h"
 #include <vector>
-void execute_transaction(const THASH_id& tx_id, t_params &t, const std::string &senderAddress, const std::vector<std::string> &payloads, const REF_getter<fee_calcer> &by)
+void execute_transaction(const THASH_id& tx_id, t_params &t, const std::string &senderAddress, const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by)
 {
-    for (int ii = 0; ii < payloads.size(); ii++)
+    for (int ii = 0; ii < tx->instructions->instructions.size(); ii++)
     {
         // auto h=blake2b_hash(payloads[ii]);
-        inBuffer i2(payloads[ii]);
-        int ty2 = i2.get_PN();
-        switch (ty2)
+        // inBuffer i2(payloads[ii]);
+        // int ty2 = i2.get_PN();
+        auto &ins = tx->instructions->instructions[ii];
+        switch (ins->type)
         {
-        case tx_id::mint:
+        case msgid::TxMint:
         {
-            tx::mint mint;
-            mint.unpack(i2);
-            auto err = TR::execute(mint, t, senderAddress, by, tx_id, ii);
+            MsgData::TxMint *m=dynamic_cast<MsgData::TxMint*>(tx.get());
+            if(!m) throw CommonError("if(!m) 334455");
+            // tx::mint mint;
+            // mint.unpack(i2);
+            auto err = TR::execute(m, t, senderAddress, by, tx_id, ii);
             if (err)
             {
                 t.setError(tx_id, ii, *err);
@@ -26,8 +30,8 @@ void execute_transaction(const THASH_id& tx_id, t_params &t, const std::string &
         }
         break;
         default:
-            logErr2("unhndled ty2 %s", txName(ty2));
-            t.logError(tx_id, ii, "unhandled transaction type %s", txName(ty2));
+            logErr2("unhndled ty2 %s", txName(tx->type));
+            t.logError(tx_id, ii, "unhandled transaction type %s", txName(tx->type));
         }
     }
 }

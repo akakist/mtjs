@@ -52,3 +52,19 @@ namespace MsgData
 
     };
 }
+
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::Base> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::Base> &s)
+{
+    auto ver=b.get_PN();
+    int t=b.get_PN();
+    if(!s.valid())
+        s=msgFactory.create(t);;
+    s->unpack(b);
+    return b;
+}

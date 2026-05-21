@@ -479,32 +479,33 @@ void Node::Service::execute_block(t_params &t, const REF_getter<root_data> &rt, 
 
     outBuffer o;
     // t.instruction_reports.resize(trs.size());
-    for (int ti = 0; ti < t.att_data.trs.size(); ti++)
+    for (int ti = 0; ti < t.att_data->trs.size(); ti++)
     {
         std::optional<std::string> t_err;
-        THASH_id th = blake2b_hash(t.att_data.trs[ti].container);
-        msg::user_message_req ur(t.att_data.trs[ti]);
-        REF_getter<fee_calcer> by = t.feeCalcers.get(ur.address_pk_ed);
+        THASH_id th = t.att_data->trs[ti]->getHash();
+        auto &tx=t.att_data->trs[ti];
+        // msg::user_message_req ur(t.att_data->trs[ti]);
+        REF_getter<fee_calcer> by = t.feeCalcers.get(tx->user_pk_ed);
         // if(!u.valid())
         //     throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
-        if (!ur.verify())
+        if (!tx->verify())
             t_err = "verify failed @12";
         // // BigInt nonce=0;
         if (!t_err)
         {
-            auto u = rt->getUserState(ur.address_pk_ed);
+            auto u = rt->getUserState(tx->user_pk_ed);
             if (!u.valid())
             {
                 t_err = "sender invalid";
             }
             if (!t_err)
             {
-                if (u->nonce != ur.nonce)
+                if (u->nonce != tx->nonce)
                     t_err = "invalid nonce";
                 if (!t_err)
                 {
                     // t.instruction_reports[ti].resize(ur.payload.size());
-                    execute_transaction(th, t, ur.address_pk_ed, ur.payload, by);
+                    execute_transaction(th, t, tx->user_pk_ed, tx, by);
                     u->nonce += 1;
                     u->setDirty(by);
                 }
@@ -538,7 +539,7 @@ void Node::Service::calc_fee_and_rewards(t_params &t, const std::vector<NODE_id>
             u->setDirty(NULL);
         }
         total_fees += z.second->get_fee();
-        t.att_data.fees[z.first] = z.second->get_fee();
+        t.att_data->fees[z.first] = z.second->get_fee();
         z.second->reset();
     }
     BigInt total_rewards = (total_fees * 9) / 10;
@@ -559,7 +560,7 @@ void Node::Service::calc_fee_and_rewards(t_params &t, const std::vector<NODE_id>
         u->setDirty(NULL);
         if (n == this_node_name && amt > 0)
             logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
-        t.att_data.rewards[n] = amt;
+        t.att_data->rewards[n] = amt;
     }
 }
 REF_getter<MsgData::BlockDBStore> Node::Service::prepareBlockDBStore(const t_params &t)

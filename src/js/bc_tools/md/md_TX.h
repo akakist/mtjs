@@ -23,14 +23,14 @@ namespace MsgData
             MUTEX_INSPECTOR;
             Base::pack(b);
             b<<user_pk_ed<<sig_ed<<nonce;
-            instructions->pack(b);
+            b<<instructions;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>user_pk_ed>>sig_ed>>nonce;
-            instructions->unpack2(b);
+            b>>instructions;
         }
         void update(Blake2bHasher &h) const
         {
@@ -54,3 +54,19 @@ namespace MsgData
 
 
 }
+
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::TX> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::TX> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::TX();
+    s->unpack2(b);
+    return b;
+}
+

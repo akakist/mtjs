@@ -1,5 +1,4 @@
-#ifndef MD_BLOCKACCEPTEDRSP_HPP
-#define MD_BLOCKACCEPTEDRSP_HPP
+#pragma once
 #include "md_Base.h"
 #include "NODE_id.h"
 namespace MsgData
@@ -46,4 +45,16 @@ namespace MsgData
         }
     };
 }
-#endif // MD_BLOCKACCEPTEDRSP_HPP
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::BlockAcceptedRSP> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::BlockAcceptedRSP> &s)
+{
+    auto ver=b.get_PN();
+    s=new MsgData::BlockAcceptedRSP();
+    s->unpack2(b);
+    return b;
+}

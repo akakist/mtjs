@@ -1,9 +1,14 @@
 #pragma once
 #include "md_Base.h"
+#include "md_TX.h"
 namespace MsgData
 {
     struct attachment_data: public Base
     {
+        attachment_data():Base(msgid::attachment_data)
+        {
+
+        }
         std::vector<REF_getter<TX>> trs;
         std::map<THASH_id,transaction_report> transaction_reports;
         std::map<std::string,BigInt> fees;
@@ -63,16 +68,18 @@ namespace MsgData
 //     s->pack(b);
 //     return b;
 // }
-inline outBuffer & operator<< (outBuffer& b,const MsgData::attachment_data &s)
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::attachment_data> &s)
 {
     b<<1;
-    b<<s.trs<<s.transaction_reports<<s.fees<<s.rewards;
+    s->pack(b);
     return b;
 }
-inline inBuffer & operator>> (inBuffer& b,  MsgData::attachment_data &s)
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::attachment_data> &s)
 {
     auto ver=b.get_PN();
-    b>>s.trs>>s.transaction_reports>>s.fees>>s.rewards;
+    if(!s.valid())
+        s=new MsgData::attachment_data();
+    s->unpack(b);
     return b;
 }
 

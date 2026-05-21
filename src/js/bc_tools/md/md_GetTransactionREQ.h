@@ -12,7 +12,7 @@ namespace MsgData
         REF_getter<LeaderCertificate> lc;
         void update(Blake2bHasher& h) const
         {
-            lc->hash(h);
+            lc->update(h);
         }
 
         void pack(outBuffer& b) const final
@@ -20,13 +20,13 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            lc->pack(b);
+            b<<lc;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            lc->unpack2(b);
+            b>>lc;
         }
 
         static Base* construct()
@@ -35,4 +35,18 @@ namespace MsgData
         }
     };
 
+}
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetTransactionREQ> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetTransactionREQ> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::GetTransactionREQ();
+    s->unpack2(b);
+    return b;
 }

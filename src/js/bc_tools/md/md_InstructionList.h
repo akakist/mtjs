@@ -20,27 +20,13 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<instructions.size();
-            for(auto& z: instructions)
-            {
-                z->pack(b);
-            }
+            b<<instructions;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            int n=b.get_PN();
-            printf("!!!!!!!!!!!!!!!! n=%d \n", n);
-            for(int i=0;i<n;i++)
-            {
-                MUTEX_INSPECTOR;
-                auto m=b.get_PN();
-                REF_getter<MsgData::Base> msg=msgFactory.create(m);
-                msg->unpack(b);
-                instructions.push_back(msg);
-
-            }
+            b>>instructions;
         }
         void update(Blake2bHasher& h) const
         {
@@ -54,4 +40,19 @@ namespace MsgData
     };
 
 
+}
+
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::InstructionList> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::InstructionList> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::InstructionList();
+    s->unpack2(b);
+    return b;
 }

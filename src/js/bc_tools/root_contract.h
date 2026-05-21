@@ -13,6 +13,7 @@
 #include "NODE_id.h"
 #include "msg.h"
 #include "hsh.h"
+#include "md/md_LeaderCertificate.h"
 
 struct bc_contract:  public data_base
 {

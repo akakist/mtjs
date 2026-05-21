@@ -23,7 +23,21 @@
 #include "NODE_id.h"
 #include "db_to_save.h"
 #include "blst_cp.h"
-
+#include "md/md_ConfirmLeaderRSP.h"
+#include "md/md_LeaderCertificate.h"
+#include "md/md_HeartBeatRSP.h"
+#include "md/md_BlockAcceptedREQ.h"
+#include "md/md_ValidateBlockRSP.h"
+#include "md/md_GetSavedBlocksRSP.h"
+#include "md/md_GetSavedBlocksREQ.h"
+#include "md/md_ValidateBlockREQ.h"
+#include "md/md_GetTransactionRSP.h"
+#include "md/md_GetTransactionREQ.h"
+#include "md/md_BlockAcceptedREQ.h"
+#include "md/md_BlockAcceptedRSP.h"
+#include "md/md_DoHeartBeatREQ.h"
+#include "md/md_ConfirmLeaderREQ.h"
+#include "md/md_ConfirmLeaderRSP.h"
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 // #define HEART_BEAT_TIMEDOUT_SEC 5
 #define HEART_BEAT_INTERVAL_SEC 5

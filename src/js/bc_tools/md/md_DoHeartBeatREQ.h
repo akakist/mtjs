@@ -24,14 +24,28 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            prev_leader_cert->pack(b);
+            b<<prev_leader_cert;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            prev_leader_cert->unpack2(b);
+            b>>prev_leader_cert;
         }
     };
 
+}
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::DoHeartBeatREQ> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::DoHeartBeatREQ> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::DoHeartBeatREQ();
+    s->unpack2(b);
+    return b;
 }

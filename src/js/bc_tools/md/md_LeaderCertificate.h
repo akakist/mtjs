@@ -1,6 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_HeartBeatREQ.h"
+
 namespace MsgData
 {
     struct LeaderCertificate: public Base
@@ -27,8 +28,7 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            heart_beat->pack(b);
-            // b<<payload_heart_beat;
+            b<<heart_beat;
             b<<nodes;
             b<<agg_sig;
         }
@@ -36,10 +36,7 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            // auto t=b.get_PN();
-            // if(t!=msgid::HeartBeatREQ)                throw CommonError("if(t!=msgid::HeartBeatREQ)");
-            heart_beat->unpack2(b);
-            // b>>payload_heart_beat;
+            b>>heart_beat;
             b>>nodes;
             b>>agg_sig;
         }
@@ -50,4 +47,19 @@ namespace MsgData
 
     };
 
+}
+
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::LeaderCertificate> &s)
+{
+    b<<1;
+    s->pack(b);
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::LeaderCertificate> &s)
+{
+    auto ver=b.get_PN();
+    if(!s.valid())
+        s=new MsgData::LeaderCertificate();
+    s->unpack2(b);
+    return b;
 }
