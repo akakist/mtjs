@@ -473,7 +473,7 @@ void Node::Service::resetTimer()
 {
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 }
-void Node::Service::execute_block(t_params &t, const REF_getter<root_data> &rt, const BLOCK_id &bl, const std::vector<NODE_id> &nodes_in_leader_cert)
+BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &nodes_in_leader_cert)
 {
     MUTEX_INSPECTOR;
 
@@ -493,7 +493,7 @@ void Node::Service::execute_block(t_params &t, const REF_getter<root_data> &rt, 
         // // BigInt nonce=0;
         if (!t_err)
         {
-            auto u = rt->getUserState(tx->user_pk_ed);
+            auto u = root->getUserState(tx->user_pk_ed);
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -516,6 +516,14 @@ void Node::Service::execute_block(t_params &t, const REF_getter<root_data> &rt, 
         else
             t.setTxError(th, *t_err);
     }
+    auto rh=proceed_merkle_on_transaction_pool_hashers(root);
+    calc_fee_and_rewards(t, nodes_in_leader_cert);
+    auto newEpoch = root->getEpoch();
+    newEpoch->epoch += 1;
+    newEpoch->setDirty(NULL);
+
+    rh=proceed_merkle_on_transaction_pool_hashers(root);
+    return rh;
 }
 void Node::Service::calc_fee_and_rewards(t_params &t, const std::vector<NODE_id> &nodes_in_leader_cert)
 {

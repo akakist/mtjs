@@ -237,7 +237,7 @@ namespace Node
         void do_start_block();
 
         void collectTransactions();
-        void execute_block(t_params &t,const REF_getter<root_data> &rt, const BLOCK_id & bl,  const std::vector<NODE_id> &nodes_in_leader_cert);
+        BLOCK_id execute_block(t_params &t,  const std::vector<NODE_id> &nodes_in_leader_cert);
 
         void do_sync(const NODE_id &src_node);
 

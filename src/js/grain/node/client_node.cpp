@@ -217,16 +217,16 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         // auto new_root_hash =
         t_params t(root);
         t.att_data->trs = r->transaction_bodies;
-        execute_block(t, root, prev_block_hash_Z, r->leader_cert->nodes);
-        calc_fee_and_rewards(t, r->leader_cert->nodes);
+        auto new_root_hash=execute_block(t,  r->leader_cert->nodes);
+        // calc_fee_and_rewards(t, r->leader_cert->nodes);
 
-        auto newEpoch = root->getEpoch();
-        newEpoch->epoch += 1;
-        newEpoch->setDirty(NULL);
+        // auto newEpoch = root->getEpoch();
+        // newEpoch->epoch += 1;
+        // newEpoch->setDirty(NULL);
 
         blockDBStore = prepareBlockDBStore(t);
 
-        auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
+        // auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
         REF_getter<MsgData::BlockInfo> block = new MsgData::BlockInfo();
         block->prev_root_hash = prev_block_hash_Z;
