@@ -479,11 +479,11 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
 
     outBuffer o;
     // t.instruction_reports.resize(trs.size());
-    for (int ti = 0; ti < t.att_data->trs.size(); ti++)
+    for (int ti = 0; ti < t.validateBlockREQ->transaction_bodies.size(); ti++)
     {
         std::optional<std::string> t_err;
-        THASH_id th = t.att_data->trs[ti]->getHash();
-        auto &tx=t.att_data->trs[ti];
+        THASH_id th = t.validateBlockREQ->transaction_bodies[ti]->getHash();
+        auto &tx=t.validateBlockREQ->transaction_bodies[ti];
         // msg::user_message_req ur(t.att_data->trs[ti]);
         REF_getter<fee_calcer> by = t.feeCalcers.get(tx->user_pk_ed);
         // if(!u.valid())
@@ -577,6 +577,7 @@ REF_getter<MsgData::BlockDBStore> Node::Service::prepareBlockDBStore(const t_par
     REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore;
     pb->epoch = root->getEpoch()->epoch;
     pb->att_data = t.att_data;
+    pb->validateBlockREQ=t.validateBlockREQ;
 
     /// вычисление первичных данных, надо для вычисления фее.
     return pb;

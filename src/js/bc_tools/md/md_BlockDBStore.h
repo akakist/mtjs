@@ -2,6 +2,7 @@
 #include "md_Base.h"
 #include "md_attachment_data.h"
 #include "md_BlockAcceptedREQ.h"
+#include "md_ValidateBlockREQ.h"
 namespace MsgData
 {
     struct BlockDBStore: public Base
@@ -9,18 +10,22 @@ namespace MsgData
         
         BlockDBStore():Base(msgid::BlockDBStore), 
         att_data(new attachment_data),
-        block_accepted_req(new BlockAcceptedREQ())
+        validateBlockREQ(new ValidateBlockREQ),
+        blockAcceptedREQ(new BlockAcceptedREQ())
+
         {
 
         }
         BigInt epoch;
         REF_getter<attachment_data> att_data;
-        REF_getter<BlockAcceptedREQ> block_accepted_req;
+        REF_getter<ValidateBlockREQ> validateBlockREQ;
+        REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
         void update(Blake2bHasher& h) const
         {
             h.update(epoch.toString());
             att_data->update(h);
-            block_accepted_req->update(h);
+            validateBlockREQ->update(h);
+            blockAcceptedREQ->update(h);
         }
         void pack(outBuffer& b) const final
         {
@@ -29,7 +34,8 @@ namespace MsgData
             Base::pack(b);
             b<<epoch;
             b<<att_data;
-            b<<block_accepted_req;
+            b<<validateBlockREQ;
+            b<<blockAcceptedREQ;
             XPASS;
         }
         void unpack(inBuffer& b) final
@@ -39,7 +45,8 @@ namespace MsgData
             Base::unpack(b);
             b>>epoch;
             b>>att_data;
-            b>>block_accepted_req;
+            b>>validateBlockREQ;
+            b>>blockAcceptedREQ;
             XPASS;
         }
 

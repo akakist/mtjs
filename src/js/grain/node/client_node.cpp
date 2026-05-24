@@ -35,7 +35,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     resetTimer();
     if (!blockDBStore.valid())
         throw CommonError("if (!blockDBStore.valid())");
-    blockDBStore->block_accepted_req = r;
+    blockDBStore->blockAcceptedREQ = r;
     std::vector<blst_cpp::PublicKey> agg_pk;
     for (auto &z : r->node_validators)
     {
@@ -84,7 +84,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
         insert.bind(1, blockDBStore->epoch.toString());
-        insert.bind(2, base62::encode(blockDBStore->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash.container));
+        insert.bind(2, base62::encode(blockDBStore->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash.container));
         insert.bind(3, time(NULL));
         insert.bind(4, base62::encode(blockDBStore->getBuffer()));
         insert.exec();
@@ -116,8 +116,8 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     }
     iUtils->getNow();
 
-    logErr2("trs size %d", blockDBStore->att_data->trs.size());
-    for (auto &z : blockDBStore->att_data->trs)
+    logErr2("trs size %d", blockDBStore->validateBlockREQ->transaction_bodies.size());
+    for (auto &z : blockDBStore->validateBlockREQ->transaction_bodies)
     {
         XTRY;
         auto h = z->getHash();
@@ -216,7 +216,9 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
         // auto new_root_hash =
         t_params t(root);
-        t.att_data->trs = r->transaction_bodies;
+        t.validateBlockREQ = r;
+        // t.att_data->trs = r->transaction_bodies;
+        
         auto new_root_hash=execute_block(t,  r->leader_cert->nodes);
         // calc_fee_and_rewards(t, r->leader_cert->nodes);
 

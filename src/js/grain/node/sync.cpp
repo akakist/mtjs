@@ -87,20 +87,20 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
     {
         // if(z.second->epoch!=z.first)
         //     throw CommonError("if(hb.epoch!=z.first)");
-        logNode("recv block epoch %s", z.second->block_accepted_req->leader_certificateZ->heart_beat->new_epoch.toString().c_str());
+        logNode("recv block epoch %s", z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->new_epoch.toString().c_str());
         logNode("cur epoch %s", root->getEpoch()->epoch.toString().c_str());
 
-        logNode("recv prev_root_hash %s",z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash.str().c_str());
-        if(prev_block_hash_Z!=z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash)
+        logNode("recv prev_root_hash %s",z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash.str().c_str());
+        if(prev_block_hash_Z!=z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash)
         {
             logNode("prev root hash not matched");
         }
         else 
             logNode("prev root hash matched !!!");
-        if (z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash != prev_block_hash_Z)
+        if (z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash != prev_block_hash_Z)
         {
 
-            logNode("inval root hash %s %s", z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash.str().c_str(), prev_block_hash_Z.str().c_str());
+            logNode("inval root hash %s %s", z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash.str().c_str(), prev_block_hash_Z.str().c_str());
             logNode("received invalid block %s", z.second->epoch.toString().c_str());
             continue;
         }
@@ -109,19 +109,20 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         // throw CommonError("if(hb.epoch!=root->getValues(NULL)->epoch) %s %s",z.second->epoch.toString().c_str(), root->getEpoch(NULL)->epoch.toString().c_str()   );
 
         std::vector<blst_cpp::PublicKey> agg_pk;
-        for (auto &k : z.second->block_accepted_req->node_validators)
+        for (auto &k : z.second->blockAcceptedREQ->node_validators)
         {
             auto n = root->getNode(k);
             agg_pk.push_back(n->bls_pk);
         }
-        if (!z.second->block_accepted_req->agg_sig.verify(agg_pk, blake2b_hash(z.second->block_accepted_req->block_payload->getBuffer()).container))
+        if (!z.second->blockAcceptedREQ->agg_sig.verify(agg_pk, blake2b_hash(z.second->blockAcceptedREQ->block_payload->getBuffer()).container))
         {
             throw CommonError("on_get_blocks_rsp: !ba.agg_sig.verify");
         }
         // logNode("on_get_blocks_rsp: block verified OK");
         t_params t(root);
-        t.att_data->trs = z.second->att_data->trs;
-        auto rh=execute_block(t,  z.second->block_accepted_req->leader_certificateZ->nodes);
+        // t.att_data->trs = z.second->att_data->trs;
+        t.validateBlockREQ = z.second->validateBlockREQ;
+        auto rh=execute_block(t,  z.second->blockAcceptedREQ->leader_certificateZ->nodes);
         // calc_fee_and_rewards(t, r->leader_cert->nodes);
         // blockDBStore = prepareBlockDBStore(t);
         /*
@@ -138,7 +139,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         */
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
-        if (new_root_hash == z.second->block_accepted_req->block_payload->new_root_hash1)
+        if (new_root_hash == z.second->blockAcceptedREQ->block_payload->new_root_hash1)
         {
             logNode("on_get_blocks_rsp: block executed OK on epoch %s", z.second->epoch.toString().c_str());
 
@@ -152,7 +153,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             root = new root_data(db.get());
             init_root(root);
             do_sync(src_node);
-            logNode("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z.second->block_accepted_req->block_payload->new_root_hash1.str().c_str());
+            logNode("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z.second->blockAcceptedREQ->block_payload->new_root_hash1.str().c_str());
             return true;
         }
 
@@ -162,7 +163,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         ///////////
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
         insert.bind(1, z.second->epoch.toString());
-        insert.bind(2, base62::encode(z.second->block_accepted_req->leader_certificateZ->heart_beat->prev_block_hash.container));
+        insert.bind(2, base62::encode(z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash.container));
         insert.bind(3, time(NULL));
         insert.bind(4, base62::encode(z.second->getBuffer()));
         insert.exec();

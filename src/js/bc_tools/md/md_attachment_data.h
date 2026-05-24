@@ -9,7 +9,7 @@ namespace MsgData
         {
 
         }
-        std::vector<REF_getter<TX>> trs;
+        // std::vector<REF_getter<TX>> trs;
         std::map<THASH_id,transaction_report> transaction_reports;
         std::map<std::string,BigInt> fees;
         std::map<NODE_id,BigInt> rewards;
@@ -18,13 +18,13 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<trs<<transaction_reports<<fees<<rewards;
+            b<<transaction_reports<<fees<<rewards;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>trs>>transaction_reports>>fees>>rewards;
+            b>>transaction_reports>>fees>>rewards;
         }
 
         // void clear()
@@ -36,10 +36,10 @@ namespace MsgData
         // }
         void update(Blake2bHasher &h) const
         {
-            for(auto &z:trs)
-            {
-                z->update(h);
-            }
+            // for(auto &z:trs)
+            // {
+            //     z->update(h);
+            // }
             for(auto &z: transaction_reports)
             {
                 z.second.update(h);

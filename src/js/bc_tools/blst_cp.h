@@ -8,6 +8,7 @@
 // #include "IUtils.h"
 #include "ioBuffer.h"
 #include "base62.h"
+#include "mutexInspector.h"
 extern "C" {
 #include <blst.h>
 }
@@ -223,14 +224,14 @@ namespace blst_cpp {
 
         blst_p2_affine affine() const {
             if (!init_)
-                throw std::runtime_error("empty aggregate signature");
+                throw std::runtime_error("empty aggregate signature"+_DMI());
             blst_p2_affine a;
             blst_p2_to_affine(&a, &agg_);
             return a;
         }
         std::string serialize() const {
             if (!init_)
-                throw std::runtime_error("empty aggregate signature");
+                throw std::runtime_error("empty aggregate signature"+_DMI());
 
             std::string out;
             out.resize(96);
@@ -262,7 +263,7 @@ namespace blst_cpp {
         }
         const blst_p2* raw() const {
             if (!init_)
-                throw std::runtime_error("empty aggregate signature");
+                throw std::runtime_error("empty aggregate signature"+_DMI());
             return &agg_;
         }
         bool verify(const std::vector<PublicKey>& pks,const std::string& msg) const
