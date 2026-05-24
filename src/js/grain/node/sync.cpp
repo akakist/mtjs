@@ -87,20 +87,20 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
     {
         // if(z.second->epoch!=z.first)
         //     throw CommonError("if(hb.epoch!=z.first)");
-        logNode("recv block epoch %s", z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->new_epoch.toString().c_str());
+        logNode("recv block epoch %s", z.second->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString().c_str());
         logNode("cur epoch %s", root->getEpoch()->epoch.toString().c_str());
 
-        logNode("recv prev_root_hash %s",z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash.str().c_str());
-        if(prev_block_hash_Z!=z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash)
+        logNode("recv prev_root_hash %s",z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.str().c_str());
+        if(prev_block_hash_Z!=z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash)
         {
             logNode("prev root hash not matched");
         }
         else 
             logNode("prev root hash matched !!!");
-        if (z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash != prev_block_hash_Z)
+        if (z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash != prev_block_hash_Z)
         {
 
-            logNode("inval root hash %s %s", z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash.str().c_str(), prev_block_hash_Z.str().c_str());
+            logNode("inval root hash %s %s", z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.str().c_str(), prev_block_hash_Z.str().c_str());
             logNode("received invalid block %s", z.second->epoch.toString().c_str());
             continue;
         }
@@ -122,7 +122,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         t_params t(root);
         // t.att_data->trs = z.second->att_data->trs;
         t.validateBlockREQ = z.second->validateBlockREQ;
-        auto rh=execute_block(t,  z.second->blockAcceptedREQ->leader_certificateZ->nodes);
+        auto rh=execute_block(t,  z.second->validateBlockREQ->leader_cert->nodes);
         // calc_fee_and_rewards(t, r->leader_cert->nodes);
         // blockDBStore = prepareBlockDBStore(t);
         /*
@@ -163,7 +163,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         ///////////
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
         insert.bind(1, z.second->epoch.toString());
-        insert.bind(2, base62::encode(z.second->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash.container));
+        insert.bind(2, base62::encode(z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.container));
         insert.bind(3, time(NULL));
         insert.bind(4, base62::encode(z.second->getBuffer()));
         insert.exec();

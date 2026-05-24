@@ -27,7 +27,13 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 {
     MUTEX_INSPECTOR;
     XTRY;
-    if (CheckState(r->leader_certificateZ->heart_beat.get(), src_node))
+    // blockDBStore->validateBlockREQ->leader_cert
+    if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)
+    {
+        logErr2("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
+        return true;
+    }
+    if (CheckState(blockDBStore->validateBlockREQ->leader_cert->heart_beat.get(), src_node))
         return true;
     if (state_Z != State::NORMAL)
         return true;
@@ -61,19 +67,20 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     {
         XTRY;
-        if (!root->verify_lider_certificate(r->leader_certificateZ))
-        {
-            logNode("leader cert not verified");
-            return true;
-        }
+
+        // if (!root->verify_lider_certificate(r->leader_certificateZ))
+        // {
+        //     logNode("leader cert not verified");
+        //     return true;
+        // }
         XPASS;
     }
 
-    if (src_node != r->leader_certificateZ->heart_beat->node_leader)
-    {
-        logNode("if(src_node!=hb.node_leader)");
-        return true;
-    }
+    // if (src_node != r->leader_certificateZ->heart_beat->node_leader)
+    // {
+    //     logNode("if(src_node!=hb.node_leader)");
+    //     return true;
+    // }
 
     db->write_batch(db_to_save_Z);
     db_to_save_Z.clear();
@@ -84,7 +91,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
         insert.bind(1, blockDBStore->epoch.toString());
-        insert.bind(2, base62::encode(blockDBStore->blockAcceptedREQ->leader_certificateZ->heart_beat->prev_block_hash.container));
+        insert.bind(2, base62::encode(blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.container));
         insert.bind(3, time(NULL));
         insert.bind(4, base62::encode(blockDBStore->getBuffer()));
         insert.exec();

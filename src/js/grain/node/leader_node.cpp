@@ -190,7 +190,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             throw CommonError("if(!bt.block_payload.valid())");
         std::vector<blst_cpp::PublicKey> agg_pk;
         auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
-        ba->leader_certificateZ = hbs.leader_info.leader_cert_2;
+        // ba->leader_certificateZ = hbs.leader_info.leader_cert_2;
         for (auto &z : bt.responses)
         {
             auto n = root->getNode(z->node_validator);
@@ -207,8 +207,8 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             logErr2("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
             return true;
         }
-        if (!ba->leader_certificateZ.valid())
-            throw CommonError("if(!ba->leader_certificateZ.valid())");
+        // if (!ba->leader_certificateZ.valid())
+        //     throw CommonError("if(!ba->leader_certificateZ.valid())");
         // msg::node_message_ed nm(ba->getBuffer(), this_node_name, my_sk_ed);
         // make_broadcast_message(nm.getBuffer());
         // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
