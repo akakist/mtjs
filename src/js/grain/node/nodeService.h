@@ -186,7 +186,7 @@ namespace Node
 
         struct block
         {
-            REF_getter<MsgData::BlockInfo> block_payload=nullptr;
+            REF_getter<MsgData::BlockInfo> blockInfo=nullptr;
             std::vector<REF_getter<MsgData::ValidateBlockRSP> > responses;
             // BigInt stake_validators;
             // std::map<NODE_id /*validator*/, blst_cpp::Signature> sigs;
@@ -208,7 +208,7 @@ namespace Node
         REF_getter<MsgData::BlockDBStore> prepareBlockDBStore(const t_params& t);
 
         // time_t last_access_time_hbZ=0; // heart-_bit last tick time
-        REF_getter<MsgData::LeaderCertificate> last_leader_cert=nullptr;
+        // REF_getter<MsgData::LeaderCertificate> last_leader_cert=nullptr;
 
         std::map<THASH_id, REF_getter<MsgData::TX > >  transaction_pool_of_leader;
         std::map<BLOCK_id,block> blocks_leader;

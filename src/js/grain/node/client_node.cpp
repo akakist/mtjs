@@ -52,7 +52,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     {
         XTRY;
-        if (!r->agg_sig.verify(agg_pk, blake2b_hash(r->block_payload->getBuffer()).container))
+        if (!r->agg_sig.verify(agg_pk, blake2b_hash(r->blockInfo->getBuffer()).container))
         {
             logNode("block aggsig not matched");
             // do_heart_beat();
@@ -100,7 +100,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(blockDBStore->getBuffer(), this));
 
-    prev_block_hash_Z = r->block_payload->new_root_hash1;
+    prev_block_hash_Z = r->blockInfo->new_root_hash1;
     blocks_leader.clear();
     node_leader_for_client.container.clear();
     sendEvent(ServiceEnum::TxValidator, new bcEvent::InvalidateRoot(this));
@@ -159,7 +159,7 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
         logErr2("if(!verify_lider_certificate(rft.payload_lc,node_leader))");
         return true;
     }
-    last_leader_cert = r->lc;
+    // last_leader_cert = r->lc;
     if (node_leader_for_client != r->lc->heart_beat->node_leader)
     {
         if (isNodeGreaterOrEqual(r->lc->heart_beat->node_leader, node_leader_for_client))
@@ -247,7 +247,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
         // msg::block_response br;
         rsp->node_validator = this_node_name;
-        rsp->payload_block = block;
+        rsp->blockInfo = block;
         rsp->sign(my_sk_bls);
 
         pass_NodeMsgRSP(rsp.get(),route);

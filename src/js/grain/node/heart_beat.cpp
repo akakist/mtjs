@@ -239,6 +239,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         {
             logNode("lEAder approved %s", m->hb->node_leader.container.c_str());
             li.request_for_transactions_sent = true;
+            // li.leader_cert_2 = lc;
             do_request_for_transactions(li);
         }
     }
@@ -273,7 +274,8 @@ bool Node::Service::DoHeartBeatREQ(const MsgData::DoHeartBeatREQ *r, const NODE_
         if(state_Z!=NORMAL)
         return true;
 
-    last_leader_cert = r->prev_leader_cert;
+    // getEpoch()->leader_cert = r->prev_leader_cert;
+    // last_leader_cert = r->prev_leader_cert;
 
     do_heart_beat();
     return true;
@@ -285,7 +287,8 @@ void Node::Service::make_leader_certificate()
     auto &li = hbs.leader_info;
     REF_getter<MsgData::LeaderCertificate> lc = new MsgData::LeaderCertificate();
     if (li.ConfirmLeaderRSP_m.empty())
-        return;
+        throw CommonError("if(li.ConfirmLeaderRSP_m.empty())");
+        // return nullptr;
     auto msg = li.ConfirmLeaderRSP_m.begin()->second->hb;
     lc->heart_beat = li.ConfirmLeaderRSP_m.begin()->second->hb;
     for (auto &r : li.ConfirmLeaderRSP_m)
@@ -296,5 +299,6 @@ void Node::Service::make_leader_certificate()
     }
 
     li.leader_cert_2 = lc;
-    last_leader_cert = lc;
+    // last_leader_cert = lc;
+    // return lc;
 }

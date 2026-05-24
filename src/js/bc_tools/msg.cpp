@@ -5,7 +5,7 @@ thread_local  MsgFactory msgFactory;
 MsgData::BlockAcceptedREQ::BlockAcceptedREQ()
     : Base(msgid::BlockAcceptedREQ), 
     // leader_certificateZ(new LeaderCertificate()), 
-    block_payload(new BlockInfo)
+    blockInfo(new BlockInfo)
 {
 }
 void MsgData::BlockAcceptedREQ::pack(outBuffer &b) const
@@ -14,7 +14,7 @@ void MsgData::BlockAcceptedREQ::pack(outBuffer &b) const
     MUTEX_INSPECTOR;
     Base::pack(b);
     // leader_certificateZ->pack(b);
-    b << block_payload;
+    b << blockInfo;
     b << node_validators << agg_sig;
     XPASS;
 }
@@ -24,7 +24,7 @@ void MsgData::BlockAcceptedREQ::unpack(inBuffer &b)
     MUTEX_INSPECTOR;
     Base::unpack(b);
     // leader_certificateZ->unpack2(b);
-    b>> block_payload;
+    b>> blockInfo;
     b >> node_validators >> agg_sig;
     XPASS;
 }
@@ -32,7 +32,7 @@ void MsgData::BlockAcceptedREQ::unpack(inBuffer &b)
 void MsgData::BlockAcceptedREQ::update(Blake2bHasher &h) const
 {
     // leader_certificateZ->update(h);
-    block_payload->update(h);
+    blockInfo->update(h);
     for (auto &z : node_validators)
     {
         h.update(z.container);

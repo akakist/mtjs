@@ -455,14 +455,18 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
 }
 
 // void Node::Service::on_blockResponse(const msg::block_response& br)
-void Node::Service::do_request_for_transactions(const Node::heart_beat_node_info &li)
+void Node::Service::do_request_for_transactions(const heart_beat_node_info& li)
 {
     // logNode("@@ %s", __FUNCTION__);
     MUTEX_INSPECTOR;
+    // auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
+    // auto &li = hbs.leader_info;
+
     REF_getter<MsgData::GetTransactionREQ> rt = new MsgData::GetTransactionREQ();
-    if (!li.leader_cert_2.valid())
-        throw CommonError("if(!li.leader_cert.valid())");
+    // if (!li.leader_cert_2.valid())
+    //     throw CommonError("if(!li.leader_cert.valid())");
     rt->lc = li.leader_cert_2;
+    // li.leader_cert_2=lc;
     broadcast_MsgEvent(rt.get());
     // msg::node_message_ed nm(rt->getBuffer(), this_node_name, my_sk_ed);
     // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
@@ -520,6 +524,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
     calc_fee_and_rewards(t, nodes_in_leader_cert);
     auto newEpoch = root->getEpoch();
     newEpoch->epoch += 1;
+    newEpoch->prev_leader_cert = t.validateBlockREQ->leader_cert;
     newEpoch->setDirty(NULL);
 
     rh=proceed_merkle_on_transaction_pool_hashers(root);

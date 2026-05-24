@@ -267,41 +267,6 @@ namespace msg
 
     };
 
-#ifdef KALL    
-    struct node_message_ed: public message_base
-    {
-
-        node_message_ed():message_base(msgid::node_message_ed) {}
-        node_message_ed(inBuffer& in):message_base(msgid::node_message_ed)
-        {
-            unpack(in);
-        }
-        node_message_ed(const std::string _payload, const NODE_id & _src_node, const std::string& sk ):message_base(msgid::node_message_ed),
-            payload(_payload),src_node(_src_node)
-        {
-            signature=sign_ed(sk,blake2b_hash(_payload).container);
-        }
-        bool verify(const std::string & pk)
-        {
-            auto res=verify_ed_pk(pk,signature,blake2b_hash(payload));
-            return res;
-        }
-        std::string payload;
-        NODE_id src_node;
-        std::string signature;
-        void pack(outBuffer& b) const final
-        {
-            message_base::pack(b);
-            b<<payload<<src_node<<signature;
-        }
-        void unpack(inBuffer& b) final
-        {
-            message_base::unpack(b);
-            b>>payload>>src_node >> signature;
-        }
-
-    };
-#endif
 
 }
 

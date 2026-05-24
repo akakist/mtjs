@@ -248,18 +248,32 @@ struct bc_epoch: public data_base
         epoch=0;
     }
     BigInt epoch;
+    REF_getter<MsgData::LeaderCertificate> prev_leader_cert;
     void pack(outBuffer& o) const final
     {
         // cost.pack(o);
         o<<1;
         o<<epoch;
+        if(prev_leader_cert.valid())
+        {
+            o<<1;
+            o<<prev_leader_cert;
+        }
+        else
+        {
+            o<<0;
+        }
     }
     void unpack(inBuffer& o) final
     {
         // cost.unpack(o);
         auto v=o.get_PN();
-
         o>>epoch;
+        int has_leader_cert=o.get_PN();
+        if(has_leader_cert) 
+        {
+            o>>prev_leader_cert;
+        }
     }
     std::string dump() final
     {

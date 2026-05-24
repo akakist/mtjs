@@ -14,16 +14,16 @@ namespace MsgData
         {
             return new ValidateBlockRSP();
         }
-        ValidateBlockRSP(): Base(msgid::ValidateBlockRSP), payload_block(new BlockInfo())
+        ValidateBlockRSP(): Base(msgid::ValidateBlockRSP), blockInfo(new BlockInfo())
         {
 
         }
-        REF_getter<BlockInfo> payload_block;
+        REF_getter<BlockInfo> blockInfo;
         blst_cpp::Signature sig;
         NODE_id node_validator;
         void update(Blake2bHasher& h) const
         {
-            payload_block->update(h);
+            blockInfo->update(h);
             h.update(node_validator.container);
         }
         void pack(outBuffer& b) const final
@@ -31,7 +31,7 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<payload_block;
+            b<<blockInfo;
             b<<sig;
             b<<node_validator;
         }
@@ -39,17 +39,17 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>payload_block;
+            b>>blockInfo;
             b>>sig;
             b>>node_validator;
         }
         void sign(const blst_cpp::SecretKey &sk)
         {
-            sig.sign(sk, blake2b_hash(payload_block->getBuffer()).container);
+            sig.sign(sk, blake2b_hash(blockInfo->getBuffer()).container);
         }
         bool verify(const blst_cpp::PublicKey &pk) const
         {
-            return sig.verify(pk, blake2b_hash(payload_block->getBuffer()).container);
+            return sig.verify(pk, blake2b_hash(blockInfo->getBuffer()).container);
         }
 
     };

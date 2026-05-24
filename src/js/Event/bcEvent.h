@@ -36,6 +36,8 @@ namespace bcEventEnum
     const EVENT_id StreamBlock(ghash("@g_StreamBlock"));
     const EVENT_id HeartBeatREQ(ghash("@g_HeartBeatREQ"));
     const EVENT_id PutTransactionREQ(ghash("@g_PutTransactionREQ"));
+    const EVENT_id GetUserStatusREQ(ghash("@g_GetUserStatusREQ"));
+    const EVENT_id GetUserStatusRSP(ghash("@g_GetUserStatusRSP"));
 
 }
 
@@ -424,9 +426,29 @@ namespace bcEvent
             o<<tx_hash<<errcode<<errmsg;
         }
     };
-   // struct NetworkBase: public Event::Base
-    // {
-    //     NetworkBase(const EVENT_id& id, const route_t& r):Event::Base(id,r) {}
-    //     virtual void  update(Blake2bHasher &h) const =0;
-    // };
+    class GetUserStatusREQ : public Event::Base
+    {
+
+    public:
+        static Base *construct(const route_t &r)
+        {
+            return new GetUserStatusREQ(r);
+        }
+        GetUserStatusREQ(const std::string& _user_pk_ed, const route_t &r)
+            : Base(bcEventEnum::GetUserStatusREQ, r), user_pk_ed(_user_pk_ed) {}
+
+        std::string user_pk_ed;
+
+        GetUserStatusREQ(const route_t &r)
+            : Base(bcEventEnum::GetUserStatusREQ, r) {}
+
+        void unpack(inBuffer &o)
+        {
+            o>>user_pk_ed;
+        }
+        void pack(outBuffer &o) const
+        {
+            o<<user_pk_ed;
+        }
+    };
 }

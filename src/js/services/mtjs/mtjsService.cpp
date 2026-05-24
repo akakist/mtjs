@@ -497,6 +497,8 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
 {
     MUTEX_INSPECTOR;
 
+    logErr2("ClientMsgReply");
+    // throw CommonError("ClientMsgReply");
     auto it = opaque.node_req_promises.find(e->hash_of_request.container);
     if (it == opaque.node_req_promises.end())
         throw CommonError("if(it==opaque.node_req_promises.end())");
@@ -507,6 +509,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
     {
     case msgid::get_user_status_rsp:
     {
+        logErr2("case msgid::get_user_status_rsp:");
         msg::get_user_status_rsp r;
         r.unpack(in);
         auto *ctx = it->second.ctx;
@@ -524,6 +527,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
     break;
     case msgid::transaction_added_rsp:
     {
+        logErr2("case msgid::transaction_added_rsp:");
         msg::transaction_added_rsp r;
         r.unpack(in);
         auto *ctx = it->second.ctx;
@@ -540,21 +544,6 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         return true;
     }
     break;
-#ifdef KALL    
-    case msgid::node_message_ed:
-    {
-        msg::node_message_ed nm;
-        nm.unpack(in);
-        inBuffer inn(nm.payload);
-        auto pp = inn.get_PN();
-        switch (pp)
-        {
-            break;
-        }
-        return true;
-    }
-    break;
-#endif
     default:
         logErr2("unhandled msg Z %d", p);
     }

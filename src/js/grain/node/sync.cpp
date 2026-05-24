@@ -114,7 +114,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             auto n = root->getNode(k);
             agg_pk.push_back(n->bls_pk);
         }
-        if (!z.second->blockAcceptedREQ->agg_sig.verify(agg_pk, blake2b_hash(z.second->blockAcceptedREQ->block_payload->getBuffer()).container))
+        if (!z.second->blockAcceptedREQ->agg_sig.verify(agg_pk, blake2b_hash(z.second->blockAcceptedREQ->blockInfo->getBuffer()).container))
         {
             throw CommonError("on_get_blocks_rsp: !ba.agg_sig.verify");
         }
@@ -139,7 +139,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         */
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
-        if (new_root_hash == z.second->blockAcceptedREQ->block_payload->new_root_hash1)
+        if (new_root_hash == z.second->blockAcceptedREQ->blockInfo->new_root_hash1)
         {
             logNode("on_get_blocks_rsp: block executed OK on epoch %s", z.second->epoch.toString().c_str());
 
@@ -153,7 +153,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             root = new root_data(db.get());
             init_root(root);
             do_sync(src_node);
-            logNode("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z.second->blockAcceptedREQ->block_payload->new_root_hash1.str().c_str());
+            logNode("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z.second->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
             return true;
         }
 

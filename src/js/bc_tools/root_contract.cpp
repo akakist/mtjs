@@ -37,13 +37,20 @@ bool root_data::verify_lider_certificate(const REF_getter<MsgData::LeaderCertifi
         for (auto &z : lc->nodes)
         {
             auto n = this->getNode(z);
+            if(!n.valid())
+                return false;
             agg_pk.push_back(n->bls_pk);
             stake += n->total_stake;
         }
         if (stake.toDouble() < this->getValues()->total_staked.toDouble() * QUORUM)
-            throw CommonError("if(stake.toDouble() < root->getValues(NULL)->total_staked.toDouble() * QUORUM)");
+        {
+            logErr2("verify lc quorum failed");
+            return false;
+        }
+            // throw CommonError("if(stake.toDouble() < root->getValues(NULL)->total_staked.toDouble() * QUORUM)");
         if (!lc->agg_sig.verify(agg_pk, blake2b_hash(lc->heart_beat->getBuffer()).container))
         {
+            logErr2("verify lc - sign invalid");;
             return false;
         }
     }

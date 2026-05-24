@@ -100,13 +100,13 @@ bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const N
         if (!bp.heart_bit_sent_on_block_accepted_rsp)
         {
             bp.heart_bit_sent_on_block_accepted_rsp = true;
-            REF_getter<MsgData::DoHeartBeatREQ> rt = new MsgData::DoHeartBeatREQ();
-            if (!last_leader_cert.valid())
-                throw CommonError("if(!last_leader_cert.valid())");
-            rt->prev_leader_cert = last_leader_cert;
+            REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
+            // if (!last_leader_cert.valid())
+            //     throw CommonError("if(!last_leader_cert.valid())");
+            rq->prev_leader_cert = root->getEpoch()->prev_leader_cert;
             // msg::node_message_ed nm(rt->getBuffer(), this_node_name, my_sk_ed);
             // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
-            broadcast_MsgEvent(rt.get());
+            broadcast_MsgEvent(rq.get());
             // do_heart_beat();
         }
     }
@@ -147,7 +147,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     }
 
     // msg::blockZ bl(r->payload_block);
-    if (r->payload_block->prev_root_hash != prev_block_hash_Z)
+    if (r->blockInfo->prev_root_hash != prev_block_hash_Z)
     {
         logErr2("if(bl.prev_root_hash!=prev_block_hash)");
         return true;
@@ -156,7 +156,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     auto &bt = blocks_leader[prev_block_hash_Z];
     if (bt.responses.size())
     {
-        if (bt.responses[0]->payload_block->getBuffer() != r->payload_block->getBuffer())
+        if (bt.responses[0]->blockInfo->getBuffer() != r->blockInfo->getBuffer())
         {
             logNode("if(bt.responses[0]->payload_block->getBuffer()!=r->getBuffer())");
             return true;
@@ -178,15 +178,15 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         XTRY;
         logNode("Block stake finalized");
         REF_getter<MsgData::BlockAcceptedREQ> ba = new MsgData::BlockAcceptedREQ();
-        if (!bt.block_payload.valid())
+        if (!bt.blockInfo.valid())
         {
-            bt.block_payload = r->payload_block;
+            bt.blockInfo = r->blockInfo;
         }
-        else if (bt.block_payload->getBuffer() != r->payload_block->getBuffer())
+        else if (bt.blockInfo->getBuffer() != r->blockInfo->getBuffer())
             throw CommonError("else if(bh.block_payload!=r->payload_block)");
 
-        ba->block_payload = bt.block_payload;
-        if (!bt.block_payload.valid())
+        ba->blockInfo = bt.blockInfo;
+        if (!bt.blockInfo.valid())
             throw CommonError("if(!bt.block_payload.valid())");
         std::vector<blst_cpp::PublicKey> agg_pk;
         auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
@@ -198,7 +198,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             ba->agg_sig.add(z->sig);
             ba->node_validators.push_back(z->node_validator);
         }
-        if (ba->agg_sig.verify(agg_pk, blake2b_hash(ba->block_payload->getBuffer()).container))
+        if (ba->agg_sig.verify(agg_pk, blake2b_hash(ba->blockInfo->getBuffer()).container))
         {
             logErr2("ValidateBlockRSP block_accepted test verified OK !!!!!!!!!!!!!!!!!!!!!");
         }
