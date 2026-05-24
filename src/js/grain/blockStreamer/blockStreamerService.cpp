@@ -118,21 +118,10 @@ BlockStreamer::Service::Service(const SERVICE_id &id, const std::string &nm, IIn
 }
 bool BlockStreamer::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
-#ifdef KALL
-    conf = e;
-    if (!root.valid())
-        root = getRoot(conf->db.get());
-
-    init_root(root);
-#endif
     return true;
 }
 bool BlockStreamer::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 {
-#ifdef KALL
-    root = getRoot(conf->db.get());
-    init_root(root);
-#endif
     return true;
 }
 

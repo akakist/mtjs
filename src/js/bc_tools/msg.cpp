@@ -43,12 +43,12 @@ const char *msgName(int id)
 {
     switch (id)
     {
-    case msgid::node_message_ed:
-        return "node_message_ed";
+    // case msgid::node_message_ed:
+    //     return "node_message_ed";
     case msgid::user_message_req:
         return "user_message_req";
-    case msgid::transaction_added_rsp:
-        return "transaction_added_rsp";
+    // case msgid::transaction_added_rsp:
+    //     return "transaction_added_rsp";
     case msgid::user_request:
         return "user_request";
     case msgid::get_user_status_req:

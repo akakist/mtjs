@@ -525,25 +525,6 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         return true;
     }
     break;
-    case msgid::transaction_added_rsp:
-    {
-        logErr2("case msgid::transaction_added_rsp:");
-        msg::transaction_added_rsp r;
-        r.unpack(in);
-        auto *ctx = it->second.ctx;
-        JSScope<20, 20> scope(it->second.ctx);
-        auto obj = JS_NewObject(ctx);
-        scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "err", JS_NewInt32(ctx, r.err));
-        JS_SetPropertyStr(ctx, obj, "err_str", JS_NewString(ctx, r.err_str.c_str()));
-        JS_SetPropertyStr(ctx, obj, "tx_hash", JS_NewString(ctx, base62::encode(r.tx_hash.container).c_str()));
-        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
-        scope.addValue(ret);
-        opaque.node_req_promises.erase(e->hash_of_request.container);
-        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
-        return true;
-    }
-    break;
     default:
         logErr2("unhandled msg Z %d", p);
     }

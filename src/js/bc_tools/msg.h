@@ -73,9 +73,9 @@ namespace msgid
 {
     enum MSG_ID
     {
-        node_message_ed,
-        user_message_req,transaction_added_rsp,
-        user_request,get_user_status_req,get_user_status_rsp, HeartBeatREQ,HeartBeatRSP,
+        user_message_req,
+        user_request,get_user_status_req,get_user_status_rsp, 
+        HeartBeatREQ,HeartBeatRSP,
         LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
         BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP, InstructionList,TX,TxMint,
         attachment_data
@@ -167,31 +167,6 @@ namespace msg
             b>> signature>>address_pk_ed;
         }
     };
-    struct transaction_added_rsp: public message_base
-    {
-        transaction_added_rsp():message_base(msgid::transaction_added_rsp) {}
-        int err;
-        std::string err_str;
-        THASH_id tx_hash;
-        void pack(outBuffer& b) const final
-        {
-
-            message_base::pack(b);
-            b<<err;
-            b<<err_str;
-            b<<tx_hash;
-
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>err;
-            b>>err_str;
-            b>>tx_hash;
-        }
-    };
-
     struct user_request: public message_base
     {
         user_request():message_base(msgid::user_request) {}
