@@ -54,13 +54,4 @@ inline std::string sign_ed(const std::string& sk, const std::string& msg)
         logErr2("crypto_sign_detached failed");
 
     return signature;
-    // std::string pk;
-    // pk.resize(crypto_sign_ed25519_PUBLICKEYBYTES);
-    //         crypto_sign_ed25519_sk_to_pk((uint8_t*)pk.data(), (unsigned char*)sk.data());
-
-    //     auto err2 =crypto_sign_verify_detached((unsigned char*)signature.data(),(unsigned char*)msg.data(),msg.size(),(unsigned char*)pk.data());
-    // if(err2)
-    // {
-    //     throw CommonError("crypto_sign_verify_detached failure 2");
-    // }
 }

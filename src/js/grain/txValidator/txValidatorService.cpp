@@ -161,12 +161,6 @@ bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ*e)
         
         passEvent(
             new bcEvent::AddTxRSP(e->tx->getHash(), err.has_value(), err?*err:"transaction added to pool", poppedFrontRoute(e->route)));
-        // msg::transaction_added_rsp tr;
-        // tr.err=err.has_value();
-        // tr.err_str=err?*err:"transaction added to pool";
-        // tr.tx_hash=blake2b_hash(e->msg);
-        // passEvent(new bcEvent::ClientMsgReply(hash, tr.getBuffer(),poppedFrontRoute(e->route)));
-    // }
     return true;
 }
 
@@ -182,27 +176,7 @@ bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg*e)
     hash=blake2b_hash(e->msg);
     switch(p)
     {
-    // case msgid::user_message_req:
-    // {
-    //     MUTEX_INSPECTOR;
-    //     std::optional<std::string> err;
-    //     msg::user_message_req um(in);
-    //     if(!err && !um.verify())
-    //     {
-    //         err="verify failed";
-    //         // return true;
 
-    //     }
-    //     if(!err)
-    //         sendEvent(ServiceEnum::Node,new bcEvent::PutTransactionREQ(e->msg,this));
-    //     msg::transaction_added_rsp tr;
-    //     tr.err=err.has_value();
-    //     tr.err_str=err?*err:"transaction added to pool";
-    //     tr.tx_hash=blake2b_hash(e->msg);
-    //     passEvent(new bcEvent::ClientMsgReply(hash, tr.getBuffer(),poppedFrontRoute(e->route)));
-    //     return true;
-    // }
-    // break;
     default:
         throw CommonError("unhandled msgid e. ff %d",p);
     }

@@ -74,7 +74,8 @@ namespace msgid
     enum MSG_ID
     {
         user_message_req,
-        user_request,get_user_status_req,get_user_status_rsp, 
+        user_request,
+        get_user_status_req,get_user_status_rsp, 
         HeartBeatREQ,HeartBeatRSP,
         LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
         BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP, InstructionList,TX,TxMint,

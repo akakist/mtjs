@@ -117,7 +117,6 @@ void Node::Service::collectTransactions()
         std::map<BigInt /*nonce*/, std::vector<REF_getter<MsgData::TX>>>> ordered;
     for (auto &z : transaction_pool_of_leader)
     {
-        // msg::user_message_req ur(z.second);
         ordered[z.second->user_pk_ed][z.second->nonce].push_back(z.second);
     }
     transaction_pool_of_leader.clear();
@@ -488,13 +487,9 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
         std::optional<std::string> t_err;
         THASH_id th = t.validateBlockREQ->transaction_bodies[ti]->getHash();
         auto &tx=t.validateBlockREQ->transaction_bodies[ti];
-        // msg::user_message_req ur(t.att_data->trs[ti]);
         REF_getter<fee_calcer> by = t.feeCalcers.get(tx->user_pk_ed);
-        // if(!u.valid())
-        //     throw CommonError("if(!u.valid()) %s %d",__FILE__,__LINE__);
         if (!tx->verify())
             t_err = "verify failed @12";
-        // // BigInt nonce=0;
         if (!t_err)
         {
             auto u = root->getUserState(tx->user_pk_ed);

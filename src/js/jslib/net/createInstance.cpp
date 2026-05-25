@@ -184,13 +184,6 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
 
     REF_getter<MsgData::TX> tx(new MsgData::TX());
     tx->instructions->container.push_back(q.get());
-    // tx->instructions->instructions.push_back(q.get());
-
-    // tx->user_pk_ed = std::string((char *)extracted_public, crypto_sign_PUBLICKEYBYTES);
-    // REF_getter<bcEvent::AddTxREQ> q1 = new bcEvent::AddTxREQ(tx);
-        // msg::user_message_req um;
-    // if(um.payload.size()==1)
-    // crypto_sign_ed25519_sk_to_seed(seed, sk.data());
     if (sk.size() != crypto_sign_SECRETKEYBYTES)
         return JS_ThrowRangeError(ctx, "if(sk.size()!=crypto_sign_SECRETKEYBYTES)");
     unsigned char extracted_public[crypto_sign_PUBLICKEYBYTES];
@@ -200,26 +193,9 @@ JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *a
     tx->user_pk_ed = pk;
     tx->nonce.from_string(std::string(_nonce));
     tx->sign(sk);
-    //  msg::user_message_req um;
-    // um.address_pk_ed = pk;
-    // um.payload.push_back(m.getBuffer());
-    // um.nonce.from_string((std::string)_nonce);
-    // auto skk=iUtils->hex2bin(_sk);
-    // if(skk.size()!=crypto_sign_SECRETKEYBYTES)
-    //     return JS_ThrowInternalError(ctx, "sk size invalid");
-
-    // um.pk.resize(crypto_sign_PUBLICKEYBYTES);
-    // crypto_sign_ed25519_sk_to_pk((uint8_t*)um.pk.data(), (unsigned char*)skk.data());
-    // um.sign(sk);
-
-    // auto buf = um.getBuffer();
-    // auto hash = blake2b_hash(buf);
     op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(tx, op->listener_->serviceId));
 
-    // logErr2("setalarm %lf",to);
     auto th=tx->getHash();
-    // Blake2bHasher h;
-    // tx->update(h);
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(th.container), NULL, to, op->listener_));
 
     auto &pd = op->node_req_promises[th.container];
