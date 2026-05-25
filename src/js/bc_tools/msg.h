@@ -75,11 +75,14 @@ namespace msgid
     {
         user_message_req,
         user_request,
-        get_user_status_req,get_user_status_rsp, 
+        get_user_status_req,
+        get_user_status_rsp, 
         HeartBeatREQ,HeartBeatRSP,
         LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
         BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP, InstructionList,TX,TxMint,
-        attachment_data
+        attachment_data,
+        GetUserStatusREQ,
+        GetUserStatusRSP
     };
 
 }
