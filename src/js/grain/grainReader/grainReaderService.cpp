@@ -27,6 +27,9 @@
 #include "events_grainReaderService.hpp"
 #include "init_root.h"
 #include "unknown.h"
+#include "msgFactory.h"
+#include "md/md_GetUserStatusREQ.h"
+#include "md/md_GetUserStatusRSP.h"
 
 bool GrainReader::Service::on_startService(const systemEvent::startService *)
 {
@@ -94,9 +97,9 @@ bool GrainReader::Service::handleEvent(const REF_getter<Event::Base> &e)
             default:
                 throw CommonError("unhabdled ev %d %s", IDC, iUtils->genum_name(IDC));
             }
+            
         }
         break;
-
         default:
             throw CommonError("unhabdled ev %d %s", ID, iUtils->genum_name(ID));
         }
@@ -108,6 +111,7 @@ bool GrainReader::Service::handleEvent(const REF_getter<Event::Base> &e)
     XPASS;
     return false;
 }
+
 
 GrainReader::Service::~Service()
 {
@@ -141,53 +145,24 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
     inBuffer in(e->msg);
 
     auto p = in.get_PN();
-    THASH_id hash;
-    hash = blake2b_hash(e->msg);
-    switch (p)
-    {
-    case msgid::user_request:
-    {
-        msg::user_request ur(in);
+    REF_getter<MsgData::Base> b=msgFactory.create(p);
+    b->unpack(in);
+    auto hash=b->getHash(); 
 
-        inBuffer in2(ur.payload);
-        auto p2 = in2.get_PN();
-        switch (p2)
+    switch(p)
+    {
+        case msgid::GetUserStatusREQ:
         {
-        case msgid::get_user_status_req:
-        {
-            MUTEX_INSPECTOR;
-            msg::get_user_status_req rq(in2);
-            std::optional<std::string> err;
-            auto u = root->getUserState(rq.address_pk_ed);
-            if (!u.valid())
-                err = "user not found " + base62::encode(rq.address_pk_ed);
+            auto pp=(MsgData::GetUserStatusREQ*) b.get();
+            auto u = root->getUserState(pp->user_pk_ed);
 
-            msg::get_user_status_rsp r;
-            if (!err)
-            {
-                r.address_pk_ed = rq.address_pk_ed;
-                r.nonce = u->nonce;
-                r.balance = u->balance;
-            }
-            else
-            {
-                r.address_pk_ed = rq.address_pk_ed;
-                r.nonce = 0;
-                r.balance = 0;
-            }
-            if (err)
-                logErr2("get_user_status_req error %s", err->c_str());
-            passEvent(new bcEvent::ClientMsgReply(hash, r.getBuffer(), poppedFrontRoute(e->route)));
-        }
-        break;
-        default:
-            throw CommonError("unhandled msgid sdf %d", p);
-        }
-    }
-    break;
-        break;
-    default:
-        throw CommonError("unhandled msgid e. ff %d", p);
+            REF_getter<MsgData::GetUserStatusRSP> rsp=new MsgData::GetUserStatusRSP;
+            rsp->balance=u->balance;
+            rsp->nonce=u->nonce;
+            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
+            
+
+        }break;
     }
 
     return true;

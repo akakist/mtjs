@@ -47,14 +47,6 @@ const char *msgName(int id)
     //     return "node_message_ed";
     case msgid::user_message_req:
         return "user_message_req";
-    // case msgid::transaction_added_rsp:
-    //     return "transaction_added_rsp";
-    case msgid::user_request:
-        return "user_request";
-    case msgid::get_user_status_req:
-        return "get_user_status_req";
-    case msgid::get_user_status_rsp:
-        return "get_user_status_rsp";
     case msgid::HeartBeatREQ:
         return "HeartBeatREQ";
     case msgid::HeartBeatRSP:
@@ -93,6 +85,12 @@ const char *msgName(int id)
         return "TxMint";
     case msgid::attachment_data:
         return "attachment_data";
+    case msgid::GetUserStatusRSP:
+        return "GetUserStatusRSP";
+    case msgid::GetUserStatusREQ:
+        return "GetUserStatusREQ";
+        
+        
         
 
     default:

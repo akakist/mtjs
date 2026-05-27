@@ -16,6 +16,8 @@
 #include "md/md_InstructionList.h"
 #include "md/md_TX.h"
 #include "md/md_TxMint.h"
+#include "md/md_GetUserStatusREQ.h"
+#include "md/md_GetUserStatusRSP.h"
 
 MsgFactory::MsgFactory() 
 {
@@ -35,5 +37,8 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::InstructionList, MsgData::InstructionList::construct);
     registerMsg(msgid::TX, MsgData::TX::construct);
     registerMsg(msgid::TxMint, MsgData::TxMint::construct);
+    // registerMsg(msgid::attachment_data, MsgData::attachment_data::construct);
+    registerMsg(msgid::GetUserStatusREQ, MsgData::GetUserStatusREQ::construct);
+    registerMsg(msgid::GetUserStatusRSP, MsgData::GetUserStatusRSP::construct);
 
 }

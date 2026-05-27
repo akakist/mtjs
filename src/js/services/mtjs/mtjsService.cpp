@@ -25,6 +25,7 @@
 #include "sv.h"
 #include "md/md_BlockDBStore.h"
 #include "md/md_attachment_data.h"
+#include "md/md_GetUserStatusRSP.h"
 extern "C"
 {
 }
@@ -505,28 +506,29 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
 
     inBuffer in(e->msg);
     auto p = in.get_PN();
-    switch (p)
+    REF_getter<MsgData::Base> b=msgFactory.create(p);
+    b->unpack(in);
+    switch(p)
     {
-    case msgid::get_user_status_rsp:
-    {
-        logErr2("case msgid::get_user_status_rsp:");
-        msg::get_user_status_rsp r;
-        r.unpack(in);
-        auto *ctx = it->second.ctx;
-        JSScope<20, 20> scope(it->second.ctx);
-        auto obj = JS_NewObject(ctx);
-        scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, r.balance.toString().c_str()));
-        JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, r.nonce.toString().c_str()));
-        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
-        scope.addValue(ret);
-        opaque.node_req_promises.erase(e->hash_of_request.container);
-        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
-        return true;
-    }
-    break;
-    default:
-        logErr2("unhandled msg Z %d", p);
+        case msgid::GetUserStatusRSP:
+        {
+            auto *rs=(MsgData::GetUserStatusRSP*) b.get();
+            auto *ctx = it->second.ctx;
+            JSScope<20, 20> scope(it->second.ctx);
+            auto obj = JS_NewObject(ctx);
+            scope.addValue(obj);
+            JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, rs->balance.toString().c_str()));
+            JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, rs->nonce.toString().c_str()));
+            JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+            scope.addValue(ret);
+            opaque.node_req_promises.erase(e->hash_of_request.container);
+            sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+            return true;
+
+        }
+        break;
+        default:
+            throw CommonError("ZZZ unhandler %s",msgName(p));
     }
     return false;
 }

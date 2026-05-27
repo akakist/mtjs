@@ -74,9 +74,9 @@ namespace msgid
     enum MSG_ID
     {
         user_message_req,
-        user_request,
-        get_user_status_req,
-        get_user_status_rsp, 
+        // user_request,
+        // get_user_status_req,
+        // get_user_status_rsp, 
         HeartBeatREQ,HeartBeatRSP,
         LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
         BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP, InstructionList,TX,TxMint,
@@ -171,81 +171,6 @@ namespace msg
             b>> signature>>address_pk_ed;
         }
     };
-    struct user_request: public message_base
-    {
-        user_request():message_base(msgid::user_request) {}
-        user_request(inBuffer& in):message_base(msgid::user_request)
-        {
-            unpack(in);
-        }
-        std::string payload;
-        std::string rnd;
-
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-
-            message_base::pack(b);
-            b<<payload<<rnd;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>payload>>rnd;
-        }
-
-    };
-    struct get_user_status_req: public message_base
-    {
-        get_user_status_req():message_base(msgid::get_user_status_req)
-        {
-
-        }
-        get_user_status_req(inBuffer &in):message_base(msgid::get_user_status_req)
-        {
-            unpack(in);
-        }
-        std::string address_pk_ed;
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-
-            message_base::pack(b);
-            b<<address_pk_ed;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>address_pk_ed;
-        }
-    };
-
-    struct get_user_status_rsp: public message_base
-    {
-        std::string address_pk_ed;
-        BigInt nonce;
-        BigInt balance;
-        get_user_status_rsp():message_base(msgid::get_user_status_rsp)
-        {
-
-        }
-        void pack(outBuffer& b) const final
-        {
-            MUTEX_INSPECTOR;
-            message_base::pack(b);
-            b<<address_pk_ed<<nonce<<balance;
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>address_pk_ed>>nonce>>balance;
-        }
-
-    };
-
 
 }
 

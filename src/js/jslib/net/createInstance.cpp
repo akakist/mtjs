@@ -27,6 +27,7 @@
 #include "timers.h"
 #include "jsValueGuard.h"
 #include "md/md_TxMint.h"
+#include "md/md_GetUserStatusREQ.h"
 // #include ""
 
 static std::string js_obj_to_kv(JSContext *ctx,
@@ -443,16 +444,20 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     if (JS_ToFloat64(ctx, &to, argv[2]))
         return JS_ThrowInternalError(ctx, "timeout parse error");
 
-    msg::user_request ur;
-    ur.rnd.resize(10);
-    RAND_bytes((unsigned char *)ur.rnd.data(), 10);
-    msg::get_user_status_req m;
-    m.address_pk_ed = address;
+    // msg::user_request ur;
+    // ur.rnd.resize(10);
+    // RAND_bytes((unsigned char *)ur.rnd.data(), 10);
+    REF_getter<MsgData::GetUserStatusREQ> rq=new MsgData::GetUserStatusREQ();
+    rq->user_pk_ed=address;
+    rq->rnd.resize(10);
+    RAND_bytes((unsigned char*)rq->rnd.data(),rq->rnd.size());
+    // msg::get_user_status_req m;
+    // m.address_pk_ed = address;
 
-    ur.payload = m.getBuffer();
+    // ur.payload = m.getBuffer();
 
-    auto hash = blake2b_hash(ur.getBuffer());
-    op->broadcaster->sendEvent(scope.toStdString(argv[0]), ServiceEnum::GrainReader, new bcEvent::ClientMsg(ur.getBuffer(), op->listener_->serviceId));
+    auto hash = rq->getHash();
+    op->broadcaster->sendEvent(scope.toStdString(argv[0]), ServiceEnum::GrainReader, new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
 
