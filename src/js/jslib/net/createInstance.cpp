@@ -15,6 +15,7 @@
 #include "quickjs.h"
 #include <string.h>
 #include <stdio.h>
+#include <openssl/rand.h>
 
 #include "quickjs.h"
 #include <string>
@@ -28,15 +29,12 @@
 #include "jsValueGuard.h"
 #include "md/md_TxMint.h"
 #include "md/md_GetUserStatusREQ.h"
+#include "js_tools.h"
 // #include ""
 
 static std::string js_obj_to_kv(JSContext *ctx,
                                 JSValueConst obj)
 {
-
-    // if (argc < 1 || !JS_IsObject(argv[0])) {
-    //     return JS_ThrowTypeError(ctx, "Expected an object");
-    // }
 
     JSScope<100, 100> scope(ctx);
     JSPropertyEnum *props;
@@ -74,6 +72,37 @@ static std::string js_obj_to_kv(JSContext *ctx,
     js_free(ctx, props);
 
     return result;
+}
+JSValue js_tx_sign(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    MUTEX_INSPECTOR;
+
+    JSScope<10, 10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
+    if (argc != 2)
+        return JS_ThrowInternalError(ctx, "number of argument must be 2");
+
+    if (!JS_IsObject(argv[0]))
+        return JS_ThrowInternalError(ctx, "tx object not specified");
+    if (!JS_IsString(argv[1]))
+        return JS_ThrowInternalError(ctx, "sk not specified");
+
+    std::string json_str;
+    qjs::convert_js_value_to_json(ctx, argv[0],json_str);
+    nlohmann::json j = nlohmann::json::parse(json_str);
+
+    std::string sk = base62::decode(scope.toStdString(argv[1]));
+
+    auto pk=extract_public_ed(sk);
+
+    nlohmann::json msg;
+    msg["tx"]=j;
+    auto signature=sign_ed(sk, blake2b_hash(j.dump()).container);
+    msg["sign"]=base62::encode(signature);
+    msg["pk"]=base62::encode(pk);
+    auto dump=msg.dump();
+    return JS_NewStringLen(ctx, dump.data(), dump.size());
+
 }
 
 JSValue js_add_instance(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
@@ -130,297 +159,65 @@ JSValue js_tx_subscribe(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 
     op->broadcaster->sendEvent(node_addr, ServiceEnum::BlockStreamer, new bcEvent::ClientTxSubscribeREQ(op->listener_->serviceId));
 
-    // op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT,toRef(hash.container),NULL,to,op->listener_));
     return JS_UNDEFINED;
 }
-JSValue js_mint(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
-{
-    MUTEX_INSPECTOR;
-
-    JSScope<10, 10> scope(ctx);
-    mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    if (argc != 3)
-        return JS_ThrowInternalError(ctx, "number of argument must be 2");
-
-    if (!JS_IsString(argv[0]))
-        return JS_ThrowInternalError(ctx, "node addr not specified");
-    if (!JS_IsString(argv[1]))
-        return JS_ThrowInternalError(ctx, "sk not specified");
-    if (!JS_IsObject(argv[2]))
-        return JS_ThrowInternalError(ctx, "msg Object not specified");
-
-    std::string node_addr = scope.toStdString(argv[0]);
-    std::string sk = base62::decode(scope.toStdString(argv[1]));
-
-    JSValue amount = JS_GetPropertyStr(ctx, argv[2], "amount");
-    scope.addValue(amount);
-    if (!JS_IsString(amount))
-        return JS_ThrowInternalError(ctx, "msg wrong param amount");
-    JSValue nonce = JS_GetPropertyStr(ctx, argv[2], "nonce");
-    scope.addValue(nonce);
-
-    if (!JS_IsString(nonce))
-        return JS_ThrowInternalError(ctx, "msg wrong param nonce");
-    JSValue timeout = JS_GetPropertyStr(ctx, argv[2], "timeout");
-    scope.addValue(timeout);
-    if (!JS_IsNumber(timeout))
-        return JS_ThrowInternalError(ctx, "msg wrong param timeout");
-    //  if(!JS_IsString(sk) || ! JS_IsString(amount) || !JS_IsString(nonce) || !JS_IsNumber(timeout))
-    //  {
-    //     return JS_ThrowInternalError(ctx, "msg wrong params");
-    //  }
-
-    // auto _sk=scope.toStdStringView(sk);
-    auto _amount = scope.toStdStringView(amount);
-    auto _nonce = scope.toStdStringView(nonce);
-    double to;
-    if (JS_ToFloat64(ctx, &to, timeout))
-        return JS_ThrowInternalError(ctx, "timeout parse error");
-
-    // tx::mint m;
-    // m.amount.from_string(std::string(_amount));
-
-    REF_getter<MsgData::TxMint> q(new MsgData::TxMint());
-    q->amount.from_string(std::string(_amount));
-
-    REF_getter<MsgData::TX> tx(new MsgData::TX());
-    tx->instructions->container.push_back(q.get());
-    if (sk.size() != crypto_sign_SECRETKEYBYTES)
-        return JS_ThrowRangeError(ctx, "if(sk.size()!=crypto_sign_SECRETKEYBYTES)");
-    unsigned char extracted_public[crypto_sign_PUBLICKEYBYTES];
-    crypto_sign_ed25519_sk_to_pk(extracted_public, (uint8_t *)sk.data());
-    auto pk = std::string((char *)extracted_public, crypto_sign_PUBLICKEYBYTES);
-
-    tx->user_pk_ed = pk;
-    tx->nonce.from_string(std::string(_nonce));
-    tx->sign(sk);
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(tx, op->listener_->serviceId));
-
-    auto th=tx->getHash();
-    op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(th.container), NULL, to, op->listener_));
-
-    auto &pd = op->node_req_promises[th.container];
-    pd.ctx = ctx;
-    JSValue prom[2];
-    JSValue promise = JS_NewPromiseCapability(ctx, prom);
-    JSValueGuard g_prom(ctx, promise);
-    JSValueGuard g_resolve(ctx, prom[0]);
-    JSValueGuard g_reject(ctx, prom[1]);
-    if (JS_IsException(promise))
-    {
-        return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
-    }
-    pd.resolve = g_resolve;
-    pd.reject = g_reject;
-
-    return g_prom.release();
-}
-
 ////////////////
 JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
 
     JSScope<10, 10> scope(ctx);
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    if (argc != 5)
-        return JS_ThrowInternalError(ctx, "number of argument must be 2");
+    if (argc != 3)
+        return JS_ThrowInternalError(ctx, "number of argument must be 3");
+
 
     if (!JS_IsString(argv[0]))
-        return JS_ThrowInternalError(ctx, "node addr not specified");
-    if (!JS_IsString(argv[1]))
-        return JS_ThrowInternalError(ctx, "nonce not specified");
+        return JS_ThrowInternalError(ctx, "node addr not specified, must be string");
+    if (!JS_IsNumber(argv[1]))
+        return JS_ThrowInternalError(ctx, "timeout not specified, must be number (float)");
     if (!JS_IsString(argv[2]))
-        return JS_ThrowInternalError(ctx, "sk not specified");
-    if (!JS_IsNumber(argv[3]))
-        return JS_ThrowInternalError(ctx, "timeout not specified");
-    if (!JS_IsArray(ctx, argv[4]))
-        return JS_ThrowInternalError(ctx, "msg array not specified");
+        return JS_ThrowInternalError(ctx, "signed msg not specified, must be string");
+
 
     auto node_addr = scope.toStdString(argv[0]);
-    logErr2("node_addr %s", node_addr.c_str());
-    auto nonce = scope.toStdString(argv[2]);
-    logErr2("nonce %s", nonce.c_str());
-    std::string sk = base62::decode(scope.toStdString(argv[3]));
-    int64_t timeout;
-    if (JS_ToInt64(ctx, &timeout, argv[4]))
+    // logErr2("node_addr %s", node_addr.c_str());
+    double timeout;
+    if (JS_ToFloat64(ctx, &timeout, argv[1]))
     {
         return JS_ThrowInternalError(ctx, "error parsing timeout");
     }
-    if (sk.size() != crypto_sign_SECRETKEYBYTES)
-        return JS_ThrowRangeError(ctx, "if(sk.size()!=crypto_sign_SECRETKEYBYTES)");
-    unsigned char extracted_public[crypto_sign_PUBLICKEYBYTES];
-    crypto_sign_ed25519_sk_to_pk(extracted_public, (uint8_t *)sk.data());
-    auto pk = std::string((char *)extracted_public, crypto_sign_PUBLICKEYBYTES);
+    auto msg = scope.toStdString(argv[2]);
 
-    msg::user_message_req um;
-    um.address_pk_ed = pk;
 
-    // std::vector<std::string> trs;
-    JSValue length_val = JS_GetPropertyStr(ctx, argv[5], "length");
-    scope.addValue(length_val);
-    uint32_t len;
-    JS_ToUint32(ctx, &len, length_val);
-    for (uint32_t i = 0; i < len; ++i)
-    {
-        // if (i > 0) result.append(", ");
-        JSValue item = JS_GetPropertyUint32(ctx, argv[4], i);
-        scope.addValue(item);
+    // auto hash=blake2b_hash(msg);
 
-        JSValue _type = JS_GetPropertyStr(ctx, item, "type");
-        scope.addValue(_type);
+    REF_getter<MsgData::TX> t=new MsgData::TX;
+    t->set_j(nlohmann::json::parse(msg));
+    // auto hash=blake2b_hash(t->hash.container);
+    
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(t, op->listener_->serviceId));
 
-        if (!JS_IsString(_type))
-            return JS_ThrowSyntaxError(ctx, "type not specified");
-        auto type = scope.toStdString(_type);
-        if (type == "mint")
-        {
-            JSValue _amount = JS_GetPropertyStr(ctx, item, "amount");
-            scope.addValue(_amount);
-            if (!JS_IsString(_amount))
-                return JS_ThrowSyntaxError(ctx, "amount not specified");
-            auto amount = scope.toStdString(_amount);
-            tx::mint m;
-            m.amount.from_string(amount);
-            um.payload.push_back(m.getBuffer());
-        }
-        if (type == "register_node")
-        {
-            JSValue _name = JS_GetPropertyStr(ctx, item, "name");
-            scope.addValue(_name);
-            if (!JS_IsString(_name))
-                return JS_ThrowSyntaxError(ctx, "name not specified");
-            auto name = scope.toStdString(_name);
 
-            JSValue _ip = JS_GetPropertyStr(ctx, item, "ip");
-            scope.addValue(_ip);
-            if (!JS_IsString(_ip))
-                return JS_ThrowSyntaxError(ctx, "ip not specified");
-            auto ip = scope.toStdString(_ip);
+    op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(t->hash.container), NULL, timeout, op->listener_));
 
-            JSValue _pk_ed = JS_GetPropertyStr(ctx, item, "pk_ed");
-            scope.addValue(_pk_ed);
-            if (!JS_IsString(_pk_ed))
-                return JS_ThrowSyntaxError(ctx, "ip not specified");
-            auto pk_ed = scope.toStdString(_pk_ed);
 
-            JSValue _pk_bls = JS_GetPropertyStr(ctx, item, "pk_bls");
-            scope.addValue(_pk_bls);
-            if (!JS_IsString(_pk_bls))
-                return JS_ThrowSyntaxError(ctx, "pk_bls not specified");
-            auto pk_bls = scope.toStdString(_pk_bls);
-
-            tx::registerNode m;
-            m.name.container = name;
-            m.ip = ip;
-            m.pk_bls.deserializeBase62Str(pk_bls);
-            m.pk_ed = base62::decode(pk_ed);
-
-            um.payload.push_back(m.getBuffer());
-        }
-        if (type == "stake")
-        {
-            JSValue _node = JS_GetPropertyStr(ctx, item, "node");
-            scope.addValue(_node);
-            if (!JS_IsString(_node))
-                return JS_ThrowSyntaxError(ctx, "node not specified");
-            auto node = scope.toStdString(_node);
-
-            JSValue _amount = JS_GetPropertyStr(ctx, item, "amount");
-            scope.addValue(_amount);
-            if (!JS_IsString(_amount))
-                return JS_ThrowSyntaxError(ctx, "amount not specified");
-            auto amount = scope.toStdString(_amount);
-
-            tx::stake m;
-            m.node.container = node;
-            m.amount.from_string(amount);
-
-            um.payload.push_back(m.getBuffer());
-        }
-        if (type == "unstake")
-        {
-            JSValue _node = JS_GetPropertyStr(ctx, item, "node");
-            scope.addValue(_node);
-            if (!JS_IsString(_node))
-                return JS_ThrowSyntaxError(ctx, "node not specified");
-            auto node = scope.toStdString(_node);
-
-            JSValue _amount = JS_GetPropertyStr(ctx, item, "amount");
-            scope.addValue(_amount);
-            if (!JS_IsString(_amount))
-                return JS_ThrowSyntaxError(ctx, "amount not specified");
-            auto amount = scope.toStdString(_amount);
-
-            tx::unstake m;
-            m.node.container = node;
-            m.amount.from_string(amount);
-
-            um.payload.push_back(m.getBuffer());
-        }
-        if (type == "transfer")
-        {
-            JSValue _to = JS_GetPropertyStr(ctx, item, "to");
-            scope.addValue(_to);
-            if (!JS_IsString(_to))
-                return JS_ThrowSyntaxError(ctx, "to not specified");
-            auto to = base62::decode(scope.toStdString(_to));
-
-            JSValue _amount = JS_GetPropertyStr(ctx, item, "amount");
-            scope.addValue(_amount);
-            if (!JS_IsString(_amount))
-                return JS_ThrowSyntaxError(ctx, "amount not specified");
-            auto amount = scope.toStdString(_amount);
-
-            tx::transfer m;
-            m.to_address = to;
-            m.amount.from_string(amount);
-            um.payload.push_back(m.getBuffer());
-        }
-        if (type == "register_contract")
-        {
-            JSValue _name = JS_GetPropertyStr(ctx, item, "name");
-            scope.addValue(_name);
-            if (!JS_IsString(_name))
-                return JS_ThrowSyntaxError(ctx, "name not specified");
-            auto name = scope.toStdString(_name);
-
-            JSValue _src = JS_GetPropertyStr(ctx, item, "src");
-            scope.addValue(_src);
-            if (!JS_IsString(_src))
-                return JS_ThrowSyntaxError(ctx, "amount not specified");
-            auto src = scope.toStdString(_src);
-
-            tx::createContract m;
-            m.name = name;
-            m.src = src;
-            um.payload.push_back(m.getBuffer());
-        }
-    }
-    um.nonce.from_string(nonce);
-    um.sign(sk);
-    std::string buf = um.getBuffer();
-    auto hash = blake2b_hash(buf);
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::ClientMsg(buf, op->listener_->serviceId));
-
-    op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, timeout, op->listener_));
-
-    auto &pd = op->node_req_promises[hash.container];
+    auto &pd = op->node_req_promises[t->hash.container];
     pd.ctx = ctx;
     JSValue prom[2];
     JSValue promise = JS_NewPromiseCapability(ctx, prom);
     JSValueGuard g_resolve(ctx, prom[0]);
-    JSValueGuard g_reject(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[1]);
     JSValueGuard g_prom(ctx, promise);
     if (JS_IsException(promise))
     {
         return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
     }
+
     pd.resolve = g_resolve;
     pd.reject = g_reject;
 
     return g_prom.release();
 }
-#include <openssl/rand.h>
 /////////////////
 JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
@@ -483,8 +280,8 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     MUTEX_INSPECTOR;
     logErr2("js_register_add_instance");
     JS_SetPropertyStr(ctx, mtjs_obj, "addInstance", JS_NewCFunction(ctx, js_add_instance, "addInstance", 2));
-    JS_SetPropertyStr(ctx, mtjs_obj, "mint", JS_NewCFunction(ctx, js_mint, "mint", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_submit", JS_NewCFunction(ctx, js_tx_submit, "tx_submit", 2));
+    JS_SetPropertyStr(ctx, mtjs_obj, "tx_sign", JS_NewCFunction(ctx, js_tx_sign, "tx_sign", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_subscribe", JS_NewCFunction(ctx, js_tx_subscribe, "tx_subscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_user_info", JS_NewCFunction(ctx, js_get_user_info, "get_user_info", 2));
 }

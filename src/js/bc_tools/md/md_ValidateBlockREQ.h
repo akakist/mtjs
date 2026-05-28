@@ -15,13 +15,15 @@ namespace MsgData
         }
 
         REF_getter<LeaderCertificate>  leader_cert;
-        std::vector<REF_getter<TX> > transaction_bodies;
+        std::vector<REF_getter<MsgData::TX> > transaction_bodies;
         void update(Blake2bHasher& h) const
         {
             leader_cert->update(h);
             for(auto& z: transaction_bodies)
             {
-                z->update(h);
+                // z->update(h);
+                // leader_cert->update(h);
+                h.update(z->hash.container);
             }
         }
 

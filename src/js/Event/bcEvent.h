@@ -368,7 +368,7 @@ namespace bcEvent
         {
             return NULL;
         }
-        PutTransactionREQ(const REF_getter<MsgData::TX>& _tx, const route_t &r)
+        PutTransactionREQ(const REF_getter<MsgData::TX> & _tx, const route_t &r)
             : NoPacked(bcEventEnum::PutTransactionREQ, r), tx(_tx) {}
 
         const REF_getter<MsgData::TX> tx;
@@ -387,7 +387,8 @@ namespace bcEvent
         REF_getter<MsgData::TX> tx;
 
         AddTxREQ(const route_t &r)
-            : Base(bcEventEnum::AddTxREQ, r), tx(new MsgData::TX) {}
+            : Base(bcEventEnum::AddTxREQ, r) {}
+
 
         void unpack(inBuffer &o)
         {

@@ -5,24 +5,34 @@ const node = "127.0.0.1:2301";
 let sk = std.getenv('k_root_ed_sk');
 let root_pk = std.getenv('k_root_ed_pk');
 async function exec() {
+    while (true) {
         mtjs.tx_subscribe(node, (params) => {
             console.log("tx report from js:", JSON.stringify(params));
         });
-    while (true) {
-	console.log("gaga");
         const ui = await mtjs.get_user_info(node, root_pk, 1);
         const nonce = ui.nonce;
         console.log(ui);
-        const rsp = await mtjs.mint(node, sk, { amount: "2000", timeout: 4, nonce: nonce });
+        let tx = {
+            commands: [
+                {
+                    contract: "",
+                    method: "mint",
+                    params: { amount: 1000 }
+                }
+            ],
+            nonce: nonce,
+        };
+        const m = mtjs.tx_sign(tx, sk);
+        console.log("signed tx:", m);
+        const rsp = await mtjs.tx_submit(node, 1, m);
         console.log(rsp);
-	sleep(1100);
+        sleep(1000);
     }
 }
 console.log(std.getenv("PATH"));
 try {
     const nums = [0, 1, 2, 3, 4];
     for (let i of nums) {
-        // if(i==3) continue;
         mtjs.addInstance(`MTJS${i}`, `
             Start=Node
                 Node_rpc_addr=127.0.0.1:${2300 + i}
@@ -44,7 +54,6 @@ try {
                 Node_my_sk_ed_env_key=k_n${i}_ed_sk
                 Node_this_node_name=n${i}
                 Node_sqlite_pn=db/s${i}
-
         `);
     }
     sleep(200);
@@ -58,13 +67,6 @@ try {
     catch (e) {
         console.log("catched: ", e);
     }
-    // mtjs.get_user_info("127.0.0.1:2345", { sk: sk , timeout: 1 })
-    // .then(o=>{
-    //     console.log(o)
-    // })
-    // .catch(e=> {
-    //     console.log("Error:", e)
-    // });
 }
 catch (e) {
     console.log(e);

@@ -127,7 +127,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     for (auto &z : blockDBStore->validateBlockREQ->transaction_bodies)
     {
         XTRY;
-        auto h = z->getHash();
+        auto &h = z->hash;
         auto it = transaction_pool_of_leader.find(h);
         if (it != transaction_pool_of_leader.end())
         {

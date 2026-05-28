@@ -155,8 +155,15 @@ include_directories(system /usr/local/include quickjs)
 include_directories(${CMAKE_BINARY_DIR} common)
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fPIC -O3 -march=native  -DNDEBUG ")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O3 -march=native  -DNDEBUG ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fPIC -O3 -march=native  -DNDEBUG")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O3 -march=native  -DNDEBUG")
+
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fPIC -O0 -g -fsanitize=address -fno-omit-frame-pointer")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O0 -g -fsanitize=address -fno-omit-frame-pointer")
+#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+#set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
+
+#ser
 #№-flto -fomit-frame-pointer
 # set(CMAKE_BUILD_TYPE Release)
 # set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
@@ -193,7 +200,7 @@ CONFIGURE_FILE( "${PROJECT_SOURCE_DIR}/version.h.in"
 
 SET(CAPS_IP "x.testquant.com")
 SET(PORT 10100)
-add_definitions( -DDEBUG  -DMUTEX_INSPECTOR_DEBUG )
+add_definitions( )
 #-DMEMLEACK_CHECK
 #-DDEBUG  -DMUTEX_INSPECTOR_DEBUG 
 #-DDEBUG  -DMUTEX_INSPECTOR_DEBUG -DWEBDUMP -DDEBUG  -DMUTEX_INSPECTOR_DEBUG

@@ -41,7 +41,7 @@ try {
             responses.delete(id);
         }
     });
-    mtjs.asyncExecute("wrk -t100 -c400 -d10s    http://127.0.0.1:6012/").then((data) => {
+    mtjs.asyncExecute("ab -n 1000000 -k  -c 100   http://127.0.0.1:6012/").then((data) => {
         console.log("ab done");
         serv.stop();
         rpc.stop();

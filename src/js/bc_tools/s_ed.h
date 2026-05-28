@@ -29,7 +29,15 @@ inline bool verify_ed_pk(const std::string& pk, const std::string & signature, c
 
 }
 
-
+inline std::string extract_public_ed(const std::string& sk)
+{
+    MUTEX_INSPECTOR;
+    if(sk.size()!=crypto_sign_SECRETKEYBYTES)
+        throw CommonError("if(sk.size()!=crypto_sign_SECRETKEYBYTES)");
+    unsigned char extracted_public[crypto_sign_PUBLICKEYBYTES];
+    crypto_sign_ed25519_sk_to_pk(extracted_public, (unsigned char*)sk.data());
+    return std::string((char*)extracted_public, crypto_sign_PUBLICKEYBYTES);
+}
 inline std::string sign_ed(const std::string& sk, const std::string& msg)
 {
     MUTEX_INSPECTOR;

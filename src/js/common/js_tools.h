@@ -46,7 +46,7 @@ namespace qjs
         }
 
     }
-
+#ifdef KALL
     inline void convert_js_value_to_json(JSContext *ctx, JSValueConst value, std::string &result) {
         if (JS_IsString(value)) {
             size_t len;
@@ -56,8 +56,8 @@ namespace qjs
         } else if (JS_IsBool(value)) {
             result.append(JS_ToBool(ctx, value) ? "true" : "false");
         } else if (JS_IsNumber(value)) {
-            double num;
-            JS_ToFloat64(ctx, &num, value);
+            int64_t num;
+            JS_ToInt64(ctx, &num, value);
             result.append(std::to_string(num));
         } else if (JS_IsArray(ctx, value)) {
             result.append("[");
@@ -93,7 +93,127 @@ namespace qjs
             result.append("null");
         }
     }
-    inline JSValue json_to_jsobject(JSContext *ctx, const char *json_str, size_t len)
+#endif
+
+inline void convert_js_value_to_json(JSContext *ctx, JSValueConst value, std::string &result) {
+    if (JS_IsString(value)) {
+        size_t len;
+        const char *str = JS_ToCStringLen(ctx, &len, value);
+        
+        if (!str) {
+            result.append("null");
+            return;
+        }
+        
+        result.append("\"");
+        // Экранирование спецсимволов
+        for (size_t i = 0; i < len; ++i) {
+            char c = str[i];
+            switch (c) {
+                case '"':  result.append("\\\""); break;
+                case '\\': result.append("\\\\"); break;
+                case '\b': result.append("\\b"); break;
+                case '\f': result.append("\\f"); break;
+                case '\n': result.append("\\n"); break;
+                case '\r': result.append("\\r"); break;
+                case '\t': result.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        char buf[7];
+                        snprintf(buf, sizeof(buf), "\\u%04x", (unsigned char)c);
+                        result.append(buf);
+                    } else {
+                        result.push_back(c);
+                    }
+                    break;
+            }
+        }
+        result.append("\"");
+        JS_FreeCString(ctx, str);
+        
+    } else if (JS_IsBool(value)) {
+        int bool_val = JS_ToBool(ctx, value);
+        result.append(bool_val ? "true" : "false");
+        
+    } else if (JS_IsNumber(value)) {
+        double num;
+        JS_ToFloat64(ctx, &num, value);
+        // Проверка на целое число
+        if (num == (int64_t)num) {
+            result.append(std::to_string((int64_t)num));
+        } else {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%.15g", num);
+            result.append(buf);
+        }
+        
+    } else if (JS_IsArray(ctx, value)) {
+        result.append("[");
+        JSValue length_val = JS_GetPropertyStr(ctx, value, "length");
+        if (JS_IsException(length_val)) {
+            result.append("]");
+            JS_FreeValue(ctx, length_val);
+            return;
+        }
+        uint32_t len;
+        JS_ToUint32(ctx, &len, length_val);
+        JS_FreeValue(ctx, length_val);
+        
+        for (uint32_t i = 0; i < len; ++i) {
+            if (i > 0) result.append(",");
+            JSValue item = JS_GetPropertyUint32(ctx, value, i);
+            convert_js_value_to_json(ctx, item, result);
+            JS_FreeValue(ctx, item);
+        }
+        result.append("]");
+        
+    } else if (JS_IsObject(value)) {
+        result.append("{");
+        JSPropertyEnum *props = nullptr;
+        uint32_t len = 0;
+        
+        int ret = JS_GetOwnPropertyNames(ctx, &props, &len, value, 
+                                         JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY);
+        
+        if (ret == 0 && props != nullptr && len > 0) {
+            bool first = true;
+            for (uint32_t i = 0; i < len; ++i) {
+                const char *key = JS_AtomToCString(ctx, props[i].atom);
+                if (!key) continue;
+                
+                JSValue prop_val = JS_GetProperty(ctx, value, props[i].atom);
+                bool skip = JS_IsException(prop_val) || JS_IsFunction(ctx, prop_val) || JS_IsUndefined(prop_val);
+                
+                if (!skip) {
+                    if (!first) result.append(",");
+                    first = false;
+                    
+                    result.append("\"");
+                    result.append(key);
+                    result.append("\":");
+                    convert_js_value_to_json(ctx, prop_val, result);
+                }
+                
+                JS_FreeValue(ctx, prop_val);
+                JS_FreeCString(ctx, key);
+                JS_FreeAtom(ctx, props[i].atom);
+            }
+        }
+        
+        if (props) {
+            js_free(ctx, props);
+        }
+        result.append("}");
+        
+    } else if (JS_IsNull(value)) {
+        result.append("null");
+    } else {
+        result.append("null");
+    }
+}
+
+
+inline JSValue json_to_jsobject(JSContext *ctx, const char *json_str, size_t len)
     {
         JSScope<10,10> scope(ctx);
         JSValue val = JS_ParseJSON(ctx, json_str, len, "<json>");

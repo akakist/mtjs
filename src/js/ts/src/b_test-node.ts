@@ -15,7 +15,20 @@ async function exec() {
             const ui=await mtjs.get_user_info(node,root_pk!,1)
             const nonce=ui.nonce;
             console.log(ui);
-            const rsp=await mtjs.mint(node, sk!, { amount:"2000", timeout:4, nonce: nonce })
+            let tx={
+                commands:[
+                    {
+                        contract:"",
+                        method:"mint",
+                        params: { amount:1000}
+                    }
+                ],
+                nonce: nonce,
+            }
+            const m=mtjs.tx_sign(tx, sk!);
+            console.log("signed tx:", m);
+
+            const rsp=await mtjs.tx_submit(node,1, m);
             console.log(rsp);
             sleep(1000);
         }

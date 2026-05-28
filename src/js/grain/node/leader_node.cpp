@@ -31,7 +31,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     // logNode("GetTransactionRSP from %s", src_node.container.c_str());
     for (auto &z : r->trs)
     {
-        THASH_id h = z->getHash();
+        THASH_id &h = z->hash;
         transaction_pool_of_leader.insert({h, z});
     }
     auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;

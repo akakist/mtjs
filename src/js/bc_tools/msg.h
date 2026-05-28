@@ -182,3 +182,5 @@ namespace MsgData
     
 }
 
+bool verify_tx(const std::string& msg);
+

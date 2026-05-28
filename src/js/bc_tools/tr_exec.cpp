@@ -4,26 +4,44 @@
 #include "tr_exec.h"
 #include "msg_tx.h"
 
-std::optional<std::string> TR::execute(const MsgData::TxMint* c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+std::optional<std::string> TR::execute_mint(const nlohmann::json &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
+    logErr2("execute_mint");
     auto v=t.root->getValues();
     auto it=v->emitters.find(senderAddress);
     if(it==v->emitters.end())
         return "insufficient_privileges";
 
+        if (!params.contains("amount"))
+        {
+            return "param amount required";
+        }
+    BigInt amount;
+    auto &a=params["amount"];
+    if(a.is_number_integer())
+    {
+        amount=a.get<uint64_t>();
+    }
+    else if(a.is_string())
+    {
+        amount.from_string(a.get<std::string>());
+    }
+    else 
+        return "param amount must be number or string";
+    // amount::from_string(params["amount"].get<std::string>());
 
     auto u=t.root->getUserState(senderAddress);
     if(!u.valid())
     {
         throw CommonError("if(!u.valid())");
     }
-    u->balance+=c->amount;
+    u->balance+=amount;
     u->setDirty(by);
     
 
     t.fee[senderAddress]+=v->fees[bc_values::mint];
 
-    t.logMsg(txid,seqId,"amount %s sucessfully minted on your balance",c->amount.toString().c_str());
+    t.logMsg(txid,seqId,"amount %s sucessfully minted on your balance",amount.toString().c_str());
 
     return std::nullopt;
 }

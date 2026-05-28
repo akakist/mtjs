@@ -1,11 +1,15 @@
 #include "msg.h"
 #include "blake2bHasher.h"
 #include "md/md_BlockAcceptedREQ.h"
-thread_local  MsgFactory msgFactory;
+#include <string>
+#include <nlohmann/json.hpp>
+// #include "md/md_GetUserStatusREQ.h"
+
+thread_local MsgFactory msgFactory;
 MsgData::BlockAcceptedREQ::BlockAcceptedREQ()
-    : Base(msgid::BlockAcceptedREQ), 
-    // leader_certificateZ(new LeaderCertificate()), 
-    blockInfo(new BlockInfo)
+    : Base(msgid::BlockAcceptedREQ),
+      // leader_certificateZ(new LeaderCertificate()),
+      blockInfo(new BlockInfo)
 {
 }
 void MsgData::BlockAcceptedREQ::pack(outBuffer &b) const
@@ -24,7 +28,7 @@ void MsgData::BlockAcceptedREQ::unpack(inBuffer &b)
     MUTEX_INSPECTOR;
     Base::unpack(b);
     // leader_certificateZ->unpack2(b);
-    b>> blockInfo;
+    b >> blockInfo;
     b >> node_validators >> agg_sig;
     XPASS;
 }
@@ -89,11 +93,18 @@ const char *msgName(int id)
         return "GetUserStatusRSP";
     case msgid::GetUserStatusREQ:
         return "GetUserStatusREQ";
-        
-        
-        
 
     default:
         return "unknown";
     }
+}
+bool verify_tx(const std::string &msg)
+{
+    nlohmann::json j = nlohmann::json::parse(msg);
+    if (!j.contains("pk") || !j.contains("sign") || !j.contains("tx"))
+        throw CommonError("invalid tx format");
+    std::string pk = base62::decode(j["pk"].get<std::string>());
+    std::string sign = base62::decode(j["sign"].get<std::string>());
+    auto tx_hash = blake2b_hash(j["tx"].dump());
+    return verify_ed_pk(pk, sign, tx_hash.container);
 }

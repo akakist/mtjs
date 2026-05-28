@@ -19,11 +19,11 @@ namespace MsgData
             unpack(in);
         }
 
-        std::vector<REF_getter<TX> >  trs;
+        std::vector<REF_getter<MsgData::TX>>  trs;
         void update(Blake2bHasher& h) const
         {
             for(auto& z:trs )
-                z->update(h);
+                h.update(z->hash.container);
         }
 
         void pack(outBuffer& b) const final

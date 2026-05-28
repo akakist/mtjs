@@ -114,10 +114,15 @@ void Node::Service::collectTransactions()
 {
     MUTEX_INSPECTOR;
     std::map<std::string /*user addr*/, 
-        std::map<BigInt /*nonce*/, std::vector<REF_getter<MsgData::TX>>>> ordered;
+        std::map<BigInt /*nonce*/, std::vector<REF_getter<MsgData::TX> > > > ordered;
     for (auto &z : transaction_pool_of_leader)
     {
-        ordered[z.second->user_pk_ed][z.second->nonce].push_back(z.second);
+        // auto j=nlohmann::json::parse(z.second);
+        // if (!z.second->j.contains("pk") || !z.second->j.contains("sign") || !z.second->j.contains("tx"))
+        //     throw CommonError("invalid tx format");
+        std::string pk = base62::decode(z.second->get_j()["pk"].get<std::string>());
+        BigInt nonce(z.second->get_j()["tx"]["nonce"].get<std::string>());
+        ordered[pk][nonce].push_back(z.second);
     }
     transaction_pool_of_leader.clear();
     for (auto &x : ordered)
@@ -126,7 +131,7 @@ void Node::Service::collectTransactions()
         {
             for (auto &z : y.second)
             {
-                transaction_pool_of_leader.insert_or_assign(z->getHash(), z);
+                transaction_pool_of_leader.insert_or_assign(blake2b_hash(z->get_j().dump()), z);
             }
         }
     }
@@ -481,39 +486,53 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
     MUTEX_INSPECTOR;
 
     outBuffer o;
+    logErr2("@@ %s",__FUNCTION__);
     // t.instruction_reports.resize(trs.size());
     for (int ti = 0; ti < t.validateBlockREQ->transaction_bodies.size(); ti++)
     {
+        logErr2("execute_block transaction %d", ti);
         std::optional<std::string> t_err;
-        THASH_id th = t.validateBlockREQ->transaction_bodies[ti]->getHash();
-        auto &tx=t.validateBlockREQ->transaction_bodies[ti];
-        REF_getter<fee_calcer> by = t.feeCalcers.get(tx->user_pk_ed);
-        if (!tx->verify())
+        auto &tt=t.validateBlockREQ->transaction_bodies[ti];
+        // THASH_id &th = t.validateBlockREQ->transaction_bodies[ti]->hash;
+        // nlohmann::json mj= nlohmann::json::parse(t.validateBlockREQ->transaction_bodies[ti]);
+        auto pk=base62::decode(tt->get_j()["pk"].get<std::string>());
+        // auto sign=base62::decode(mj["sign"].get<std::string>());
+        // auto &tx=t.validateBlockREQ->transaction_bodies[ti];
+        auto &tj = tt->get_j()["tx"];
+        REF_getter<fee_calcer> by = t.feeCalcers.get(pk);
+        if (!tt->verify())
+        {
             t_err = "verify failed @12";
+            logErr2("verify failed @12");
+        }
         if (!t_err)
         {
-            auto u = root->getUserState(tx->user_pk_ed);
+            auto u = root->getUserState(pk);
             if (!u.valid())
             {
                 t_err = "sender invalid";
+                logErr2("sender invalid");
             }
             if (!t_err)
             {
-                if (u->nonce != tx->nonce)
+                auto n=tj["nonce"].get<std::string>();
+                BigInt nonce;
+                nonce.from_string(n);
+                if (u->nonce != nonce)
                     t_err = "invalid nonce";
                 if (!t_err)
                 {
                     // t.instruction_reports[ti].resize(ur.payload.size());
-                    execute_transaction(th, t, tx->user_pk_ed, tx, by);
+                    execute_transaction(tt->hash, t, pk, tj["commands"], by);
                     u->nonce += 1;
                     u->setDirty(by);
                 }
             }
         }
         if (!t_err)
-            t.setTxSuccess(th);
+            t.setTxSuccess(tt->hash);
         else
-            t.setTxError(th, *t_err);
+            t.setTxError(tt->hash, *t_err);
     }
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
     calc_fee_and_rewards(t, nodes_in_leader_cert);
@@ -640,7 +659,8 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     MUTEX_INSPECTOR;
     // TRANSACTION_body tr;
     // tr.container = e->msg;
-    transaction_pool_of_leader.insert_or_assign(e->tx->getHash(),e->tx);
+    auto h=blake2b_hash(e->tx->get_j().dump());
+    transaction_pool_of_leader.insert_or_assign(h,e->tx);
     return true;
 }
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)

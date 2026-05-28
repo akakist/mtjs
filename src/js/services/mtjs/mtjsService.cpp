@@ -473,9 +473,13 @@ bool MTJS::Service::CommandEntered(const telnetEvent::CommandEntered *e)
 // #include "quickjspp.hpp"
 bool MTJS::Service::AddTxRSP(const bcEvent::AddTxRSP* e)
 {
+
+    
+
     auto it = opaque.node_req_promises.find(e->tx_hash.container);
     if (it == opaque.node_req_promises.end())
         throw CommonError("if(it==opaque.node_req_promises.end())");
+
 
         // msg::transaction_added_rsp r;
         // r.unpack(in);
@@ -486,10 +490,15 @@ bool MTJS::Service::AddTxRSP(const bcEvent::AddTxRSP* e)
         JS_SetPropertyStr(ctx, obj, "err", JS_NewInt32(ctx, e->errcode));
         JS_SetPropertyStr(ctx, obj, "err_str", JS_NewString(ctx, e->errmsg.c_str()));
         JS_SetPropertyStr(ctx, obj, "tx_hash", JS_NewString(ctx, base62::encode(e->tx_hash.container).c_str()));
+
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+
         scope.addValue(ret);
+
         opaque.node_req_promises.erase(e->tx_hash.container);
-        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->tx_hash.container), this));
+
+            sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->tx_hash.container), this));
+
         return true;
     
 }
@@ -548,7 +557,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
         nlohmann::json jtr;
         if (opaque.tx_subscription_cb.has_value())
         {
-            THASH_id tx_hash = pb->validateBlockREQ->transaction_bodies[ti]->getHash();
+            THASH_id tx_hash = pb->validateBlockREQ->transaction_bodies[ti]->hash;
             jtr["tx_hash"] = base62::encode(tx_hash.container);
             // logErr2("ClientTxSubscribeRSP: tx_hash %s",base62::encode(tx_hash.container).c_str());
             JSScope<10, 10> scope(js_ctx);

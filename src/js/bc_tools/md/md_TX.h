@@ -1,6 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_InstructionList.h"
+#include <nlohmann/json.hpp>
 namespace MsgData
 {
     struct TX: public Base
@@ -10,48 +11,76 @@ namespace MsgData
         {
             return new TX();
         }
-        TX():Base(msgid::TX), instructions(new InstructionList())
+        TX():Base(msgid::TX)
+        // , instructions(new InstructionList())
         {
 
         }
-        REF_getter<InstructionList> instructions;
-        std::string user_pk_ed;
-        std::string sig_ed;
-        BigInt nonce;
+        private:
+        nlohmann::json j;
+        public:
+        THASH_id hash;
+
+        void set_j(const nlohmann::json& _j)
+        {
+            j=_j;
+            hash=blake2b_hash(j.dump());
+        }
+        const nlohmann::json& get_j() const
+        {
+            return j;
+        }
+        // REF_getter<InstructionList> instructions;
+        // std::string user_pk_ed;
+        // std::string sig_ed;
+        // BigInt nonce;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<user_pk_ed<<sig_ed<<nonce;
-            b<<instructions;
+            b<<j.dump();
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>user_pk_ed>>sig_ed>>nonce;
-            b>>instructions;
+            std::string s;
+            b>>s;
+            j=nlohmann::json::parse(s);
+            hash=blake2b_hash(s);
+            // b>>user_pk_ed>>sig_ed>>nonce;
+            // b>>instructions;
         }
         void update(Blake2bHasher &h) const
         {
-            instructions->update(h);
-            h.update(user_pk_ed);
-            h.update(nonce.toString());
-        }
-        void sign(const std::string& sk)
-        {
+            // instructions->update(h);
             MUTEX_INSPECTOR;
-            Blake2bHasher h;
-            update(h);
-            sig_ed=sign_ed(sk,h.final());
+            throw CommonError("unimpl");
+            // h.update(j.dump());
+            // h.update(nonce.toString());
         }
         bool verify()
         {
-            MUTEX_INSPECTOR;
-            Blake2bHasher h;
-            update(h);
-            return verify_ed_pk(user_pk_ed,sig_ed,h.final());
+            auto &tx=j["tx"];
+            auto h=blake2b_hash(tx.dump());
+            auto sign=base62::decode(j["sign"].get<std::string>());
+            auto pk=base62::decode(j["pk"].get<std::string>());
+            return verify_ed_pk(pk,sign,h);
         }
+        // void sign(const std::string& sk)
+        // {
+        //     MUTEX_INSPECTOR;
+        //     Blake2bHasher h;
+        //     update(h);
+        //     sig_ed=sign_ed(sk,h.final());
+        // }
+        // bool verify()
+        // {
+        //     MUTEX_INSPECTOR;
+        //     Blake2bHasher h;
+        //     update(h);
+        //     return verify_ed_pk(user_pk_ed,sig_ed,h.final());
+        // }
     };
 
 
