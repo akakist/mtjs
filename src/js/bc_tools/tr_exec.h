@@ -4,12 +4,10 @@
 #include "msg_tx.h"
 #include "root_contract.h"
 #include "t_params.h"
-#include "md/md_TxMint.h"
 
 namespace TR {
     std::optional<std::string> execute_mint(const nlohmann::json &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
 
-    std::optional<std::string> execute(const MsgData::TxMint* c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
     std::optional<std::string> execute(const tx::unstake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
     std::optional<std::string> execute(const tx::createContract &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
     std::optional<std::string> execute(const tx::transfer &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);

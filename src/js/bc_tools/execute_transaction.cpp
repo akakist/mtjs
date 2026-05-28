@@ -4,7 +4,6 @@
 #include "msg_tx.h"
 #include "t_params.h"
 #include "tr_exec.h"
-#include "md/md_TxMint.h"
 #include <vector>
 void execute_transaction(const THASH_id& tx_id, t_params &t, const std::string &senderAddress, const nlohmann::json& tx_cmds, const REF_getter<fee_calcer> &by)
 {
@@ -40,26 +39,5 @@ void execute_transaction(const THASH_id& tx_id, t_params &t, const std::string &
                 t.logError(tx_id, ii, "unhandled method %s for root contract", method.c_str());
             }
         }
-#ifdef KALL        
-        switch (ins["type"].get<int>())
-        {
-        case msgid::TxMint:
-        {
-            MsgData::TxMint *m=dynamic_cast<MsgData::TxMint*>(ins.get());
-            if(!m) throw CommonError("if(!m) 334455");
-            // tx::mint mint;
-            // mint.unpack(i2);
-            auto err = TR::execute(m, t, senderAddress, by, tx_id, ii);
-            if (err)
-            {
-                t.setError(tx_id, ii, *err);
-            }
-        }
-        break;
-        default:
-            logErr2("unhndled ty2 %s", txName(tx->type));
-            t.logError(tx_id, ii, "unhandled transaction type %s", txName(tx->type));
-        }
-#endif
     }
 }

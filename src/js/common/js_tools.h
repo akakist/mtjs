@@ -46,54 +46,6 @@ namespace qjs
         }
 
     }
-#ifdef KALL
-    inline void convert_js_value_to_json(JSContext *ctx, JSValueConst value, std::string &result) {
-        if (JS_IsString(value)) {
-            size_t len;
-            const char *str = JS_ToCStringLen(ctx, &len, value);
-            result.append("\"").append(str).append("\"");
-            JS_FreeCString(ctx, str);
-        } else if (JS_IsBool(value)) {
-            result.append(JS_ToBool(ctx, value) ? "true" : "false");
-        } else if (JS_IsNumber(value)) {
-            int64_t num;
-            JS_ToInt64(ctx, &num, value);
-            result.append(std::to_string(num));
-        } else if (JS_IsArray(ctx, value)) {
-            result.append("[");
-            JSValue length_val = JS_GetPropertyStr(ctx, value, "length");
-            uint32_t len;
-            JS_ToUint32(ctx, &len, length_val);
-            JS_FreeValue(ctx, length_val);
-            for (uint32_t i = 0; i < len; ++i) {
-                if (i > 0) result.append(", ");
-                JSValue item = JS_GetPropertyUint32(ctx, value, i);
-                convert_js_value_to_json(ctx, item, result);
-                JS_FreeValue(ctx, item);
-            }
-            result.append("]");
-        } else if (JS_IsObject(value)) {
-            result.append("{");
-            JSPropertyEnum *props;
-            uint32_t len;
-            JS_GetOwnPropertyNames(ctx, &props, &len, value, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK);
-            for (uint32_t i = 0; i < len; ++i) {
-                if (i > 0) result.append(", ");
-                JSValue key = JS_AtomToValue(ctx, props[i].atom);
-                JSValue val = JS_GetProperty(ctx, value, props[i].atom);
-                convert_js_value_to_json(ctx, key, result);
-                result.append(": ");
-                convert_js_value_to_json(ctx, val, result);
-                JS_FreeValue(ctx, key);
-                JS_FreeValue(ctx, val);
-            }
-            js_free(ctx, props);
-            result.append("}");
-        } else {
-            result.append("null");
-        }
-    }
-#endif
 
 inline void convert_js_value_to_json(JSContext *ctx, JSValueConst value, std::string &result) {
     if (JS_IsString(value)) {

@@ -13,9 +13,7 @@
 #include "md/md_DoHeartBeatREQ.h"
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
-#include "md/md_InstructionList.h"
 #include "md/md_TX.h"
-#include "md/md_TxMint.h"
 #include "md/md_GetUserStatusREQ.h"
 #include "md/md_GetUserStatusRSP.h"
 
@@ -34,10 +32,7 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::DoHeartBeatREQ, MsgData::DoHeartBeatREQ::construct);
     registerMsg(msgid::ConfirmLeaderREQ, MsgData::ConfirmLeaderREQ::construct);
     registerMsg(msgid::ConfirmLeaderRSP, MsgData::ConfirmLeaderRSP::construct);
-    registerMsg(msgid::InstructionList, MsgData::InstructionList::construct);
     registerMsg(msgid::TX, MsgData::TX::construct);
-    registerMsg(msgid::TxMint, MsgData::TxMint::construct);
-    // registerMsg(msgid::attachment_data, MsgData::attachment_data::construct);
     registerMsg(msgid::GetUserStatusREQ, MsgData::GetUserStatusREQ::construct);
     registerMsg(msgid::GetUserStatusRSP, MsgData::GetUserStatusRSP::construct);
 

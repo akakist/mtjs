@@ -27,7 +27,6 @@
 #include "Events/System/timerEvent.h"
 #include "timers.h"
 #include "jsValueGuard.h"
-#include "md/md_TxMint.h"
 #include "md/md_GetUserStatusREQ.h"
 #include "js_tools.h"
 // #include ""
