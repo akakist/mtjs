@@ -6,7 +6,7 @@ namespace MsgData
 {
     struct GetSavedBlocksRSP: public Base
     {
-        
+
         static Base* construct()
         {
             return new GetSavedBlocksRSP();

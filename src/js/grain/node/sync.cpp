@@ -95,7 +95,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         {
             logNode("prev root hash not matched");
         }
-        else 
+        else
             logNode("prev root hash matched !!!");
         if (z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash != prev_block_hash_Z)
         {

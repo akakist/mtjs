@@ -11,7 +11,7 @@
 
 struct c_pipe_async_reader_buf: public async_task
 {
-        
+
     std::string path;
     REF_getter<Stream> stream=nullptr;
     int rv=-1;
@@ -108,7 +108,7 @@ static JSValue js_read_pipe_buf(JSContext *ctx, JSValueConst this_val,
 }
 struct c_pipe_async_reader_lines: public async_task
 {
-        
+
     std::string path;
     REF_getter<Stream> stream=nullptr;
     int rv=-1;
@@ -212,7 +212,7 @@ static JSValue js_read_pipe_lines(JSContext *ctx, JSValueConst this_val,
 
 struct c_stdin_async_reader_lines: public async_task
 {
-        
+
     REF_getter<Stream> stream=nullptr;
     int rv=-1;
     std::string errstr;

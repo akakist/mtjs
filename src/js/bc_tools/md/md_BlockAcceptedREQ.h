@@ -6,7 +6,7 @@ namespace MsgData
 {
     struct BlockAcceptedREQ: public Base
     {
-        
+
         BlockAcceptedREQ();
         static Base* construct()
         {

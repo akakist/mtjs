@@ -76,10 +76,10 @@ namespace msgid
         user_message_req,
         // user_request,
         // get_user_status_req,
-        // get_user_status_rsp, 
+        // get_user_status_rsp,
         HeartBeatREQ,HeartBeatRSP,
         LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
-        BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP, 
+        BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP,
         // InstructionList,
         TX,
         // TxMint,
@@ -182,7 +182,7 @@ namespace msg
 
 
 //     struct BlockInfo;
-    
+
 // }
 
 // bool verify_tx(const std::string& msg);

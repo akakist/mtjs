@@ -4,7 +4,7 @@ namespace MsgData
 {
     struct GetSavedBlocksREQ: public Base
     {
-        
+
         GetSavedBlocksREQ():Base(msgid::GetSavedBlocksREQ)
         {
 

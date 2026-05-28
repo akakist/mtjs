@@ -76,7 +76,7 @@ int mainMTJS(int argc, char** argv )
         registerBlockValidatorService(NULL);
         registerBroadcasterTreeService(NULL);
         registerGrainReaderService(NULL);
-	    registerBlockStreamerService(NULL);
+        registerBlockStreamerService(NULL);
 
 
 

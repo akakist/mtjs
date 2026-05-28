@@ -5,7 +5,7 @@
 
 struct CDatabase: public IDatabase
 {
-        
+
     rocksdb::DB *db;
     int put_cell(const std::string& k, const std::string& v)
     {

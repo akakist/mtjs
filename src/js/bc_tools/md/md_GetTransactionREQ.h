@@ -5,7 +5,7 @@ namespace MsgData
 {
     struct GetTransactionREQ: public Base
     {
-        
+
         GetTransactionREQ():Base(msgid::GetTransactionREQ),lc(new LeaderCertificate())
         {
         }

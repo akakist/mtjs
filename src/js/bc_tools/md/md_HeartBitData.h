@@ -7,7 +7,7 @@ namespace MsgData
 {
     struct DoHeartBeatREQ: public Base
     {
-        
+
         static Base* construct()
         {
             return new DoHeartBeatREQ();

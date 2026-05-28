@@ -142,7 +142,7 @@ bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
 {
     MUTEX_INSPECTOR;
- 
+
     std::optional<std::string> err;
     auto &hash=e->tx->hash;
     if (!err)

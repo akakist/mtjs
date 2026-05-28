@@ -17,7 +17,7 @@ struct async_task: public Refcountable
     /// execute and finalize executes in another threads and class members must be locked by mutexes
     virtual void finalize(JSContext *ctx)=0;
     async_task(ListenerBase* l): Refcountable("async_task"),
-    listener(l) {
+        listener(l) {
     }
     virtual ~async_task()
     {
@@ -27,7 +27,7 @@ struct async_task: public Refcountable
 
 struct op_deque: public Refcountable
 {
-        
+
     MutexC m_mutex;
     Condition m_cond;
     bool m_isTerminating;
@@ -36,8 +36,8 @@ struct op_deque: public Refcountable
 
     op_deque()
         : Refcountable("op_deque"),
-        m_cond(m_mutex),
-        m_isTerminating(false) {
+          m_cond(m_mutex),
+          m_isTerminating(false) {
     }
     ~op_deque()
     {

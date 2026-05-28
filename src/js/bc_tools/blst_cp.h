@@ -105,9 +105,9 @@ namespace blst_cpp {
 
     class Signature;
     inline bool verifyZ(const PublicKey& pk,
-                       const Signature& sig,
-                       const uint8_t* msg,
-                       size_t len);
+                        const Signature& sig,
+                        const uint8_t* msg,
+                        size_t len);
 
 // Signature in G2
     class Signature {
@@ -148,7 +148,7 @@ namespace blst_cpp {
             blst_p2_compress((uint8_t*)out.data(), &sig_);
             return out;
         }
-        void deserializeBase62Str(const std::string& hex) 
+        void deserializeBase62Str(const std::string& hex)
         {
             deserialize(base62::decode(hex));
         }
@@ -167,8 +167,8 @@ namespace blst_cpp {
             blst_p2_from_affine(&sig_, &aff);
         }
         bool verify(const PublicKey& pk,
-                       const uint8_t* msg,
-                       size_t len) const
+                    const uint8_t* msg,
+                    size_t len) const
         {
             return verifyZ(pk, *this, msg, len);
         }
@@ -188,9 +188,9 @@ namespace blst_cpp {
 
 // Single verify
     inline bool verifyZ(const PublicKey& pk,
-                       const Signature& sig,
-                       const uint8_t* msg,
-                       size_t len)
+                        const Signature& sig,
+                        const uint8_t* msg,
+                        size_t len)
     {
         blst_p1_affine pk_aff = pk.affine();
         blst_p2_affine sig_aff = sig.affine();
@@ -242,7 +242,7 @@ namespace blst_cpp {
         // ============================
         // DESERIALIZATION
         // ============================
-        void deserializeBase62Str(const std::string& hex) 
+        void deserializeBase62Str(const std::string& hex)
         {
             deserialize(base62::decode(hex));
         }

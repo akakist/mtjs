@@ -5,14 +5,14 @@ namespace MsgData
 {
     struct GetTransactionRSP: public Base
     {
-        
+
         static Base* construct()
         {
             return new GetTransactionRSP();
         }
         GetTransactionRSP():Base(msgid::GetTransactionRSP)
         {
-            
+
         }
         GetTransactionRSP(inBuffer &in):Base(msgid::GetTransactionRSP)
         {

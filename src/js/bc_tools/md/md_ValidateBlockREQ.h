@@ -4,7 +4,7 @@ namespace MsgData
 {
     struct ValidateBlockREQ: public Base
     {
-        
+
         ValidateBlockREQ():Base(msgid::ValidateBlockREQ),
             leader_cert(new LeaderCertificate())
         {
@@ -59,4 +59,4 @@ inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::ValidateBlockREQ
         s=new MsgData::ValidateBlockREQ();
     s->unpack2(b);
     return b;
-}   
+}

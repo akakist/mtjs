@@ -5,7 +5,7 @@ namespace MsgData
 {
     struct GetUserStatusRSP: public Base
     {
-        
+
         GetUserStatusRSP():Base(msgid::GetUserStatusRSP)
         {
         }

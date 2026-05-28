@@ -25,7 +25,8 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
     { return new bc_values(p); },
     +[](Cellable *p) -> data_base *
-    { return new bc_epoch(p); }};
+    { return new bc_epoch(p); }
+};
 
 bool root_data::verify_lider_certificate(const REF_getter<MsgData::LeaderCertificate> &lc)
 {
@@ -47,7 +48,7 @@ bool root_data::verify_lider_certificate(const REF_getter<MsgData::LeaderCertifi
             logErr2("verify lc quorum failed");
             return false;
         }
-            // throw CommonError("if(stake.toDouble() < root->getValues(NULL)->total_staked.toDouble() * QUORUM)");
+        // throw CommonError("if(stake.toDouble() < root->getValues(NULL)->total_staked.toDouble() * QUORUM)");
         if (!lc->agg_sig.verify(agg_pk, blake2b_hash(lc->heart_beat->getBuffer()).container))
         {
             logErr2("verify lc - sign invalid");;

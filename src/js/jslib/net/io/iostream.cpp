@@ -10,7 +10,7 @@
 
 struct ConstReadableStringStream: public Stream
 {
-        
+
     std::string buf;
     std::string read(size_t n) final
     {
@@ -53,12 +53,12 @@ struct ConstReadableStringStream: public Stream
 };
 struct WriteableStringStream: public Stream
 {
-        
+
     std::deque<std::string> buf;
     MutexC mutex;
     Condition cond;
     bool streamEnded=false;
-    WriteableStringStream():Stream("WriteableStringStream"), cond(mutex) 
+    WriteableStringStream():Stream("WriteableStringStream"), cond(mutex)
     {
     }
     ~WriteableStringStream()
@@ -128,7 +128,7 @@ struct WriteableStringStream: public Stream
 
 struct FileReadableStream: public Stream
 {
-        
+
     FILE *fp;
     size_t content_length=0;
     std::string filename;
@@ -173,7 +173,7 @@ struct FileReadableStream: public Stream
 };
 struct FileWriteableStream: public Stream
 {
-        
+
     FILE *fp;
     FileWriteableStream(const std::string &fn): Stream("FileWriteableStream")
     {
@@ -221,7 +221,7 @@ struct FileWriteableStream: public Stream
 };
 struct EventEmitterStream: public Stream
 {
-        
+
     REF_getter<EventEmitter> emitter;
     std::deque<std::string> buf;
     bool streamEnded=false;
@@ -489,14 +489,14 @@ static JSValue js_stream_end(JSContext *ctx, JSValueConst this_val,
     JSStreamData *s = (JSStreamData *) JS_GetOpaque2(ctx, this_val, js_stream_class_id);
     if (!s)
     {
-       return JS_EXCEPTION;
+        return JS_EXCEPTION;
     }
     for(int i=0; i<argc; i++)
     {
         if(!JS_IsString(argv[i]))
         {
             return JS_ThrowSyntaxError(ctx, "param must be string");
-        } 
+        }
         auto str=scope.toStdStringView(argv[i]);
         s->stream->write("data",str.data(),str.size());
 

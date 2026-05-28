@@ -97,7 +97,7 @@ bool GrainReader::Service::handleEvent(const REF_getter<Event::Base> &e)
             default:
                 throw CommonError("unhabdled ev %d %s", IDC, iUtils->genum_name(IDC));
             }
-            
+
         }
         break;
         default:
@@ -147,22 +147,23 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
     auto p = in.get_PN();
     REF_getter<MsgData::Base> b=msgFactory.create(p);
     b->unpack(in);
-    auto hash=b->getHash(); 
+    auto hash=b->getHash();
 
     switch(p)
     {
-        case msgid::GetUserStatusREQ:
-        {
-            auto pp=(MsgData::GetUserStatusREQ*) b.get();
-            auto u = root->getUserState(pp->user_pk_hex_ed);
+    case msgid::GetUserStatusREQ:
+    {
+        auto pp=(MsgData::GetUserStatusREQ*) b.get();
+        auto u = root->getUserState(pp->user_pk_hex_ed);
 
-            REF_getter<MsgData::GetUserStatusRSP> rsp=new MsgData::GetUserStatusRSP;
-            rsp->balance=u->balance;
-            rsp->nonce=u->nonce;
-            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
-            
+        REF_getter<MsgData::GetUserStatusRSP> rsp=new MsgData::GetUserStatusRSP;
+        rsp->balance=u->balance;
+        rsp->nonce=u->nonce;
+        passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
 
-        }break;
+
+    }
+    break;
     }
 
     return true;

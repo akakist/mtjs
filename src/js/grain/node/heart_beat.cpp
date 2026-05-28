@@ -156,7 +156,7 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
         hbr->node_signer = this_node_name;
         hbr->sig.sign(my_sk_bls, blake2b_hash(h->hb->getBuffer()).container);
 
-        
+
         pass_NodeMsgRSP(hbr.get(),route);
     }
     return true;
@@ -232,8 +232,8 @@ void Node::Service::do_heart_beat()
     {
         REF_getter<MsgData::HeartBeatREQ> hb_req =
             new MsgData::HeartBeatREQ(prev_block_hash_Z,
-                                     root->getEpoch()->epoch+1,
-                                     this_node_name);
+                                      root->getEpoch()->epoch+1,
+                                      this_node_name);
 
         broadcast_MsgEvent(hb_req.get());
     }
@@ -242,7 +242,7 @@ void Node::Service::do_heart_beat()
 }
 bool Node::Service::DoHeartBeatREQ(const MsgData::DoHeartBeatREQ *r, const NODE_id &src_node, const route_t &route)
 {
-        if(state_Z!=NORMAL)
+    if(state_Z!=NORMAL)
         return true;
 
     do_heart_beat();
@@ -256,7 +256,7 @@ void Node::Service::make_leader_certificate()
     REF_getter<MsgData::LeaderCertificate> lc = new MsgData::LeaderCertificate();
     if (li.ConfirmLeaderRSP_m.empty())
         throw CommonError("if(li.ConfirmLeaderRSP_m.empty())");
-        // return nullptr;
+    // return nullptr;
     auto msg = li.ConfirmLeaderRSP_m.begin()->second->hb;
     lc->heart_beat = li.ConfirmLeaderRSP_m.begin()->second->hb;
     for (auto &r : li.ConfirmLeaderRSP_m)

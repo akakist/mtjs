@@ -23,7 +23,7 @@ async function exec() {
             nonce: nonce,
         };
         const m = mtjs.tx_sign(tx, sk);
-        console.log("signed tx:", m);
+//        console.log("signed tx:", m);
         const rsp = await mtjs.tx_submit(node, 1, m);
         console.log(rsp);
         sleep(1000);

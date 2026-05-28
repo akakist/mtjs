@@ -51,7 +51,7 @@ namespace BlockStreamer
         bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
         bool ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ*);
         bool StreamBlock(const bcEvent::StreamBlock*);
-        
+
 
 
 

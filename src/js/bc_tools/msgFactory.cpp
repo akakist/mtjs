@@ -1,7 +1,7 @@
 #include "msgFactory.h"
 #include "msg.h"
 #include "md/md_HeartBeatREQ.h"
-#include "md/md_HeartBeatRSP.h" 
+#include "md/md_HeartBeatRSP.h"
 #include "md/md_GetTransactionREQ.h"
 #include "md/md_GetTransactionRSP.h"
 #include "md/md_ValidateBlockREQ.h"
@@ -17,7 +17,7 @@
 #include "md/md_GetUserStatusREQ.h"
 #include "md/md_GetUserStatusRSP.h"
 
-MsgFactory::MsgFactory() 
+MsgFactory::MsgFactory()
 {
     registerMsg(msgid::HeartBeatREQ, MsgData::HeartBeatREQ::construct);
     registerMsg(msgid::HeartBeatRSP, MsgData::HeartBeatRSP::construct);

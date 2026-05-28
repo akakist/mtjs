@@ -5,7 +5,7 @@ namespace MsgData
 {
     struct TX: public Base
     {
-        
+
         static Base* construct()
         {
             return new TX();
@@ -14,9 +14,9 @@ namespace MsgData
         {
 
         }
-        private:
+    private:
         nlohmann::json j;
-        public:
+    public:
         THASH_id hash;
 
         void set_j(const nlohmann::json& _j)

@@ -4,13 +4,13 @@ const char* msgName(int id);
 
 namespace MsgData
 {
-class Base;
+    class Base;
 }
 
 class MsgFactory {
 public:
     using Constructor = MsgData::Base* (*)();
-    
+
     MsgData::Base* create(const int& id) {
 
         auto it = registry.find(id);
@@ -20,13 +20,13 @@ public:
         }
         return it->second();
     }
-    
+
     bool registerMsg(const int& id, Constructor ctor) {
         registry[id] = ctor;
         return true;
     }
     MsgFactory();
-    
+
 private:
-        std::map<int, Constructor> registry;
+    std::map<int, Constructor> registry;
 };

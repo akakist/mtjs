@@ -32,7 +32,7 @@ struct server_conf_base: public Refcountable
 };
 struct server_conf_http: public server_conf_base
 {
-        
+
     /// WS
     std::map<std::string,JSValue> ws_callbacks;
     JSValue callback;
@@ -54,7 +54,7 @@ struct server_conf_http: public server_conf_base
 
 struct RCF: public Refcountable
 {
-        
+
     std::map<msockaddr_in,REF_getter<server_conf_base> > servers;
 
 

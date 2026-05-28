@@ -12,7 +12,7 @@
 
 struct EventEmitter: public Refcountable
 {
-        
+
     int maxListeners=10;
     std::map<std::string, std::set<JSValueGuard>> m_listeners;
     JSContext* ctx;

@@ -5,7 +5,7 @@ namespace MsgData
 {
     struct HeartBeatRSP: public Base
     {
-        
+
         HeartBeatRSP():Base(msgid::HeartBeatRSP), payload_heart_beat(new HeartBeatREQ())
         {
         }

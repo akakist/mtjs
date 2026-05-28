@@ -162,7 +162,7 @@ namespace Node
 
         bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);
-        
+
         void initDB();
 
         // void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);

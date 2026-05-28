@@ -21,7 +21,7 @@ struct data_base : public Refcountable
     int type;
     Cellable *parent;
     data_base(int t, Cellable* _parent): Refcountable("data_base"),
-     type(t), parent(_parent) {}
+        type(t), parent(_parent) {}
     ~data_base()
     {
     }
@@ -50,7 +50,7 @@ extern std::vector< data_base* (*)(Cellable*)> db_constructors;
 
 struct Cellable: public Refcountable
 {
-        
+
     Cellable()= delete;
     Cellable& operator=(const Cellable&) = delete;
     static Cellable* construct(Cellable *p, const std::string& id)
@@ -138,7 +138,7 @@ public:
             else
             {
                 throw CommonError("!if(payload_ctor_idx<hsh::HSH_END)");;
-            }   
+            }
 
         }
     }

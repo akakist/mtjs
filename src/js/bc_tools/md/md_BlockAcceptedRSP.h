@@ -5,7 +5,7 @@ namespace MsgData
 {
     struct BlockAcceptedRSP: public Base
     {
-        
+
         static Base* construct()
         {
             return new BlockAcceptedRSP();

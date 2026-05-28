@@ -27,21 +27,21 @@
 
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 
-    enum timers
-    {
-        TIMER_BROADCAST_ACK_TIMEDOUT,
-    };
-    struct TIMER_BROADCAST_ACK_TIMEDOUT_cookie: public Refcountable
-    {
-        TIMER_BROADCAST_ACK_TIMEDOUT_cookie(): Refcountable("TIMER_BROADCAST_ACK_TIMEDOUT_cookie"){}
-        SERVICE_id dstService;
-        NODE_id dstName_;
-        BroadcasterTree::TreeNode tree;
-        std::string msg;
-        REF_getter<root_data> root=NULL;
-        route_t route;
+enum timers
+{
+    TIMER_BROADCAST_ACK_TIMEDOUT,
+};
+struct TIMER_BROADCAST_ACK_TIMEDOUT_cookie: public Refcountable
+{
+    TIMER_BROADCAST_ACK_TIMEDOUT_cookie(): Refcountable("TIMER_BROADCAST_ACK_TIMEDOUT_cookie") {}
+    SERVICE_id dstService;
+    NODE_id dstName_;
+    BroadcasterTree::TreeNode tree;
+    std::string msg;
+    REF_getter<root_data> root=NULL;
+    route_t route;
 
-    };
+};
 
 namespace BroadcasterTree
 {
@@ -65,7 +65,7 @@ namespace BroadcasterTree
         bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
         bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
         bool SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork);
-        
+
         void logNode(const char* fmt, ...);
 
 

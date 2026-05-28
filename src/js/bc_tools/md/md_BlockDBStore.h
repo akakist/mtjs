@@ -7,11 +7,11 @@ namespace MsgData
 {
     struct BlockDBStore: public Base
     {
-        
-        BlockDBStore():Base(msgid::BlockDBStore), 
-        att_data(new attachment_data),
-        validateBlockREQ(new ValidateBlockREQ),
-        blockAcceptedREQ(new BlockAcceptedREQ())
+
+        BlockDBStore():Base(msgid::BlockDBStore),
+            att_data(new attachment_data),
+            validateBlockREQ(new ValidateBlockREQ),
+            blockAcceptedREQ(new BlockAcceptedREQ())
 
         {
 

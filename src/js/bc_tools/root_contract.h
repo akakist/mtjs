@@ -17,7 +17,7 @@
 
 struct bc_contract:  public data_base
 {
-        
+
     bc_contract(Cellable *p):data_base(hsh::bc_contract,p) {}
     std::string name_;
     std::string owner;
@@ -48,7 +48,7 @@ struct bc_contract:  public data_base
 };
 struct bc_user: public data_base
 {
-        
+
     bc_user(Cellable* p): data_base(hsh::bc_user,p) {
     }
     std::string pkhex_еd;
@@ -101,7 +101,7 @@ struct bc_user: public data_base
 };
 struct bc_user_state: public data_base
 {
-        
+
     bc_user_state(Cellable* p): data_base(hsh::bc_user_state,p) {
         nonce=0;
         balance=0;
@@ -135,7 +135,7 @@ struct bc_user_state: public data_base
 struct bc_node: public data_base
 {
 
-        
+
     bc_node(Cellable *p):data_base(hsh::bc_node,p) {
         total_stake=0;
     }
@@ -180,7 +180,7 @@ struct bc_node: public data_base
 
 struct bc_values: public data_base
 {
-        
+
     enum __fee_types
     {
         contract_deploy,
@@ -243,7 +243,7 @@ struct bc_values: public data_base
 
 struct bc_epoch: public data_base
 {
-        
+
     bc_epoch(Cellable* p): data_base(hsh::bc_epoch,p) {
         epoch=0;
     }
@@ -270,7 +270,7 @@ struct bc_epoch: public data_base
         auto v=o.get_PN();
         o>>epoch;
         int has_leader_cert=o.get_PN();
-        if(has_leader_cert) 
+        if(has_leader_cert)
         {
             o>>prev_leader_cert;
         }
@@ -288,7 +288,7 @@ REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vect
 
 struct root_data: public Cellable
 {
-        
+
     REF_getter<IDatabase> db;
     root_data(IDatabase *db_): Cellable(nullptr,"r"),db(db_)
     {

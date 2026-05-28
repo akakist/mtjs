@@ -6,7 +6,7 @@ namespace MsgData
 {
     struct ConfirmLeaderREQ: public Base
     {
-        
+
         static Base* construct()
         {
             return new ConfirmLeaderREQ();
@@ -16,7 +16,7 @@ namespace MsgData
 
         }
         REF_getter<HeartBeatREQ> hb;
-        // blst_cpp::Signature sig;        
+        // blst_cpp::Signature sig;
         // NODE_id node_signer;
         void update(Blake2bHasher& h) const
         {

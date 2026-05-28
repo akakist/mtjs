@@ -11,7 +11,7 @@ namespace MsgData
     {
         int type;
         Base(int type_):Refcountable("MsgData::Base"),
-        type(type_) {}
+            type(type_) {}
         virtual ~Base() {}
         virtual void pack(outBuffer& b) const
         {

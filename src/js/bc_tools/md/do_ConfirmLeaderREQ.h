@@ -5,7 +5,7 @@ namespace MsgData
 {
     struct ConfirmLeaderREQ: public Base
     {
-        
+
         static Base* construct()
         {
             return new ConfirmLeaderREQ();

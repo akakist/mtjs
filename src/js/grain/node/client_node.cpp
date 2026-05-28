@@ -200,7 +200,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         // auto new_root_hash =
         t_params t(root);
         t.validateBlockREQ = r;
-        
+
         auto new_root_hash=execute_block(t,  r->leader_cert->nodes);
 
         blockDBStore = prepareBlockDBStore(t);

@@ -474,33 +474,33 @@ bool MTJS::Service::CommandEntered(const telnetEvent::CommandEntered *e)
 bool MTJS::Service::AddTxRSP(const bcEvent::AddTxRSP* e)
 {
 
-    
+
 
     auto it = opaque.node_req_promises.find(e->tx_hash.container);
     if (it == opaque.node_req_promises.end())
         throw CommonError("if(it==opaque.node_req_promises.end())");
 
 
-        // msg::transaction_added_rsp r;
-        // r.unpack(in);
-        auto *ctx = it->second.ctx;
-        JSScope<20, 20> scope(it->second.ctx);
-        auto obj = JS_NewObject(ctx);
-        scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "err", JS_NewInt32(ctx, e->errcode));
-        JS_SetPropertyStr(ctx, obj, "err_str", JS_NewString(ctx, e->errmsg.c_str()));
-        JS_SetPropertyStr(ctx, obj, "tx_hash", JS_NewString(ctx, base62::encode(e->tx_hash.container).c_str()));
+    // msg::transaction_added_rsp r;
+    // r.unpack(in);
+    auto *ctx = it->second.ctx;
+    JSScope<20, 20> scope(it->second.ctx);
+    auto obj = JS_NewObject(ctx);
+    scope.addValue(obj);
+    JS_SetPropertyStr(ctx, obj, "err", JS_NewInt32(ctx, e->errcode));
+    JS_SetPropertyStr(ctx, obj, "err_str", JS_NewString(ctx, e->errmsg.c_str()));
+    JS_SetPropertyStr(ctx, obj, "tx_hash", JS_NewString(ctx, base62::encode(e->tx_hash.container).c_str()));
 
-        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+    JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
 
-        scope.addValue(ret);
+    scope.addValue(ret);
 
-        opaque.node_req_promises.erase(e->tx_hash.container);
+    opaque.node_req_promises.erase(e->tx_hash.container);
 
-            sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->tx_hash.container), this));
+    sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->tx_hash.container), this));
 
-        return true;
-    
+    return true;
+
 }
 
 bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
@@ -519,25 +519,25 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
     b->unpack(in);
     switch(p)
     {
-        case msgid::GetUserStatusRSP:
-        {
-            auto *rs=(MsgData::GetUserStatusRSP*) b.get();
-            auto *ctx = it->second.ctx;
-            JSScope<20, 20> scope(it->second.ctx);
-            auto obj = JS_NewObject(ctx);
-            scope.addValue(obj);
-            JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, rs->balance.toString().c_str()));
-            JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, rs->nonce.toString().c_str()));
-            JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
-            scope.addValue(ret);
-            opaque.node_req_promises.erase(e->hash_of_request.container);
-            sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
-            return true;
+    case msgid::GetUserStatusRSP:
+    {
+        auto *rs=(MsgData::GetUserStatusRSP*) b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20, 20> scope(it->second.ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, rs->balance.toString().c_str()));
+        JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, rs->nonce.toString().c_str()));
+        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
 
-        }
-        break;
-        default:
-            throw CommonError("ZZZ unhandler %s",msgName(p));
+    }
+    break;
+    default:
+        throw CommonError("ZZZ unhandler %s",msgName(p));
     }
     return false;
 }

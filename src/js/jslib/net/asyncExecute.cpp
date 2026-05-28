@@ -13,7 +13,7 @@ static JSClassID js_curl_response_class_id;
 
 struct execute_task: public async_task
 {
-        
+
     execute_task(ListenerBase* l): async_task(l) {
 
     }

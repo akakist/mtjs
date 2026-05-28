@@ -30,7 +30,7 @@ std::optional<std::string> TR::execute_mint(const nlohmann::json &params, t_para
     {
         amount.from_string(a.get<std::string>());
     }
-    else 
+    else
         return "param amount must be number or string";
 
     auto u=t.root->getUserState(senderAddress);
@@ -40,7 +40,7 @@ std::optional<std::string> TR::execute_mint(const nlohmann::json &params, t_para
     }
     u->balance+=amount;
     u->setDirty(by);
-    
+
 
     t.fee[senderAddress]+=v->fees[bc_values::mint];
 
@@ -102,7 +102,7 @@ std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t
         return "contract name already exists";
 
     cc=t.root->addContract(c.name,by);
-    
+
     cc->owner=senderAddress;
     cc->name_=c.name;
     cc->src=c.src;
@@ -110,7 +110,7 @@ std::optional<std::string> TR::execute(const tx::createContract &c, t_params & t
     u->contracts.insert(c.name);
     u->setDirty(by);
     cc->setDirty(by);
-    
+
 
     t.fee[senderAddress]+=v->fees[bc_values::contract_deploy];
 
@@ -199,7 +199,7 @@ std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,c
             return "allowed only lowercase symbols";
         }
     }
-    
+
     auto nn=t.root->getNode(c.name);
     if(nn.valid())
         return "Node already registered with name";
@@ -211,7 +211,7 @@ std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,c
         return "if(!u.valid())";
     if(us->balance < v->fees[bc_values::node_create])
         return "Not enough funds";
-    
+
     u->nodes.insert(c.name);
 
     auto n=t.root->addNode(c.name,by);

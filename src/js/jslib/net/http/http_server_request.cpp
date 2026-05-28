@@ -123,8 +123,8 @@ static JSValue js_is_websocket(JSContext* ctx, JSValueConst this_val/*, int magi
 }
 
 static JSValue js_parse_headers_simple(JSContext* ctx, JSValueConst this_val,
-                                      int argc, JSValueConst* argv) {
-    
+                                       int argc, JSValueConst* argv) {
+
 
     JS_HTTP_Request* req = static_cast<JS_HTTP_Request*>(JS_GetOpaque2(ctx, this_val, js_request_class_id));
     if (!req) return JS_EXCEPTION;
@@ -132,10 +132,10 @@ static JSValue js_parse_headers_simple(JSContext* ctx, JSValueConst this_val,
 
     auto &headers=req->req->headers;
 
-    
+
     // Создаем объект
     JSValue headers_obj = JS_NewObject(ctx);
-    
+
     // Заполняем заголовки
     for (const auto& [key, value] : headers) {
         JSAtom atom = JS_NewAtomLen(ctx, key.data(),key.size());
@@ -143,12 +143,12 @@ static JSValue js_parse_headers_simple(JSContext* ctx, JSValueConst this_val,
         JS_SetProperty(ctx, headers_obj, atom, js_value);
         JS_FreeAtom(ctx, atom);
     }
-    
+
     return headers_obj;
 }
 
 static JSValue js_parse_uri_no_malloc(JSContext* ctx, JSValueConst this_val,
-                                     int argc, JSValueConst* argv) {
+                                      int argc, JSValueConst* argv) {
 
 
     JS_HTTP_Request* req = static_cast<JS_HTTP_Request*>(JS_GetOpaque2(ctx, this_val, js_request_class_id));
@@ -156,19 +156,19 @@ static JSValue js_parse_uri_no_malloc(JSContext* ctx, JSValueConst this_val,
 
 
     auto &uri=req->req->url;
-    
+
     URIParser parser;
-    
+
     if (!parser.parse(uri)) {
         return JS_ThrowTypeError(ctx, "Failed to parse URL");
     }
-    
+
     // Создаем основной объект URL
     JSValue url_obj = JS_NewObject(ctx);
-    
+
     // Создаем объект для параметров
     JSValue params_obj = JS_NewObject(ctx);
-    
+
     // Заполняем параметры
     for (const auto& [key, value] : parser.params()) {
         JSAtom atom_key = JS_NewAtomLen(ctx, key.data(), key.size());
@@ -176,18 +176,18 @@ static JSValue js_parse_uri_no_malloc(JSContext* ctx, JSValueConst this_val,
         JS_SetProperty(ctx, params_obj, atom_key, js_value);
         JS_FreeAtom(ctx, atom_key);
     }
-    
+
     // Заполняем свойства основного объекта
-    JS_SetPropertyStr(ctx, url_obj, "full", 
-                     JS_NewStringLen(ctx, parser.full().data(), parser.full().size()));
-    JS_SetPropertyStr(ctx, url_obj, "path", 
-                     JS_NewStringLen(ctx, parser.path().data(), parser.path().size()));
-    JS_SetPropertyStr(ctx, url_obj, "query", 
-                     JS_NewStringLen(ctx, parser.query().data(), parser.query().size()));
-    JS_SetPropertyStr(ctx, url_obj, "fragment", 
-                     JS_NewStringLen(ctx, parser.fragment().data(), parser.fragment().size()));
+    JS_SetPropertyStr(ctx, url_obj, "full",
+                      JS_NewStringLen(ctx, parser.full().data(), parser.full().size()));
+    JS_SetPropertyStr(ctx, url_obj, "path",
+                      JS_NewStringLen(ctx, parser.path().data(), parser.path().size()));
+    JS_SetPropertyStr(ctx, url_obj, "query",
+                      JS_NewStringLen(ctx, parser.query().data(), parser.query().size()));
+    JS_SetPropertyStr(ctx, url_obj, "fragment",
+                      JS_NewStringLen(ctx, parser.fragment().data(), parser.fragment().size()));
     JS_SetPropertyStr(ctx, url_obj, "params", params_obj);
-    
+
     return url_obj;
 }
 

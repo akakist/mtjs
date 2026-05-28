@@ -9,7 +9,7 @@ namespace MsgData
 {
     struct ValidateBlockRSP: public Base
     {
-        
+
         static Base* construct()
         {
             return new ValidateBlockRSP();
@@ -68,4 +68,4 @@ inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::ValidateBlockRSP
         s=new MsgData::ValidateBlockRSP();
     s->unpack2(b);
     return b;
-}   
+}

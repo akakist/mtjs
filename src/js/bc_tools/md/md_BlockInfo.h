@@ -5,7 +5,7 @@ namespace MsgData
 {
     struct BlockInfo: public Base
     {
-        
+
         static Base* construct()
         {
             return new BlockInfo();

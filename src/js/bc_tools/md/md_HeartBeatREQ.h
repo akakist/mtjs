@@ -4,13 +4,13 @@ namespace MsgData
 {
     struct HeartBeatREQ: public Base
     {
-        
+
         HeartBeatREQ():Base(msgid::HeartBeatREQ)
         {
 
         }
         HeartBeatREQ(const BLOCK_id& _prev_block_hash, const BigInt& _newepoch, const NODE_id& _node_leader):Base(msgid::HeartBeatREQ),
-        prev_block_hash(_prev_block_hash), new_epoch(_newepoch), node_leader(_node_leader)
+            prev_block_hash(_prev_block_hash), new_epoch(_newepoch), node_leader(_node_leader)
         {
         }
         BLOCK_id prev_block_hash;
@@ -25,7 +25,7 @@ namespace MsgData
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
-            
+
             Base::pack(b);
             b<<prev_block_hash;
             b<<node_leader;

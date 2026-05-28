@@ -73,13 +73,13 @@ static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueC
     {
         logErr2("setTimer %lld %lf", t->timerId, t->timeout);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(
-                                                           Timers::TIMER_INTERVAL, toRef(std::to_string(t->timerId)), t.get(), t->timeout, op->listener_));
+                                       Timers::TIMER_INTERVAL, toRef(std::to_string(t->timerId)), t.get(), t->timeout, op->listener_));
     }
     else
     {
         logErr2("SetAlarm %lld %lf", t->timerId, t->timeout);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(
-                                                           Timers::TIMER_TIMER, toRef(std::to_string(t->timerId)), t.get(), t->timeout, op->listener_));
+                                       Timers::TIMER_TIMER, toRef(std::to_string(t->timerId)), t.get(), t->timeout, op->listener_));
     }
 
     return jsTimeout;
@@ -108,13 +108,13 @@ static JSValue js_clearCommon(JSContext *ctx, JSValueConst val, int argc, JSValu
     {
         logErr2("StopTimer %lld", timerId);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::StopTimer(
-                                                           Timers::TIMER_INTERVAL, toRef(std::to_string(timerId)), op->listener_));
+                                       Timers::TIMER_INTERVAL, toRef(std::to_string(timerId)), op->listener_));
     }
     else
     {
         logErr2("StopAlarm %lld", timerId);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(
-                                                           Timers::TIMER_TIMER, toRef(std::to_string(timerId)), op->listener_));
+                                       Timers::TIMER_TIMER, toRef(std::to_string(timerId)), op->listener_));
     }
     op->rcf->timers.timers_refed.erase(timerId);
     op->rcf->timers.timers_unrefed.erase(timerId);

@@ -113,7 +113,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 void Node::Service::collectTransactions()
 {
     MUTEX_INSPECTOR;
-    std::map<std::string /*user addr*/, 
+    std::map<std::string /*user addr*/,
         std::map<BigInt /*nonce*/, std::vector<REF_getter<MsgData::TX> > > > ordered;
     for (auto &z : transaction_pool_of_leader)
     {
@@ -180,13 +180,13 @@ void Node::Service::do_start_block()
 }
 void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b)
 {
-            auto msg=b->getBuffer();
+    auto msg=b->getBuffer();
 
-            auto signature=sign_ed(my_sk_ed,blake2b_hash(msg).container);
-            sendEvent(ServiceEnum::BroadcasterTree, 
-                new bcEvent::BroadcastMessage(ServiceEnum::Node, 
-                    this_node_name, signature,msg, ListenerBase::serviceId));
-    
+    auto signature=sign_ed(my_sk_ed,blake2b_hash(msg).container);
+    sendEvent(ServiceEnum::BroadcasterTree,
+              new bcEvent::BroadcastMessage(ServiceEnum::Node,
+                                            this_node_name, signature,msg, ListenerBase::serviceId));
+
 }
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
@@ -634,26 +634,26 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     REF_getter<MsgData::Base> msg = msgFactory.create(id);
     msg->unpack(in);
 
-        switch (msg->type)
-        {
-        case msgid::GetTransactionREQ:
-            return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::HeartBeatREQ:
-            return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::ValidateBlockREQ:
-            return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::BlockAcceptedREQ:
-            return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::GetSavedBlocksREQ:
-            return GetSavedBlocksREQ(static_cast<const MsgData::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::DoHeartBeatREQ:
-            return DoHeartBeatREQ(static_cast<const MsgData::DoHeartBeatREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::ConfirmLeaderREQ:
-            return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
+    switch (msg->type)
+    {
+    case msgid::GetTransactionREQ:
+        return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::HeartBeatREQ:
+        return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::ValidateBlockREQ:
+        return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::BlockAcceptedREQ:
+        return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::GetSavedBlocksREQ:
+        return GetSavedBlocksREQ(static_cast<const MsgData::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::DoHeartBeatREQ:
+        return DoHeartBeatREQ(static_cast<const MsgData::DoHeartBeatREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::ConfirmLeaderREQ:
+        return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
 
-        default:
-            throw CommonError("unjandled MsgData %s", msgName(msg->type));
-        }
+    default:
+        throw CommonError("unjandled MsgData %s", msgName(msg->type));
+    }
 
     return true;
 }

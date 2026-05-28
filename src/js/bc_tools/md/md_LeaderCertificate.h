@@ -6,7 +6,7 @@ namespace MsgData
 {
     struct LeaderCertificate: public Base
     {
-        
+
         LeaderCertificate():Base(msgid::LeaderCertificate), heart_beat(new MsgData::HeartBeatREQ())
         {
 

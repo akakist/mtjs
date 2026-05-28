@@ -193,7 +193,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     REF_getter<MsgData::TX> t=new MsgData::TX;
     t->set_j(nlohmann::json::parse(msg));
     // auto hash=blake2b_hash(t->hash.container);
-    
+
     op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(t, op->listener_->serviceId));
 
 
