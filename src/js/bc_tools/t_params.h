@@ -7,8 +7,6 @@ struct t_params
 {
     t_params(const REF_getter<root_data>& r): root(r),att_data(new MsgData::attachment_data()) {}
     REF_getter<root_data> root;
-    // std::vector<std::vector<instruction_report>> instruction_reports;
-    // std::map<THASH_id,transaction_report> transaction_reports;
     REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
     REF_getter<MsgData::attachment_data> att_data;
     _feeCalcers feeCalcers;

@@ -51,7 +51,7 @@ struct bc_user: public data_base
         
     bc_user(Cellable* p): data_base(hsh::bc_user,p) {
     }
-    std::string pkbin_еd;
+    std::string pkhex_еd;
     std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
     std::set<NODE_id> nodes;
     std::set<std::string> contracts;
@@ -60,18 +60,18 @@ struct bc_user: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<pkbin_еd<<my_stakes<<nodes<<contracts;
+        o<<pkhex_еd<<my_stakes<<nodes<<contracts;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
-        o>>pkbin_еd>>my_stakes>>nodes>>contracts;
+        o>>pkhex_еd>>my_stakes>>nodes>>contracts;
     }
     std::string dump() final
     {
         std::ostringstream o;
-        o<<"PK: "  << base62::encode(pkbin_еd) << std::endl;
+        o<<"PK: "  << pkhex_еd << std::endl;
         o<< "Stakes: ";
         for(auto& z: my_stakes)
         {
@@ -140,7 +140,7 @@ struct bc_node: public data_base
         total_stake=0;
     }
     NODE_id name_;
-    std::string owner_ed_pk;
+    std::string owner_ed_pkhex;
     blst_cpp::PublicKey bls_pk;
     std::string ed_pk;
     std::string ip;
@@ -150,20 +150,20 @@ struct bc_node: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_ed_pk<<bls_pk<<ed_pk<<ip<<stakes<<total_stake;
+        o<<name_<<owner_ed_pkhex<<bls_pk<<ed_pk<<ip<<stakes<<total_stake;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>total_stake;
+        o>>name_>>owner_ed_pkhex>>bls_pk>>ed_pk>>ip>>stakes>>total_stake;
     }
     std::string dump() final
     {
         std::ostringstream o;
         o<< "Node: "<< name_.container << std::endl;
-        o<< "Owner: "<< base62::encode(owner_ed_pk) << std::endl;
+        o<< "Owner: "<< owner_ed_pkhex << std::endl;
         o<< "bls_pk: "<< base62::encode(bls_pk.serialize()) << std::endl;
         o<< "ed_pk: "<< base62::encode(ed_pk) << std::endl;
         o<< "ip:port: "<< ip << std::endl;
@@ -220,19 +220,19 @@ struct bc_values: public data_base
     }
     std::vector<BigInt> fees;
     BigInt total_staked;
-    std::set<std::string> emitters;
+    std::set<std::string> emitters_hex;
     void pack(outBuffer& o) const final
     {
         // cost.pack(o);
         o<<1;
-        o<<fees<<total_staked<<emitters;
+        o<<fees<<total_staked<< emitters_hex;
     }
     void unpack(inBuffer& o) final
     {
         // cost.unpack(o);
         auto v=o.get_PN();
 
-        o>>fees>>total_staked>>emitters;
+        o>>fees>>total_staked>>emitters_hex;
     }
     std::string dump() final
     {

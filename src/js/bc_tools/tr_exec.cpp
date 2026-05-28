@@ -6,16 +6,20 @@
 
 std::optional<std::string> TR::execute_mint(const nlohmann::json &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
-    logErr2("execute_mint");
     auto v=t.root->getValues();
-    auto it=v->emitters.find(senderAddress);
-    if(it==v->emitters.end())
+    auto it=v->emitters_hex.find(senderAddress);
+    if(it==v->emitters_hex.end())
+    {
+        logErr2("insufficient_privileges");
         return "insufficient_privileges";
 
-        if (!params.contains("amount"))
-        {
-            return "param amount required";
-        }
+    }
+
+    if (!params.contains("amount"))
+    {
+        logErr2("param amount required");
+        return "param amount required";
+    }
     BigInt amount;
     auto &a=params["amount"];
     if(a.is_number_integer())
@@ -28,7 +32,6 @@ std::optional<std::string> TR::execute_mint(const nlohmann::json &params, t_para
     }
     else 
         return "param amount must be number or string";
-    // amount::from_string(params["amount"].get<std::string>());
 
     auto u=t.root->getUserState(senderAddress);
     if(!u.valid())
@@ -216,7 +219,7 @@ std::optional<std::string> TR::execute(const tx::registerNode &c, t_params & t,c
     n->ip=c.ip;
     n->ed_pk=c.pk_ed;
     n->bls_pk=c.pk_bls;
-    n->owner_ed_pk=senderAddress;
+    n->owner_ed_pkhex=senderAddress;
     n->setDirty(by);
     u->setDirty(by);
     us->setDirty(by);

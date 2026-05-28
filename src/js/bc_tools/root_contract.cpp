@@ -170,20 +170,20 @@ REF_getter<bc_values> root_data::checkValues()
     return NULL;
 }
 
-std::vector<std::string> root_data::getUserPath(const std::string &pk)
+std::vector<std::string> root_data::getUserPath(const std::string &pk_hex)
 {
     std::vector<std::string> p;
     p.push_back("u");
-    appendRelativeInternalPath(p, pk, 3);
-    p.push_back(pk);
+    appendRelativeInternalPath(p, pk_hex, 5);
+    p.push_back(pk_hex);
     return p;
 }
-std::vector<std::string> root_data::getUserStatePath(const std::string &pk)
+std::vector<std::string> root_data::getUserStatePath(const std::string &pk_hex)
 {
     std::vector<std::string> p;
     p.push_back("s");
-    appendRelativeInternalPath(p, pk, 3);
-    p.push_back(pk);
+    appendRelativeInternalPath(p, pk_hex, 5);
+    p.push_back(pk_hex);
     return p;
 }
 

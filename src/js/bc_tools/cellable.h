@@ -165,21 +165,25 @@ public:
     void calc_tree_hash(_db_to_save &db_dump);
 
 };
-static const char* BASE62_TABLE[62] = {
-    "0","1","2","3","4","5","6","7","8","9",
-    "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
-    "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"
-};
+// static const char* BASE62_TABLE[62] = {
+//     "0","1","2","3","4","5","6","7","8","9",
+//     "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
+//     "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"
+// };
 inline void appendRelativeInternalPath(std::vector<std::string>&vs, const std::string & k, int depth2)
 {
     MUTEX_INSPECTOR;
-    auto h=ghash(k.c_str());
-
+    // auto h=ghash(k.c_str());
+    if(k.size()<depth2)
+    {
+        throw CommonError("if(k.size()<depth2)");
+    }
+    // uint64_t h=0;
     for(int i=0; i<depth2; i++)
     {
-        auto k=h % 62;
-        vs.push_back(BASE62_TABLE[k]);
-        h/=62;
+        // auto k=h % 62;
+        vs.push_back(k.substr(i, 1));
+        // h/=62;
     }
 }
 

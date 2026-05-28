@@ -7,28 +7,18 @@
 #include <vector>
 void execute_transaction(const THASH_id& tx_id, t_params &t, const std::string &senderAddress, const nlohmann::json& tx_cmds, const REF_getter<fee_calcer> &by)
 {
-    logErr2("execute_transaction");
     for (int ii = 0; ii < tx_cmds.size(); ii++)
     {
-        // auto h=blake2b_hash(payloads[ii]);
-        // inBuffer i2(payloads[ii]);
-        // int ty2 = i2.get_PN();
 
         auto &cmd = tx_cmds[ii];
         auto contract=cmd["contract"].get<std::string>();
         auto method=cmd["method"].get<std::string>();
         auto params=cmd["params"];
-        logErr2("contract %s",contract.c_str());
-        logErr2("method %s",method.c_str());
         if(contract=="")
         {
             if(method=="mint")
             {
                 auto err=TR::execute_mint(params,t,senderAddress,by,tx_id,ii);
-                // MsgData::TxMint m;
-                // m.user_pk_ed=senderAddress;
-                // m.amount=params["amount"].get<std::string>();
-                // auto err = TR::execute(&m, t, senderAddress, by, tx_id, ii);
                 if (err)
                 {
                     t.setError(tx_id, ii, *err);

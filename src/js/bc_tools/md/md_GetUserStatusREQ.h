@@ -9,11 +9,11 @@ namespace MsgData
         GetUserStatusREQ():Base(msgid::GetUserStatusREQ)
         {
         }
-        std::string user_pk_ed;
+        std::string user_pk_hex_ed;
         std::string rnd;
         void update(Blake2bHasher& h) const
         {
-            h.update(user_pk_ed);
+            h.update(user_pk_hex_ed);
             h.update(rnd);
         }
 
@@ -22,14 +22,14 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<user_pk_ed;
+            b<<user_pk_hex_ed;
             b<<rnd;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>user_pk_ed;
+            b>>user_pk_hex_ed;
             b>>rnd;
         }
 

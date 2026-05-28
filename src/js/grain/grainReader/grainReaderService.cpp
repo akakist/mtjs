@@ -154,7 +154,7 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
         case msgid::GetUserStatusREQ:
         {
             auto pp=(MsgData::GetUserStatusREQ*) b.get();
-            auto u = root->getUserState(pp->user_pk_ed);
+            auto u = root->getUserState(pp->user_pk_hex_ed);
 
             REF_getter<MsgData::GetUserStatusRSP> rsp=new MsgData::GetUserStatusRSP;
             rsp->balance=u->balance;

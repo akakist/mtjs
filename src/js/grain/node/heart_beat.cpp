@@ -73,8 +73,6 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
             REF_getter<MsgData::ConfirmLeaderREQ> rt = new MsgData::ConfirmLeaderREQ();
             rt->hb = m->payload_heart_beat;
             broadcast_MsgEvent(rt.get());
-            // msg::node_message_ed nm(rt->getBuffer(), this_node_name, my_sk_ed);
-            // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
         }
     }
     XPASS;
@@ -84,16 +82,12 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
-    // logNode("@@ %s",__FUNCTION__);
-    // if(state_Z!=NORMAL)
-    //     return true;
     if(CheckState(h, src_node))
         return true;
 
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
     bool need_replace = false;
-    // auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
 
     if (prev_block_hash_Z != h->prev_block_hash)
     {
@@ -122,28 +116,19 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h, const NODE_id &
         hbr->signature.sign(my_sk_bls, blake2b_hash(h->getBuffer()).container);
 
         pass_NodeMsgRSP(hbr.get(),route);
-        // auto buf=hbr->getBuffer();
-        // auto sig=sign_ed(my_sk_ed,blake2b_hash(buf).container);
-
-        // msg::node_message_ed nme(hbr->getBuffer(), this_node_name, my_sk_ed);
-        // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
-        // passEvent(new bcEvent::NodeMsgRSP(this_node_name,sig,buf, poppedFrontRoute(route)));
     }
     return true;
 }
 bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const NODE_id &src_node, const route_t &route)
 
-// bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* h,const std::string &heart_beat_payload, const route_t& route)
 {
     MUTEX_INSPECTOR;
-    // logNode("@@ %s",__FUNCTION__);
     if(state_Z!=NORMAL)
         return true;
 
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
     bool need_replace = false;
-    // auto &hbs=blocks_leader[prev_block_hash].heart_beat_store;
 
     if (prev_block_hash_Z != h->hb->prev_block_hash)
     {
@@ -167,18 +152,12 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
     if (need_reply)
     {
         REF_getter<MsgData::ConfirmLeaderRSP> hbr = new MsgData::ConfirmLeaderRSP();
-        // msg::heart_beat_rsp hba;
         hbr->hb = h->hb;
         hbr->node_signer = this_node_name;
         hbr->sig.sign(my_sk_bls, blake2b_hash(h->hb->getBuffer()).container);
 
         
-        // msg::node_message_ed nme(hbr->getBuffer(), this_node_name, my_sk_ed);
-        // logNode("passEvent MsgReply %s",poppedFrontRoute(route).dump().c_str());
         pass_NodeMsgRSP(hbr.get(),route);
-        // auto buf=hbr->getBuffer();
-        // auto sig=sign_ed(my_sk_ed,blake2b_hash(buf).container);
-        // passEvent(new bcEvent::NodeMsgRSP(this_node_name,sig,buf, poppedFrontRoute(route)));
     }
     return true;
 }
@@ -189,7 +168,6 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     if(state_Z!=NORMAL)
         return true;
 
-    // logNode("@@ %s",__FUNCTION__);
     auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     if (prev_block_hash_Z != m->hb->prev_block_hash)
@@ -250,21 +228,14 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 void Node::Service::do_heart_beat()
 {
     blocks_leader.clear();
-    // logNode("@@ %s",__FUNCTION__);
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
     {
         REF_getter<MsgData::HeartBeatREQ> hb_req =
             new MsgData::HeartBeatREQ(prev_block_hash_Z,
                                      root->getEpoch()->epoch+1,
                                      this_node_name);
-        // DBG(logNode("broadcast heart beat as leader %s",this_node_name.container.c_str()));
 
         broadcast_MsgEvent(hb_req.get());
-        // outBuffer o;
-        // hb_req->pack(o);
-
-        // msg::node_message_ed nm(o.asString()->container, this_node_name, my_sk_ed);
-        // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
     }
 
     return;
@@ -273,9 +244,6 @@ bool Node::Service::DoHeartBeatREQ(const MsgData::DoHeartBeatREQ *r, const NODE_
 {
         if(state_Z!=NORMAL)
         return true;
-
-    // getEpoch()->leader_cert = r->prev_leader_cert;
-    // last_leader_cert = r->prev_leader_cert;
 
     do_heart_beat();
     return true;
@@ -299,6 +267,4 @@ void Node::Service::make_leader_certificate()
     }
 
     li.leader_cert_2 = lc;
-    // last_leader_cert = lc;
-    // return lc;
 }

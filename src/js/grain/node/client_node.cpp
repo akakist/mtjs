@@ -55,7 +55,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         if (!r->agg_sig.verify(agg_pk, blake2b_hash(r->blockInfo->getBuffer()).container))
         {
             logNode("block aggsig not matched");
-            // do_heart_beat();
             return true;
         }
         else
@@ -65,22 +64,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XPASS;
     }
 
-    {
-        XTRY;
-
-        // if (!root->verify_lider_certificate(r->leader_certificateZ))
-        // {
-        //     logNode("leader cert not verified");
-        //     return true;
-        // }
-        XPASS;
-    }
-
-    // if (src_node != r->leader_certificateZ->heart_beat->node_leader)
-    // {
-    //     logNode("if(src_node!=hb.node_leader)");
-    //     return true;
-    // }
 
     db->write_batch(db_to_save_Z);
     db_to_save_Z.clear();
@@ -116,14 +99,10 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
         resetTimer();
         pass_NodeMsgRSP(br.get(), route);
-        // auto buffer = br->getBuffer();
-        // auto signature = sign_ed(my_sk_ed, buffer);
-        // passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(route)));
         XPASS;
     }
     iUtils->getNow();
 
-    logErr2("trs size %d", blockDBStore->validateBlockREQ->transaction_bodies.size());
     for (auto &z : blockDBStore->validateBlockREQ->transaction_bodies)
     {
         XTRY;
@@ -159,7 +138,6 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
         logErr2("if(!verify_lider_certificate(rft.payload_lc,node_leader))");
         return true;
     }
-    // last_leader_cert = r->lc;
     if (node_leader_for_client != r->lc->heart_beat->node_leader)
     {
         if (isNodeGreaterOrEqual(r->lc->heart_beat->node_leader, node_leader_for_client))
@@ -194,8 +172,6 @@ int get_global_refcount();
 
 bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
 {
-    // if(state_Z!=NORMAL)
-    //     return true;
     if (CheckState(r->leader_cert->heart_beat.get(), src_node))
         return true;
 
@@ -224,18 +200,11 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         // auto new_root_hash =
         t_params t(root);
         t.validateBlockREQ = r;
-        // t.att_data->trs = r->transaction_bodies;
         
         auto new_root_hash=execute_block(t,  r->leader_cert->nodes);
-        // calc_fee_and_rewards(t, r->leader_cert->nodes);
-
-        // auto newEpoch = root->getEpoch();
-        // newEpoch->epoch += 1;
-        // newEpoch->setDirty(NULL);
 
         blockDBStore = prepareBlockDBStore(t);
 
-        // auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
         REF_getter<MsgData::BlockInfo> block = new MsgData::BlockInfo();
         block->prev_root_hash = prev_block_hash_Z;
@@ -245,14 +214,11 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         block->payload_heart_beat = r->leader_cert->heart_beat;
 
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
-        // msg::block_response br;
         rsp->node_validator = this_node_name;
         rsp->blockInfo = block;
         rsp->sign(my_sk_bls);
 
         pass_NodeMsgRSP(rsp.get(),route);
-        // msg::node_message_ed nn(rsp->getBuffer(), this_node_name, my_sk_ed);
-        // passEvent(new bcEvent::MsgReply(nn.getBuffer(), poppedFrontRoute(route)));
     }
 #ifdef MEMLEACK_CHECK
     logNode("!!!!!!!!!!!!!! global REF count %d", get_global_refcount());

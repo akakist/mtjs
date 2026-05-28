@@ -234,23 +234,16 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
         return JS_ThrowInternalError(ctx, "timeout not specified");
 
     std::string node_addr = (std::string)scope.toStdString(argv[0]);
-    std::string address = base62::decode(scope.toStdString(argv[1]));
+    std::string address_hex = scope.toStdString(argv[1]);
     // std::string nick=(std::string)scope.toStdString(argv[1]);
     double to;
     if (JS_ToFloat64(ctx, &to, argv[2]))
         return JS_ThrowInternalError(ctx, "timeout parse error");
 
-    // msg::user_request ur;
-    // ur.rnd.resize(10);
-    // RAND_bytes((unsigned char *)ur.rnd.data(), 10);
     REF_getter<MsgData::GetUserStatusREQ> rq=new MsgData::GetUserStatusREQ();
-    rq->user_pk_ed=address;
+    rq->user_pk_hex_ed=address_hex;
     rq->rnd.resize(10);
     RAND_bytes((unsigned char*)rq->rnd.data(),rq->rnd.size());
-    // msg::get_user_status_req m;
-    // m.address_pk_ed = address;
-
-    // ur.payload = m.getBuffer();
 
     auto hash = rq->getHash();
     op->broadcaster->sendEvent(scope.toStdString(argv[0]), ServiceEnum::GrainReader, new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
