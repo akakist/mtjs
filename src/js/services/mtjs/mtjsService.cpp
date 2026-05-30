@@ -557,7 +557,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
         nlohmann::json jtr;
         if (opaque.tx_subscription_cb.has_value())
         {
-            THASH_id tx_hash = pb->validateBlockREQ->transaction_bodies[ti]->hash;
+            THASH_id tx_hash = blake2b_hash(pb->validateBlockREQ->transaction_bodies[ti]->tx_body);
             jtr["tx_hash"] = base62::encode(tx_hash.container);
             // logErr2("ClientTxSubscribeRSP: tx_hash %s",base62::encode(tx_hash.container).c_str());
             JSScope<10, 10> scope(js_ctx);

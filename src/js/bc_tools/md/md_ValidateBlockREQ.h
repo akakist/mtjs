@@ -23,7 +23,8 @@ namespace MsgData
             {
                 // z->update(h);
                 // leader_cert->update(h);
-                h.update(z->hash.container);
+                h.update(z->tx_body);
+                h.update(z->pk_ed_bin);
             }
         }
 

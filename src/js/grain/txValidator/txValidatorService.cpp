@@ -144,7 +144,7 @@ bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
     MUTEX_INSPECTOR;
 
     std::optional<std::string> err;
-    auto &hash=e->tx->hash;
+    auto hash=e->tx->getHash();
     if (!err)
     {
         if (!e->tx->verify())

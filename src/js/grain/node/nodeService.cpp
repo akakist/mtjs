@@ -117,8 +117,8 @@ void Node::Service::collectTransactions()
         std::map<BigInt /*nonce*/, std::vector<REF_getter<MsgData::TX> > > > ordered;
     for (auto &z : transaction_pool_of_leader)
     {
-        std::string pk = base62::decode(z.second->get_j()["pk"].get<std::string>());
-        BigInt nonce(z.second->get_j()["tx"]["nonce"].get<std::string>());
+        std::string &pk = z.second->pk_ed_bin;
+        BigInt &nonce=z.second->nonce;
         ordered[pk][nonce].push_back(z.second);
     }
     transaction_pool_of_leader.clear();
@@ -128,7 +128,7 @@ void Node::Service::collectTransactions()
         {
             for (auto &z : y.second)
             {
-                transaction_pool_of_leader.insert_or_assign(blake2b_hash(z->get_j().dump()), z);
+                transaction_pool_of_leader.insert_or_assign(blake2b_hash(z->tx_body+z->nonce.toString()), z);
             }
         }
     }
@@ -456,8 +456,9 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
     {
         std::optional<std::string> t_err;
         auto &tt=t.validateBlockREQ->transaction_bodies[ti];
-        auto pk_hex=tt->get_j()["pk"].get<std::string>();
-        auto &tj = tt->get_j()["tx"];
+        auto tx_hash=tt->getHash();
+        auto pk_hex=base62::encode(tt->pk_ed_bin);
+        auto &tj = tt->tx_body;
         REF_getter<fee_calcer> by = t.feeCalcers.get(pk_hex);
         if (!tt->verify())
         {
@@ -474,27 +475,27 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
             }
             if (!t_err)
             {
-                auto n=tj["nonce"].get<std::string>();
-                BigInt nonce;
-                nonce.from_string(n);
-                if (u->nonce != nonce)
+                // auto n=tj["nonce"].get<std::string>();
+                // BigInt nonce;
+                // nonce.from_string(n);
+                if (u->nonce != tt->nonce)
                 {
-                    logErr2("invalid nonce, expected %s got %s", u->nonce.toString().c_str(), nonce.toString().c_str());
+                    logErr2("invalid nonce, expected %s got %s", u->nonce.toString().c_str(), tt->nonce.toString().c_str());
                     t_err = "invalid nonce";
 
                 }
                 if (!t_err)
                 {
-                    execute_transaction(tt->hash, t, pk_hex, tj["commands"], by);
+                    execute_transaction(tt->getHash(), t, pk_hex, tj, by);
                     u->nonce += 1;
                     u->setDirty(by);
                 }
             }
         }
         if (!t_err)
-            t.setTxSuccess(tt->hash);
+            t.setTxSuccess(tx_hash);
         else
-            t.setTxError(tt->hash, *t_err);
+            t.setTxError(tx_hash, *t_err);
     }
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
     calc_fee_and_rewards(t, nodes_in_leader_cert);
@@ -616,7 +617,7 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     MUTEX_INSPECTOR;
     // TRANSACTION_body tr;
     // tr.container = e->msg;
-    auto h=blake2b_hash(e->tx->get_j().dump());
+    auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
     return true;
 }

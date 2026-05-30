@@ -1,6 +1,7 @@
 #pragma once
 #include "md_Base.h"
-#include <nlohmann/json.hpp>
+// #include <nlohmann/json.hpp>
+// #include "xyjson.h"
 namespace MsgData
 {
     struct TX: public Base
@@ -15,46 +16,51 @@ namespace MsgData
 
         }
     private:
-        nlohmann::json j;
+        // yyjson::Document j;
     public:
-        THASH_id hash;
+        std::string tx_body;
+        // THASH_id hash;
+        std::string pk_ed_bin;
+        std::string sig_ed_bin;
+        BigInt nonce;
 
-        void set_j(const nlohmann::json& _j)
-        {
-            j=_j;
-            hash=blake2b_hash(j.dump());
-        }
-        const nlohmann::json& get_j() const
-        {
-            return j;
-        }
+        // void set_j(const std::string& _tx_body)
+        // {
+        //     tx_body=_tx_body;
+        //     // hash=blake2b_hash(j.dump());
+        // }
+        // const yyjson::Document& get_j() const
+        // {
+        //     return j;
+        // }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<j.dump();
+            b<<tx_body<<pk_ed_bin<<sig_ed_bin<<nonce;
+
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            std::string s;
-            b>>s;
-            j=nlohmann::json::parse(s);
-            hash=blake2b_hash(s);
+            b>>tx_body>>pk_ed_bin>>sig_ed_bin>>nonce;
         }
         void update(Blake2bHasher &h) const
         {
             MUTEX_INSPECTOR;
-            throw CommonError("unimpl");
+            // throw CommonError("unimpl");
+            h.update(tx_body);
+            h.update(pk_ed_bin);
+            h.update(nonce.toString());
         }
         bool verify()
         {
-            auto &tx=j["tx"];
-            auto h=blake2b_hash(tx.dump());
-            auto sign=base62::decode(j["sign"].get<std::string>());
-            auto pk=base62::decode(j["pk"].get<std::string>());
-            return verify_ed_pk(pk,sign,h);
+            // auto &tx=j["tx"];
+            auto h=getHash();
+            // auto sign=base62::decode(j["sign"].get<std::string>());
+            // auto pk=base62::decode(j["pk"].get<std::string>());
+            return verify_ed_pk(pk_ed_bin,sig_ed_bin,h);
         }
     };
 

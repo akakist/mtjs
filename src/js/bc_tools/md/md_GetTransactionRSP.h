@@ -23,7 +23,7 @@ namespace MsgData
         void update(Blake2bHasher& h) const
         {
             for(auto& z:trs )
-                h.update(z->hash.container);
+                h.update(z->tx_body);
         }
 
         void pack(outBuffer& b) const final

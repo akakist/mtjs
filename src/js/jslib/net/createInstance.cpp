@@ -10,6 +10,7 @@
 #include "main/configObj.h"
 #include "bcEvent.h"
 
+#include "md_TX.h"
 #include "quickjs.h"
 
 #include "quickjs.h"
@@ -87,21 +88,20 @@ JSValue js_tx_sign(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
         return JS_ThrowInternalError(ctx, "sk not specified");
 
     std::string json_str;
-    qjs::convert_js_value_to_json(ctx, argv[0],json_str);
+    qjs::convert_js_value_to_json(ctx, argv[0], json_str);
     nlohmann::json j = nlohmann::json::parse(json_str);
 
     std::string sk = base62::decode(scope.toStdString(argv[1]));
 
-    auto pk=extract_public_ed(sk);
+    auto pk = extract_public_ed(sk);
 
     nlohmann::json msg;
-    msg["tx"]=j;
-    auto signature=sign_ed(sk, blake2b_hash(j.dump()).container);
-    msg["sign"]=base62::encode(signature);
-    msg["pk"]=base62::encode(pk);
-    auto dump=msg.dump();
+    msg["tx"] = j;
+    auto signature = sign_ed(sk, blake2b_hash(j.dump()).container);
+    msg["sign"] = base62::encode(signature);
+    msg["pk"] = base62::encode(pk);
+    auto dump = msg.dump();
     return JS_NewStringLen(ctx, dump.data(), dump.size());
-
 }
 
 JSValue js_add_instance(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
@@ -169,14 +169,12 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     if (argc != 3)
         return JS_ThrowInternalError(ctx, "number of argument must be 3");
 
-
     if (!JS_IsString(argv[0]))
         return JS_ThrowInternalError(ctx, "node addr not specified, must be string");
     if (!JS_IsNumber(argv[1]))
         return JS_ThrowInternalError(ctx, "timeout not specified, must be number (float)");
     if (!JS_IsString(argv[2]))
         return JS_ThrowInternalError(ctx, "signed msg not specified, must be string");
-
 
     auto node_addr = scope.toStdString(argv[0]);
     // logErr2("node_addr %s", node_addr.c_str());
@@ -187,20 +185,17 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     }
     auto msg = scope.toStdString(argv[2]);
 
-
     // auto hash=blake2b_hash(msg);
 
-    REF_getter<MsgData::TX> t=new MsgData::TX;
-    t->set_j(nlohmann::json::parse(msg));
-    // auto hash=blake2b_hash(t->hash.container);
+    REF_getter<MsgData::TX> t = new MsgData::TX;
+    t->tx_body = msg;
+    auto hash = blake2b_hash(t->tx_body+t->nonce.toString());
 
     op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(t, op->listener_->serviceId));
 
+    op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, timeout, op->listener_));
 
-    op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(t->hash.container), NULL, timeout, op->listener_));
-
-
-    auto &pd = op->node_req_promises[t->hash.container];
+    auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
     JSValue prom[2];
     JSValue promise = JS_NewPromiseCapability(ctx, prom);
@@ -240,10 +235,10 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     if (JS_ToFloat64(ctx, &to, argv[2]))
         return JS_ThrowInternalError(ctx, "timeout parse error");
 
-    REF_getter<MsgData::GetUserStatusREQ> rq=new MsgData::GetUserStatusREQ();
-    rq->user_pk_hex_ed=address_hex;
+    REF_getter<MsgData::GetUserStatusREQ> rq = new MsgData::GetUserStatusREQ();
+    rq->user_pk_hex_ed = address_hex;
     rq->rnd.resize(10);
-    RAND_bytes((unsigned char*)rq->rnd.data(),rq->rnd.size());
+    RAND_bytes((unsigned char *)rq->rnd.data(), rq->rnd.size());
 
     auto hash = rq->getHash();
     op->broadcaster->sendEvent(scope.toStdString(argv[0]), ServiceEnum::GrainReader, new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));

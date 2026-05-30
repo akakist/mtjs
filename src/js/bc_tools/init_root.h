@@ -75,7 +75,7 @@ inline void init_root(const REF_getter<root_data> &r)
         nn->name_=name;
         nn->owner_ed_pkhex=u_root_pk_hex;
         nn->total_stake=stakes[i];//.from_decimal(std::to_string(stakes[i]));
-        nn->bls_pk.deserializeBase62Str(getenv2(keys[i].first));
+        nn->bls_pk.deserializeHexStr(getenv2(keys[i].first));
 
         nn->ed_pk=base62::decode(getenv2(keys[i].second));
 

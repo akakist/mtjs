@@ -117,7 +117,7 @@ namespace msg
         }
 
     };
-
+#ifdef KALL
     struct user_message_req: public message_base
     {
         user_message_req():message_base(msgid::user_message_req) {}
@@ -174,7 +174,7 @@ namespace msg
             b>> signature>>address_pk_ed;
         }
     };
-
+#endif
 }
 
 // namespace MsgData

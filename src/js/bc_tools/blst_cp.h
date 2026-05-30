@@ -78,7 +78,7 @@ namespace blst_cpp {
             blst_p1_compress((uint8_t*)out.data(), &pk_);
             return out;
         }
-        void deserializeBase62Str(const std::string& hex) {
+        void deserializeHexStr(const std::string& hex) {
             deserialize(base62::decode(hex));
         }
         void deserialize(const std::string& buf)
