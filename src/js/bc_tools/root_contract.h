@@ -14,6 +14,7 @@
 #include "msg.h"
 #include "hsh.h"
 #include "md/md_LeaderCertificate.h"
+#include <xyjson.h>
 
 struct bc_contract:  public data_base
 {
@@ -146,18 +147,19 @@ struct bc_node: public data_base
     std::string ip;
     std::map<std::string /*user*/, BigInt> stakes;
     BigInt total_stake;
+    int missed_rounds = 0;
     void pack(outBuffer& o)  const final
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_ed_pkhex<<bls_pk<<ed_pk<<ip<<stakes<<total_stake;
+        o<<name_<<owner_ed_pkhex<<bls_pk<<ed_pk<<ip<<stakes<<total_stake<<missed_rounds;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_ed_pkhex>>bls_pk>>ed_pk>>ip>>stakes>>total_stake;
+        o>>name_>>owner_ed_pkhex>>bls_pk>>ed_pk>>ip>>stakes>>total_stake>>missed_rounds;
     }
     std::string dump() final
     {
@@ -167,6 +169,7 @@ struct bc_node: public data_base
         o<< "bls_pk: "<< base62::encode(bls_pk.serialize()) << std::endl;
         o<< "ed_pk: "<< base62::encode(ed_pk) << std::endl;
         o<< "ip:port: "<< ip << std::endl;
+        o<< "missed rounds: "<< missed_rounds << std::endl;
         o<< "stake: "<< total_stake.toString() << std::endl;
         o<< "stakers: "<< std::endl;
         for(auto &z: stakes)
@@ -186,6 +189,7 @@ struct bc_values: public data_base
         contract_deploy,
         contract_transfer,
         node_create,
+        node_update,
         node_enable_from_manual,
         node_enable_from_offline,
         nick_create,

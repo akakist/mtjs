@@ -94,13 +94,3 @@ const char *msgName(int id)
         return "unknown";
     }
 }
-// bool verify_tx(const std::string &msg)
-// {
-//     nlohmann::json j = nlohmann::json::parse(msg);
-//     if (!j.contains("pk") || !j.contains("sign") || !j.contains("tx"))
-//         throw CommonError("invalid tx format");
-//     std::string pk = base62::decode(j["pk"].get<std::string>());
-//     std::string sign = base62::decode(j["sign"].get<std::string>());
-//     auto tx_hash = blake2b_hash(j["tx"].dump());
-//     return verify_ed_pk(pk, sign, tx_hash.container);
-// }

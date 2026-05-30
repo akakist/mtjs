@@ -7,6 +7,9 @@
 
 namespace TR {
     std::optional<std::string> execute_mint(const nlohmann::json &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
+    std::optional<std::string> execute_transfer(const nlohmann::json &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
+    std::optional<std::string> execute_create_node(const nlohmann::json &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
+    std::optional<std::string> execute_update_node(const nlohmann::json &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
 
     std::optional<std::string> execute(const tx::unstake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
     std::optional<std::string> execute(const tx::createContract &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);

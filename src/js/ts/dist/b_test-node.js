@@ -4,6 +4,12 @@ import { sleep } from "os";
 const node = "127.0.0.1:2301";
 let sk = std.getenv('k_root_ed_sk');
 let root_pk = std.getenv('k_root_ed_pk');
+let u0 = std.getenv('k_u0_ed_pk');
+let u1 = std.getenv('k_u1_ed_pk');
+let u2 = std.getenv('k_u2_ed_pk');
+let u3 = std.getenv('k_u3_ed_pk');
+let u4 = std.getenv('k_u4_ed_pk');
+let users = [u0, u1, u2, u3, u4];
 async function exec() {
     while (true) {
         mtjs.tx_subscribe(node, (params) => {
@@ -17,13 +23,20 @@ async function exec() {
                 {
                     contract: "",
                     method: "mint",
-                    params: { amount: 1000 }
+                    params: { amount: 100000 }
                 }
             ],
             nonce: nonce,
         };
+        for (let i = 0; i < users.length; i++) {
+            tx.commands.push({
+                contract: "",
+                method: "transfer",
+                params: { to: users[i], amount: 100 + i }
+            });
+        }
         const m = mtjs.tx_sign(tx, sk);
-//        console.log("signed tx:", m);
+        console.log("signed tx:", m);
         const rsp = await mtjs.tx_submit(node, 1, m);
         console.log(rsp);
         sleep(1000);

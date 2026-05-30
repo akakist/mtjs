@@ -31,15 +31,27 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
 
 include(FetchContent)
 
-FetchContent_Declare(
-    yyjson
-    URL https://github.com/ibireme/yyjson/archive/refs/tags/0.8.0.tar.gz
-)
-FetchContent_MakeAvailable(yyjson)
-message (STATUS "YYJSON: "  ${yyjson_SOURCE_DIR}/src)
-include_directories( ${yyjson_SOURCE_DIR}/src )
+#FetchContent_Declare(
+#    yyjson
+#    URL https://github.com/ibireme/yyjson/archive/refs/tags/0.12.0.tar.gz
+#)
+#FetchContent_MakeAvailable(yyjson)
+
+#FetchContent_Declare(
+#    xyjson
+#    URL https://github.com/lymslive/xyjson/archive/refs/tags/v1.0.0.tar.gz
+#)
+#FetchContent_MakeAvailable(xyjson)
+
+
+#message (STATUS "YYJSON: "  ${yyjson_SOURCE_DIR}/src)
+#message (STATUS "XYJSON: "  ${xyjson_SOURCE_DIR})
+#include_directories( ${yyjson_SOURCE_DIR}/src )
+#include_directories( ${xyjson_SOURCE_DIR}/include)
 
 find_package(PkgConfig REQUIRED)
+find_package(yyjson REQUIRED)
+find_package(xyjson REQUIRED)
 
 find_package(SQLite3 REQUIRED)
 find_package(PostgreSQL REQUIRED)
