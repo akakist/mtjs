@@ -43,8 +43,8 @@ declare global
         addInstance(name:string, conf:string);
         get_user_info(nodeaddr:string, nick:string, timeout: number): Promise<userInfo>;
         // mint(nodeaddr:string, sk:string, params:object): Promise<object>;
-        tx_sign(tx:Objectstring, sk:string): string;
-        tx_submit(nodeaddr:string,  timeout:number, params:Object): Promise<object>;
+        // tx_sign(tx:Objectstring, sk:string): string;
+        tx_submit(nodeaddr:string,  timeout:number, msg:string,sk:string, nonce:string): Promise<object>;
         tx_subscribe(nodeaddr:string, callback: (params:tx_report) => void): void;
         pipe: Pipe;
         STDIN: STDIN;

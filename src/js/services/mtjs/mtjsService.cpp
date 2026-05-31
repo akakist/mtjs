@@ -26,6 +26,7 @@
 #include "md/md_BlockDBStore.h"
 #include "md/md_attachment_data.h"
 #include "md/md_GetUserStatusRSP.h"
+#include "xyjson.h"
 extern "C"
 {
 }
@@ -489,7 +490,7 @@ bool MTJS::Service::AddTxRSP(const bcEvent::AddTxRSP* e)
     scope.addValue(obj);
     JS_SetPropertyStr(ctx, obj, "err", JS_NewInt32(ctx, e->errcode));
     JS_SetPropertyStr(ctx, obj, "err_str", JS_NewString(ctx, e->errmsg.c_str()));
-    JS_SetPropertyStr(ctx, obj, "tx_hash", JS_NewString(ctx, base62::encode(e->tx_hash.container).c_str()));
+    JS_SetPropertyStr(ctx, obj, "tx_hash", JS_NewString(ctx, base16::encode(e->tx_hash.container).c_str()));
 
     JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
 
@@ -541,7 +542,6 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
     }
     return false;
 }
-#include <nlohmann/json.hpp>
 extern "C" JSValue parse_yyjson(JSContext *ctx, const char *json_str, size_t len);
 
 bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
@@ -551,42 +551,43 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     inBuffer in(e->msg);
     REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore();
     pb->unpack2(in);
-    nlohmann::json j;
     for (size_t ti = 0; ti < pb->validateBlockREQ->transaction_bodies.size(); ti++)
     {
-        nlohmann::json jtr;
+        // xy::json::
+        yyjson::MutableDocument jtr;
         if (opaque.tx_subscription_cb.has_value())
         {
-            THASH_id tx_hash = blake2b_hash(pb->validateBlockREQ->transaction_bodies[ti]->tx_body);
-            jtr["tx_hash"] = base62::encode(tx_hash.container);
-            // logErr2("ClientTxSubscribeRSP: tx_hash %s",base62::encode(tx_hash.container).c_str());
+            THASH_id tx_hash = pb->validateBlockREQ->transaction_bodies[ti]->getHash();
+            jtr["tx_hash"] = base16::encode(tx_hash.container);
+            // logErr2("ClientTxSubscribeRSP: tx_hash %s",base16::encode(tx_hash.container).c_str());
             JSScope<10, 10> scope(js_ctx);
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);
             auto &tx_report = pb->att_data->transaction_reports[tx_hash];
             for (int ii = 0; ii < tx_report.instruction_reports.size(); ii++)
             {
-                nlohmann::json ii_json;
+                yyjson::MutableObject ii_json;
                 ii_json["errcode"] = tx_report.instruction_reports[ii].err_code;
                 ii_json["errstr"] = tx_report.instruction_reports[ii].err_str;
                 // logErr2("err_str %d %d %s",ti,ii,pb->att_data.instruction_reports[ti][ii].err_str.c_str());
-                nlohmann::json logmsgs_json;
+                yyjson::MutableArray logmsgs_json;
                 auto &lms = tx_report.instruction_reports[ii].logMsgs;
                 for (auto &z : lms)
                 {
                     // logErr2("logmsgs %d %d %d %s",ti,ii,k,pb->att_data.instruction_reports[ti][ii].logMsgs[k].c_str());
-                    logmsgs_json.push_back(z);
+                    logmsgs_json.push(z);
                 }
                 ii_json["logMsgs"] = logmsgs_json;
-                jtr["instructions"].push_back(ii_json);
-                jtr["errcode"].push_back(tx_report.err_code);
-                jtr["errstr"].push_back(tx_report.err_str);
+                jtr["instructions"].append(ii_json);
+                jtr["errcode"].append(tx_report.err_code);
+                jtr["errstr"].append(tx_report.err_str);
             }
             if (!JS_IsFunction(js_ctx, opaque.tx_subscription_cb->get()))
             {
                 throw CommonError("callback not a function");
             }
-            auto str = jtr.dump();
+            std::string str; 
+            jtr.write(str);
             // logErr2("json %s",str.c_str());
             JSValue obj = JS_ParseJSON(js_ctx, str.data(), str.size(), "<input>");
             scope.addValue(obj);

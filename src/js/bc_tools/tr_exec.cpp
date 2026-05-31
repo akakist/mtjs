@@ -1,5 +1,5 @@
 #include "NODE_id.h"
-#include "base62.h"
+#include "base16.h"
 #include "bigint.h"
 #include "msg.h"
 #include <fcntl.h>
@@ -11,8 +11,8 @@
 std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 {
     auto v = t.root->getValues();
-    auto it = v->emitters_hex.find(senderAddress);
-    if (it == v->emitters_hex.end())
+    auto it = v->emitters_bin.find(senderAddress);
+    if (it == v->emitters_bin.end())
     {
         logErr2("insufficient_privileges");
         return "insufficient_privileges";
@@ -29,7 +29,7 @@ std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_param
     auto u = t.root->getUserState(senderAddress);
     if (!u.valid())
     {
-        throw CommonError("if(!u.valid())");
+        return "mint: sender state not found";
     }
     u->balance += amount;
     u->setDirty(by);
@@ -156,7 +156,7 @@ std::optional<std::string> TR::execute_update_node(const yyjson::Value &params, 
 
     // u->nodes.insert(name);
 
-    if (senderAddress != nn->owner_ed_pkhex)
+    if (senderAddress != nn->owner_ed_pk)
     {
         return "only node owner can update node info";
     }
@@ -171,7 +171,7 @@ std::optional<std::string> TR::execute_update_node(const yyjson::Value &params, 
     auto pk_ed=params / "pk_ed";
     if(pk_ed.isString())
     {
-        nn->ed_pk = base62::decode(pk_ed.toString());
+        nn->ed_pk = base16::decode(pk_ed.toString());
         t.logMsg(txid, seqId, "pk ed changed");
     }
     auto pk_bls=params / "pk_bls";
@@ -191,12 +191,12 @@ std::optional<std::string> TR::execute_update_node(const yyjson::Value &params, 
 
     // n->name_ = name;
     // n->ip = params["ip"].get<std::string>();
-    // n->ed_pk = base62::decode(params["pk_ed"].get<std::string>());
+    // n->ed_pk = base16::decode(params["pk_ed"].get<std::string>());
     // if (n->ed_pk.size() != senderAddress.size() / 2)
     // {
     //     return "invalid ed pk";
     // }
-    // n->bls_pk.deserialize(base62::decode(params["pk_bls"].get<std::string>()));
+    // n->bls_pk.deserialize(base16::decode(params["pk_bls"].get<std::string>()));
     // n->owner_ed_pkhex = senderAddress;
     nn->setDirty(by);
     // u->setDirty(by);
@@ -269,9 +269,9 @@ std::optional<std::string> TR::execute_create_node(const yyjson::Value &params, 
 
     n->name_ = name;
     n->ip = ip.toString();
-    n->ed_pk = base62::decode(pk_ed.toString());
-    n->bls_pk.deserialize(base62::decode(pk_bls.toString()));
-    n->owner_ed_pkhex = senderAddress;
+    n->ed_pk = base16::decode(pk_ed.toString());
+    n->bls_pk.deserialize(base16::decode(pk_bls.toString()));
+    n->owner_ed_pk = senderAddress;
     n->setDirty(by);
     u->setDirty(by);
     us->setDirty(by);
@@ -358,7 +358,7 @@ std::optional<std::string> TR::execute_create_node(const yyjson::Value &params, 
 //     auto to = t.root->getUserState(c.to_address);
 //     if (!to.valid())
 //     {
-//         return "destination user not found " + base62::encode(c.to_address);
+//         return "destination user not found " + base16::encode(c.to_address);
 //     }
 //     if (from->balance < v->fees[bc_values::transfer] + c.amount)
 //     {

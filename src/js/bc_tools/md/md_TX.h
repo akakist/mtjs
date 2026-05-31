@@ -1,7 +1,5 @@
 #pragma once
 #include "md_Base.h"
-// #include <nlohmann/json.hpp>
-// #include "xyjson.h"
 namespace MsgData
 {
     struct TX: public Base
@@ -24,15 +22,6 @@ namespace MsgData
         std::string sig_ed_bin;
         BigInt nonce;
 
-        // void set_j(const std::string& _tx_body)
-        // {
-        //     tx_body=_tx_body;
-        //     // hash=blake2b_hash(j.dump());
-        // }
-        // const yyjson::Document& get_j() const
-        // {
-        //     return j;
-        // }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
@@ -58,8 +47,8 @@ namespace MsgData
         {
             // auto &tx=j["tx"];
             auto h=getHash();
-            // auto sign=base62::decode(j["sign"].get<std::string>());
-            // auto pk=base62::decode(j["pk"].get<std::string>());
+            // auto sign=base16::decode(j["sign"].get<std::string>());
+            // auto pk=base16::decode(j["pk"].get<std::string>());
             return verify_ed_pk(pk_ed_bin,sig_ed_bin,h);
         }
     };

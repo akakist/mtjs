@@ -1,6 +1,5 @@
 #pragma once
 #include <string>
-#include <nlohmann/json.hpp>
 #include "blst_cp.h"
 #include <stdint.h>
 #include "IUtils.h"
@@ -9,7 +8,7 @@
 #include <fcntl.h>
 #include "ioBuffer.h"
 #include "bigint.h"
-#include "base62.h"
+#include "base16.h"
 #include "NODE_id.h"
 #include "msg.h"
 #include "hsh.h"
@@ -41,7 +40,7 @@ struct bc_contract:  public data_base
     {
         std::ostringstream o;
         o<<"Contract: "  << name_ << std::endl;
-        o<< "Owner: " << base62::encode(owner) << std::endl;
+        o<< "Owner: " << base16::encode(owner) << std::endl;
         o<< "Src: " << src << std::endl;
 
         return o.str();
@@ -52,7 +51,7 @@ struct bc_user: public data_base
 
     bc_user(Cellable* p): data_base(hsh::bc_user,p) {
     }
-    std::string pkhex_еd;
+    std::string pkbin_еd;
     std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
     std::set<NODE_id> nodes;
     std::set<std::string> contracts;
@@ -61,18 +60,18 @@ struct bc_user: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<pkhex_еd<<my_stakes<<nodes<<contracts;
+        o<<pkbin_еd<<my_stakes<<nodes<<contracts;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
-        o>>pkhex_еd>>my_stakes>>nodes>>contracts;
+        o>>pkbin_еd>>my_stakes>>nodes>>contracts;
     }
     std::string dump() final
     {
         std::ostringstream o;
-        o<<"PK: "  << pkhex_еd << std::endl;
+        o<<"PK: "  << base16::encode(pkbin_еd) << std::endl;
         o<< "Stakes: ";
         for(auto& z: my_stakes)
         {
@@ -141,7 +140,7 @@ struct bc_node: public data_base
         total_stake=0;
     }
     NODE_id name_;
-    std::string owner_ed_pkhex;
+    std::string owner_ed_pk;
     blst_cpp::PublicKey bls_pk;
     std::string ed_pk;
     std::string ip;
@@ -152,29 +151,29 @@ struct bc_node: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_ed_pkhex<<bls_pk<<ed_pk<<ip<<stakes<<total_stake<<missed_rounds;
+        o<<name_<<owner_ed_pk<<bls_pk<<ed_pk<<ip<<stakes<<total_stake<<missed_rounds;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_ed_pkhex>>bls_pk>>ed_pk>>ip>>stakes>>total_stake>>missed_rounds;
+        o>>name_>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>total_stake>>missed_rounds;
     }
     std::string dump() final
     {
         std::ostringstream o;
         o<< "Node: "<< name_.container << std::endl;
-        o<< "Owner: "<< owner_ed_pkhex << std::endl;
-        o<< "bls_pk: "<< base62::encode(bls_pk.serialize()) << std::endl;
-        o<< "ed_pk: "<< base62::encode(ed_pk) << std::endl;
+        o<< "Owner: "<<  base16::encode(owner_ed_pk) << std::endl;
+        o<< "bls_pk: "<< base16::encode(bls_pk.serialize()) << std::endl;
+        o<< "ed_pk: "<< base16::encode(ed_pk) << std::endl;
         o<< "ip:port: "<< ip << std::endl;
         o<< "missed rounds: "<< missed_rounds << std::endl;
         o<< "stake: "<< total_stake.toString() << std::endl;
         o<< "stakers: "<< std::endl;
         for(auto &z: stakes)
         {
-            o<< "\t"<< base62::encode(z.first) << " -> " << z.second.toString() << std::endl;
+            o<< "\t"<< base16::encode(z.first) << " -> " << z.second.toString() << std::endl;
         }
         return o.str();
     }
@@ -224,19 +223,19 @@ struct bc_values: public data_base
     }
     std::vector<BigInt> fees;
     BigInt total_staked;
-    std::set<std::string> emitters_hex;
+    std::set<std::string> emitters_bin;
     void pack(outBuffer& o) const final
     {
         // cost.pack(o);
         o<<1;
-        o<<fees<<total_staked<< emitters_hex;
+        o<<fees<<total_staked<< emitters_bin;
     }
     void unpack(inBuffer& o) final
     {
         // cost.unpack(o);
         auto v=o.get_PN();
 
-        o>>fees>>total_staked>>emitters_hex;
+        o>>fees>>total_staked>>emitters_bin;
     }
     std::string dump() final
     {

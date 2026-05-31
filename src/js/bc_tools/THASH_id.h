@@ -2,7 +2,7 @@
 #include "ioBuffer.h"
 #include <stdio.h>
 // #include "IUtils.h"
-#include "base62.h"
+#include "base16.h"
 
 
 ///  wrapper for int for debug
@@ -13,7 +13,7 @@ struct THASH_id
     THASH_id() {}
     std::string str() const
     {
-        return base62::encode(container).substr(0,4);
+        return base16::encode(container).substr(0,4);
     }
 
 };

@@ -11,7 +11,7 @@ struct BLOCK_id
     BLOCK_id() {}
     std::string str() const
     {
-        return base62::encode(container).substr(0,4);
+        return base16::encode(container).substr(0,4);
     }
 
 };

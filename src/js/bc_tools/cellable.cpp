@@ -16,7 +16,7 @@ std::string Cellable::dump()
        <<"children:" << std::endl;
     for(auto &z: children_hashes)
     {
-        str<<"<a href='"<<z.first<< "/'>" << z.first << "</a>" << " -> "<< base62::encode(z.second.container) << std::endl;
+        str<<"<a href='"<<z.first<< "/'>" << z.first << "</a>" << " -> "<< base16::encode(z.second.container) << std::endl;
     }
     if(data.valid())
         str << data->dump();
@@ -77,7 +77,7 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string& id, IDatabase*
         }
         else
         {
-            throw CommonError("get_cell: cell hash not matched %s %s", base62::encode(it->second.container).c_str(),base62::encode(h.container).c_str());
+            throw CommonError("get_cell: cell hash not matched %s %s", base16::encode(it->second.container).c_str(),base16::encode(h.container).c_str());
 
         }
     }

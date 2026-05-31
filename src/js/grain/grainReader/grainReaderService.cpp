@@ -10,7 +10,7 @@
 #include "broadcaster.h"
 #include "THASH_id.h"
 #include "blake2bHasher.h"
-#include "base62.h"
+#include "base16.h"
 #include "corelib/mutexInspector.h"
 #include "Event/bcEvent.h"
 #include <exception>
@@ -154,7 +154,7 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
     case msgid::GetUserStatusREQ:
     {
         auto pp=(MsgData::GetUserStatusREQ*) b.get();
-        auto u = root->getUserState(pp->user_pk_hex_ed);
+        auto u = root->getUserState(pp->user_pk_bin_ed);
 
         REF_getter<MsgData::GetUserStatusRSP> rsp=new MsgData::GetUserStatusRSP;
         rsp->balance=u->balance;

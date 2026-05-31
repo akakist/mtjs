@@ -73,117 +73,13 @@ namespace msgid
 {
     enum MSG_ID
     {
-        user_message_req,
-        // user_request,
-        // get_user_status_req,
-        // get_user_status_rsp,
         HeartBeatREQ,HeartBeatRSP,
         LeaderCertificate, ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,BlockAcceptedRSP, GetTransactionREQ,GetTransactionRSP,
         BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP,
-        // InstructionList,
         TX,
-        // TxMint,
         attachment_data,
         GetUserStatusREQ,
         GetUserStatusRSP
     };
 
 }
-namespace msg
-{
-    struct message_base
-    {
-        int type;
-        message_base(int type_):type(type_) {}
-        virtual ~message_base() {}
-        virtual void pack(outBuffer& b) const
-        {
-            MUTEX_INSPECTOR;
-            // std::string signature;
-            b<<type;
-
-        }
-        virtual void unpack(inBuffer& b)
-        {
-            // std::string signature;
-            // b>>signature;
-        }
-        std::string getBuffer() const
-        {
-            MUTEX_INSPECTOR;
-            outBuffer o;
-            pack(o);
-            return o.asString()->container;
-        }
-
-    };
-#ifdef KALL
-    struct user_message_req: public message_base
-    {
-        user_message_req():message_base(msgid::user_message_req) {}
-        user_message_req(inBuffer &in):message_base(msgid::user_message_req) {
-            unpack(in);
-        }
-        user_message_req(const TRANSACTION_body& s):message_base(msgid::user_message_req) {
-            inBuffer in(s.container);
-            int t=in.get_PN();
-            if(t!=msgid::user_message_req)
-                throw CommonError("if(t!=msgid::user_message_req)");
-            unpack(in);
-        }
-        std::vector<std::string> payload;
-        BigInt nonce;
-        std::string signature;
-        std::string address_pk_ed;
-        bool verify()
-        {
-            MUTEX_INSPECTOR;
-            Blake2bHasher h;
-            for(auto& z:payload)
-                h.update(z);
-            h.update(nonce.toString());
-            return verify_ed_pk(address_pk_ed,signature,h.final());
-        }
-        void sign(const std::string &sk)
-        {
-            MUTEX_INSPECTOR;
-            Blake2bHasher h;
-            for(auto& z:payload)
-                h.update(z);
-            h.update(nonce.toString());
-            signature=sign_ed(sk,h.final());
-            // pk.resize(crypto_sign_PUBLICKEYBYTES);
-            // crypto_sign_ed25519_sk_to_pk((uint8_t*)pk.data(), (unsigned char*)sk.data());
-
-        }
-        void pack(outBuffer& b) const final
-        {
-
-            message_base::pack(b);
-            b<<payload;
-            b<<nonce;
-            b<< signature<<address_pk_ed;
-
-        }
-        void unpack(inBuffer& b) final
-        {
-            MUTEX_INSPECTOR;
-            message_base::unpack(b);
-            b>>payload;
-            b>>nonce;
-            b>> signature>>address_pk_ed;
-        }
-    };
-#endif
-}
-
-// namespace MsgData
-// {
-
-
-//     struct BlockInfo;
-
-// }
-
-// bool verify_tx(const std::string& msg);
-

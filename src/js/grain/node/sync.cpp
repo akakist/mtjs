@@ -1,4 +1,4 @@
-#include "base62.h"
+#include "base16.h"
 #include "blake2bHasher.h"
 #include "commonError.h"
 #include "NODE_id.h"
@@ -56,7 +56,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const
             BigInt epoch;
             epoch.from_string(epoch_);
             logNode("loaded from DB block epoch %s", epoch_.c_str());
-            std::string data = base62::decode(query1.getColumn(1).getString());
+            std::string data = base16::decode(query1.getColumn(1).getString());
             inBuffer in(data);
             REF_getter<MsgData::BlockDBStore> bds = new MsgData::BlockDBStore();
             bds->unpack2(in);
@@ -69,11 +69,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const
     logNode("QUERY RESULTS %d", ret->blocks_Z.size());
 
     ret->lastEpoch = root->getEpoch()->epoch;
-    // msg::node_message_ed nm(ret->getBuffer(), this_node_name, my_sk_ed);
     pass_NodeMsgRSP(ret.get(),route);
-    // auto buf=ret->getBuffer();
-    // auto sig=sign_ed(my_sk_ed,blake2b_hash(buf).container);
-    // passEvent(new bcEvent::NodeMsgRSP(this_node_name,sig, buf, poppedFrontRoute(route)));
 
     return true;
 }
@@ -163,9 +159,9 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         ///////////
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
         insert.bind(1, z.second->epoch.toString());
-        insert.bind(2, base62::encode(z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.container));
+        insert.bind(2, base16::encode(z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.container));
         insert.bind(3, time(NULL));
-        insert.bind(4, base62::encode(z.second->getBuffer()));
+        insert.bind(4, base16::encode(z.second->getBuffer()));
         insert.exec();
     }
     if (r->lastEpoch > root->getEpoch()->epoch)

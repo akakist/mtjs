@@ -2,7 +2,7 @@
 #include "Events/System/Net/rpcEvent.h"
 #include "Events/System/Run/startServiceEvent.h"
 #include "Events/System/timerEvent.h"
-#include "base62.h"
+#include "base16.h"
 #include "commonError.h"
 #include "Events/Tools/telnetEvent.h"
 #include "bigint.h"
@@ -60,9 +60,9 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 
     init_root(root);
     initDB();
-    my_sk_bls.deserializeBase62Str(getenv2(my_sk_bls_env_key));
+    my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
 
-    my_sk_ed = base62::decode(getenv2(my_sk_ed_env_key));
+    my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
     logErr2("ServiceInit nodename %s", this_node_name.container.c_str());
     sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db, this));
     sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db, this));
@@ -91,19 +91,6 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^go\\s+(.+)$", "go to child element", ListenerBase::serviceId));
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^back$", "go to parent", ListenerBase::serviceId));
 
-    // msgFactory.registerMsg(msgid::HeartBeatREQ, MsgData::HeartBeatREQ::construct);
-    // msgFactory.registerMsg(msgid::HeartBeatRSP, MsgData::HeartBeatRSP::construct);
-    // msgFactory.registerMsg(msgid::GetTransactionREQ, MsgData::GetTransactionREQ::construct);
-    // msgFactory.registerMsg(msgid::GetTransactionRSP, MsgData::GetTransactionRSP::construct);
-    // msgFactory.registerMsg(msgid::ValidateBlockREQ, MsgData::ValidateBlockREQ::construct);
-    // msgFactory.registerMsg(msgid::ValidateBlockRSP, MsgData::ValidateBlockRSP::construct);
-    // msgFactory.registerMsg(msgid::BlockAcceptedREQ, MsgData::BlockAcceptedREQ::construct);
-    // msgFactory.registerMsg(msgid::BlockAcceptedRSP, MsgData::BlockAcceptedRSP::construct);
-    // msgFactory.registerMsg(msgid::GetSavedBlocksREQ, MsgData::GetSavedBlocksREQ::construct);
-    // msgFactory.registerMsg(msgid::GetSavedBlocksRSP, MsgData::GetSavedBlocksRSP::construct);
-    // msgFactory.registerMsg(msgid::DoHeartBeatREQ, MsgData::DoHeartBeatREQ::construct);
-    // msgFactory.registerMsg(msgid::ConfirmLeaderREQ, MsgData::ConfirmLeaderREQ::construct);
-    // msgFactory.registerMsg(msgid::ConfirmLeaderRSP, MsgData::ConfirmLeaderRSP::construct);
 
     do_heart_beat();
 
@@ -128,7 +115,7 @@ void Node::Service::collectTransactions()
         {
             for (auto &z : y.second)
             {
-                transaction_pool_of_leader.insert_or_assign(blake2b_hash(z->tx_body+z->nonce.toString()), z);
+                transaction_pool_of_leader.insert_or_assign(z->getHash(), z);
             }
         }
     }
@@ -454,12 +441,13 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
     // outBuffer o;
     for (int ti = 0; ti < t.validateBlockREQ->transaction_bodies.size(); ti++)
     {
+    MUTEX_INSPECTOR;
         std::optional<std::string> t_err;
-        auto &tt=t.validateBlockREQ->transaction_bodies[ti];
+        auto tt=t.validateBlockREQ->transaction_bodies[ti];
         auto tx_hash=tt->getHash();
-        auto pk_hex=base62::encode(tt->pk_ed_bin);
+        auto &pk_bin=tt->pk_ed_bin;
         auto &tj = tt->tx_body;
-        REF_getter<fee_calcer> by = t.feeCalcers.get(pk_hex);
+        REF_getter<fee_calcer> by = t.feeCalcers.get(pk_bin);
         if (!tt->verify())
         {
             t_err = "verify failed @12";
@@ -467,7 +455,8 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
         }
         if (!t_err)
         {
-            auto u = root->getUserState(pk_hex);
+    MUTEX_INSPECTOR;
+            auto u = root->getUserState(pk_bin);
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -486,7 +475,8 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
                 }
                 if (!t_err)
                 {
-                    execute_transaction(tt->getHash(), t, pk_hex, tj, by);
+    MUTEX_INSPECTOR;
+                    execute_transaction(tt->getHash(), t, pk_bin, tj, by);
                     u->nonce += 1;
                     u->setDirty(by);
                 }
@@ -538,7 +528,7 @@ void Node::Service::calc_fee_and_rewards(t_params &t, const std::vector<NODE_id>
         auto node = root->getNode(n);
         if (!node.valid())
             throw CommonError("if(!node.valid()) 556677");
-        auto &owner = node->owner_ed_pkhex;
+        auto &owner = node->owner_ed_pk;
         auto u = root->getUserState(owner);
         if (!u.valid())
         {

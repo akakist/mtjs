@@ -7,7 +7,7 @@
 #include "commonError.h"
 #include "IDatabase.h"
 #include <vector>
-#include "base62.h"
+#include "base16.h"
 #include "db_to_save.h"
 #include "fee_calcer.h"
 #include "hsh.h"
@@ -165,7 +165,7 @@ public:
     void calc_tree_hash(_db_to_save &db_dump);
 
 };
-// static const char* BASE62_TABLE[62] = {
+// static const char* base16_TABLE[62] = {
 //     "0","1","2","3","4","5","6","7","8","9",
 //     "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
 //     "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"

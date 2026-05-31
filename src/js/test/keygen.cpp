@@ -2,7 +2,7 @@
 #include "blst_cp.h"
 #include <openssl/rand.h>
 #include <nlohmann/json.hpp>
-#include "base62.h"
+#include "base16.h"
 std::vector<unsigned char> randomBytes(size_t len) {
     std::vector<unsigned char> buf(len);
     if (RAND_bytes(buf.data(), static_cast<int>(len)) != 1) {
@@ -92,16 +92,16 @@ int main() {
         std::cout << "Verification failed!" << std::endl;
     }
     nlohmann::json j;
-    j["bls"]["sk"]=base62::encode(sk.serialize());
-    j["bls"]["pk"]=base62::encode(pk.serialize());
+    j["bls"]["sk"]=base16::encode(sk.serialize());
+    j["bls"]["pk"]=base16::encode(pk.serialize());
 
         // std::cout << "SK:"<< sk.serializeToHexStr() << std::endl;
         // std::cout << "PK:"<< pk.serializeToHexStr() << std::endl;
         // std::cout << "SIG:"<< sig.serializeToHexStr() << std::endl;
 
     auto kp=generateEd25519Keypair();
-    j["ed"]["sk"]=base62::encode(kp.sk_bin);
-    j["ed"]["pk"]=base62::encode(kp.pk_bin);
+    j["ed"]["sk"]=base16::encode(kp.sk_bin);
+    j["ed"]["pk"]=base16::encode(kp.pk_bin);
     std::cout<< j.dump(4);
 
     std::vector<std::string> names={"main","root","n0","n1","n2","n3","n4","u0","u1","u2","u3","u4"};
@@ -112,11 +112,11 @@ int main() {
         blst_cpp::SecretKey sk(buf.data(), buf.size());
         blst_cpp::PublicKey pk(sk);
 
-        printf("export k_%s_bls_sk=%s\n",n.c_str(),base62::encode(sk.serialize()).c_str());
-        printf("export k_%s_bls_pk=%s\n",n.c_str(),base62::encode(pk.serialize()).c_str());
+        printf("export k_%s_bls_sk=%s\n",n.c_str(),base16::encode(sk.serialize()).c_str());
+        printf("export k_%s_bls_pk=%s\n",n.c_str(),base16::encode(pk.serialize()).c_str());
         auto kp=generateEd25519Keypair();
-        printf("export k_%s_ed_sk=%s\n",n.c_str(),base62::encode(kp.sk_bin).c_str());
-        printf("export k_%s_ed_pk=%s\n",n.c_str(),base62::encode(kp.pk_bin).c_str());
+        printf("export k_%s_ed_sk=%s\n",n.c_str(),base16::encode(kp.sk_bin).c_str());
+        printf("export k_%s_ed_pk=%s\n",n.c_str(),base16::encode(kp.pk_bin).c_str());
 
 
     }

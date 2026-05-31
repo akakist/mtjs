@@ -22,7 +22,6 @@
 #include <string>
 #include <vector>
 #include <cstdio>
-#include <nlohmann/json.hpp>
 #include "msg.h"
 #include "msg_tx.h"
 #include "Events/System/timerEvent.h"
@@ -72,36 +71,6 @@ static std::string js_obj_to_kv(JSContext *ctx,
     js_free(ctx, props);
 
     return result;
-}
-JSValue js_tx_sign(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
-{
-    MUTEX_INSPECTOR;
-
-    JSScope<10, 10> scope(ctx);
-    mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    if (argc != 2)
-        return JS_ThrowInternalError(ctx, "number of argument must be 2");
-
-    if (!JS_IsObject(argv[0]))
-        return JS_ThrowInternalError(ctx, "tx object not specified");
-    if (!JS_IsString(argv[1]))
-        return JS_ThrowInternalError(ctx, "sk not specified");
-
-    std::string json_str;
-    qjs::convert_js_value_to_json(ctx, argv[0], json_str);
-    nlohmann::json j = nlohmann::json::parse(json_str);
-
-    std::string sk = base62::decode(scope.toStdString(argv[1]));
-
-    auto pk = extract_public_ed(sk);
-
-    nlohmann::json msg;
-    msg["tx"] = j;
-    auto signature = sign_ed(sk, blake2b_hash(j.dump()).container);
-    msg["sign"] = base62::encode(signature);
-    msg["pk"] = base62::encode(pk);
-    auto dump = msg.dump();
-    return JS_NewStringLen(ctx, dump.data(), dump.size());
 }
 
 JSValue js_add_instance(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
@@ -166,15 +135,19 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     JSScope<10, 10> scope(ctx);
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    if (argc != 3)
-        return JS_ThrowInternalError(ctx, "number of argument must be 3");
+    if (argc != 5)
+        return JS_ThrowInternalError(ctx, "number of argument must be 5");
 
     if (!JS_IsString(argv[0]))
         return JS_ThrowInternalError(ctx, "node addr not specified, must be string");
     if (!JS_IsNumber(argv[1]))
         return JS_ThrowInternalError(ctx, "timeout not specified, must be number (float)");
     if (!JS_IsString(argv[2]))
-        return JS_ThrowInternalError(ctx, "signed msg not specified, must be string");
+        return JS_ThrowInternalError(ctx, "msg not specified, must be string");
+    if (!JS_IsString(argv[3]))
+        return JS_ThrowInternalError(ctx, "sk not specified, must be string");
+    if (!JS_IsString(argv[4]))
+        return JS_ThrowInternalError(ctx, "nonce not specified, must be string");
 
     auto node_addr = scope.toStdString(argv[0]);
     // logErr2("node_addr %s", node_addr.c_str());
@@ -184,12 +157,27 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
         return JS_ThrowInternalError(ctx, "error parsing timeout");
     }
     auto msg = scope.toStdString(argv[2]);
+    auto sk = base16::decode(scope.toStdString(argv[3]));
+    auto pk = extract_public_ed(sk);
+    auto nonce_str = scope.toStdString(argv[4]);
+    BigInt nonce;
+    try
+    {        nonce.from_string(nonce_str);
+    }    
+    catch (std::exception &e)
+    {
+                return JS_ThrowInternalError(ctx, "error parsing nonce: %s", e.what());
+    }
 
     // auto hash=blake2b_hash(msg);
 
     REF_getter<MsgData::TX> t = new MsgData::TX;
     t->tx_body = msg;
-    auto hash = blake2b_hash(t->tx_body+t->nonce.toString());
+    t->pk_ed_bin = pk;
+    t->nonce = nonce;
+    auto hash = t->getHash();
+    t->sig_ed_bin = sign_ed(sk, hash.container);
+    // auto hash = blake2b_hash(t->tx_body+t->nonce.toString());
 
     op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(t, op->listener_->serviceId));
 
@@ -212,6 +200,37 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     return g_prom.release();
 }
+// JSValue js_tx_sign(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+// {
+//     MUTEX_INSPECTOR;
+
+//     JSScope<10, 10> scope(ctx);
+//     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
+//     if (argc != 2)
+//         return JS_ThrowInternalError(ctx, "number of argument must be 2");
+
+//     if (!JS_IsObject(argv[0]))
+//         return JS_ThrowInternalError(ctx, "tx object not specified");
+//     if (!JS_IsString(argv[1]))
+//         return JS_ThrowInternalError(ctx, "sk not specified");
+
+//     std::string json_str;
+//     qjs::convert_js_value_to_json(ctx, argv[0], json_str);
+//     // nlohmann::json j = nlohmann::json::parse(json_str);
+
+//     std::string sk = base16::decode(scope.toStdString(argv[1]));
+
+//     auto pk = extract_public_ed(sk);
+
+//     nlohmann::json msg;
+//     msg["tx"] = j;
+//     auto signature = sign_ed(sk, blake2b_hash(j.dump()).container);
+//     msg["sign"] = base16::encode(signature);
+//     msg["pk"] = base16::encode(pk);
+//     auto dump = msg.dump();
+//     return JS_NewStringLen(ctx, dump.data(), dump.size());
+// }
+
 /////////////////
 JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
@@ -229,14 +248,14 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
         return JS_ThrowInternalError(ctx, "timeout not specified");
 
     std::string node_addr = (std::string)scope.toStdString(argv[0]);
-    std::string address_hex = scope.toStdString(argv[1]);
+    std::string address = base16::decode(scope.toStdString(argv[1]));
     // std::string nick=(std::string)scope.toStdString(argv[1]);
     double to;
     if (JS_ToFloat64(ctx, &to, argv[2]))
         return JS_ThrowInternalError(ctx, "timeout parse error");
 
     REF_getter<MsgData::GetUserStatusREQ> rq = new MsgData::GetUserStatusREQ();
-    rq->user_pk_hex_ed = address_hex;
+    rq->user_pk_bin_ed = address;
     rq->rnd.resize(10);
     RAND_bytes((unsigned char *)rq->rnd.data(), rq->rnd.size());
 
@@ -268,7 +287,7 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     logErr2("js_register_add_instance");
     JS_SetPropertyStr(ctx, mtjs_obj, "addInstance", JS_NewCFunction(ctx, js_add_instance, "addInstance", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_submit", JS_NewCFunction(ctx, js_tx_submit, "tx_submit", 2));
-    JS_SetPropertyStr(ctx, mtjs_obj, "tx_sign", JS_NewCFunction(ctx, js_tx_sign, "tx_sign", 2));
+    // JS_SetPropertyStr(ctx, mtjs_obj, "tx_sign", JS_NewCFunction(ctx, js_tx_sign, "tx_sign", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_subscribe", JS_NewCFunction(ctx, js_tx_subscribe, "tx_subscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_user_info", JS_NewCFunction(ctx, js_get_user_info, "get_user_info", 2));
 }

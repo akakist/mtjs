@@ -15,29 +15,26 @@ async function exec() {
         mtjs.tx_subscribe(node, (params) => {
             console.log("tx report from js:", JSON.stringify(params));
         });
-        const ui = await mtjs.get_user_info(node, root_pk, 1);
+        const ui = await mtjs.get_user_info(node, root_pk, 1.5);
         const nonce = ui.nonce;
         console.log(ui);
-        let tx = {
-            commands: [
-                {
-                    contract: "",
-                    method: "mint",
-                    params: { amount: 100000 }
-                }
-            ],
-            nonce: nonce,
-        };
+        let tx = [
+            {
+                contract: "",
+                method: "mint",
+                params: { amount: "100000" }
+            }
+        ];
         for (let i = 0; i < users.length; i++) {
-            tx.commands.push({
+            tx.push({
                 contract: "",
                 method: "transfer",
-                params: { to: users[i], amount: 100 + i }
+                params: { to: users[i], amount: `${100 + i}` }
             });
         }
-        const m = mtjs.tx_sign(tx, sk);
-        console.log("signed tx:", m);
-        const rsp = await mtjs.tx_submit(node, 1, m);
+        // const m=mtjs.tx_sign(tx, sk!);
+        // console.log("signed tx:", m);
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(tx), sk, nonce);
         console.log(rsp);
         sleep(1000);
     }

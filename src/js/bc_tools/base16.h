@@ -3,7 +3,7 @@
 #include <vector>
 #include <stdint.h>
 #include <stdexcept>
-namespace base62
+namespace base16
 {
     // std::string encode(const std::string& data);
     // std::string decode(const std::string& str);
@@ -26,4 +26,4 @@ namespace base62
                (c >= 'a' && c <= 'f') ||
                (c >= 'A' && c <= 'F');
     }
-} // namespace base62
+} // namespace base16

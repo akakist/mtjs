@@ -11,12 +11,4 @@ namespace TR {
     std::optional<std::string> execute_create_node(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
     std::optional<std::string> execute_update_node(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
 
-#ifdef KALL
-    std::optional<std::string> execute(const tx::unstake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
-    std::optional<std::string> execute(const tx::createContract &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
-    std::optional<std::string> execute(const tx::transfer &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
-    std::optional<std::string> execute(const tx::stake &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
-    std::optional<std::string> execute(const tx::registerNode &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
-    std::optional<std::string> execute(const tx::transferContract &c, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
-#endif
 }

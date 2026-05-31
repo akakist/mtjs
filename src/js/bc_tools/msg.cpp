@@ -2,8 +2,6 @@
 #include "blake2bHasher.h"
 #include "md/md_BlockAcceptedREQ.h"
 #include <string>
-#include <nlohmann/json.hpp>
-// #include "md/md_GetUserStatusREQ.h"
 
 thread_local MsgFactory msgFactory;
 MsgData::BlockAcceptedREQ::BlockAcceptedREQ()
@@ -49,8 +47,8 @@ const char *msgName(int id)
     {
     // case msgid::node_message_ed:
     //     return "node_message_ed";
-    case msgid::user_message_req:
-        return "user_message_req";
+    // case msgid::user_message_req:
+    //     return "user_message_req";
     case msgid::HeartBeatREQ:
         return "HeartBeatREQ";
     case msgid::HeartBeatRSP:

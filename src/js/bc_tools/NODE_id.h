@@ -1,7 +1,7 @@
 #pragma once
 #include "ioBuffer.h"
 #include <stdio.h>
-#include "base62.h"
+#include "base16.h"
 
 
 ///  wrapper for int for debug
@@ -12,7 +12,7 @@ struct NODE_id
     NODE_id() {}
     std::string str() const
     {
-        return base62::encode(container).substr(0,4);
+        return base16::encode(container).substr(0,4);
     }
 
 };

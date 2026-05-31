@@ -7,7 +7,7 @@
 #include <string.h>
 // #include "IUtils.h"
 #include "ioBuffer.h"
-#include "base62.h"
+#include "base16.h"
 #include "mutexInspector.h"
 extern "C" {
 #include <blst.h>
@@ -39,8 +39,8 @@ namespace blst_cpp {
             memcpy(out.data(), sk_.b, 32);
             return out;
         }
-        void deserializeBase62Str(const std::string& hex) {
-            return deserialize(base62::decode(hex));
+        void deserializebase16Str(const std::string& hex) {
+            return deserialize(base16::decode(hex));
         }
         void deserialize(const std::string& buf)
         {
@@ -79,7 +79,7 @@ namespace blst_cpp {
             return out;
         }
         void deserializeHexStr(const std::string& hex) {
-            deserialize(base62::decode(hex));
+            deserialize(base16::decode(hex));
         }
         void deserialize(const std::string& buf)
         {
@@ -148,9 +148,9 @@ namespace blst_cpp {
             blst_p2_compress((uint8_t*)out.data(), &sig_);
             return out;
         }
-        void deserializeBase62Str(const std::string& hex)
+        void deserializebase16Str(const std::string& hex)
         {
-            deserialize(base62::decode(hex));
+            deserialize(base16::decode(hex));
         }
         void deserialize(const std::string& buf)
         {
@@ -242,9 +242,9 @@ namespace blst_cpp {
         // ============================
         // DESERIALIZATION
         // ============================
-        void deserializeBase62Str(const std::string& hex)
+        void deserializebase16Str(const std::string& hex)
         {
-            deserialize(base62::decode(hex));
+            deserialize(base16::decode(hex));
         }
         void deserialize(const std::string& buf)
         {

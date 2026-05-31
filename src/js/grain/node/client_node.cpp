@@ -6,7 +6,7 @@
 #include "blake2bHasher.h"
 #include "IUtils.h"
 #include "commonError.h"
-#include "base62.h"
+#include "base16.h"
 #include "corelib/mutexInspector.h"
 #include "Event/bcEvent.h"
 #include <SQLiteCpp/Statement.h>
@@ -74,9 +74,9 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
         insert.bind(1, blockDBStore->epoch.toString());
-        insert.bind(2, base62::encode(blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.container));
+        insert.bind(2, base16::encode(blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.container));
         insert.bind(3, time(NULL));
-        insert.bind(4, base62::encode(blockDBStore->getBuffer()));
+        insert.bind(4, base16::encode(blockDBStore->getBuffer()));
         insert.exec();
         XPASS;
     }
@@ -111,7 +111,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         if (it != transaction_pool_of_leader.end())
         {
             transaction_pool_of_leader.erase(it);
-            logNode("removed tx %s", base62::encode(h.container).c_str());
+            logNode("removed tx %s", base16::encode(h.container).c_str());
         }
         XPASS;
     }
@@ -172,33 +172,60 @@ int get_global_refcount();
 
 bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
 {
-    if (CheckState(r->leader_cert->heart_beat.get(), src_node))
+    MUTEX_INSPECTOR;
+    logErr2("ValidateBlockREQ");
+    if (state_Z != State::NORMAL)
+    {
+        logErr2("state_Z != State::NORMAL");
         return true;
+
+    }
+
+    t_params t(root);
+    bool err=false;
+    if (CheckState(r->leader_cert->heart_beat.get(), src_node))
+    {
+        t.att_data->block_report={1,"check state heart beat failed"};
+        logErr2("check state heart beat failed");
+        err=true;
+    }
+        // return true;
 
     resetTimer();
-    MUTEX_INSPECTORS("ValidateBlockREQ");
-    if (r->leader_cert->heart_beat->node_leader != node_leader_for_client)
-        return true;
-    if (state_Z != State::NORMAL)
-        return true;
+    if(!err)
+    {
+        if (r->leader_cert->heart_beat->node_leader != node_leader_for_client)
+        {
+            t.att_data->block_report={1,"cert node leader mismatched"};
+            err=true;
+            logErr2("cert node leader mismatched");
+        }
 
-    if (!root->verify_lider_certificate(r->leader_cert))
-        throw CommonError("if(!verify_lider_certificate(b.leader_cert))");
+    }
 
-    if (r->leader_cert->heart_beat->prev_block_hash != prev_block_hash_Z)
+    if (!err && !root->verify_lider_certificate(r->leader_cert))
+    {
+        err=true;
+        t.att_data->block_report={1,"verify_lider_certificate failed"};
+        logErr2("verify_lider_certificate failed");
+    }
+    
+    if (!err && r->leader_cert->heart_beat->prev_block_hash != prev_block_hash_Z)
     {
         if (root->getEpoch()->epoch + 1 != r->leader_cert->heart_beat->new_epoch)
         {
+            t.att_data->block_report={1,"epoch invalid"};
+            err=true;
             logNode("if (root->getEpoch()->epoch+1 < r->leader_cert->heart_beat->new_epoch)");
             // setBlockId(r->leader_cert->heart_beat->prev_block_hash);
-            return true;
+            // return true;
         }
         logNode("ERROR: ValidateBlock block %s, nextblock %s", r->leader_cert->heart_beat->prev_block_hash.str().c_str(), prev_block_hash_Z.str().c_str());
     }
+    if(!err)
     {
 
         // auto new_root_hash =
-        t_params t(root);
         t.validateBlockREQ = r;
 
         auto new_root_hash=execute_block(t,  r->leader_cert->nodes);

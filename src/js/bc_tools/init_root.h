@@ -5,13 +5,14 @@
 
 inline void init_root(const REF_getter<root_data> &r)
 {
+    MUTEX_INSPECTOR;
     std::vector<int> stakes= {100,200,300,400,500};
-    std::string u_root_pk_hex=getenv2("k_root_ed_pk");
+    std::string u_root_pk=base16::decode(getenv2("k_root_ed_pk"));
     if(!r->checkValues().valid())
     {
         auto v=r->getValues();
-        if(!v->emitters_hex.count(u_root_pk_hex))
-            v->emitters_hex.insert(u_root_pk_hex);
+        if(!v->emitters_bin.count(u_root_pk))
+            v->emitters_bin.insert(u_root_pk);
 
         int total=0;
         for(auto &z: stakes)
@@ -22,9 +23,9 @@ inline void init_root(const REF_getter<root_data> &r)
         v->setDirty(NULL);
     }
     // u_root pk
-    if(!r->checkUserState(u_root_pk_hex).valid())
+    if(!r->checkUserState(u_root_pk).valid())
     {
-        auto u=r->getUserState(u_root_pk_hex);
+        auto u=r->getUserState(u_root_pk);
         if(!u.valid())
         {
             throw CommonError("cannot find root user state");
@@ -73,11 +74,11 @@ inline void init_root(const REF_getter<root_data> &r)
 
         REF_getter<bc_node> nn=r->addNode(name,NULL);
         nn->name_=name;
-        nn->owner_ed_pkhex=u_root_pk_hex;
+        nn->owner_ed_pk=u_root_pk;
         nn->total_stake=stakes[i];//.from_decimal(std::to_string(stakes[i]));
         nn->bls_pk.deserializeHexStr(getenv2(keys[i].first));
 
-        nn->ed_pk=base62::decode(getenv2(keys[i].second));
+        nn->ed_pk=base16::decode(getenv2(keys[i].second));
 
         nn->ip="127.0.0.1:"+std::to_string(2300+i);
         nn->setDirty(NULL);

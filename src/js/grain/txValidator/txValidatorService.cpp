@@ -1,10 +1,10 @@
 #include "Events/System/Net/rpcEvent.h"
 #include "Events/System/timerEvent.h"
+#include "THASH_id.h"
 #include "corelib/mutexInspector.h"
-#include "Event/bcEvent.h"
-#include <time.h>
 #include <map>
 #include "txValidatorService.h"
+#include "ioBuffer.h"
 #include "msg.h"
 #include "tools_mt.h"
 #include "tree.h"
@@ -144,7 +144,7 @@ bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
     MUTEX_INSPECTOR;
 
     std::optional<std::string> err;
-    auto hash=e->tx->getHash();
+    auto hash = e->tx->getHash();
     if (!err)
     {
         if (!e->tx->verify())
@@ -156,7 +156,6 @@ bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
 
     if (!err)
         sendEvent(ServiceEnum::Node, new bcEvent::PutTransactionREQ(e->tx, this));
-
 
     passEvent(
         new bcEvent::AddTxRSP(hash, err.has_value(), err ? *err : "transaction added to pool", poppedFrontRoute(e->route)));

@@ -10,6 +10,7 @@ namespace MsgData
 
         }
         // std::vector<REF_getter<TX>> trs;
+        std::pair<int,std::string> block_report={0,""};
         std::map<THASH_id,transaction_report> transaction_reports;
         std::map<std::string,BigInt> fees;
         std::map<NODE_id,BigInt> rewards;
@@ -18,13 +19,13 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<transaction_reports<<fees<<rewards;
+            b<<block_report<<transaction_reports<<fees<<rewards;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>transaction_reports>>fees>>rewards;
+            b>>block_report>>transaction_reports>>fees>>rewards;
         }
 
         // void clear()
@@ -40,6 +41,8 @@ namespace MsgData
             // {
             //     z->update(h);
             // }
+            h.update(std::to_string(block_report.first));
+            h.update(block_report.second);
             for(auto &z: transaction_reports)
             {
                 z.second.update(h);
