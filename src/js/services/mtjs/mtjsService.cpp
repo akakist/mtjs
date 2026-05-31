@@ -27,6 +27,7 @@
 #include "md/md_attachment_data.h"
 #include "md/md_GetUserStatusRSP.h"
 #include "xyjson.h"
+#include <nlohmann/json.hpp>
 extern "C"
 {
 }
@@ -547,6 +548,7 @@ extern "C" JSValue parse_yyjson(JSContext *ctx, const char *json_str, size_t len
 bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 {
     MUTEX_INSPECTOR;
+    XTRY;
 
     inBuffer in(e->msg);
     REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore();
@@ -554,7 +556,9 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     for (size_t ti = 0; ti < pb->validateBlockREQ->transaction_bodies.size(); ti++)
     {
         // xy::json::
-        yyjson::MutableDocument jtr;
+        nlohmann::json jtr;
+        // jtr["instructions"] = yyjson::MutableArray();
+        // nlohmann::json ins;
         if (opaque.tx_subscription_cb.has_value())
         {
             THASH_id tx_hash = pb->validateBlockREQ->transaction_bodies[ti]->getHash();
@@ -564,30 +568,32 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);
             auto &tx_report = pb->att_data->transaction_reports[tx_hash];
+            
+            logErr2("tx_report.instruction_reports size %d",tx_report.instruction_reports.size());
             for (int ii = 0; ii < tx_report.instruction_reports.size(); ii++)
             {
-                yyjson::MutableObject ii_json;
+                nlohmann::json ii_json;
                 ii_json["errcode"] = tx_report.instruction_reports[ii].err_code;
                 ii_json["errstr"] = tx_report.instruction_reports[ii].err_str;
                 // logErr2("err_str %d %d %s",ti,ii,pb->att_data.instruction_reports[ti][ii].err_str.c_str());
-                yyjson::MutableArray logmsgs_json;
+                nlohmann::json logmsgs_json;
                 auto &lms = tx_report.instruction_reports[ii].logMsgs;
                 for (auto &z : lms)
                 {
                     // logErr2("logmsgs %d %d %d %s",ti,ii,k,pb->att_data.instruction_reports[ti][ii].logMsgs[k].c_str());
-                    logmsgs_json.push(z);
+                    logmsgs_json.push_back(z);
                 }
                 ii_json["logMsgs"] = logmsgs_json;
-                jtr["instructions"].append(ii_json);
-                jtr["errcode"].append(tx_report.err_code);
-                jtr["errstr"].append(tx_report.err_str);
+                jtr["instructions"].push_back(ii_json);
             }
+            jtr["errcode"]=tx_report.err_code;
+            jtr["errstr"]=tx_report.err_str;
             if (!JS_IsFunction(js_ctx, opaque.tx_subscription_cb->get()))
             {
                 throw CommonError("callback not a function");
             }
-            std::string str; 
-            jtr.write(str);
+            std::string str=jtr.dump(); 
+            // jtr.write(str);
             // logErr2("json %s",str.c_str());
             JSValue obj = JS_ParseJSON(js_ctx, str.data(), str.size(), "<input>");
             scope.addValue(obj);
@@ -598,5 +604,6 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
             qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
         }
     }
+    XPASS;
     return true;
 }

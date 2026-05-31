@@ -73,7 +73,7 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     auto _to=params / "to";
     if(!_to.isString())
         return "param to must be string";
-    auto to_addr=_to.toString();
+    auto to_addr=base16::decode(_to.toString());
     if(to_addr.size()!=senderAddress.size())
         return "param to has invalid size";
 
@@ -107,7 +107,7 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
 
     t.fee[senderAddress] += v->fees[bc_values::transfer];
 
-    t.logMsg(txid, seqId, "amount %s sucessfully transferred to %s", amount.toString().c_str(), to_addr.c_str());
+    t.logMsg(txid, seqId, "amount %s sucessfully transferred to %s", amount.toString().c_str(), base16::encode(to_addr).c_str());
 
     return std::nullopt;
 }

@@ -173,7 +173,6 @@ int get_global_refcount();
 bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
-    logErr2("ValidateBlockREQ");
     if (state_Z != State::NORMAL)
     {
         logErr2("state_Z != State::NORMAL");
