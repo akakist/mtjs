@@ -5,12 +5,17 @@ import { sleep } from "os";
 const node="127.0.0.1:2301";
 let sk=std.getenv('k_root_ed_sk');
 let root_pk=std.getenv('k_root_ed_pk');
-let u0 = std.getenv('k_u0_ed_pk');
-let u1 = std.getenv('k_u1_ed_pk');
-let u2 = std.getenv('k_u2_ed_pk');
-let u3 = std.getenv('k_u3_ed_pk');
-let u4 = std.getenv('k_u4_ed_pk');
-let users=[u0!,u1!,u2!,u3!,u4!];
+// let u0 = std.getenv('k_u0_ed_pk');
+// let u1 = std.getenv('k_u1_ed_pk');
+// let u2 = std.getenv('k_u2_ed_pk');
+// let u3 = std.getenv('k_u3_ed_pk');
+// let u4 = std.getenv('k_u4_ed_pk');
+// let users=[u0!,u1!,u2!,u3!,u4!];
+let users: string[] = [];
+for (let i = 0; i < 20; i++) {
+    let pk = std.getenv(`k_u${i}_ed_pk`);
+    if (pk) users.push(pk);
+}
 async function exec() {
         while(true)
         {
@@ -23,7 +28,7 @@ async function exec() {
             let tx=
                 [
                     {
-                        contract:"",
+                        contract:"root",
                         method:"mint",
                         params: { amount:"100000"}
                     }
@@ -32,7 +37,7 @@ async function exec() {
             for (let i = 0; i < users.length; i++)
             {
                 tx.push({
-                    contract:"",
+                    contract:"root",
                     method:"transfer",
                     params:{to:users[i], amount: `${100+i}`}
                 } as any);
@@ -49,13 +54,13 @@ async function exec() {
 
 console.log(std.getenv("PATH"));
 try{
-    const nums=[0,1,2,3,4];
+    const nums=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19];
     for(let i of nums)
     {
         mtjs.addInstance(`MTJS${i}`,`
             Start=Node
                 Node_rpc_addr=127.0.0.1:${2300+i}
-                Node_web_addr=127.0.0.1:${7700+i}
+                Node_web_addr=0.0.0.0:${7700+i}
                 Node_rockdb_path=db/r${i}
                 MTJS_PENDING_TIMEOUT=0.2
                 MTJS_STACK_SIZE=8388608
@@ -69,8 +74,8 @@ try{
                 HTTP_max_post=1000000
                 HTTP_doc_urls=/pics,/html,/css
                 HTTP_document_root=./www
-                Node_my_sk_bls_env_key=k_n${i}_bls_sk
-                Node_my_sk_ed_env_key=k_n${i}_ed_sk
+                Node_my_sk_bls_env_key=k_node${i}_bls_sk
+                Node_my_sk_ed_env_key=k_node${i}_ed_sk
                 Node_this_node_name=n${i}
                 Node_sqlite_pn=db/s${i}
         `);

@@ -6,7 +6,6 @@
 #include <optional>
 #include "cellable.h"
 #include "tr_exec.h"
-#include "msg_tx.h"
 
 std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 {
@@ -282,6 +281,134 @@ std::optional<std::string> TR::execute_create_node(const yyjson::Value &params, 
 
     return std::nullopt;
 }
+std::optional<std::string> TR::execute_stake_node(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+{
+    auto v = t.root->getValues();
+    auto _amount = params / "amount";
+    if (!_amount.isString())
+    {
+        return "param string amount required"; 
+    }
+    BigInt amount;
+    amount.from_string(_amount.toString());
+    auto _node = params / "node";
+    if (!_node.isString())    
+    {
+        return "param string node required";
+    }
+    NODE_id node;
+    node.container = _node.toString();
+
+    auto us = t.root->getUserState(senderAddress);
+    if (!us.valid())
+        return "if(!us.valid())";
+
+        if (us->balance < amount + v->fees[bc_values::stake])
+    {
+        return "Insufficient funds";
+    }
+
+    auto n=t.root->getNode(node);
+    if(!n.valid())
+    {
+        return "node not found";
+    }
+    BigInt &nodeStake = n->stakes[senderAddress];
+
+    us->balance -= amount;
+    nodeStake += amount;
+    t.fee[senderAddress] += v->fees[bc_values::stake];
+
+    t.logMsg(txid, seqId, "node %s staked on amount %s", node.container.c_str(), amount.toString().c_str());
+    n->setDirty(by);
+    us->setDirty(by);
+    return std::nullopt;
+    return std::nullopt;    
+}
+std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+{
+    auto v = t.root->getValues();
+    auto _amount = params / "amount";
+    if (!_amount.isString())
+    {
+        return "param string amount required"; 
+    }
+    BigInt amount;
+    amount.from_string(_amount.toString());
+    auto _node = params / "node";
+    if (!_node.isString())    {
+        return "param string node required";
+    }
+    NODE_id node;
+    node.container = _node.toString();
+    auto n = t.root->getNode(node);
+    if (!n.valid())
+    {
+        return "nodes not registered";
+    }
+    auto nodeStakeIt = n->stakes.find(senderAddress);
+    if (nodeStakeIt == n->stakes.end())
+    {
+        return "no_stake_found";
+    }
+    auto &nodeStake = nodeStakeIt->second;
+    if (nodeStake < amount)
+    {
+        return "insufficient stake in node";
+    }
+
+    auto u = t.root->getUserState(senderAddress);
+
+    if (!u.valid())
+        return "FATAL:  dst addr not found";
+    
+    if(u->balance < v->fees[bc_values::unstake])
+    {
+        return "Insufficient funds to unstake";
+    }
+    u->balance += amount;
+
+    nodeStake -= amount;
+    v->total_staked -= amount;
+    v->setDirty(by);
+    n->setDirty(by);
+    u->setDirty(by);
+
+    t.fee[senderAddress] += v->fees[bc_values::unstake];
+
+    t.logMsg(txid, seqId, "node %s unstaked on amount %s", node.container.c_str(), amount.toString().c_str());
+
+    return std::nullopt;
+}
+// std::optional<std::string> TR::execute(const tx::createContract &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+// {
+//     auto v = t.root->getValues();
+//     auto u = t.root->getUser(senderAddress);
+//     if (!u.valid())
+//         return "sender not found";
+
+//     auto cc = t.root->getContract(c.name);
+//     if (cc.valid())
+//         return "contract name already exists";
+
+//     cc = t.root->addContract(c.name, by);
+
+//     cc->owner = senderAddress;
+//     cc->name_ = c.name;
+//     cc->src = c.src;
+
+//     u->contracts.insert(c.name);
+//     u->setDirty(by);
+//     cc->setDirty(by);
+
+//     t.fee[senderAddress] += v->fees[bc_values::contract_deploy];
+
+//     t.logMsg(txid, seqId, "contract %s deployed successfully", c.name.c_str());
+
+//     return std::nullopt;
+//     return std::nullopt;    
+    
+// }
 
 // std::optional<std::string> TR::execute(const tx::unstake &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 // {

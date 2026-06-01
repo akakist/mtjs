@@ -6,7 +6,6 @@
 #include <set>
 #include "jsscope.h"
 #include "js_tools.h"
-#include "jHolder.h"
 #include "jsValueGuard.h"
 
 

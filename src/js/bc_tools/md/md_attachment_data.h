@@ -14,18 +14,19 @@ namespace MsgData
         std::map<THASH_id,transaction_report> transaction_reports;
         std::map<std::string,BigInt> fees;
         std::map<NODE_id,BigInt> rewards;
+        std::vector<std::string> emitted_events;
 
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<block_report<<transaction_reports<<fees<<rewards;
+            b<<block_report<<transaction_reports<<fees<<rewards<<emitted_events;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>block_report>>transaction_reports>>fees>>rewards;
+            b>>block_report>>transaction_reports>>fees>>rewards>>emitted_events;
         }
 
         // void clear()
@@ -46,10 +47,6 @@ namespace MsgData
             for(auto &z: transaction_reports)
             {
                 z.second.update(h);
-                // for(auto& y: z)
-                // {
-                //     y.update(h);
-                // }
             }
             for(auto &z: fees)
             {
@@ -60,6 +57,10 @@ namespace MsgData
             {
                 h.update(z.first.container);
                 h.update(z.second.toString());
+            }
+            for(const auto &z: emitted_events)
+            {
+                h.update(z);
             }
         }
     };

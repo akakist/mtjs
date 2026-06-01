@@ -27,6 +27,12 @@ struct CDatabase: public IDatabase
         {
             throw CommonError("Write failed: %s",s.ToString().c_str());
         }
+        size_t totalsize=0;
+        for(auto& z:v.cells)        {
+            totalsize+=z.second.size();
+        }
+        logErr2("write batch %d cells total size %d bytes",v.cells.size(), totalsize);
+        // logErr2("write batch %d cells",v.cells.size());
         logErr2("write batch %d granules",v.cells.size());
 
         db->Flush(rocksdb::FlushOptions());

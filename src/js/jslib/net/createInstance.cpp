@@ -23,7 +23,6 @@
 #include <vector>
 #include <cstdio>
 #include "msg.h"
-#include "msg_tx.h"
 #include "Events/System/timerEvent.h"
 #include "timers.h"
 #include "jsValueGuard.h"
@@ -200,36 +199,6 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     return g_prom.release();
 }
-// JSValue js_tx_sign(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
-// {
-//     MUTEX_INSPECTOR;
-
-//     JSScope<10, 10> scope(ctx);
-//     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-//     if (argc != 2)
-//         return JS_ThrowInternalError(ctx, "number of argument must be 2");
-
-//     if (!JS_IsObject(argv[0]))
-//         return JS_ThrowInternalError(ctx, "tx object not specified");
-//     if (!JS_IsString(argv[1]))
-//         return JS_ThrowInternalError(ctx, "sk not specified");
-
-//     std::string json_str;
-//     qjs::convert_js_value_to_json(ctx, argv[0], json_str);
-//     // nlohmann::json j = nlohmann::json::parse(json_str);
-
-//     std::string sk = base16::decode(scope.toStdString(argv[1]));
-
-//     auto pk = extract_public_ed(sk);
-
-//     nlohmann::json msg;
-//     msg["tx"] = j;
-//     auto signature = sign_ed(sk, blake2b_hash(j.dump()).container);
-//     msg["sign"] = base16::encode(signature);
-//     msg["pk"] = base16::encode(pk);
-//     auto dump = msg.dump();
-//     return JS_NewStringLen(ctx, dump.data(), dump.size());
-// }
 
 /////////////////
 JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)

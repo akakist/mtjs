@@ -104,8 +104,14 @@ int main() {
     j["ed"]["pk"]=base16::encode(kp.pk_bin);
     std::cout<< j.dump(4);
 
-    std::vector<std::string> names={"main","root","n0","n1","n2","n3","n4","u0","u1","u2","u3","u4"};
 
+    std::vector<std::string> names={"main","root"};
+
+    for(unsigned i=0;i<20;i++)
+    {
+        names.push_back("node"+std::to_string(i));
+        names.push_back("u"+std::to_string(i));
+    }
     for(auto &n:names)
     {
         auto buf = randomBytes(32);

@@ -22,6 +22,7 @@ cellable.cpp
 execute_transaction.cpp
 msg.cpp
 msgFactory.cpp
+init_root.cpp
 )
 
 

@@ -1,5 +1,4 @@
 #pragma once
-#include "jHolder.h"
 #include "rcf.h"
 #include "broadcaster.h"
 #include "async_task.h"
