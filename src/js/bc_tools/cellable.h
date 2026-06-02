@@ -173,17 +173,18 @@ public:
 inline void appendRelativeInternalPath(std::vector<std::string>&vs, const std::string & k, int depth2)
 {
     MUTEX_INSPECTOR;
-    // auto h=ghash(k.c_str());
     if(k.size()<depth2)
     {
         throw CommonError("if(k.size()<depth2)");
     }
-    // uint64_t h=0;
-    for(int i=0; i<depth2; i++)
+    int i=0;
+    for(i=0; i<depth2; i++)
     {
-        // auto k=h % 62;
         vs.push_back(k.substr(i, 1));
-        // h/=62;
+    }
+    if(k.size()>depth2)
+    {
+        vs.push_back(k.substr(depth2));
     }
 }
 

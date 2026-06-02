@@ -569,13 +569,13 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 #include <stdlib.h>
 int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 {
-    auto nv = root->getNodesNames();
+    auto nv = root->getAllNodes();
     int crc = __crc32(0, prev_block_hash_Z.container.data(), prev_block_hash_Z.container.size());
     int idx = crc % nv.size();
     int npoz = -1;
     for (int i = 0; i < nv.size(); i++)
     {
-        if (node == nv[i])
+        if (node == nv[i]->name_)
             npoz = i;
     }
     return abs(idx - npoz);
@@ -584,7 +584,7 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 {
     if (nodeLeft == nodeRight)
         return true;
-    auto nv = root->getNodesNames();
+    auto nv = root->getAllNodes();
     {
         int crc = __crc32(0, prev_block_hash_Z.container.data(), prev_block_hash_Z.container.size());
         int idx = crc % nv.size();
@@ -593,9 +593,9 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
         int tpoz = -1;
         for (int i = 0; i < nv.size(); i++)
         {
-            if (nodeLeft == nv[i])
+            if (nodeLeft == nv[i]->name_)
                 npoz = i;
-            if (nodeRight == nv[i])
+            if (nodeRight == nv[i]->name_)
                 tpoz = i;
         }
         return abs(idx - npoz) < abs(idx - tpoz);

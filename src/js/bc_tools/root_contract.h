@@ -52,46 +52,50 @@ struct bc_user: public data_base
     bc_user(Cellable* p): data_base(hsh::bc_user,p) {
     }
     std::string pkbin_еd;
-    std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
-    std::set<NODE_id> nodes;
-    std::set<std::string> contracts;
+    // std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
+    // std::set<NODE_id> nodes;
+    // std::set<std::string> contracts;
 
     void pack(outBuffer& o) const final
     {
         data_base::pack(o);
         o<<1;
-        o<<pkbin_еd<<my_stakes<<nodes<<contracts;
+        o<<pkbin_еd
+        // <<my_stakes<<nodes<<contracts
+        ;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
-        o>>pkbin_еd>>my_stakes>>nodes>>contracts;
+        o>>pkbin_еd
+        // >>my_stakes>>nodes>>contracts
+        ;
     }
     std::string dump() final
     {
         std::ostringstream o;
         o<<"PK: "  << base16::encode(pkbin_еd) << std::endl;
-        o<< "Stakes: ";
-        for(auto& z: my_stakes)
-        {
-            o<< z.first.container <<"->"<< z.second.toString();
-        }
+        // o<< "Stakes: ";
+        // for(auto& z: my_stakes)
+        // {
+        //     o<< z.first.container <<"->"<< z.second.toString();
+        // }
+        // o<< std::endl;
+
+        // o<< "Nodes: ";
+        // for(auto& z: nodes)
+        // {
+        //     o<< z.container <<" ";
+        // }
         o<< std::endl;
 
-        o<< "Nodes: ";
-        for(auto& z: nodes)
-        {
-            o<< z.container <<" ";
-        }
-        o<< std::endl;
 
-
-        o<< "Contracts: ";
-        for(auto& z: contracts)
-        {
-            o<< z <<" ";
-        }
+        // o<< "Contracts: ";
+        // for(auto& z: contracts)
+        // {
+        //     o<< z <<" ";
+        // }
         o<< std::endl;
 
 
@@ -319,7 +323,9 @@ struct root_data: public Cellable
     REF_getter<bc_user_state>   checkUserState(const std::string &pk);
 
 
-    std::vector<NODE_id> getNodesNames();
+    // std::vector<NODE_id> getNodesNames();
+    std::vector<REF_getter<bc_node>> getAllNodes();
+
 
     REF_getter<bc_node> getNode(const NODE_id &name);
     REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc);

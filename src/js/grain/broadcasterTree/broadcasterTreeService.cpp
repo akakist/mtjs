@@ -175,15 +175,15 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
     MUTEX_INSPECTOR;
     std::map<NODE_id, BroadcasterTree::Node> nodes;
 
-    auto ks = root->getNodesNames();
+    auto ks = root->getAllNodes();
     for (auto &nd : ks)
     {
-        auto nn = root->getNode(nd);
+        // auto nn = root->getNode(nd);
         BroadcasterTree::Node n;
-        n.name = nn->name_;
-        n.stake = nn->total_stake;
-        n.ip = nn->ip;
-        nodes[nn->name_] = n;
+        n.name = nd->name_;
+        n.stake = nd->total_stake;
+        n.ip = nd->ip;
+        nodes[nd->name_] = n;
     }
     if (nodes.size() == 0)
         return true;

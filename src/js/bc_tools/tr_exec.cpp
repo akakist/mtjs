@@ -239,14 +239,14 @@ std::optional<std::string> TR::execute_create_node(const yyjson::Value &params, 
     auto us = t.root->getUserState(senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    auto u = t.root->getUser(senderAddress);
-    if (!u.valid())
-        return "if(!u.valid())";
+    // auto u = t.root->getUser(senderAddress);
+    // if (!u.valid())
+    //     return "if(!u.valid())";
 
     if (us->balance < v->fees[bc_values::node_create])
         return "Not enough funds";
 
-    u->nodes.insert(name);
+    // u->nodes.insert(name);
 
     auto n = t.root->addNode(name, by);
 
@@ -272,7 +272,7 @@ std::optional<std::string> TR::execute_create_node(const yyjson::Value &params, 
     n->bls_pk.deserialize(base16::decode(pk_bls.toString()));
     n->owner_ed_pk = senderAddress;
     n->setDirty(by);
-    u->setDirty(by);
+    // u->setDirty(by);
     us->setDirty(by);
 
     t.fee[senderAddress] += v->fees[bc_values::node_create];

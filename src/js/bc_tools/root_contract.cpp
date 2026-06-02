@@ -83,7 +83,7 @@ std::vector<std::string> root_data::getContractPath(const std::string &name)
     std::vector<std::string> p;
     p.push_back("c");
     appendRelativeInternalPath(p, name, 3);
-    p.push_back(name);
+    // p.push_back(name);
     return p;
 }
 
@@ -91,7 +91,8 @@ std::vector<std::string> root_data::getNodePath(const std::string &name)
 {
     std::vector<std::string> p;
     p.push_back("n");
-    p.push_back(name);
+    appendRelativeInternalPath(p, name, 2);
+    // p.push_back(name);
     return p;
 }
 
@@ -180,7 +181,7 @@ std::vector<std::string> root_data::getUserPath(const std::string &pk_bin)
     p.push_back("u");
     std::string pk_hex=base16::encode(pk_bin);
     appendRelativeInternalPath(p, pk_hex, 5);
-    p.push_back(pk_hex);
+    // p.push_back(pk_hex);
     return p;
 }
 std::vector<std::string> root_data::getUserStatePath(const std::string &pk_bin)
@@ -189,10 +190,11 @@ std::vector<std::string> root_data::getUserStatePath(const std::string &pk_bin)
     if(pk_bin.size()!=32)
     throw CommonError("    if(pk_bin.size()!=32) %d %s",pk_bin.size(),_DMI().c_str());
     std::vector<std::string> p;
+    p.reserve(10);
     p.push_back("s");
     std::string pk_hex=base16::encode(pk_bin);
     appendRelativeInternalPath(p, pk_hex, 5);
-    p.push_back(pk_hex);
+    // p.push_back(pk_hex);
     return p;
 }
 
@@ -246,18 +248,59 @@ REF_getter<bc_user_state> root_data::checkUserState(const std::string &pk)
     return dynamic_cast<bc_user_state *>(cc->data.get());
 }
 
-std::vector<NODE_id> root_data::getNodesNames()
+void getChildrenRecursive( Cellable* c, std::vector<REF_getter<data_base>> &res,IDatabase *db)
+{
+    if(c->data.valid())
+    {
+        res.push_back(c->data);
+    }
+    for(auto& z: c->children_hashes)
+    {
+        auto key=z.first;
+        auto it=c->children_ptrs.find(key);
+        if(it!=c->children_ptrs.end())
+        {
+            getChildrenRecursive(it->second.get(), res,db);
+        }
+        else 
+        {
+            auto cc=c->getLeafNoCreate(key, db);
+            if(!cc.valid())
+            {
+                throw CommonError("if(!cc.valid())");
+            }
+            getChildrenRecursive(cc.get(), res, db);
+        }
+    }
+}
+std::vector<REF_getter<bc_node>> root_data::getAllNodes()
 {
 
-    std::vector<NODE_id> v;
-    auto nodes = this->getLeafNoCreate("n", db.get());
-    for (auto &z : nodes->children_hashes)
+    std::vector<REF_getter<data_base>> v;
+
+    auto n = this->getLeafNoCreate("n", db.get());
+
+    getChildrenRecursive(n.get(), v, db.get());
+
+    std::vector<REF_getter<bc_node>> vv;
+    for(auto& z: v)
     {
-        NODE_id n;
-        n.container = z.first;
-        v.push_back(n);
+        if(z->type==hsh::bc_node)
+        {
+            auto *p=dynamic_cast<bc_node*>(z.get());
+            if(p)
+                vv.push_back(p);
+            else throw CommonError("if(p)");
+        }
     }
-    return v;
+    return vv;
+    // for (auto &z : n->children_hashes)
+    // {
+    //     NODE_id n;
+    //     n.container = z.first;
+    //     v.push_back(n);
+    // }
+    // return v;
 }
 REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer> &bc)
 {

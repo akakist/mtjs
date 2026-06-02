@@ -140,6 +140,11 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     if (state_Z != NORMAL)
         return true;
 
+    if (r->blockInfo->prev_root_hash != prev_block_hash_Z)
+    {
+        logErr2("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_block_hash");
+        return true;
+    }
     if (!r->verify(root->getNode(r->node_validator)->bls_pk))
     {
         logErr2("block response not validated");
@@ -147,11 +152,6 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     }
 
     // msg::blockZ bl(r->payload_block);
-    if (r->blockInfo->prev_root_hash != prev_block_hash_Z)
-    {
-        logErr2("if(bl.prev_root_hash!=prev_block_hash)");
-        return true;
-    }
     // if(bl.)
     auto &bt = blocks_leader[prev_block_hash_Z];
     if (bt.responses.size())
