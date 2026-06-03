@@ -16,6 +16,10 @@ for (let i = 0; i < 20; i++) {
     if (pk)
         users.push(pk);
 }
+let nodes = [];
+for (let i = 0; i < 20; i++) {
+    nodes.push(`n${i}`);
+}
 async function exec() {
     while (true) {
         mtjs.tx_subscribe(node, (params) => {
@@ -36,6 +40,20 @@ async function exec() {
                 contract: "root",
                 method: "transfer",
                 params: { to: users[i], amount: `${100 + i}` }
+            });
+        }
+        for (let i = 0; i < nodes.length; i++) {
+            tx.push({
+                contract: "root",
+                method: "stake_node",
+                params: { node: nodes[i], amount: `${i + 10}` }
+            });
+        }
+        for (let i = 1; i < nodes.length; i++) {
+            tx.push({
+                contract: "root",
+                method: "unstake_node",
+                params: { node: nodes[i], amount: `${i + 5}` }
             });
         }
         // const m=mtjs.tx_sign(tx, sk!);

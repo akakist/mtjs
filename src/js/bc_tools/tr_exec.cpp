@@ -317,6 +317,9 @@ std::optional<std::string> TR::execute_stake_node(const yyjson::Value &params, t
 
     us->balance -= amount;
     nodeStake += amount;
+    n->total_stake += amount;
+    v->total_staked += amount;
+    
     t.fee[senderAddress] += v->fees[bc_values::stake];
 
     t.logMsg(txid, seqId, "node %s staked on amount %s", node.container.c_str(), amount.toString().c_str());
@@ -369,7 +372,11 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     u->balance += amount;
 
     nodeStake -= amount;
+    
+    n->total_stake -= amount;
+
     v->total_staked -= amount;
+    
     v->setDirty(by);
     n->setDirty(by);
     u->setDirty(by);

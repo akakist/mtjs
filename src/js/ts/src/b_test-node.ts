@@ -16,6 +16,10 @@ for (let i = 0; i < 20; i++) {
     let pk = std.getenv(`k_u${i}_ed_pk`);
     if (pk) users.push(pk);
 }
+let nodes: string[] = [];
+for (let i = 0; i < 20; i++) {
+    nodes.push(`n${i}`);
+}
 async function exec() {
         while(true)
         {
@@ -40,6 +44,22 @@ async function exec() {
                     contract:"root",
                     method:"transfer",
                     params:{to:users[i], amount: `${100+i}`}
+                } as any);
+            }
+            for(let i=0;i<nodes.length;i++)
+            {
+                tx.push({
+                    contract:"root",
+                    method:"stake_node",
+                    params:{node:nodes[i], amount:`${i+10}`!}
+                } as any);
+            }
+            for(let i=1;i<nodes.length;i++)
+            {
+                tx.push({
+                    contract:"root",
+                    method:"unstake_node",
+                    params:{node:nodes[i], amount:`${i+5}`!}
                 } as any);
             }
 
