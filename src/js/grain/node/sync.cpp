@@ -25,6 +25,7 @@ void Node::Service::do_sync(const NODE_id &src_node)
         throw CommonError("if(!n.valid())");
     REF_getter<MsgData::GetSavedBlocksREQ> gbr = new MsgData::GetSavedBlocksREQ();
     gbr->epoch = root->getEpoch()->epoch;
+    gbr->prev_block_hash=prev_block_hash_Z;
     logNode("@@@@@@@@@@@@@@@@ REQUEST for blocks since %s", gbr->epoch.toString().c_str());
     // msg::node_message_ed nm(gbr->getBuffer(), this_node_name, my_sk_ed);
     // broadcast_MsgEvent(gbr);
@@ -45,8 +46,21 @@ bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const
     BigInt epoch = 0;
     {
         logNode("Query FROM epoch %s", r->epoch.toString().c_str());
-        SQLite::Statement query1(dbs, "SELECT epoch, data FROM blocks WHERE epoch>=" + r->epoch.toString() + " LIMIT 20");
-        // query1.bind(1, r->epoch.toString());
+        SQLite::Statement query0(dbs, "SELECT epoch FROM blocks WHERE prev_root_hash='" + base16::encode(r->prev_block_hash.container) + "'");
+
+        bool f1=false;
+        BigInt epoch;
+        while(query0.executeStep())
+        {
+            f1=true;
+            epoch.from_string(query0.getColumn(0).getString());
+        }
+        if(!f1)
+        {
+            throw CommonError("NOT FOUND %s",base16::encode(r->prev_block_hash.container).c_str());
+        }
+        SQLite::Statement query1(dbs, "SELECT epoch,data FROM blocks WHERE epoch>=? ORDER by epoch");
+        query1.bind(1, epoch.toString());
         bool found = false;
         while (query1.executeStep())
         {
@@ -90,6 +104,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         if(prev_block_hash_Z!=z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash)
         {
             logNode("prev root hash not matched");
+            continue;
         }
         else
             logNode("prev root hash matched !!!");
@@ -119,7 +134,6 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         // t.att_data->trs = z.second->att_data->trs;
         t.validateBlockREQ = z.second->validateBlockREQ;
         auto rh=execute_block(t,  z.second->validateBlockREQ->leader_cert->nodes);
-        // calc_fee_and_rewards(t, r->leader_cert->nodes);
         // blockDBStore = prepareBlockDBStore(t);
         /*
         execute_block(t, root, prev_block_hash_Z, r->leader_cert->nodes);

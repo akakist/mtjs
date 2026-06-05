@@ -13,6 +13,8 @@
 #include <string>
 #include <time.h>
 #include <map>
+#include "md_BlockAcceptedRSP.h"
+#include "md_ValidateBlockRSP.h"
 #include "msg.h"
 #include "ioBuffer.h"
 #include "nodeService.h"
@@ -28,11 +30,15 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     MUTEX_INSPECTOR;
     XTRY;
     // blockDBStore->validateBlockREQ->leader_cert
-    if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)
+    if (!blockDBStore.valid())
+        return true;
+
+    if (blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader != src_node)
     {
         logErr2("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
         return true;
     }
+
     if (CheckState(blockDBStore->validateBlockREQ->leader_cert->heart_beat.get(), src_node))
         return true;
     if (state_Z != State::NORMAL)
@@ -51,6 +57,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     }
 
     {
+        MUTEX_INSPECTOR;
         XTRY;
         if (!r->agg_sig.verify(agg_pk, blake2b_hash(r->blockInfo->getBuffer()).container))
         {
@@ -64,16 +71,17 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XPASS;
     }
 
-
     db->write_batch(db_to_save_Z);
     db_to_save_Z.clear();
 
     {
+        MUTEX_INSPECTOR;
         XTRY;
         SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
 
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
         insert.bind(1, blockDBStore->epoch.toString());
+
         insert.bind(2, base16::encode(blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.container));
         insert.bind(3, time(NULL));
         insert.bind(4, base16::encode(blockDBStore->getBuffer()));
@@ -91,6 +99,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     sendEvent(ServiceEnum::GrainReader, new bcEvent::InvalidateRoot(this));
 
     {
+        MUTEX_INSPECTOR;
         XTRY;
         REF_getter<MsgData::BlockAcceptedRSP> br = new MsgData::BlockAcceptedRSP();
         br->new_root_hash = prev_block_hash_Z;
@@ -101,10 +110,13 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         pass_NodeMsgRSP(br.get(), route);
         XPASS;
     }
+
     iUtils->getNow();
 
     for (auto &z : blockDBStore->validateBlockREQ->transaction_bodies)
     {
+
+        MUTEX_INSPECTOR;
         XTRY;
         auto h = z->getHash();
         auto it = transaction_pool_of_leader.find(h);
@@ -117,6 +129,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     }
     blockDBStore = nullptr;
     {
+        MUTEX_INSPECTOR;
         XTRY;
         do_heart_beat();
         XPASS;
@@ -157,15 +170,14 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     {
         rsp->trs.push_back(z.second);
     }
-    pass_NodeMsgRSP(rsp.get(),route);
+    pass_NodeMsgRSP(rsp.get(), route);
     return true;
 }
-void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r)
+void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
 {
     auto buffer = e->getBuffer();
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
     passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
-
 }
 
 int get_global_refcount();
@@ -177,60 +189,57 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     {
         logErr2("state_Z != State::NORMAL");
         return true;
-
     }
 
     t_params t(root);
-    bool err=false;
+    bool err = false;
     if (CheckState(r->leader_cert->heart_beat.get(), src_node))
     {
-        t.att_data->block_report={1,"check state heart beat failed"};
+        t.att_data->block_report = {1, "check state heart beat failed"};
         logErr2("check state heart beat failed");
-        err=true;
+        err = true;
     }
-        // return true;
+    // return true;
 
     resetTimer();
-    if(!err)
+    if (!err)
     {
         if (r->leader_cert->heart_beat->node_leader != node_leader_for_client)
         {
-            t.att_data->block_report={1,"cert node leader mismatched"};
-            err=true;
+            t.att_data->block_report = {1, "cert node leader mismatched"};
+            err = true;
             logErr2("cert node leader mismatched");
         }
-
     }
 
     if (!err && !root->verify_lider_certificate(r->leader_cert))
     {
-        err=true;
-        t.att_data->block_report={1,"verify_lider_certificate failed"};
+        err = true;
+        t.att_data->block_report = {1, "verify_lider_certificate failed"};
         logErr2("verify_lider_certificate failed");
     }
-    
+
     if (!err && r->leader_cert->heart_beat->prev_block_hash != prev_block_hash_Z)
     {
         if (root->getEpoch()->epoch + 1 != r->leader_cert->heart_beat->new_epoch)
         {
-            t.att_data->block_report={1,"epoch invalid"};
-            err=true;
+            t.att_data->block_report = {1, "epoch invalid"};
+            err = true;
             logNode("if (root->getEpoch()->epoch+1 < r->leader_cert->heart_beat->new_epoch)");
             // setBlockId(r->leader_cert->heart_beat->prev_block_hash);
             // return true;
         }
         logNode("ERROR: ValidateBlock block %s, nextblock %s", r->leader_cert->heart_beat->prev_block_hash.str().c_str(), prev_block_hash_Z.str().c_str());
     }
-    if(!err)
+    if (!err)
     {
 
         // auto new_root_hash =
         t.validateBlockREQ = r;
 
-        auto new_root_hash=execute_block(t,  r->leader_cert->nodes);
+        auto new_root_hash = execute_block(t, r->leader_cert->nodes);
 
         blockDBStore = prepareBlockDBStore(t);
-
 
         REF_getter<MsgData::BlockInfo> block = new MsgData::BlockInfo();
         block->prev_root_hash = prev_block_hash_Z;
@@ -244,7 +253,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         rsp->blockInfo = block;
         rsp->sign(my_sk_bls);
 
-        pass_NodeMsgRSP(rsp.get(),route);
+        pass_NodeMsgRSP(rsp.get(), route);
     }
 #ifdef MEMLEACK_CHECK
     logNode("!!!!!!!!!!!!!! global REF count %d", get_global_refcount());
@@ -257,4 +266,3 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 #endif
     return true;
 }
-

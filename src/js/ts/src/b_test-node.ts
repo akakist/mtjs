@@ -50,7 +50,7 @@ async function exec() {
             {
                 tx.push({
                     contract:"root",
-                    method:"stake_node",
+                    method:"node_stake",
                     params:{node:nodes[i], amount:`${i+10}`!}
                 } as any);
             }
@@ -58,7 +58,7 @@ async function exec() {
             {
                 tx.push({
                     contract:"root",
-                    method:"unstake_node",
+                    method:"node_unstake",
                     params:{node:nodes[i], amount:`${i+5}`!}
                 } as any);
             }

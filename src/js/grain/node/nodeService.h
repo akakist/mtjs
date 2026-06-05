@@ -53,16 +53,8 @@ namespace Node
     {
         TIMER_START_HEART_BEAT,
         TIMER_RESTART_BLOCK,
+        TIMER_PERIODIC_CLOCK,
     };
-    // struct heart_beat_responce2
-    // {
-    //     BigInt stake_34;
-    //     REF_getter<MsgData::HeartBeatRSP> rsp;
-    //     heart_beat_responce2():rsp(nullptr)
-    //     {
-    //         stake_34=0;
-    //     }
-    // };
     struct heart_beat_node_info
     {
         heart_beat_node_info() : leader_cert_2(nullptr) {
@@ -188,8 +180,6 @@ namespace Node
         {
             REF_getter<MsgData::BlockInfo> blockInfo=nullptr;
             std::vector<REF_getter<MsgData::ValidateBlockRSP> > responses;
-            // BigInt stake_validators;
-            // std::map<NODE_id /*validator*/, blst_cpp::Signature> sigs;
 
 
 
@@ -200,39 +190,18 @@ namespace Node
 
             std::map<NODE_id, REF_getter<MsgData::BlockAcceptedRSP> > acceptors;
 
-            // int round_=0;
             heart_beat_info    heart_beat_store;
 
         };
         _db_to_save db_to_save_Z;
         REF_getter<MsgData::BlockDBStore> prepareBlockDBStore(const t_params& t);
 
-        // time_t last_access_time_hbZ=0; // heart-_bit last tick time
-        // REF_getter<MsgData::LeaderCertificate> last_leader_cert=nullptr;
 
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         std::map<BLOCK_id,block> blocks_leader;
         NODE_id node_leader_for_client;
 
-        // struct _prepared_block
-        // {
-        //     attachment_data att_data;
-        //     BigInt epoch;
-        //     void clear()
-        //     {
-        //         att_data.clear();
-        //         epoch=0;
-        //     }
-        // };
-        // _prepared_block prepared_block;
         REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
-        // void do_client_tx_report(const msg::publish_block &pb);
-//
-        // void setBlockId(const BLOCK_id& b)
-        // {
-        //     prev_block_hash_Z=b;
-        //     auto err=db->put_cell("#root_hash#",b.container);
-        // }
         BLOCK_id prev_block_hash_Z;
         void do_start_block();
 
@@ -243,7 +212,7 @@ namespace Node
 
         bool CheckState(const MsgData::HeartBeatREQ *r, const NODE_id & src_node);
 
-        void calc_fee_and_rewards(t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert);
+        void calc_fee_rewards_nodes(t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert);
 
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
 
@@ -251,7 +220,7 @@ namespace Node
         REF_getter<IDatabase> db=nullptr;
 
 
-
+        uint64_t last_activity_time=0;
         std::string sqlite_pn;
         std::string rocksdb_path;
         std::set<msockaddr_in> rpc_addr;

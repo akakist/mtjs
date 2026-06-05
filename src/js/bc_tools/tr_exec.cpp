@@ -33,7 +33,7 @@ std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_param
     u->balance += amount;
     u->setDirty(by);
 
-    t.fee[senderAddress] += v->fees[bc_values::mint];
+    t.fee[senderAddress] += v->getFee("mint");
 
     t.logMsg(txid, seqId, "amount %s sucessfully minted on your balance", amount.toString().c_str());
 
@@ -49,26 +49,9 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
         return "param amount must be string";
     }
 
-    // if (!params.contains("amount"))
-    // {
-    //     logErr2("param amount required");
-    //     return "param amount required";
-    // }
     BigInt amount;
     amount.from_string(_a.toString());
 
-    // auto &a = params["amount"];
-    // if (a.isSis_number_integer())
-    // {
-    //     amount = a.get<uint64_t>();
-    // }
-    // else if (a.is_string())
-    // {
-    //     amount.from_string(a.get<std::string>());
-    // }
-    // else
-    //     return "param amount must be number or string";
-    // if()
     auto _to=params / "to";
     if(!_to.isString())
         return "param to must be string";
@@ -95,7 +78,8 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     {
         return "destination user not found";
     }
-    if (u->balance < v->fees[bc_values::transfer] + amount)
+    auto fee=v->getFee("transfer");
+    if (u->balance < fee + amount)
     {
         return "Not enough funds";
     }
@@ -104,13 +88,13 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     u->setDirty(by);
     to->setDirty(by);
 
-    t.fee[senderAddress] += v->fees[bc_values::transfer];
+    t.fee[senderAddress] += fee;
 
     t.logMsg(txid, seqId, "amount %s sucessfully transferred to %s", amount.toString().c_str(), base16::encode(to_addr).c_str());
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_update_node(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 {
     // if(senderAddress!=)
     auto v = t.root->getValues();
@@ -122,45 +106,24 @@ std::optional<std::string> TR::execute_update_node(const yyjson::Value &params, 
         return "param name must be string";
     }
     name.container = _name.toString();
-    // for (auto &z : name.container)
-    // {
-    //     if (!isalnum(z))
-    //     {
-    //         return "allowed only isalnum symbols";
-    //     }
-    //     if (isalpha(z) && isupper(z))
-    //     {
-    //         return "allowed only lowercase symbols";
-    //     }
-    // }
 
 
     auto nn = t.root->getNode(name);
     if (!nn.valid())
         return "Node not found";
-    // if(nn->owner_ed_pkhex!=senderAddress)
-    // {
-    //     return "not node owner";
-    // }
-
-    auto us = t.root->getUserState(senderAddress);
-    if (!us.valid())
-        return "if(!us.valid())";
-    // auto u = t.root->getUser(senderAddress);
-    // if (!u.valid())
-    //     return "if(!u.valid())";
-
-    if (us->balance < v->fees[bc_values::node_update])
-        return "Not enough funds";
-
-    // u->nodes.insert(name);
-
-    if (senderAddress != nn->owner_ed_pk)
+    if(nn->owner_ed_pk!=senderAddress)
     {
         return "only node owner can update node info";
     }
+    auto us = t.root->getUserState(senderAddress);
+    if (!us.valid())
+        return "if(!us.valid())";
+    auto fee=v->getFee("node_update");
+    if (us->balance < fee)
+        return "Not enough funds";
 
-    // auto n = t.root->addNode(name, by);
+
+
     auto ip=params / "ip";
     if (ip.isString())
     {
@@ -176,39 +139,22 @@ std::optional<std::string> TR::execute_update_node(const yyjson::Value &params, 
     auto pk_bls=params / "pk_bls";
     if(pk_bls.isString())
     {
-        nn->bls_pk.deserializeHexStr(pk_ed.toString());
+        nn->bls_pk.deserializeHexStr(pk_bls.toString());
         t.logMsg(txid, seqId, "pk bls changed");
     }
     
 
-    // if (!params.contains("ip") || !params["ip"].is_string())
-    //     return "param ip required";
-    // if (!params.contains("pk_ed") || !params["pk_ed"].is_string())
-    //     return "param pk_ed required";
-    // if (!params.contains("pk_bls") || !params["pk_bls"].is_string())
-    //     return "param pk_bls required";
-
-    // n->name_ = name;
-    // n->ip = params["ip"].get<std::string>();
-    // n->ed_pk = base16::decode(params["pk_ed"].get<std::string>());
-    // if (n->ed_pk.size() != senderAddress.size() / 2)
-    // {
-    //     return "invalid ed pk";
-    // }
-    // n->bls_pk.deserialize(base16::decode(params["pk_bls"].get<std::string>()));
-    // n->owner_ed_pkhex = senderAddress;
     nn->setDirty(by);
-    // u->setDirty(by);
     us->setDirty(by);
 
-    t.fee[senderAddress] += v->fees[bc_values::node_update];
+    t.fee[senderAddress] += fee;
 
     t.logMsg(txid, seqId, "node %s updated", name.container.c_str());
 
     return std::nullopt;
 }
 
-std::optional<std::string> TR::execute_create_node(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 {
     auto v = t.root->getValues();
     NODE_id name;
@@ -239,14 +185,10 @@ std::optional<std::string> TR::execute_create_node(const yyjson::Value &params, 
     auto us = t.root->getUserState(senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    // auto u = t.root->getUser(senderAddress);
-    // if (!u.valid())
-    //     return "if(!u.valid())";
-
-    if (us->balance < v->fees[bc_values::node_create])
+    auto fee=v->getFee("node_create");
+    if (us->balance < fee)
         return "Not enough funds";
 
-    // u->nodes.insert(name);
 
     auto n = t.root->addNode(name, by);
 
@@ -259,12 +201,6 @@ std::optional<std::string> TR::execute_create_node(const yyjson::Value &params, 
         return "string param pk_ed required";
     if(!pk_bls.isString())
         return "string param pk_bls required";
-    // if (!params.ge.contains("ip") || !params["ip"].is_string())
-    //     return "param ip required";
-    // if (!params.contains("pk_ed") || !params["pk_ed"].is_string())
-    //     return "param pk_ed required";
-    // if (!params.contains("pk_bls") || !params["pk_bls"].is_string())
-    //     return "param pk_bls required";
 
     n->name_ = name;
     n->ip = ip.toString();
@@ -275,13 +211,13 @@ std::optional<std::string> TR::execute_create_node(const yyjson::Value &params, 
     // u->setDirty(by);
     us->setDirty(by);
 
-    t.fee[senderAddress] += v->fees[bc_values::node_create];
+    t.fee[senderAddress] += fee;
 
     t.logMsg(txid, seqId, "node %s registered", name.container.c_str());
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_stake_node(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v = t.root->getValues();
     auto _amount = params / "amount";
@@ -302,8 +238,8 @@ std::optional<std::string> TR::execute_stake_node(const yyjson::Value &params, t
     auto us = t.root->getUserState(senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-
-        if (us->balance < amount + v->fees[bc_values::stake])
+    auto fee=v->getFee("node_stake");
+    if (us->balance < amount + fee)
     {
         return "Insufficient funds";
     }
@@ -320,12 +256,11 @@ std::optional<std::string> TR::execute_stake_node(const yyjson::Value &params, t
     n->total_stake += amount;
     v->total_staked += amount;
     
-    t.fee[senderAddress] += v->fees[bc_values::stake];
+    t.fee[senderAddress] += fee;
 
     t.logMsg(txid, seqId, "node %s staked on amount %s", node.container.c_str(), amount.toString().c_str());
     n->setDirty(by);
     us->setDirty(by);
-    return std::nullopt;
     return std::nullopt;    
 }
 std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
@@ -364,8 +299,8 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
 
     if (!u.valid())
         return "FATAL:  dst addr not found";
-    
-    if(u->balance < v->fees[bc_values::unstake])
+    auto fee=v->getFee("node_unstake");
+    if(u->balance < fee)
     {
         return "Insufficient funds to unstake";
     }
@@ -381,12 +316,51 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     n->setDirty(by);
     u->setDirty(by);
 
-    t.fee[senderAddress] += v->fees[bc_values::unstake];
+    t.fee[senderAddress] += fee;
 
     t.logMsg(txid, seqId, "node %s unstaked on amount %s", node.container.c_str(), amount.toString().c_str());
 
     return std::nullopt;
 }
+
+std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+{
+    auto v = t.root->getValues();
+    auto _node = params / "node";
+    if (!_node.isString())    
+    {
+        return "param string node required";
+    }
+    NODE_id node;
+    node.container = _node.toString();
+
+    auto n = t.root->getNode(node);
+    if (!n.valid())
+    {
+        return "node not found";
+    }
+    if (n->owner_ed_pk != senderAddress)
+    {
+        return "only node owner can enable node";
+    }
+    auto fee=v->getFee("node_enable");
+    auto us = t.root->getUserState(senderAddress);
+    if (!us.valid())
+        return "if(!us.valid())";
+    if (us->balance < fee)
+    {
+        return "Insufficient funds";
+    }
+    n->missed_rounds = 0;
+    n->setDirty(by);
+
+    t.fee[senderAddress] += fee;
+
+    t.logMsg(txid, seqId, "node %s enabled", node.container.c_str());
+
+    return std::nullopt;
+}
+
 // std::optional<std::string> TR::execute(const tx::createContract &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 // {
 //     auto v = t.root->getValues();
@@ -417,43 +391,6 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     
 // }
 
-// std::optional<std::string> TR::execute(const tx::unstake &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
-// {
-//     auto v = t.root->getValues();
-
-//     auto n = t.root->getNode(c.node);
-//     if (!n.valid())
-//     {
-//         return "nodes not registered";
-//     }
-//     auto nodeStakeIt = n->stakes.find(senderAddress);
-//     if (nodeStakeIt == n->stakes.end())
-//     {
-//         return "no_stake_found";
-//     }
-//     auto &nodeStake = nodeStakeIt->second;
-//     if (nodeStake < c.amount)
-//     {
-//         return "insufficient stake";
-//     }
-
-//     auto u = t.root->getUser(senderAddress);
-
-//     if (!u.valid())
-//         return "FATAL:  dst addr not found";
-
-//     nodeStake -= c.amount;
-//     v->total_staked -= c.amount;
-//     v->setDirty(by);
-//     n->setDirty(by);
-//     u->setDirty(by);
-
-//     t.fee[senderAddress] += v->fees[bc_values::unstake];
-
-//     t.logMsg(txid, seqId, "node %s unstaked on amount %s", c.node.container.c_str(), c.amount.toString().c_str());
-
-//     return std::nullopt;
-// }
 // std::optional<std::string> TR::execute(const tx::createContract &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 // {
 //     auto v = t.root->getValues();
@@ -482,110 +419,5 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
 //     return std::nullopt;
 // }
 
-// std::optional<std::string> TR::execute(const tx::transfer &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
-// {
-//     auto v = t.root->getValues();
-//     auto from = t.root->getUserState(senderAddress);
-//     if (!from.valid())
-//         return "cannot find src addr";
 
-//     auto to = t.root->getUserState(c.to_address);
-//     if (!to.valid())
-//     {
-//         return "destination user not found " + base16::encode(c.to_address);
-//     }
-//     if (from->balance < v->fees[bc_values::transfer] + c.amount)
-//     {
-//         return "Not enough money";
-//     }
-//     from->balance -= c.amount;
-//     to->balance += c.amount;
-//     from->setDirty(by);
-//     to->setDirty(by);
-//     t.fee[senderAddress] += v->fees[bc_values::transfer];
-//     t.logMsg(txid, seqId, "amount %s successfully transferred", c.amount.toString().c_str());
-//     return std::nullopt;
-// }
 
-// std::optional<std::string> TR::execute(const tx::stake &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
-// {
-//     auto v = t.root->getValues();
-//     if (!v.valid())
-//     {
-//         return "values not found";
-//     }
-//     auto n = t.root->getNode(c.node);
-//     if (!n.valid())
-//     {
-//         return "Node not registered";
-//     }
-//     auto sender = t.root->getUserState(senderAddress);
-//     if (!sender.valid())
-//     {
-//         return "user account not found";
-//     }
-
-//     // BigInt amt;
-//     // amt.from_string(c.amount);
-//     if (sender->balance + v->fees[bc_values::stake] < c.amount)
-//     {
-//         return "Insufficient funds";
-//     }
-
-//     BigInt &nodeStake = n->stakes[senderAddress];
-
-//     sender->balance -= c.amount;
-//     nodeStake += c.amount;
-//     t.fee[senderAddress] += v->fees[bc_values::stake];
-
-//     t.logMsg(txid, seqId, "node %s staked on amount %s", c.node.container.c_str(), c.amount.toString().c_str());
-//     n->setDirty(by);
-//     sender->setDirty(by);
-//     return std::nullopt;
-// }
-
-// std::optional<std::string> TR::execute(const tx::registerNode &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
-// {
-//     auto v = t.root->getValues();
-//     for (auto &z : c.name.container)
-//     {
-//         if (!isalnum(z))
-//         {
-//             return "allowed only isalnum symbols";
-//         }
-//         if (isalpha(z) && isupper(z))
-//         {
-//             return "allowed only lowercase symbols";
-//         }
-//     }
-
-//     auto nn = t.root->getNode(c.name);
-//     if (nn.valid())
-//         return "Node already registered with name";
-//     auto us = t.root->getUserState(senderAddress);
-//     if (!us.valid())
-//         return "if(!us.valid())";
-//     auto u = t.root->getUser(senderAddress);
-//     if (!u.valid())
-//         return "if(!u.valid())";
-//     if (us->balance < v->fees[bc_values::node_create])
-//         return "Not enough funds";
-
-//     u->nodes.insert(c.name);
-
-//     auto n = t.root->addNode(c.name, by);
-//     n->name_ = c.name;
-//     n->ip = c.ip;
-//     n->ed_pk = c.pk_ed;
-//     n->bls_pk = c.pk_bls;
-//     n->owner_ed_pkhex = senderAddress;
-//     n->setDirty(by);
-//     u->setDirty(by);
-//     us->setDirty(by);
-
-//     t.fee[senderAddress] += v->fees[bc_values::node_create];
-
-//     t.logMsg(txid, seqId, "node %s registered", c.name.container.c_str());
-
-//     return std::nullopt;
-// }

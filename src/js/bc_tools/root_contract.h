@@ -187,47 +187,50 @@ struct bc_node: public data_base
 struct bc_values: public data_base
 {
 
-    enum __fee_types
-    {
-        contract_deploy,
-        contract_transfer,
-        node_create,
-        node_update,
-        node_enable_from_manual,
-        node_enable_from_offline,
-        nick_create,
-        nick_transfer,
-        cell_in_contract_create,
-        freeze_contract,
-        mint,
-        unstake,
-        stake,
-        transfer,
-        register_nick,
+    // enum __fee_types
+    // {
+    //     contract_deploy,
+    //     contract_transfer,
+    //     node_create,
+    //     node_update,
+    //     node_enable_from_manual,
+    //     node_enable_from_offline,
+    //     nick_create,
+    //     nick_transfer,
+    //     cell_in_contract_create,
+    //     freeze_contract,
+    //     mint,
+    //     unstake,
+    //     stake,
+    //     transfer,
+    //     register_nick,
 
-        FEE_TYPE_END
-    };
+    //     // FEE_TYPE_END
+    // };
 
     bc_values(Cellable *p): data_base(hsh::bc_values,p) {
-        fees.resize(FEE_TYPE_END);
-        fees[contract_deploy]=BigInt(5000);
-        fees[contract_transfer]=BigInt(1000);
-        fees[node_create]=BigInt(20000);
-        fees[node_enable_from_manual]=BigInt(5000);
-        fees[node_enable_from_offline]=BigInt(10000);
-        fees[nick_create]=BigInt(2000);
-        fees[nick_transfer]=BigInt(1000);
-        fees[cell_in_contract_create]=BigInt(500);
-        fees[freeze_contract]=BigInt(3000);
-        fees[mint]=BigInt(95);
-        fees[unstake]=BigInt(200);
-        fees[stake]=BigInt(200);
-        fees[transfer]=BigInt(1000);
-        fees[register_nick]=BigInt(5000);
+        // fees.resize(FEE_TYPE_END);
+        fees["contract_deploy"]=BigInt(5000);
+        fees["contract_transfer"]=BigInt(1000);
+        fees["node_create"]=BigInt(20000);
+        fees["node_update"]=BigInt(10000);
+        fees["node_enable"]=BigInt(5000);
+        fees["node_unstake"]=BigInt(2000);
+        fees["node_stake"]=BigInt(2000);
+        fees["mint"]=BigInt(95);
+        fees["transfer"]=BigInt(1000);
     }
-    std::vector<BigInt> fees;
+    std::map<std::string,BigInt> fees;
     BigInt total_staked;
     std::set<std::string> emitters_bin;
+    BigInt getFee(const std::string &fee_type) const
+    {
+        auto it=fees.find(fee_type);
+        if(it!=fees.end())
+            return it->second;
+        throw CommonError("fee '%s' not found", fee_type.c_str());
+        return BigInt(0);
+    }
     void pack(outBuffer& o) const final
     {
         // cost.pack(o);

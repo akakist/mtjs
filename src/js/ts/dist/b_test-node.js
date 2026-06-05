@@ -45,14 +45,14 @@ async function exec() {
         for (let i = 0; i < nodes.length; i++) {
             tx.push({
                 contract: "root",
-                method: "stake_node",
+                method: "node_stake",
                 params: { node: nodes[i], amount: `${i + 10}` }
             });
         }
         for (let i = 1; i < nodes.length; i++) {
             tx.push({
                 contract: "root",
-                method: "unstake_node",
+                method: "node_unstake",
                 params: { node: nodes[i], amount: `${i + 5}` }
             });
         }
@@ -65,7 +65,7 @@ async function exec() {
 }
 console.log(std.getenv("PATH"));
 try {
-    const nums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+    const nums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,  11, 12, 13, 14, 15, 16, 17, 18, 19];
     for (let i of nums) {
         mtjs.addInstance(`MTJS${i}`, `
             Start=Node

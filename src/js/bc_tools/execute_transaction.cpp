@@ -35,14 +35,16 @@ void execute_transaction(const THASH_id &tx_id, t_params &t, const std::string &
                     err = TR::execute_mint(params, t, senderAddress, by, tx_id, ii);
                 else if (meth == "transfer")
                     err = TR::execute_transfer(params, t, senderAddress, by, tx_id, ii);
-                else if (meth == "create_node")
-                    err = TR::execute_create_node(params, t, senderAddress, by, tx_id, ii);
-                else if (meth == "update_node")
-                    err = TR::execute_update_node(params, t, senderAddress, by, tx_id, ii);
-                else if (meth == "stake_node")
-                    err = TR::execute_stake_node(params, t, senderAddress, by, tx_id, ii);
-                else if (meth == "unstake_node")
+                else if (meth == "node_create")
+                    err = TR::execute_node_create(params, t, senderAddress, by, tx_id, ii);
+                else if (meth == "node_update")
+                    err = TR::execute_node_update(params, t, senderAddress, by, tx_id, ii);
+                else if (meth == "node_stake")
+                    err = TR::execute_node_stake(params, t, senderAddress, by, tx_id, ii);
+                else if (meth == "node_unstake")
                     err = TR::execute_unstake_node(params, t, senderAddress, by, tx_id, ii);
+                else if (meth == "node_enable")
+                    err = TR::execute_node_enable(params, t, senderAddress, by, tx_id, ii);
                 else
                 {
                     t.logError(tx_id, ii, "unhandled method %s for root contract", method.toString().c_str());

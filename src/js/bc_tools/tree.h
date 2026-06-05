@@ -8,13 +8,15 @@ namespace BroadcasterTree
 {
     struct Node {
         NODE_id name;
-        BigInt stake;
+        BigInt stake_A;
         std::string ip;
+        int missed_rounds=0;
         void hash(Blake2bHasher&h)
         {
             h.update(name.container);
-            h.update(stake.toString());
+            h.update(stake_A.toString());
             h.update(ip);
+            h.update(std::to_string(missed_rounds));
         }
     };
 
@@ -40,12 +42,12 @@ namespace BroadcasterTree
 } // namespace BroadcasterTree
 inline outBuffer & operator<< (outBuffer& o,const BroadcasterTree::Node& t)
 {
-    o<<t.name<<t.stake<<t.ip;
+    o<<t.name<<t.stake_A<<t.ip;
     return o;
 }
 inline inBuffer & operator>> (inBuffer& o,BroadcasterTree::Node& t)
 {
-    o>>t.name>>t.stake>>t.ip;
+    o>>t.name>>t.stake_A>>t.ip;
     return o;
 }
 

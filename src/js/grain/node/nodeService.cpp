@@ -48,6 +48,7 @@
 bool Node::Service::on_startService(const systemEvent::startService *)
 {
     MUTEX_INSPECTOR;
+    last_activity_time=iUtils->getNow();
 
     SECURE sec;
     sec.use_ssl = false;
@@ -75,6 +76,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         sendEvent(ServiceEnum::RPC, new rpcEvent::DoListen(z, sec));
     }
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
+    sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 1., this));
 
     std::string res;
     int err = db->get_cell("#root_hash#", &res);
@@ -488,7 +490,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
             t.setTxError(tx_hash, *t_err);
     }
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
-    calc_fee_and_rewards(t, nodes_in_leader_cert);
+    calc_fee_rewards_nodes(t, nodes_in_leader_cert);
     auto newEpoch = root->getEpoch();
     newEpoch->epoch += 1;
     newEpoch->prev_leader_cert = t.validateBlockREQ->leader_cert;
@@ -497,7 +499,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
     rh=proceed_merkle_on_transaction_pool_hashers(root);
     return rh;
 }
-void Node::Service::calc_fee_and_rewards(t_params &t, const std::vector<NODE_id> &nodes_in_leader_cert)
+void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_id> &nodes_in_leader_cert)
 {
     auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
@@ -522,6 +524,7 @@ void Node::Service::calc_fee_and_rewards(t_params &t, const std::vector<NODE_id>
         t.att_data->fees[z.first] = z.second->get_fee();
         z.second->reset();
     }
+    // iUtils->getNow
     BigInt total_rewards = (total_fees * 9) / 10;
     for (auto &n : nodes_in_leader_cert)
     {
@@ -541,6 +544,37 @@ void Node::Service::calc_fee_and_rewards(t_params &t, const std::vector<NODE_id>
         if (n == this_node_name && amt > 0)
             logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
         t.att_data->rewards[n] = amt;
+    }
+    std::set<NODE_id> ns;
+    for(auto& z:nodes_in_leader_cert)
+    {
+        ns.insert(z);
+    }
+    auto nodes=t.root->getAllNodes();
+    for(auto &n: nodes)
+    {
+        if(ns.count(n->name_))
+        {
+            if(n->missed_rounds==0)
+                continue;
+            else
+            {
+                n->missed_rounds=0;
+                n->setDirty(NULL);
+            }
+        }
+        else
+        {
+            if(n->missed_rounds>=100)
+            {
+                continue;
+            }
+            else
+            {
+                n->missed_rounds++;
+                n->setDirty(NULL);
+            }
+        }
     }
 }
 REF_getter<MsgData::BlockDBStore> Node::Service::prepareBlockDBStore(const t_params &t)
@@ -605,14 +639,24 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 {
     MUTEX_INSPECTOR;
-    // TRANSACTION_body tr;
-    // tr.container = e->msg;
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
+    if(iUtils->getNow()-last_activity_time>2000000)
+    {
+        last_activity_time=iUtils->getNow();
+        logNode("do_heart_beat in PutTransactionREQ");
+        // do_heart_beat();
+            REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
+            rq->prev_leader_cert = root->getEpoch()->prev_leader_cert;
+            broadcast_MsgEvent(rq.get());
+
+    }
     return true;
 }
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 {
+    last_activity_time=iUtils->getNow();
+
     auto n = root->getNode(m->node_signer);
     if (!verify_ed_pk(n->ed_pk, m->signature, blake2b_hash(m->msg_payload)))
     {

@@ -14,21 +14,25 @@ namespace MsgData
             return new GetSavedBlocksREQ();
         }
         BigInt epoch;
+        BLOCK_id prev_block_hash;
         void update(Blake2bHasher& h) const
         {
             h.update(epoch.toString());
+            h.update(prev_block_hash.container);
         }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
             b<<epoch;
+            b<<prev_block_hash;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>epoch;
+            b>>prev_block_hash;
         }
     };
 
