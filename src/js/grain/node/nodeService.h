@@ -201,7 +201,13 @@ namespace Node
         std::map<BLOCK_id,block> blocks_leader;
         NODE_id node_leader_for_client;
 
-        REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
+        struct cli_bl
+        {
+            REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
+            REF_getter<MsgData::attachment_data> att_data= nullptr;
+
+        };
+        std::map<BLOCK_id, cli_bl> c_blocks;
         BLOCK_id prev_block_hash_Z;
         void do_start_block();
 

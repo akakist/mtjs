@@ -577,15 +577,15 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         }
     }
 }
-REF_getter<MsgData::BlockDBStore> Node::Service::prepareBlockDBStore(const t_params &t)
-{
-    REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore;
-    pb->epoch = root->getEpoch()->epoch;
-    pb->att_data = t.att_data;
-    pb->validateBlockREQ=t.validateBlockREQ;
+// REF_getter<MsgData::BlockDBStore> Node::Service::prepareBlockDBStore(const t_params &t)
+// {
+//     REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore;
+//     pb->epoch = root->getEpoch()->epoch;
+//     pb->att_data = t.att_data;
+//     pb->validateBlockREQ=t.validateBlockREQ;
 
-    return pb;
-}
+//     return pb;
+// }
 BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)
 {
     r->calc_tree_hash(db_to_save_Z);

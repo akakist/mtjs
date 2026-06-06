@@ -550,10 +550,10 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     MUTEX_INSPECTOR;
     XTRY;
 
-    inBuffer in(e->msg);
-    REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore();
-    pb->unpack2(in);
-    for (size_t ti = 0; ti < pb->validateBlockREQ->transaction_bodies.size(); ti++)
+    // inBuffer in(e->msg);
+    // REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore();
+    // pb->unpack2(in);
+    for (size_t ti = 0; ti < e->blockStore->validateBlockREQ->transaction_bodies.size(); ti++)
     {
         // xy::json::
         nlohmann::json jtr;
@@ -561,13 +561,13 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
         // nlohmann::json ins;
         if (opaque.tx_subscription_cb.has_value())
         {
-            THASH_id tx_hash = pb->validateBlockREQ->transaction_bodies[ti]->getHash();
+            THASH_id tx_hash = e->blockStore->validateBlockREQ->transaction_bodies[ti]->getHash();
             jtr["tx_hash"] = base16::encode(tx_hash.container);
             // logErr2("ClientTxSubscribeRSP: tx_hash %s",base16::encode(tx_hash.container).c_str());
             JSScope<10, 10> scope(js_ctx);
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);
-            auto &tx_report = pb->att_data->transaction_reports[tx_hash];
+            auto &tx_report = e->att_data->transaction_reports[tx_hash];
             
             logErr2("tx_report.instruction_reports size %d",tx_report.instruction_reports.size());
             for (int ii = 0; ii < tx_report.instruction_reports.size(); ii++)

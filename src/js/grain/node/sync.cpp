@@ -112,11 +112,11 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         {
 
             logNode("inval root hash %s %s", z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.str().c_str(), prev_block_hash_Z.str().c_str());
-            logNode("received invalid block %s", z.second->epoch.toString().c_str());
+            // logNode("received invalid block %s", z.second->epoch.toString().c_str());
             continue;
         }
         else
-            logNode("ok received block %s", z.second->epoch.toString().c_str());
+            logNode("ok received block %s", z.second->blockAcceptedREQ->blockInfo->prev_epoch.toString().c_str());
         // throw CommonError("if(hb.epoch!=root->getValues(NULL)->epoch) %s %s",z.second->epoch.toString().c_str(), root->getEpoch(NULL)->epoch.toString().c_str()   );
 
         std::vector<blst_cpp::PublicKey> agg_pk;
@@ -151,7 +151,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
 
         if (new_root_hash == z.second->blockAcceptedREQ->blockInfo->new_root_hash1)
         {
-            logNode("on_get_blocks_rsp: block executed OK on epoch %s", z.second->epoch.toString().c_str());
+            logNode("on_get_blocks_rsp: block executed OK on epoch %s", z.second->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString().c_str());
 
             logNode("db->write_batch(db_to_save_Z); %d", db_to_save_Z.cells.size());
             db->write_batch(db_to_save_Z);
@@ -169,10 +169,10 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
 
         SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
 
-        logNode("insert epoch %s", z.second->epoch.toString().c_str());
+        logNode("insert epoch %s", z.second->blockAcceptedREQ->blockInfo->prev_epoch.toString().c_str());
         ///////////
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
-        insert.bind(1, z.second->epoch.toString());
+        insert.bind(1, z.second->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString());
         insert.bind(2, base16::encode(z.second->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.container));
         insert.bind(3, time(NULL));
         insert.bind(4, base16::encode(z.second->getBuffer()));

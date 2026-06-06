@@ -14,6 +14,7 @@
 #include <time.h>
 #include <map>
 #include "md_BlockAcceptedRSP.h"
+#include "md_BlockDBStore.h"
 #include "md_ValidateBlockRSP.h"
 #include "msg.h"
 #include "ioBuffer.h"
@@ -30,24 +31,30 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     MUTEX_INSPECTOR;
     XTRY;
     // blockDBStore->validateBlockREQ->leader_cert
-    if (!blockDBStore.valid())
+    auto& c=c_blocks[r->blockInfo->prev_root_hash];
+    
+    if (!c.blockDBStore.valid())
+    {
+        logErr2("if (!c.blockDBStore.valid())");
         return true;
 
-    if (blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader != src_node)
+    }
+
+    if (c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader != src_node)
     {
         logErr2("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
         return true;
     }
 
-    if (CheckState(blockDBStore->validateBlockREQ->leader_cert->heart_beat.get(), src_node))
+    if (CheckState(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat.get(), src_node))
         return true;
     if (state_Z != State::NORMAL)
         return true;
 
     resetTimer();
-    if (!blockDBStore.valid())
+    if (! c.blockDBStore.valid())
         throw CommonError("if (!blockDBStore.valid())");
-    blockDBStore->blockAcceptedREQ = r;
+    c.blockDBStore->blockAcceptedREQ = r;
     std::vector<blst_cpp::PublicKey> agg_pk;
     for (auto &z : r->node_validators)
     {
@@ -80,16 +87,16 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
 
         SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
-        insert.bind(1, blockDBStore->epoch.toString());
+        insert.bind(1,  c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString());
 
-        insert.bind(2, base16::encode(blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.container));
+        insert.bind(2, base16::encode(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_block_hash.container));
         insert.bind(3, time(NULL));
-        insert.bind(4, base16::encode(blockDBStore->getBuffer()));
+        insert.bind(4, base16::encode(c.blockDBStore->getBuffer()));
         insert.exec();
         XPASS;
     }
 
-    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(blockDBStore->getBuffer(), this));
+    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(c.blockDBStore, c.att_data, this));
 
     prev_block_hash_Z = r->blockInfo->new_root_hash1;
     blocks_leader.clear();
@@ -113,7 +120,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     iUtils->getNow();
 
-    for (auto &z : blockDBStore->validateBlockREQ->transaction_bodies)
+    for (auto &z : c.blockDBStore->validateBlockREQ->transaction_bodies)
     {
 
         MUTEX_INSPECTOR;
@@ -127,7 +134,8 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         XPASS;
     }
-    blockDBStore = nullptr;
+    c_blocks.clear();
+    // blockDBStore = nullptr;
     {
         MUTEX_INSPECTOR;
         XTRY;
@@ -239,7 +247,12 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
         auto new_root_hash = execute_block(t, r->leader_cert->nodes);
 
-        blockDBStore = prepareBlockDBStore(t);
+        auto &c = c_blocks[prev_block_hash_Z];
+        if (!c.blockDBStore.valid())
+            c.blockDBStore = new MsgData::BlockDBStore;
+        c.blockDBStore->validateBlockREQ=r;
+        // blockDBStore = prepareBlockDBStore(t);
+        c.att_data=t.att_data;
 
         REF_getter<MsgData::BlockInfo> block = new MsgData::BlockInfo();
         block->prev_root_hash = prev_block_hash_Z;
