@@ -20,8 +20,10 @@
 
 void Node::Service::do_sync(const NODE_id &src_node)
 {
-    if(state_Z==SYNCING)
-        return;
+    logNode("void Node::Service::do_sync(const NODE_id &src_node)");
+    // if(state_Z==SYNCING)
+    //     return;
+    // state_Z=SYNCING;
     auto n = root->getNode(src_node);
     if (!n.valid())
         throw CommonError("if(!n.valid())");
@@ -40,7 +42,7 @@ void Node::Service::do_sync(const NODE_id &src_node)
 bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
-    if(state_Z==SYNCING)
+    if(state_Z==STATE_SYNCING)
         return true;
 
     // if(state_Z==SYNCING)
@@ -58,7 +60,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const
         {
 
             std::string res;
-            if (db_history->get_cell(prev.container, &res))
+            if (db_history->get(prev.container, &res))
             {
                 logNode("cannot find block %s", r->prev_root_hash.str().c_str());
                 break;
@@ -91,7 +93,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
 {
     XTRY;
     MUTEX_INSPECTOR;
-    if(state_Z!=SYNCING)
+    if(state_Z!=STATE_SYNCING)
     {
         logNode("error if(state_Z!=SYNCING)");
     }
@@ -152,13 +154,14 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         {
             root = new root_data(db_state.get());
             init_root(root);
+            state_Z=STATE_SYNCING;
             do_sync(src_node);
             logNode("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
             return true;
         }
         outBuffer o;
         o<<z;
-        if(db_history->put_cell(z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
+        if(db_history->put(z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
             o.asString()->container
         ))
         {
@@ -170,13 +173,16 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         logNode("call3 do_sync();");
 
         logNode("do_sync again: ");
+        state_Z=STATE_SYNCING;
         do_sync(src_node);
         return true;
     }
     else
-        logNode("ERR %s %d", __FILE__, __LINE__);
+    {
+    }
 
-    state_Z = State::NORMAL;
+    logNode("!!! SUCCESS CATCH UP ");
+    state_Z = State::STATE_NORMAL;
     logNode("State::NORMAL");
     XPASS;
     return true;

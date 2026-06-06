@@ -4,6 +4,9 @@
 #include "db_to_save.h"
 struct IDatabase: public Refcountable
 {
+    virtual void close() =  0;
+
+    virtual bool compactRange() = 0;
 
     virtual int put_cell(const std::string& k, const std::string& v)=0;
     virtual int get_cell(const std::string& k, std::string* v)=0;

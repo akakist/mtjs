@@ -123,7 +123,7 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
 
 {
     MUTEX_INSPECTOR;
-    if(state_Z!=NORMAL)
+    if(state_Z!=STATE_NORMAL)
         return true;
 
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
@@ -165,7 +165,7 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
 bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
-    if(state_Z!=NORMAL)
+    if(state_Z!=STATE_NORMAL)
         return true;
 
     auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
@@ -242,7 +242,7 @@ void Node::Service::do_heart_beat()
 }
 bool Node::Service::DoHeartBeatREQ(const MsgData::DoHeartBeatREQ *r, const NODE_id &src_node, const route_t &route)
 {
-    if(state_Z!=NORMAL)
+    if(state_Z!=STATE_NORMAL)
         return true;
 
     do_heart_beat();

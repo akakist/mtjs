@@ -155,7 +155,11 @@ bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
     }
 
     if (!err)
+    {
+        logErr2("sendEvent(ServiceEnum::Node, new bcEvent::PutTransactionREQ(e->tx, this));");
         sendEvent(ServiceEnum::Node, new bcEvent::PutTransactionREQ(e->tx, this));
+
+    }
 
     passEvent(
         new bcEvent::AddTxRSP(hash, err.has_value(), err ? *err : "transaction added to pool", poppedFrontRoute(e->route)));

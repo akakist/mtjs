@@ -7,12 +7,31 @@ struct CDatabase: public IDatabase
 {
 
     rocksdb::DB *db;
+    void close()
+    {
+        db->Close();
+    }
+    bool compactRange()
+    {
+        rocksdb::CompactRangeOptions compact_opts;
+        // 1. Задаем поведение на нижнем (bottommost) уровне. Чтобы наверняка утрамбовать все данные и удалить старые версии, используем `kForce` [citation:9].
+        compact_opts.bottommost_level_compaction = rocksdb::BottommostLevelCompaction::kForce;
+
+// 2. Разрешаем временно увеличить нагрузку на диск, чтобы ускорить процесс.
+        compact_opts.allow_write_stall = true;
+
+// 3. Увеличиваем количество подкомпактов для параллельной работы (опционально, если есть свободные ядра).
+        compact_opts.max_subcompactions = 4;
+
+        rocksdb::Status s = db->CompactRange(compact_opts, nullptr, nullptr);
+        return !s.ok();
+    }
     int put_cell(const std::string& k, const std::string& v)
     {
         rocksdb::Status s;
         s = db->Put(rocksdb::WriteOptions(), k, v);
         if (!s.ok()) std::cerr << "Put failed: " << s.ToString() << "\n";
-        db->Flush(rocksdb::FlushOptions());
+        // db->Flush(rocksdb::FlushOptions());
         return !s.ok();
     }
     int write_batch(const _db_to_save &v)
@@ -28,7 +47,7 @@ struct CDatabase: public IDatabase
             throw CommonError("Write failed: %s",s.ToString().c_str());
         }
 
-        db->Flush(rocksdb::FlushOptions());
+        // db->Flush(rocksdb::FlushOptions());
 
         return 0;
     }
@@ -59,6 +78,8 @@ struct CDatabase: public IDatabase
         options.keep_log_file_num = 3;        // хранить только 3 старых лога
         options.max_log_file_size = 10 * 1024 * 1024; // 10 MB
         options.max_open_files=800;
+        // options.compaction_on_commit = true;
+        options.level0_file_num_compaction_trigger = 2;
         rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
         if (!s.ok()) {
             std::cerr << "Open failed: " << s.ToString() << "\n";

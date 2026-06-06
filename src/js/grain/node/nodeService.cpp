@@ -56,10 +56,23 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
 
     db_state = new CDatabase(rocksdb_path+"_state");
+    auto db_state2=db_state;
+    iUtils->add_shutdown_cb([db_state2](){
+
+        logErr2("close db handler");
+        db_state2->close();
+    });
+
     if (!root.valid())
         root = getRoot(db_state.get());
 
-    db_history = new CDatabase(rocksdb_path+"_history");
+    db_history = new DB_history(rocksdb_path+"_history");
+    auto db_h_copy=db_history;
+    iUtils->add_shutdown_cb([db_h_copy](){
+
+        logErr2("close db handler");
+        db_h_copy->close();
+    });
     init_root(root);
     // initDB();
     my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
@@ -83,7 +96,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     int err = db_state->get_cell("#root_hash#", &res);
     if (!err)
     {
-        logNode("prev_root_hash_Z.container = res;");
+        // logNode("prev_root_hash_Z.container = res;");
         prev_root_hash_Z.container = res;
     }
 
@@ -179,7 +192,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     {
     case timers::TIMER_RESTART_BLOCK:
     {
-        if (state_Z != NORMAL)
+        if (state_Z != STATE_NORMAL)
             return true;
         auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
         auto &li = hbs.leader_info;
@@ -190,7 +203,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     break;
     case timers::TIMER_START_HEART_BEAT:
     {
-        if (state_Z != NORMAL)
+        if (state_Z != STATE_NORMAL)
             return true;
 
         DBG(logNode("case timers::TIMER_START_HEART_BEAT:"));
@@ -620,10 +633,14 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 {
     MUTEX_INSPECTOR;
+    logErr2("@@ %s",__FUNCTION__);
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
+//     logErr2("iUtils->getNow(() -last_activity_time %lld iUtils->getNow() %lld last_activity_time %lld",iUtils->getNow()-last_activity_time,
+// iUtils->getNow(),last_activity_time);
     if(iUtils->getNow()-last_activity_time>2000000)
     {
+        // logErr2("last_activity_time=iUtils->getNow(); %s %d",__FILE__,__LINE__);
         last_activity_time=iUtils->getNow();
         logNode("do_heart_beat in PutTransactionREQ");
         // do_heart_beat();
@@ -636,8 +653,8 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 }
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 {
-    last_activity_time=iUtils->getNow();
-
+    // last_activity_time=iUtils->getNow();
+    // logErr2("last_activity_time=iUtils->getNow(); %s %d",__FILE__,__LINE__);
     auto n = root->getNode(m->node_signer);
     if (!verify_ed_pk(n->ed_pk, m->signature, blake2b_hash(m->msg_payload)))
     {
@@ -653,18 +670,24 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     switch (msg->type)
     {
     case msgid::GetTransactionREQ:
+        last_activity_time=iUtils->getNow();
         return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::HeartBeatREQ:
+        last_activity_time=iUtils->getNow();
         return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ValidateBlockREQ:
+        last_activity_time=iUtils->getNow();
         return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::BlockAcceptedREQ:
+        last_activity_time=iUtils->getNow();
         return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::GetSavedBlocksREQ:
         return GetSavedBlocksREQ(static_cast<const MsgData::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::DoHeartBeatREQ:
+        last_activity_time=iUtils->getNow();
         return DoHeartBeatREQ(static_cast<const MsgData::DoHeartBeatREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderREQ:
+        last_activity_time=iUtils->getNow();
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
 
     default:

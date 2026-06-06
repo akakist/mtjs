@@ -5,6 +5,7 @@
 #include "commonError.h"
 #include <iostream>
 #include "common/mtjsEvent.h"
+#include <signal.h>
 void registerRPCService(const char* pn);
 #ifdef __linux__
 #endif
@@ -54,10 +55,31 @@ void help(const std::vector<par>& v)
     }
     exit(1);
 }
+void onterm(int signum)
+{
+    iUtils->setTerminate(1);
+    // exit(1);
+}
 
 int mainMTJS(int argc, char** argv )
 {
     // curl_global_init(CURL_GLOBAL_DEFAULT);
+
+#ifndef _WIN32
+        signal(SIGPIPE,SIG_IGN);
+#endif
+        signal(SIGABRT,onterm);
+        signal(SIGTERM,onterm);
+        signal(SIGINT,onterm);
+        signal(SIGSEGV,onterm);
+        signal(SIGFPE,onterm);
+        signal(SIGILL,onterm);
+#ifndef _WIN32
+        signal(SIGQUIT,onterm);
+        signal(SIGBUS,onterm);
+        signal(SIGHUP,onterm);
+#endif
+        signal(10,onterm);
 
     try {
         iUtils=new CUtils(argc, argv, "mtjs");
@@ -250,7 +272,8 @@ int mainMTJS(int argc, char** argv )
 //        system("mtjs 127.0.0.1 8081");
         while(!iUtils->isTerminating())
             sleep(1);
-        delete iUtils;
+        // delete iUtils;
+        iUtils->execute_shutdown_cbs();
         return 0;
 
     } catch (CommonError& e)

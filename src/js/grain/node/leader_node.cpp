@@ -23,7 +23,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
 {
     XTRY;
     MUTEX_INSPECTOR;
-    if (state_Z != NORMAL)
+    if (state_Z != STATE_NORMAL)
         return true;
 
     // logNode("GetTransactionRSP from %s", src_node.container.c_str());
@@ -57,7 +57,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const N
 {
     XTRY;
     MUTEX_INSPECTOR;
-    if (state_Z != NORMAL)
+    if (state_Z != STATE_NORMAL)
         return true;
 
     if (!r->verify(root->getNode(r->node_signer)->bls_pk))
@@ -105,13 +105,19 @@ bool Node::Service::CheckState(const MsgData::HeartBeatREQ *r, const NODE_id &sr
 {
     if (r->prev_root_hash != prev_root_hash_Z)
     {
-        if (state_Z == NORMAL)
+        if(r->prev_root_hash.container.size()==0 && prev_root_hash_Z.container.size()!=0)
+            return 1;
+        // logNode("if (r->prev_root_hash != prev_root_hash_Z) %s %s",r->prev_root_hash.str().c_str(),prev_root_hash_Z.str().c_str());
+        if (state_Z == STATE_NORMAL)
         {
+            // logNode("if (state_Z == NORMAL)");
+            // r->
+            // logNode("r->new_epoch %s root->getEpoch()->epoch   - %s  src_node %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str(),src_node.container.c_str());
             if (r->new_epoch > root->getEpoch()->epoch + 1)
             {
-                logNode("r->new_epoch > root->getEpoch()->epoch + 1  - %s %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str());
+                // logNode("r->new_epoch > root->getEpoch()->epoch + 1  - %s %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str());
+                state_Z = STATE_SYNCING;
                 do_sync(src_node);
-                state_Z = SYNCING;
             }
             return 1;
         }
@@ -124,7 +130,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 {
     XTRY;
     MUTEX_INSPECTOR;
-    if (state_Z != NORMAL)
+    if (state_Z != STATE_NORMAL)
         return true;
 
     if (r->blockInfo->prev_root_hash != prev_root_hash_Z)

@@ -28,7 +28,7 @@
 
 bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
 {
-    if(state_Z!=NORMAL)
+    if(state_Z!=STATE_NORMAL)
         return true;
     MUTEX_INSPECTOR;
     XTRY;
@@ -50,7 +50,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     if (CheckState(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat.get(), src_node))
         return true;
-    if (state_Z != State::NORMAL)
+    if (state_Z != State::STATE_NORMAL)
         return true;
 
     resetTimer();
@@ -96,7 +96,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XTRY;
         outBuffer o;
         o<<c.blockDBStore;
-        db_history->put_cell(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
+        db_history->put(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
             o.asString()->container
         );
         // SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
@@ -163,7 +163,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
-    if(state_Z!=NORMAL)
+    if(state_Z!=STATE_NORMAL)
         return true;
     if (CheckState(r->lc->heart_beat.get(), src_node))
         return true;
@@ -210,7 +210,7 @@ int get_global_refcount();
 bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
-    if (state_Z != State::NORMAL)
+    if (state_Z != State::STATE_NORMAL)
     {
         logErr2("state_Z != State::NORMAL");
         return true;

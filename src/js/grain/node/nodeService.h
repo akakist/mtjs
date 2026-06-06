@@ -38,13 +38,14 @@
 #include "md/md_DoHeartBeatREQ.h"
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
+#include "dbHistory.h"
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 // #define HEART_BEAT_TIMEDOUT_SEC 5
 #define HEART_BEAT_INTERVAL_SEC 5
 
 enum State
 {
-    NORMAL,SYNCING
+    STATE_NORMAL,STATE_SYNCING
 };
 
 namespace Node
@@ -221,7 +222,8 @@ namespace Node
 
         REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;
-        REF_getter<IDatabase> db_history=nullptr;
+        // REF_getter<IDatabase> db_history=nullptr;
+        REF_getter<DB_history> db_history;
 
 
         uint64_t last_activity_time=0;
@@ -230,7 +232,7 @@ namespace Node
         std::set<msockaddr_in> rpc_addr;
         void logNode(const char* fmt, ...);
         IInstance *iInstance=NULL;
-        State state_Z=NORMAL;
+        State state_Z=STATE_NORMAL;
 
         std::vector<std::string> telnet_data_path;
 
@@ -245,6 +247,7 @@ namespace Node
         std::string my_sk_ed_env_key;
 
         MsgFactory msgFactory;
+
 
 
 
