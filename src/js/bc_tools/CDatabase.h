@@ -10,8 +10,9 @@ struct CDatabase: public IDatabase
     int put_cell(const std::string& k, const std::string& v)
     {
         rocksdb::Status s;
-        s = db->Put(rocksdb::WriteOptions(), "key", "value");
+        s = db->Put(rocksdb::WriteOptions(), k, v);
         if (!s.ok()) std::cerr << "Put failed: " << s.ToString() << "\n";
+        db->Flush(rocksdb::FlushOptions());
         return !s.ok();
     }
     int write_batch(const _db_to_save &v)
@@ -20,20 +21,12 @@ struct CDatabase: public IDatabase
         for(auto& z:v.cells)
         {
             batch.Put(z.first, z.second);
-            // logErr2("batch.Put %s size %d",z.first.c_str(), z.second.size());
         }
         rocksdb::Status s=db->Write(rocksdb::WriteOptions(), &batch);
         if (!s.ok())
         {
             throw CommonError("Write failed: %s",s.ToString().c_str());
         }
-        size_t totalsize=0;
-        for(auto& z:v.cells)        {
-            totalsize+=z.second.size();
-        }
-        logErr2("write batch %d cells total size %d bytes",v.cells.size(), totalsize);
-        // logErr2("write batch %d cells",v.cells.size());
-        logErr2("write batch %d granules",v.cells.size());
 
         db->Flush(rocksdb::FlushOptions());
 
@@ -48,7 +41,7 @@ struct CDatabase: public IDatabase
         auto status=db->Get(ro,k,v);
         if(!status.ok())
         {
-            logErr2("get failed %s",k.c_str());
+            logErr2("get failed %s",base16::encode(k).c_str());
             // throw std::runtime_error("db corrupted");
         }
         return !status.ok();
@@ -65,6 +58,7 @@ struct CDatabase: public IDatabase
         options.level_compaction_dynamic_level_bytes = true;
         options.keep_log_file_num = 3;        // хранить только 3 старых лога
         options.max_log_file_size = 10 * 1024 * 1024; // 10 MB
+        options.max_open_files=800;
         rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
         if (!s.ok()) {
             std::cerr << "Open failed: " << s.ToString() << "\n";

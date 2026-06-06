@@ -55,20 +55,21 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     for (auto &z : web_addr)
         sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
 
-    db = new CDatabase(rocksdb_path);
+    db_state = new CDatabase(rocksdb_path+"_state");
     if (!root.valid())
-        root = getRoot(db.get());
+        root = getRoot(db_state.get());
 
+    db_history = new CDatabase(rocksdb_path+"_history");
     init_root(root);
-    initDB();
+    // initDB();
     my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
 
     my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
     logErr2("ServiceInit nodename %s", this_node_name.container.c_str());
-    sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db, this));
-    sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db, this));
-    sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db, this));
-    sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db, this));
+    sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
     for (auto &z : rpc_addr)
     {
         SECURE sec;
@@ -79,11 +80,11 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 1., this));
 
     std::string res;
-    int err = db->get_cell("#root_hash#", &res);
+    int err = db_state->get_cell("#root_hash#", &res);
     if (!err)
     {
-        logNode("prev_block_hash_Z.container = res;");
-        prev_block_hash_Z.container = res;
+        logNode("prev_root_hash_Z.container = res;");
+        prev_root_hash_Z.container = res;
     }
 
     logNode("do_heart_beat in startService");
@@ -123,30 +124,18 @@ void Node::Service::collectTransactions()
     }
 }
 
-void Node::Service::initDB()
-{
-    SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-
-    dbs.exec(R"( CREATE TABLE IF NOT EXISTS  blocks (
-    epoch INTEGER UNIQUE,
-    prev_root_hash BLOB NOT NULL,
-    data BLOB NOT NULL,
-    date INTEGER NOT NULL
-        )
-        )");
-    dbs.exec("CREATE INDEX IF NOT EXISTS   idx_prev_hash ON blocks(prev_root_hash);");
-    dbs.exec("CREATE INDEX IF NOT EXISTS idx_epoch ON blocks(epoch)");
-}
 
 void Node::Service::do_start_block()
 {
     MUTEX_INSPECTOR;
+    logNode("@@ %s",__FUNCTION__);
     if (transaction_pool_of_leader.empty())
     {
+        logNode("if (transaction_pool_of_leader.empty())");
         sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK, NULL, NULL, 0.5, this));
         return;
     }
-    auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
+    auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     {
         {
@@ -155,14 +144,14 @@ void Node::Service::do_start_block()
             // msg::block_request b;
             b->leader_cert = li.leader_cert_2;
 
-            auto &bt = blocks_leader[prev_block_hash_Z];
+            auto &bt = blocks_leader[prev_root_hash_Z];
             logNode("before collectTransactions sz %d", transaction_pool_of_leader.size());
             collectTransactions();
             logNode("AFTER collectTransactions sz %d", transaction_pool_of_leader.size());
 
             for (auto &z : transaction_pool_of_leader)
                 b->transaction_bodies.push_back(z.second);
-
+            logNode("broadcast ValidateBlockREQ");
             broadcast_MsgEvent(b.get());
         }
     }
@@ -192,7 +181,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     {
         if (state_Z != NORMAL)
             return true;
-        auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
+        auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
         auto &li = hbs.leader_info;
         li.request_for_transactions_sent = true;
         do_request_for_transactions(li);
@@ -317,7 +306,7 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 
     if (match(ds, e->command, tokens))
     {
-        auto cc = getByPathNoCreate(root.get(), telnet_data_path, db.get());
+        auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
         if (cc.valid())
         {
             sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, cc->dump() + "\n", this));
@@ -331,7 +320,7 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
         {
             sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "if(tokens.size()==2)\n", this));
             telnet_data_path.push_back(tokens[1]);
-            auto cc = getByPathNoCreate(root.get(), telnet_data_path, db.get());
+            auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
             if (cc.valid())
             {
                 sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "OK, current path: " + cc->getDbId() + "\n", this));
@@ -346,7 +335,7 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
     if (match(back, e->command, tokens))
     {
         telnet_data_path.pop_back();
-        auto cc = getByPathNoCreate(root.get(), telnet_data_path, db.get());
+        auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
         if (cc.valid())
         {
             sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "OK, current path: " + cc->getDbId() + "\n", this));
@@ -410,7 +399,7 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
     HTTP::Response r(e->req);
     auto uri = (std::string)e->req->url;
     auto da = iUtils->splitString("/", uri);
-    auto c = getByPathNoCreate(root.get(), da, db.get());
+    auto c = getByPathNoCreate(root.get(), da, db_state.get());
     if (!c.valid())
     {
         r.make_response("<pre> if(!c.valid()) </pre>");
@@ -577,15 +566,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         }
     }
 }
-// REF_getter<MsgData::BlockDBStore> Node::Service::prepareBlockDBStore(const t_params &t)
-// {
-//     REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore;
-//     pb->epoch = root->getEpoch()->epoch;
-//     pb->att_data = t.att_data;
-//     pb->validateBlockREQ=t.validateBlockREQ;
 
-//     return pb;
-// }
 BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)
 {
     r->calc_tree_hash(db_to_save_Z);
@@ -604,7 +585,7 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 {
     auto nv = root->getAllNodes();
-    int crc = __crc32(0, prev_block_hash_Z.container.data(), prev_block_hash_Z.container.size());
+    int crc = __crc32(0, prev_root_hash_Z.container.data(), prev_root_hash_Z.container.size());
     int idx = crc % nv.size();
     int npoz = -1;
     for (int i = 0; i < nv.size(); i++)
@@ -620,7 +601,7 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
         return true;
     auto nv = root->getAllNodes();
     {
-        int crc = __crc32(0, prev_block_hash_Z.container.data(), prev_block_hash_Z.container.size());
+        int crc = __crc32(0, prev_root_hash_Z.container.data(), prev_root_hash_Z.container.size());
         int idx = crc % nv.size();
 
         int npoz = -1;
@@ -739,7 +720,7 @@ void Node::Service::logNode(const char *fmt, ...)
         {
             throw CommonError("if(!epoch.valid())");
         }
-        fprintf(stdout, "%lf [Node] [%s] [%s] [%s] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_block_hash_Z.str().c_str(), epoch->epoch.toString().c_str());
+        fprintf(stdout, "%lf [Node] [%s] [%s] [%s] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch.toString().c_str());
         vfprintf(stdout, fmt, ap);
         fprintf(stdout, "\n");
         va_end(ap);

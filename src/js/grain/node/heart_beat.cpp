@@ -19,11 +19,11 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 {
     XTRY;
 
-    auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
+    auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
-    if (prev_block_hash_Z != m->payload_heart_beat->prev_block_hash)
+    if (prev_root_hash_Z != m->payload_heart_beat->prev_root_hash)
     {
-        logNode("heat beat expired %s %s", prev_block_hash_Z.str().c_str(), m->payload_heart_beat->prev_block_hash.str().c_str());
+        logNode("heat beat expired %s %s", prev_root_hash_Z.str().c_str(), m->payload_heart_beat->prev_root_hash.str().c_str());
         return false;
     }
 
@@ -89,7 +89,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h, const NODE_id &
 
     bool need_replace = false;
 
-    if (prev_block_hash_Z != h->prev_block_hash)
+    if (prev_root_hash_Z != h->prev_root_hash)
     {
         logNode("invalid root hashe, no answer");
         return true;
@@ -130,7 +130,7 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
 
     bool need_replace = false;
 
-    if (prev_block_hash_Z != h->hb->prev_block_hash)
+    if (prev_root_hash_Z != h->hb->prev_root_hash)
     {
         logNode("invalid root hashe, no answer");
         return true;
@@ -168,11 +168,11 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     if(state_Z!=NORMAL)
         return true;
 
-    auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
+    auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
-    if (prev_block_hash_Z != m->hb->prev_block_hash)
+    if (prev_root_hash_Z != m->hb->prev_root_hash)
     {
-        logErr2("heat beat expired %s %s", prev_block_hash_Z.str().c_str(), m->hb->prev_block_hash.str().c_str());
+        logErr2("heat beat expired %s %s", prev_root_hash_Z.str().c_str(), m->hb->prev_root_hash.str().c_str());
         return false;
     }
 
@@ -231,7 +231,7 @@ void Node::Service::do_heart_beat()
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
     {
         REF_getter<MsgData::HeartBeatREQ> hb_req =
-            new MsgData::HeartBeatREQ(prev_block_hash_Z,
+            new MsgData::HeartBeatREQ(prev_root_hash_Z,
                                       root->getEpoch()->epoch+1,
                                       this_node_name);
 
@@ -251,7 +251,7 @@ bool Node::Service::DoHeartBeatREQ(const MsgData::DoHeartBeatREQ *r, const NODE_
 
 void Node::Service::make_leader_certificate()
 {
-    auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
+    auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     REF_getter<MsgData::LeaderCertificate> lc = new MsgData::LeaderCertificate();
     if (li.ConfirmLeaderRSP_m.empty())

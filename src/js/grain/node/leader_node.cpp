@@ -9,7 +9,6 @@
 #include "REF.h"
 #include "corelib/mutexInspector.h"
 #include "Event/bcEvent.h"
-#include <SQLiteCpp/Statement.h>
 #include <time.h>
 #include <map>
 #include "msg.h"
@@ -18,7 +17,6 @@
 #include "nodeService.h"
 #include "QUORUM.h"
 #include "route_t.h"
-#include <SQLiteCpp/Database.h>
 #include <vector>
 
 bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const NODE_id &src_node, const route_t &route)
@@ -34,7 +32,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         THASH_id h = z->getHash();
         transaction_pool_of_leader.insert({h, z});
     }
-    auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
+    auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     li.transaction_responders.insert(src_node);
     BigInt stake = 0;
@@ -43,16 +41,10 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         auto n = root->getNode(z);
         stake += n->total_stake;
     }
-    // logNode("TRS %d",transaction_pool_of_leader.size());
     if (stake.toDouble() > root->getValues()->total_staked.toDouble() * QUORUM)
     {
         if (hbs.leader_info.leader_cert_2.valid() && hbs.leader_info.leader_cert_2->nodes.size() == li.transaction_responders.size())
         {
-            // if(transaction_pool_of_leader.empty())
-            // {
-            //     sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(TIMER_RESTART_BLOCK,NULL,NULL,1.,this));
-            //     return true;
-            // }
             do_start_block();
             logNode("do_start_block();");
             li.transaction_responders.clear();
@@ -73,7 +65,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const N
         logErr2("block_accepted_rsp: verify failed");
         return true;
     }
-    auto &bp = blocks_leader[prev_block_hash_Z];
+    auto &bp = blocks_leader[prev_root_hash_Z];
     bp.acceptors.insert({r->node_signer, r});
 
     blst_cpp::AggregateSignature agg_sig;
@@ -101,28 +93,23 @@ bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const N
         {
             bp.heart_bit_sent_on_block_accepted_rsp = true;
             REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
-            // if (!last_leader_cert.valid())
-            //     throw CommonError("if(!last_leader_cert.valid())");
             rq->prev_leader_cert = root->getEpoch()->prev_leader_cert;
-            // msg::node_message_ed nm(rt->getBuffer(), this_node_name, my_sk_ed);
-            // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
             broadcast_MsgEvent(rq.get());
-            // do_heart_beat();
         }
     }
-    // last_access_time_hbZ=time(NULL);
 
     XPASS;
     return true;
 }
 bool Node::Service::CheckState(const MsgData::HeartBeatREQ *r, const NODE_id &src_node) // 1 если невалидно
 {
-    if (r->prev_block_hash != prev_block_hash_Z)
+    if (r->prev_root_hash != prev_root_hash_Z)
     {
         if (state_Z == NORMAL)
         {
             if (r->new_epoch > root->getEpoch()->epoch + 1)
             {
+                logNode("r->new_epoch > root->getEpoch()->epoch + 1  - %s %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str());
                 do_sync(src_node);
                 state_Z = SYNCING;
             }
@@ -140,9 +127,9 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     if (state_Z != NORMAL)
         return true;
 
-    if (r->blockInfo->prev_root_hash != prev_block_hash_Z)
+    if (r->blockInfo->prev_root_hash != prev_root_hash_Z)
     {   
-        logErr2("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_block_hash");
+        logErr2("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash");
         return true;
     }
     if (!r->verify(root->getNode(r->node_validator)->bls_pk))
@@ -151,9 +138,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         return true;
     }
 
-    // msg::blockZ bl(r->payload_block);
-    // if(bl.)
-    auto &bt = blocks_leader[prev_block_hash_Z];
+    auto &bt = blocks_leader[prev_root_hash_Z];
     if (bt.responses.size())
     {
         if (bt.responses[0]->blockInfo->getHash() != r->blockInfo->getHash())
@@ -171,8 +156,6 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     {
         stakeVal += root->getNode(z->node_validator)->total_stake;
     }
-    // bt.stake_validators+=root->getNode(r->node_validator,NULL)->total_stake;
-    // logNode("Block staked %lf",bt.stake.toDouble());
     if (stakeVal.toDouble() > root->getValues()->total_staked.toDouble() * QUORUM)
     {
         XTRY;
@@ -189,7 +172,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         if (!bt.blockInfo.valid())
             throw CommonError("if(!bt.block_payload.valid())");
         std::vector<blst_cpp::PublicKey> agg_pk;
-        auto &hbs = blocks_leader[prev_block_hash_Z].heart_beat_store;
+        auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
         // ba->leader_certificateZ = hbs.leader_info.leader_cert_2;
         for (auto &z : bt.responses)
         {
@@ -207,11 +190,6 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             logErr2("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
             return true;
         }
-        // if (!ba->leader_certificateZ.valid())
-        //     throw CommonError("if(!ba->leader_certificateZ.valid())");
-        // msg::node_message_ed nm(ba->getBuffer(), this_node_name, my_sk_ed);
-        // make_broadcast_message(nm.getBuffer());
-        // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::BroadcastMessage(ServiceEnum::Node, nm.getBuffer(), ListenerBase::serviceId));
         broadcast_MsgEvent(ba.get());
 
         bt.block_accepted_sent = true;

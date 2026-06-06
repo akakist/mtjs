@@ -155,9 +155,6 @@ namespace Node
         bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);
 
-        void initDB();
-
-        // void on_heart_beat_rsp(const msg::heart_beat_rsp& hbr);
 
         void make_leader_certificate();
         bool isNodeGreaterOrEqual(const NODE_id& nodeLeft, const NODE_id& nodeRight);
@@ -208,7 +205,7 @@ namespace Node
 
         };
         std::map<BLOCK_id, cli_bl> c_blocks;
-        BLOCK_id prev_block_hash_Z;
+        BLOCK_id prev_root_hash_Z;
         void do_start_block();
 
         void collectTransactions();
@@ -223,7 +220,8 @@ namespace Node
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
 
         REF_getter<root_data> root=nullptr;
-        REF_getter<IDatabase> db=nullptr;
+        REF_getter<IDatabase> db_state=nullptr;
+        REF_getter<IDatabase> db_history=nullptr;
 
 
         uint64_t last_activity_time=0;

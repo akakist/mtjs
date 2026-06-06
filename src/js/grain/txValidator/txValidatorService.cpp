@@ -14,7 +14,7 @@
 #include "CDatabase.h"
 #include "s_ed.h"
 #include "QUORUM.h"
-#include <SQLiteCpp/Database.h>
+// #include <SQLiteCpp/Database.h>
 #include "CDatabase.h"
 #include <iostream>
 #include <thread>

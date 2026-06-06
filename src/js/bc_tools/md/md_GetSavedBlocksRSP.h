@@ -15,8 +15,9 @@ namespace MsgData
         {
 
         }
-        std::vector<std::pair<BigInt, REF_getter<MsgData::BlockDBStore>> > blocks_Z;
-        BigInt lastEpoch;
+        std::vector<REF_getter<MsgData::BlockDBStore>> blocks_ZZ;
+        // BigInt lastEpoch;
+        BLOCK_id last_prev_root_hash;
         void update(Blake2bHasher& h) const
         {
             throw CommonError("unimp");
@@ -25,15 +26,15 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<blocks_Z;
-            b<<lastEpoch;
+            b<<blocks_ZZ;
+            b<<last_prev_root_hash;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>blocks_Z;
-            b>>lastEpoch;
+            b>>blocks_ZZ;
+            b>>last_prev_root_hash;
         }
     };
 
