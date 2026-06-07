@@ -161,7 +161,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         }
         outBuffer o;
         o<<z;
-        if(db_history->writeBlock(z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
+        if(db_history->writeBlock(z->validateBlockREQ->leader_cert->heart_beat->new_epoch, z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
             o.asString()->container
         ))
         {

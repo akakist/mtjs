@@ -96,7 +96,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XTRY;
         outBuffer o;
         o<<c.blockDBStore;
-        db_history->writeBlock(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
+        db_history->writeBlock(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->new_epoch, c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
             o.asString()->container
         );
         XPASS;
