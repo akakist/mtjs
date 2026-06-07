@@ -96,18 +96,9 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XTRY;
         outBuffer o;
         o<<c.blockDBStore;
-        db_history->put(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
+        db_history->writeBlock(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
             o.asString()->container
         );
-        // SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-
-        // SQLite::Statement insert(dbs, "REPLACE INTO blocks (epoch, prev_root_hash, date, data) VALUES (?, ?, ?, ?)");
-        // insert.bind(1,  c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString());
-
-        // insert.bind(2, base16::encode(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container));
-        // insert.bind(3, time(NULL));
-        // insert.bind(4, base16::encode(c.blockDBStore->getBuffer()));
-        // insert.exec();
         XPASS;
     }
 
@@ -285,7 +276,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
         pass_NodeMsgRSP(rsp.get(), route);
     }
-#ifdef MEMLEACK_CHECK
+#ifdef MEMLEAK_CHECK
     logNode("!!!!!!!!!!!!!! global REF count %d", get_global_refcount());
     std::vector<std::string> v;
     root->print_calcers(v);

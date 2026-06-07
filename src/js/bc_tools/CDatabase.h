@@ -47,7 +47,7 @@ struct CDatabase: public IDatabase
             throw CommonError("Write failed: %s",s.ToString().c_str());
         }
 
-        // db->Flush(rocksdb::FlushOptions());
+	 db->Flush(rocksdb::FlushOptions());
 
         return 0;
     }
@@ -77,9 +77,9 @@ struct CDatabase: public IDatabase
         options.level_compaction_dynamic_level_bytes = true;
         options.keep_log_file_num = 3;        // хранить только 3 старых лога
         options.max_log_file_size = 10 * 1024 * 1024; // 10 MB
-        options.max_open_files=800;
+//        options.max_open_files=800;
         // options.compaction_on_commit = true;
-        options.level0_file_num_compaction_trigger = 2;
+//        options.level0_file_num_compaction_trigger = 2;
         rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
         if (!s.ok()) {
             std::cerr << "Open failed: " << s.ToString() << "\n";

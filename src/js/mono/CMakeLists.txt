@@ -34,7 +34,7 @@ else()
 target_link_libraries(mtjs 
 -static  
 -Wl,--start-group node2-serviceS node-serviceS node3-serviceS node4-serviceS node5-serviceS node6-serviceS 
-     mtjsmoduleS mtjscommon     mtjsnet  mtjsutils bctools quickjs megatron-main   zsingle megatron-core sodium   rocksdb  crypto  blst
+     mtjsmoduleS mtjscommon     mtjsnet  mtjsutils bctools quickjs megatron-main   zsingle megatron-core sodium   rocksdb SQLiteCpp sqlite3  crypto  blst
       ${linuxlib} yyjson zstd lz4 bz2 snappy
 
 #curl  psl idn2 unistring nghttp2
