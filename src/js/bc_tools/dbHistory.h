@@ -1,12 +1,9 @@
 #pragma once
 #include <cstdio>
 #include <ctime>
-#include <map>
 #include <string>
-#include "IDatabase.h"
 #include "REF.h"
 #include "commonError.h"
-#include "CDatabase.h"
 #include <sys/stat.h>
 #include <SQLiteCpp/Database.h>
 #define TM_RADIX (3600)

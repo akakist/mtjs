@@ -1,7 +1,6 @@
 #include "msg.h"
 #include "blake2bHasher.h"
 #include "md/md_BlockAcceptedREQ.h"
-#include <string>
 
 thread_local MsgFactory msgFactory;
 MsgData::BlockAcceptedREQ::BlockAcceptedREQ()

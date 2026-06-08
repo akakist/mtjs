@@ -1,15 +1,11 @@
 #pragma once
 #include "REF.h"
-#include <set>
 #include <string>
 #include <rocksdb/db.h>
-#include "blake2bHasher.h"
 #include "commonError.h"
 #include "IDatabase.h"
 #include <vector>
-#include "base16.h"
 #include "db_to_save.h"
-#include "fee_calcer.h"
 #include "hsh.h"
 
 struct Cellable;

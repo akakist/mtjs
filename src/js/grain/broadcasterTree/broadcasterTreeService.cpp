@@ -19,13 +19,10 @@
 #include "broadcasterTreeService.h"
 #include "event_mt.h"
 #include "listenerBuffered1Thread.h"
-#include "root_contract.h"
 #include "route_t.h"
-#include "refstring.h"
 #include "tools_mt.h"
 #include "tree.h"
 #include "events_broadcasterTreeService.hpp"
-#include "init_root.h"
 #include "unknown.h"
 
 bool BroadcasterTree::Service::on_startService(const systemEvent::startService *)

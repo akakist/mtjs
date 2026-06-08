@@ -51,7 +51,7 @@ include(FetchContent)
 
 find_package(PkgConfig REQUIRED)
 find_package(yyjson REQUIRED)
-find_package(xyjson REQUIRED)
+#find_package(xyjson REQUIRED)
 
 find_package(SQLite3 REQUIRED)
 find_package(PostgreSQL REQUIRED)

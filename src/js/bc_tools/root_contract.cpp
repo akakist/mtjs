@@ -1,19 +1,15 @@
 
 
-#include <mutex>
 #include <string>
 #include <gmp.h>
-#include <iostream>
 #include <vector>
 #include <string>
 #include "bigint.h"
 #include "blake2bHasher.h"
 #include "blst_cp.h"
 #include "ioBuffer.h"
-#include "ghash.h"
 #include <sys/stat.h>
 #include "root_contract.h"
-#include "msg.h"
 #include "QUORUM.h"
 
 std::vector<data_base *(*)(Cellable *)> db_constructors = {

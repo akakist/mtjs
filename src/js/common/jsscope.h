@@ -2,7 +2,6 @@
 #include "quickjs.h"
 #include <string>
 #include <string_view>
-#include <stdexcept>
 #include "commonError.h"
 
 template<size_t S1, size_t S2>

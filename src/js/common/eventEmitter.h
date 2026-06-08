@@ -4,8 +4,6 @@
 #include <vector>
 #include <string>
 #include <set>
-#include "jsscope.h"
-#include "js_tools.h"
 #include "jsValueGuard.h"
 
 

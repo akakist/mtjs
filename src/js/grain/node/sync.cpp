@@ -1,22 +1,15 @@
-#include "base16.h"
 #include "blake2bHasher.h"
 #include "commonError.h"
 #include "NODE_id.h"
 #include "REF.h"
 #include "ioBuffer.h"
 #include "md_GetSavedBlocksRSP.h"
-#include "msg.h"
 #include "bcEvent.h"
 #include "listenerBase.h"
 #include "mutexInspector.h"
 #include "nodeService.h"
-#include <vector>
 #include <cstdlib>
 #include <cstddef>
-#include "t_params.h"
-#include "tools_mt.h"
-#include "init_root.h"
-#include "base16.h"
 
 void Node::Service::do_sync(const NODE_id &src_node)
 {

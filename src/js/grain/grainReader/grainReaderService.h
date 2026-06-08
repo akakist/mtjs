@@ -4,25 +4,11 @@
 
 
 #include "listenerBuffered1Thread.h"
-#include <map>
 #include <rocksdb/db.h>
 #include "Events/System/Run/startServiceEvent.h"
-#include "Events/Tools/telnetEvent.h"
-#include "Events/Tools/webHandlerEvent.h"
-#include "Events/System/Net/httpEvent.h"
 #include "Events/System/timerEvent.h"
-#include "Events/System/Net/httpEvent.h"
 #include "Event/bcEvent.h"
 #include "root_contract.h"
-#include "msg.h"
-#include "tr_exec.h"
-#include "bigint.h"
-#include "TRANSACTION_id.h"
-#include "THASH_id.h"
-#include "NODE_id.h"
-#include "db_to_save.h"
-#include <thread>
-#include <condition_variable>
 
 
 

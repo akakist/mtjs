@@ -2,26 +2,11 @@
 #include "Events/System/timerEvent.h"
 #include "THASH_id.h"
 #include "corelib/mutexInspector.h"
-#include <map>
 #include "txValidatorService.h"
 #include "ioBuffer.h"
-#include "msg.h"
 #include "tools_mt.h"
-#include "tree.h"
 #include "events_txValidatorService.hpp"
-#include "version_mega.h"
-#include "tr_exec.h"
-#include "CDatabase.h"
-#include "s_ed.h"
-#include "QUORUM.h"
 // #include <SQLiteCpp/Database.h>
-#include "CDatabase.h"
-#include <iostream>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <chrono>
-#include "init_root.h"
 
 bool TxValidator::Service::on_startService(const systemEvent::startService *)
 {
@@ -109,7 +94,6 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base> &e)
     XPASS;
     return false;
 }
-#include <regex>
 
 TxValidator::Service::~Service()
 {

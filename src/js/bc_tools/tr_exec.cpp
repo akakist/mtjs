@@ -1,11 +1,4 @@
-#include "NODE_id.h"
-#include "base16.h"
-#include "bigint.h"
-#include "msg.h"
 #include <fcntl.h>
-#include <optional>
-#include "cellable.h"
-#include "tr_exec.h"
 
 std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 {

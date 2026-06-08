@@ -13,11 +13,9 @@
 #include <exception>
 #include <string>
 #include <time.h>
-#include <map>
 #include "blockStreamerService.h"
 #include "event_mt.h"
 #include "listenerBuffered1Thread.h"
-#include "tools_mt.h"
 #include "events_blockStreamerService.hpp"
 #include "unknown.h"
 

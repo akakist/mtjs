@@ -6,7 +6,6 @@
 #include "commonError.h"
 #include "Events/Tools/telnetEvent.h"
 #include "bigint.h"
-#include "TRANSACTION_id.h"
 #include "blake2bHasher.h"
 #include "REF.h"
 #include "Events/Tools/webHandlerEvent.h"
@@ -29,11 +28,9 @@
 #include "epoll_socket_info.h"
 #include "event_mt.h"
 #include "events_nodeService.hpp"
-#include "CDatabase.h"
 #include "getenv2.h"
 #include "httpConnection.h"
 #include "fee_calcer.h"
-#include "init_root.h"
 #include "execute_transaction.h"
 #include "root_contract.h"
 #include "listenerBase.h"
@@ -618,7 +615,6 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
     ret.container = root_hash.container;
     return ret;
 }
-#include "__crc32.h"
 #include <stdlib.h>
 int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 {

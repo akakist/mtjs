@@ -2,7 +2,6 @@
 #include <quickjs.h>
 #include "commonError.h"
 #include "mutexInspector.h"
-#include "backtrace.h"
 #include "jsscope.h"
 namespace qjs
 {

@@ -1,7 +1,6 @@
 // blst_cpp.hpp
 #pragma once
 
-#include <vector>
 #include <stdexcept>
 #include <cstdint>
 #include <string.h>

@@ -19,12 +19,9 @@
 #include "common/mtjsEvent.h"
 #include "common/jsscope.h"
 #include "common/timers.h"
-#include "Events/Tools/webHandlerEvent.h"
 #include "errcodes.h"
 
 #include "sv.h"
-#include "md/md_BlockDBStore.h"
-#include "md/md_attachment_data.h"
 #include "md/md_GetUserStatusRSP.h"
 #include "xyjson.h"
 #include <nlohmann/json.hpp>

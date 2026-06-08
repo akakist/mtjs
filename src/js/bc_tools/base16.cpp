@@ -1,7 +1,6 @@
 #include <string>
 #include <vector>
 #include <cstdint>
-#include <algorithm>
 #include <stdexcept>
 #include <string.h>
 #include "base16.h"
