@@ -30,7 +30,7 @@ std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_param
     {
         return "mint: sender state not found";
     }
-    u->balance += amount;
+    u->addBalance(amount);
     u->setDirty();
     t.addCalcer(u.get(),by);
 
@@ -80,12 +80,12 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
         return "destination user not found";
     }
     auto fee=v->getFee("transfer");
-    if (u->balance < fee + amount)
+    if (u->getBalance() < fee + amount)
     {
         return "Not enough funds";
     }
-    u->balance -= amount;
-    to->balance += amount;
+    u->subBalance(amount);
+    to->addBalance(amount);
     u->setDirty();
     to->setDirty();
     t.addCalcer(u.get(),by);
@@ -123,7 +123,7 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("node_update");
-    if (us->balance < fee)
+    if (us->getBalance() < fee)
         return "Not enough funds";
 
 
@@ -193,7 +193,7 @@ std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, 
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("node_create");
-    if (us->balance < fee)
+    if (us->getBalance() < fee)
         return "Not enough funds";
 
 
@@ -250,7 +250,7 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("node_stake");
-    if (us->balance < amount + fee)
+    if (us->getBalance() < amount + fee)
     {
         return "Insufficient funds";
     }
@@ -262,7 +262,7 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
     }
     BigInt &nodeStake = n->stakes[senderAddress];
 
-    us->balance -= amount;
+    us->subBalance(amount);
     nodeStake += amount;
     n->total_stake += amount;
     v->total_staked += amount;
@@ -314,11 +314,11 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     if (!u.valid())
         return "FATAL:  dst addr not found";
     auto fee=v->getFee("node_unstake");
-    if(u->balance < fee)
+    if(u->getBalance() < fee)
     {
         return "Insufficient funds to unstake";
     }
-    u->balance += amount;
+    u->addBalance(amount);
 
     nodeStake -= amount;
 
@@ -364,7 +364,7 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
     auto us = t.root->getUserState(senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    if (us->balance < fee)
+    if (us->getBalance() < fee)
     {
         return "Insufficient funds";
     }

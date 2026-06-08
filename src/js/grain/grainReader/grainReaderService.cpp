@@ -152,8 +152,8 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
         auto u = root->getUserState(pp->user_pk_bin_ed);
 
         REF_getter<MsgData::GetUserStatusRSP> rsp=new MsgData::GetUserStatusRSP;
-        rsp->balance=u->balance;
-        rsp->nonce=u->nonce;
+        rsp->balance=u->getBalance();
+        rsp->nonce=u->getNonce();
         passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
 
 

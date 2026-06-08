@@ -75,26 +75,9 @@ struct bc_user: public data_base
     {
         std::ostringstream o;
         o<<"PK: "  << base16::encode(pkbin_еd) << std::endl;
-        // o<< "Stakes: ";
-        // for(auto& z: my_stakes)
-        // {
-        //     o<< z.first.container <<"->"<< z.second.toString();
-        // }
-        // o<< std::endl;
-
-        // o<< "Nodes: ";
-        // for(auto& z: nodes)
-        // {
-        //     o<< z.container <<" ";
-        // }
         o<< std::endl;
 
 
-        // o<< "Contracts: ";
-        // for(auto& z: contracts)
-        // {
-        //     o<< z <<" ";
-        // }
         o<< std::endl;
 
 
@@ -109,9 +92,40 @@ struct bc_user_state: public data_base
         nonce=0;
         balance=0;
     }
+    private:
     BigInt balance;
     BigInt nonce;
-
+    public:
+    BigInt getBalance()
+    {
+        M_LOCK(parent->mx);
+        return balance;
+    }
+    void addBalance(const BigInt &n)
+    {
+        M_LOCK(parent->mx);
+        balance+=n;
+    }
+    void setBalance(const BigInt &n)
+    {
+        M_LOCK(parent->mx);
+        balance=n;
+    }
+    void subBalance(const BigInt &n)
+    {
+        M_LOCK(parent->mx);
+        balance-=n;
+    }
+    BigInt getNonce()
+    {
+        M_LOCK(parent->mx);
+        return nonce;
+    }
+    void incNonce()
+    {
+        M_LOCK(parent->mx);
+        nonce+=1;
+    }
     void pack(outBuffer& o) const final
     {
         data_base::pack(o);
@@ -126,6 +140,7 @@ struct bc_user_state: public data_base
     }
     std::string dump() final
     {
+        M_LOCK(parent->mx);
         std::ostringstream o;
         o<< "Balance: " << balance.toString() << std::endl;
         o<< "Nonce: " << nonce.toString() <<std::endl;

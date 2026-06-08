@@ -472,9 +472,9 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
                 // auto n=tj["nonce"].get<std::string>();
                 // BigInt nonce;
                 // nonce.from_string(n);
-                if (u->nonce != tt->nonce)
+                if (u->getNonce() != tt->nonce)
                 {
-                    logErr2("invalid nonce, expected %s got %s", u->nonce.toString().c_str(), tt->nonce.toString().c_str());
+                    logErr2("invalid nonce, expected %s got %s", u->getNonce().toString().c_str(), tt->nonce.toString().c_str());
                     t_err = "invalid nonce";
 
                 }
@@ -482,7 +482,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
                 {
                     MUTEX_INSPECTOR;
                     execute_transaction(tt->getHash(), t, pk_bin, tj, by);
-                    u->nonce += 1;
+                    u->incNonce();
                     u->setDirty();
 
                 }
@@ -536,15 +536,15 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         auto u = root->getUserState(z.first);
         if (!u.valid())
             throw CommonError("if(!u.valid()) 334455");
-        if (u->balance < z.second->get_fee())
+        if (u->getBalance() < z.second->get_fee())
         {
-            u->balance = 0;
+            u->setBalance(0);
             u->setDirty();
         }
         else
         {
-            logErr2("balance deduct %s fee %s", u->balance.toString().c_str(), z.second->get_fee().toString().c_str());
-            u->balance -= z.second->get_fee();
+            logErr2("balance deduct %s fee %s", u->getBalance().toString().c_str(), z.second->get_fee().toString().c_str());
+            u->subBalance(z.second->get_fee());
             u->setDirty();
         }
         total_fees += z.second->get_fee();
@@ -566,7 +566,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
             // u=root->addUser(upk,NULL);
         }
         BigInt amt = (total_rewards * node->total_stake) / root->getValues()->total_staked;
-        u->balance += amt;
+        u->addBalance(amt);
         u->setDirty();
         if (n == this_node_name && amt > 0)
             logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());

@@ -31,7 +31,7 @@ void init_root(const REF_getter<root_data> &r)
         {
             throw CommonError("cannot find root user state");
         }
-        u->balance=1000000;
+        u->addBalance(1000000);
         u->setDirty();
 
     }
