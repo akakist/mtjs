@@ -64,24 +64,24 @@ struct Cellable: public Refcountable
     Cellable * parent=nullptr;
     const std::string m_id;
     size_t last_size=0;
-    std::set<REF_getter<fee_calcer>> calcers_Z;
+    // std::set<REF_getter<fee_calcer>> calcers_Z;
 
     std::map<std::string,THASH_id > children_hashes;
     std::map<std::string, REF_getter<Cellable>> children_ptrs;
     unsigned int payload_ctor_idx=hsh::HSH_END;
     REF_getter<data_base> data=nullptr;
-    void print_calcers(std::vector<std::string> &v)
-    {
-        if(calcers_Z.size())
-        {
-            v.push_back(getDbId());
-        }
-        for(auto& z: children_ptrs)
-        {
-            z.second->print_calcers(v);
-        }
+    // void print_calcers(std::vector<std::string> &v)
+    // {
+    //     if(calcers_Z.size())
+    //     {
+    //         v.push_back(getDbId());
+    //     }
+    //     for(auto& z: children_ptrs)
+    //     {
+    //         z.second->print_calcers(v);
+    //     }
 
-    }
+    // }
 public:
     bool is_dirty=false;
 
@@ -91,8 +91,8 @@ public:
     void setDirty(const REF_getter<fee_calcer>& bc)
     {
         is_dirty=true;
-        if(bc.valid())
-            calcers_Z.insert(bc);
+        // if(bc.valid())
+        //     calcers_Z.insert(bc);
         if(parent)
         {
             parent->setDirty(bc);

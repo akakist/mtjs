@@ -95,30 +95,30 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
         {
 
             c->calc_tree_hash(db_dump);
-            for(auto& bc: c->calcers_Z)
-            {
-                if(bc.valid())
-                    calcers_Z.insert(bc);
-            }
+            // for(auto& bc: c->calcers_Z)
+            // {
+            //     if(bc.valid())
+            //         calcers_Z.insert(bc);
+            // }
             auto child_buf=c->getBuffer();
             auto ch=blake2b_hash(child_buf);
             if(ch!=children_hashes[cid])
             {
                 db_dump.add(c->getDbId(),child_buf);
                 c->last_size=child_buf.size();
-                if(c->calcers_Z.size()>0)
-                {
-                    auto portion=child_buf.size()/c->calcers_Z.size();
-                    for(auto& bc: c->calcers_Z)
-                    {
-                        if(bc.valid())
-                        {
-                            bc->add(portion);
-                            calcers_Z.insert(bc);
-                        }
-                    }
-                    c->calcers_Z.clear();
-                }
+                // if(c->calcers_Z.size()>0)
+                // {
+                //     auto portion=child_buf.size()/c->calcers_Z.size();
+                //     for(auto& bc: c->calcers_Z)
+                //     {
+                //         if(bc.valid())
+                //         {
+                //             bc->add(portion);
+                //             calcers_Z.insert(bc);
+                //         }
+                //     }
+                //     c->calcers_Z.clear();
+                // }
                 children_hashes[cid]=ch;
             }
         }

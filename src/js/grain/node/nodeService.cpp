@@ -141,7 +141,7 @@ void Node::Service::collectTransactions()
 void Node::Service::do_start_block()
 {
     MUTEX_INSPECTOR;
-    logNode("@@ %s",__FUNCTION__);
+    // logNode("@@ %s",__FUNCTION__);
     if (transaction_pool_of_leader.empty())
     {
         logNode("if (transaction_pool_of_leader.empty())");
@@ -158,13 +158,13 @@ void Node::Service::do_start_block()
             b->leader_cert = li.leader_cert_2;
 
             auto &bt = blocks_leader[prev_root_hash_Z];
-            logNode("before collectTransactions sz %d", transaction_pool_of_leader.size());
+            // logNode("before collectTransactions sz %d", transaction_pool_of_leader.size());
             collectTransactions();
-            logNode("AFTER collectTransactions sz %d", transaction_pool_of_leader.size());
+            // logNode("AFTER collectTransactions sz %d", transaction_pool_of_leader.size());
 
             for (auto &z : transaction_pool_of_leader)
                 b->transaction_bodies.push_back(z.second);
-            logNode("broadcast ValidateBlockREQ");
+            // logNode("broadcast ValidateBlockREQ");
             broadcast_MsgEvent(b.get());
         }
     }
@@ -606,7 +606,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
 BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)
 {
     r->calc_tree_hash(db_to_save_Z);
-    r->calcers_Z.clear();
+    // r->calcers_Z.clear();
 
     auto root_buf = r->getBuffer();
     auto root_hash = blake2b_hash(root_buf);
@@ -656,7 +656,7 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 {
     MUTEX_INSPECTOR;
-    logErr2("@@ %s",__FUNCTION__);
+    // logErr2("@@ %s",__FUNCTION__);
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
 //     logErr2("iUtils->getNow(() -last_activity_time %lld iUtils->getNow() %lld last_activity_time %lld",iUtils->getNow()-last_activity_time,
