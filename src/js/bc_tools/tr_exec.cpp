@@ -31,7 +31,7 @@ std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_param
         return "mint: sender state not found";
     }
     u->balance += amount;
-    u->setDirty(by);
+    u->setDirty();
     t.addCalcer(u.get(),by);
 
     t.fee[senderAddress] += v->getFee("mint");
@@ -86,8 +86,8 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     }
     u->balance -= amount;
     to->balance += amount;
-    u->setDirty(by);
-    to->setDirty(by);
+    u->setDirty();
+    to->setDirty();
     t.addCalcer(u.get(),by);
     t.addCalcer(to.get(),by);
 
@@ -146,10 +146,10 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
         nn->bls_pk.deserializeHexStr(pk_bls.toString());
         t.logMsg(txid, seqId, "pk bls changed");
     }
-    
 
-    nn->setDirty(by);
-    us->setDirty(by);
+
+    nn->setDirty();
+    us->setDirty();
     t.addCalcer(nn.get(),by);
     t.addCalcer(us.get(),by);
 
@@ -214,9 +214,9 @@ std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, 
     n->ed_pk = base16::decode(pk_ed.toString());
     n->bls_pk.deserialize(base16::decode(pk_bls.toString()));
     n->owner_ed_pk = senderAddress;
-    n->setDirty(by);
-    // u->setDirty(by);
-    us->setDirty(by);
+    n->setDirty();
+    // u->setDirty();
+    us->setDirty();
     t.addCalcer(n.get(),by);
     t.addCalcer(us.get(),by);
 
@@ -234,12 +234,12 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
     auto _amount = params / "amount";
     if (!_amount.isString())
     {
-        return "param string amount required"; 
+        return "param string amount required";
     }
     BigInt amount;
     amount.from_string(_amount.toString());
     auto _node = params / "node";
-    if (!_node.isString())    
+    if (!_node.isString())
     {
         return "param string node required";
     }
@@ -266,16 +266,16 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
     nodeStake += amount;
     n->total_stake += amount;
     v->total_staked += amount;
-    
+
     t.fee[senderAddress] += fee;
 
     t.logMsg(txid, seqId, "node %s staked on amount %s", node.container.c_str(), amount.toString().c_str());
-    n->setDirty(by);
-    us->setDirty(by);
+    n->setDirty();
+    us->setDirty();
     t.addCalcer(n.get(),by);
     t.addCalcer(us.get(),by);
 
-    return std::nullopt;    
+    return std::nullopt;
 }
 std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
@@ -283,7 +283,7 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     auto _amount = params / "amount";
     if (!_amount.isString())
     {
-        return "param string amount required"; 
+        return "param string amount required";
     }
     BigInt amount;
     amount.from_string(_amount.toString());
@@ -321,14 +321,14 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     u->balance += amount;
 
     nodeStake -= amount;
-    
+
     n->total_stake -= amount;
 
     v->total_staked -= amount;
-    
-    v->setDirty(by);
-    n->setDirty(by);
-    u->setDirty(by);
+
+    v->setDirty();
+    n->setDirty();
+    u->setDirty();
     t.addCalcer(v.get(),by);
     t.addCalcer(n.get(),by);
     t.addCalcer(u.get(),by);
@@ -344,7 +344,7 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
 {
     auto v = t.root->getValues();
     auto _node = params / "node";
-    if (!_node.isString())    
+    if (!_node.isString())
     {
         return "param string node required";
     }
@@ -369,7 +369,7 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
         return "Insufficient funds";
     }
     n->missed_rounds = 0;
-    n->setDirty(by);
+    n->setDirty();
 
     t.fee[senderAddress] += fee;
 
@@ -396,16 +396,16 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
 //     cc->src = c.src;
 
 //     u->contracts.insert(c.name);
-//     u->setDirty(by);
-//     cc->setDirty(by);
+//     u->setDirty();
+//     cc->setDirty();
 
 //     t.fee[senderAddress] += v->fees[bc_values::contract_deploy];
 
 //     t.logMsg(txid, seqId, "contract %s deployed successfully", c.name.c_str());
 
 //     return std::nullopt;
-//     return std::nullopt;    
-    
+//     return std::nullopt;
+
 // }
 
 // std::optional<std::string> TR::execute(const tx::createContract &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
@@ -426,8 +426,8 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
 //     cc->src = c.src;
 
 //     u->contracts.insert(c.name);
-//     u->setDirty(by);
-//     cc->setDirty(by);
+//     u->setDirty();
+//     cc->setDirty();
 
 //     t.fee[senderAddress] += v->fees[bc_values::contract_deploy];
 

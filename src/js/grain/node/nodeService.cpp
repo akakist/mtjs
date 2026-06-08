@@ -57,7 +57,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 
     db_state = new CDatabase(rocksdb_path+"_state");
     auto db_state2=db_state;
-    iUtils->add_shutdown_cb([db_state2](){
+    iUtils->add_shutdown_cb([db_state2]() {
 
         logErr2("close db handler");
         db_state2->close();
@@ -68,7 +68,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 
     db_history = new DB_history(rocksdb_path+"_history");
     auto db_h_copy=db_history;
-    iUtils->add_shutdown_cb([db_h_copy](){
+    iUtils->add_shutdown_cb([db_h_copy]() {
 
         logErr2("close db handler");
         db_h_copy->close();
@@ -445,7 +445,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
     // outBuffer o;
     for (int ti = 0; ti < t.validateBlockREQ->transaction_bodies.size(); ti++)
     {
-    MUTEX_INSPECTOR;
+        MUTEX_INSPECTOR;
         std::optional<std::string> t_err;
         auto tt=t.validateBlockREQ->transaction_bodies[ti];
         auto tx_hash=tt->getHash();
@@ -459,7 +459,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
         }
         if (!t_err)
         {
-    MUTEX_INSPECTOR;
+            MUTEX_INSPECTOR;
             auto u = root->getUserState(pk_bin);
             if (!u.valid())
             {
@@ -479,10 +479,10 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
                 }
                 if (!t_err)
                 {
-    MUTEX_INSPECTOR;
+                    MUTEX_INSPECTOR;
                     execute_transaction(tt->getHash(), t, pk_bin, tj, by);
                     u->nonce += 1;
-                    u->setDirty(NULL);
+                    u->setDirty();
 
                 }
             }
@@ -497,13 +497,14 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
     auto newEpoch = root->getEpoch();
     newEpoch->epoch += 1;
     newEpoch->prev_leader_cert = t.validateBlockREQ->leader_cert;
-    newEpoch->setDirty(NULL);
+    newEpoch->setDirty();
 
     rh=proceed_merkle_on_transaction_pool_hashers(root);
     return rh;
 }
 void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_id> &nodes_in_leader_cert)
 {
+    MUTEX_INSPECTOR;
     std::map<Cellable*, std::set<REF_getter<fee_calcer>>> cc;
     for(auto & z:t.calcers)
     {
@@ -520,7 +521,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
     {
         size_t size=z.first->last_size;
         size_t portion=size/z.second.size();
-        for(auto &x: z.second) 
+        for(auto &x: z.second)
         {
             x->add(portion);
         }
@@ -537,13 +538,13 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         if (u->balance < z.second->get_fee())
         {
             u->balance = 0;
-            u->setDirty(NULL);
+            u->setDirty();
         }
         else
         {
             logErr2("balance deduct %s fee %s", u->balance.toString().c_str(), z.second->get_fee().toString().c_str());
             u->balance -= z.second->get_fee();
-            u->setDirty(NULL);
+            u->setDirty();
         }
         total_fees += z.second->get_fee();
         t.att_data->fees[z.first] = z.second->get_fee();
@@ -565,7 +566,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         }
         BigInt amt = (total_rewards * node->total_stake) / root->getValues()->total_staked;
         u->balance += amt;
-        u->setDirty(NULL);
+        u->setDirty();
         if (n == this_node_name && amt > 0)
             logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
         t.att_data->rewards[n] = amt;
@@ -585,7 +586,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
             else
             {
                 n->missed_rounds=0;
-                n->setDirty(NULL);
+                n->setDirty();
             }
         }
         else
@@ -597,7 +598,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
             else
             {
                 n->missed_rounds++;
-                n->setDirty(NULL);
+                n->setDirty();
             }
         }
     }
@@ -605,6 +606,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
 
 BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)
 {
+    MUTEX_INSPECTOR;
     r->calc_tree_hash(db_to_save_Z);
     // r->calcers_Z.clear();
 
@@ -667,9 +669,9 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
         last_activity_time=iUtils->getNow();
         logNode("do_heart_beat in PutTransactionREQ");
         // do_heart_beat();
-            REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
-            rq->prev_leader_cert = root->getEpoch()->prev_leader_cert;
-            broadcast_MsgEvent(rq.get());
+        REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
+        rq->prev_leader_cert = root->getEpoch()->prev_leader_cert;
+        broadcast_MsgEvent(rq.get());
 
     }
     return true;

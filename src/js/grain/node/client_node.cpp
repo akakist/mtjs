@@ -34,7 +34,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     XTRY;
     // blockDBStore->validateBlockREQ->leader_cert
     auto& c=c_blocks[r->blockInfo->prev_root_hash];
-    
+
     if (!c.blockDBStore.valid())
     {
         logErr2("if (!c.blockDBStore.valid())");
@@ -97,8 +97,8 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         outBuffer o;
         o<<c.blockDBStore;
         db_history->writeBlock(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->new_epoch, c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
-            o.asString()->container
-        );
+                               o.asString()->container
+                              );
         XPASS;
     }
 

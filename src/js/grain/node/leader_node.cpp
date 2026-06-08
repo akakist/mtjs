@@ -134,7 +134,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         return true;
 
     if (r->blockInfo->prev_root_hash != prev_root_hash_Z)
-    {   
+    {
         logErr2("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash");
         return true;
     }

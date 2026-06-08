@@ -61,16 +61,16 @@ struct bc_user: public data_base
         data_base::pack(o);
         o<<1;
         o<<pkbin_еd
-        // <<my_stakes<<nodes<<contracts
-        ;
+         // <<my_stakes<<nodes<<contracts
+         ;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
         o>>pkbin_еd
-        // >>my_stakes>>nodes>>contracts
-        ;
+         // >>my_stakes>>nodes>>contracts
+         ;
     }
     std::string dump() final
     {

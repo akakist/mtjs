@@ -47,7 +47,7 @@ struct CDatabase: public IDatabase
             throw CommonError("Write failed: %s",s.ToString().c_str());
         }
 
-	 db->Flush(rocksdb::FlushOptions());
+        db->Flush(rocksdb::FlushOptions());
 
         return 0;
     }

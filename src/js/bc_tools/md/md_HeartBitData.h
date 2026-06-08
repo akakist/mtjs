@@ -25,13 +25,19 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<prev_leader_cert;
+            if(prev_leader_cert.valid())
+            {
+                b<<1<<prev_leader_cert;
+
+            }
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>prev_leader_cert;
+            int valid=b.get_PN();
+            if(valid)
+                b>>prev_leader_cert;
         }
     };
 

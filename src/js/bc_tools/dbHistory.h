@@ -20,7 +20,7 @@ struct DB_history : public Refcountable
     void close()
     {
     }
-        
+
     std::string dbName(int prev)
     {
         struct tm tm;
@@ -45,21 +45,21 @@ struct DB_history : public Refcountable
         fclose(f);
     }
     bool writeBlock(const BigInt& epoch, const std::string& prev_root_hash, const std::string& data) {
-        
+
         write_chunked(data);
-        
+
         auto pn=base_path+".db";
 
         SQLite::Database dbs(pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
 
         initDB(dbs);
 
-        SQLite::Statement query(dbs, 
-            "INSERT OR REPLACE INTO blocks (prev_root_hash, data, epoch) VALUES (?, ?, ?)"
-        );
+        SQLite::Statement query(dbs,
+                                "INSERT OR REPLACE INTO blocks (prev_root_hash, data, epoch) VALUES (?, ?, ?)"
+                               );
         query.bind(1, prev_root_hash.data(),prev_root_hash.size());
-        query.bind(2, data.data(),data.size());  
-        query.bind(3, epoch.toString());  
+        query.bind(2, data.data(),data.size());
+        query.bind(3, epoch.toString());
         query.exec();
         if(epoch>20000)
         {
@@ -72,16 +72,16 @@ struct DB_history : public Refcountable
         {
             auto pn=base_path+".db";
 
-            try{
+            try {
                 SQLite::Database dbs(pn,  SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-                
+
 
                 initDB(dbs);
-                SQLite::Statement query(dbs, 
-                "SELECT data FROM blocks WHERE prev_root_hash = ?"
-                );
+                SQLite::Statement query(dbs,
+                                        "SELECT data FROM blocks WHERE prev_root_hash = ?"
+                                       );
                 query.bind(1, prev_root_hash.data(), prev_root_hash.size());
-        
+
                 if (query.executeStep()) {
 
                     const std::string blob = query.getColumn(0).getString();
@@ -102,7 +102,7 @@ struct DB_history : public Refcountable
             // Включить WAL для производительности (опционально)
             db.exec("PRAGMA journal_mode=WAL;");
             db.exec("PRAGMA synchronous=NORMAL;");
-            
+
             db.exec(R"(CREATE TABLE IF NOT EXISTS blocks (
                 prev_root_hash BLOB NOT NULL,
                 epoch INTEGER NOT NULL,
@@ -110,7 +110,7 @@ struct DB_history : public Refcountable
             ))");
             db.exec("CREATE INDEX IF NOT EXISTS idx_prev_hash ON blocks(prev_root_hash);");
             db.exec("CREATE INDEX IF NOT EXISTS idx_epoch ON blocks(epoch);");
-            
+
             return true;
         } catch (...) {
             return false;

@@ -53,7 +53,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const
 
     BigInt epoch = 0;
     {
-            MUTEX_INSPECTOR;
+        MUTEX_INSPECTOR;
         logNode("Query FROM root hash '%s' blocks %d", r->prev_root_hash.str().c_str(),ret->blocks_ZZ.size());
         BLOCK_id prev = r->prev_root_hash;
         while (ret->blocks_ZZ.size() < 40)
@@ -162,8 +162,8 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         outBuffer o;
         o<<z;
         if(db_history->writeBlock(z->validateBlockREQ->leader_cert->heart_beat->new_epoch, z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
-            o.asString()->container
-        ))
+                                  o.asString()->container
+                                 ))
         {
             logErr2("error saving block");
         }

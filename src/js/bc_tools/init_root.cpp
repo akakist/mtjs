@@ -20,7 +20,7 @@ void init_root(const REF_getter<root_data> &r)
             total+=z;
         }
         v->total_staked=total;
-        v->setDirty(NULL);
+        v->setDirty();
     }
     // u_root pk
     if(!r->checkUserState(u_root_pk).valid())
@@ -31,7 +31,7 @@ void init_root(const REF_getter<root_data> &r)
             throw CommonError("cannot find root user state");
         }
         u->balance=1000000;
-        u->setDirty(NULL);
+        u->setDirty();
 
     }
 
@@ -39,10 +39,10 @@ void init_root(const REF_getter<root_data> &r)
     for (size_t i = 0; i < 20; i++)
     {
         keys.push_back(
-            {
-                "k_node"+std::to_string(i)+"_bls_pk",
-                "k_node"+std::to_string(i)+"_ed_pk"
-            }
+        {
+            "k_node"+std::to_string(i)+"_bls_pk",
+            "k_node"+std::to_string(i)+"_ed_pk"
+        }
         );
     }
 
@@ -63,7 +63,7 @@ void init_root(const REF_getter<root_data> &r)
         nn->ed_pk=base16::decode(getenv2(keys[i].second));
 
         nn->ip="127.0.0.1:"+std::to_string(2300+i);
-        nn->setDirty(NULL);
+        nn->setDirty();
         // r->;
 
     }

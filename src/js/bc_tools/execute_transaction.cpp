@@ -9,11 +9,11 @@
 void execute_transaction(const THASH_id &tx_id, t_params &t, const std::string &senderAddress, const std::string &tx_cmds, const REF_getter<fee_calcer> &by)
 {
     yyjson::Document doc(tx_cmds);
-    yyjson::Value root = doc.root(); 
+    yyjson::Value root = doc.root();
 
     if(root.isArray())
     {
-        for (int ii=0; ii < root.size(); ii++)    
+        for (int ii=0; ii < root.size(); ii++)
         {
             bool err=false;
             yyjson::Value item = root[ii];
@@ -21,11 +21,11 @@ void execute_transaction(const THASH_id &tx_id, t_params &t, const std::string &
             auto method = item/"method";
             auto params= item/"params";
             if(!contract.isString() || !method.isString() || !params.isObject())
-            { 
+            {
                 t.setError(tx_id,ii,"contract method params fields required");
                 err=true;
             }
-                // throw CommonError("if(!contract.isString() || !method.isString() || !params.isObject())");
+            // throw CommonError("if(!contract.isString() || !method.isString() || !params.isObject())");
             if (!err && contract == "root")
             {
                 std::optional<std::string> err;
@@ -58,8 +58,8 @@ void execute_transaction(const THASH_id &tx_id, t_params &t, const std::string &
 
         }
     }
-    else 
+    else
     {
-        t.att_data->block_report={1,"tx body must be array"};
+        t.att_data->block_report= {1,"tx body must be array"};
     }
 }

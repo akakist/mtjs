@@ -1,132 +1,161 @@
 #include "cellable.h"
-
+#include "commonError.h"
 
 std::string Cellable::getDbId() const
 {
-    if(parent)
-        return parent->getDbId()+"."+m_id;
+    if (parent)
+        return parent->getDbId() + "." + m_id;
 
-    return parent?m_id:"";
+    return parent ? m_id : "";
 }
 
 std::string Cellable::dump()
 {
     std::ostringstream str;
-    str<<"Cellable "<< std::endl
-       <<"children:" << std::endl;
-    for(auto &z: children_hashes)
+    str << "Cellable " << std::endl
+        << "children:" << std::endl;
     {
-        str<<"<a href='"<<z.first<< "/'>" << z.first << "</a>" << " -> "<< base16::encode(z.second.container) << std::endl;
+        MutexLocker lk(mx);
+        for (auto &z : children_hashes_mx)
+        {
+            str << "<a href='" << z.first << "/'>" << z.first << "</a>" << " -> " << base16::encode(z.second.container) << std::endl;
+        }
     }
-    if(data.valid())
+    if (data.valid())
         str << data->dump();
     return str.str();
-
 }
 
-REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string& id, IDatabase* db)
+REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l)
 {
     MUTEX_INSPECTOR;
-    auto it=children_hashes.find(id);
-    if(it!=children_hashes.end())
-        return getLeafNoCreate(id,db);
+    {
+        MUTEX_INSPECTOR;
+        l.lock();
 
+    }
+    auto it = children_hashes_mx.find(id);
+    if (it != children_hashes_mx.end())
+    {
+        MUTEX_INSPECTOR;
+        l.unlock();
+        return getLeafNoCreate(id, db,l);
+    }
+    // lk.unlock();
 
-    children_hashes[id].container="";
-    auto it2=children_ptrs.find(id);
-    if(it2!=children_ptrs.end())
+    // l.lock();
+    children_hashes_mx[id].container = "";
+    auto it2 = children_ptrs_mx.find(id);
+    if (it2 != children_ptrs_mx.end())
         throw CommonError("if(it!=children_ptrs.end())");
-    REF_getter<Cellable> c=new Cellable(this,id);
-    children_ptrs.insert({id,c});
+    REF_getter<Cellable> c = new Cellable(this, id);
+    children_ptrs_mx.insert({id, c});
+    {
+        MUTEX_INSPECTOR;
+        l.unlock();
+
+    }
     return c;
 }
 
-REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string& id, IDatabase* db)
+REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l)
 {
     MUTEX_INSPECTOR;
-    auto it=children_hashes.find(id);
-    if(it==children_hashes.end())
-        return NULL;
-
-
-    auto ip=children_ptrs.find(id);
-    if(ip!=children_ptrs.end())
     {
-
-        return ip->second;
+        MUTEX_INSPECTOR;
+        l.lock();
 
     }
-    REF_getter<Cellable> cc=new Cellable(this,id);
+    auto ip = children_ptrs_mx.find(id);
+    if (ip != children_ptrs_mx.end())
+    {
+        MUTEX_INSPECTOR;
+        l.unlock();
+        return ip->second;
+    }
+    auto it = children_hashes_mx.find(id);
+    if (it == children_hashes_mx.end())
+    {
+        MUTEX_INSPECTOR;
+        l.unlock();
+        return NULL;
+    }
+    {
+        MUTEX_INSPECTOR;
+        l.unlock();
 
-    children_ptrs.insert({id,cc});
+    }
+    REF_getter<Cellable> cc = new Cellable(this, id);
+
 
     std::string result;
 
-    int r=db->get_cell(cc->getDbId(),&result);
-    if(r)
-        logErr2("db->get_cell err %s",cc->getDbId().c_str());
+    int r = db->get_cell(cc->getDbId(), &result);
+    if (r)
+        logErr2("db->get_cell err %s", cc->getDbId().c_str());
 
-
-    if(result.size())
+    if (result.size())
     {
-        auto h=blake2b_hash(result);
-        if(it->second==h)
+        MUTEX_INSPECTOR;
+        auto h = blake2b_hash(result);
+        if (it->second == h)
         {
             inBuffer in(result);
             cc->unpack(in);
         }
         else
         {
-            throw CommonError("get_cell: cell hash not matched %s %s", base16::encode(it->second.container).c_str(),base16::encode(h.container).c_str());
-
+            throw CommonError("get_cell: cell hash not matched %s %s", base16::encode(it->second.container).c_str(), base16::encode(h.container).c_str());
         }
+    }
+    {
+        MUTEX_INSPECTOR;
+        l.lock();
+    }
+    children_ptrs_mx.insert({id, cc});
+    {
+        MUTEX_INSPECTOR;
+        l.unlock();
+
     }
     return cc;
 }
 void Cellable::calc_tree_hash(_db_to_save &db_dump)
 {
-    if(!is_dirty)
+    MUTEX_INSPECTOR;
+    if (!is_dirty)
         return;
-    for(auto &zz:children_ptrs)
+    MutexLockerDeferred lk(mx);
+    lk.lock();
+    auto cptr_copy = children_ptrs_mx;
+    lk.unlock();
+
+    for (auto &zz : cptr_copy)
     {
-        auto cid=zz.first;
-        auto c=zz.second;
-        if(c->is_dirty)
+        MUTEX_INSPECTOR;
+        auto cid = zz.first;
+        auto c = zz.second;
+        if (c->is_dirty)
         {
-
+            MUTEX_INSPECTOR;
+            // lk.unlock();
             c->calc_tree_hash(db_dump);
-            // for(auto& bc: c->calcers_Z)
-            // {
-            //     if(bc.valid())
-            //         calcers_Z.insert(bc);
-            // }
-            auto child_buf=c->getBuffer();
-            auto ch=blake2b_hash(child_buf);
-            if(ch!=children_hashes[cid])
+            lk.lock();
+            auto child_buf = c->getBuffer();
+            auto ch = blake2b_hash(child_buf);
+            if (ch != children_hashes_mx[cid])
             {
-                db_dump.add(c->getDbId(),child_buf);
-                c->last_size=child_buf.size();
-                // if(c->calcers_Z.size()>0)
-                // {
-                //     auto portion=child_buf.size()/c->calcers_Z.size();
-                //     for(auto& bc: c->calcers_Z)
-                //     {
-                //         if(bc.valid())
-                //         {
-                //             bc->add(portion);
-                //             calcers_Z.insert(bc);
-                //         }
-                //     }
-                //     c->calcers_Z.clear();
-                // }
-                children_hashes[cid]=ch;
+                MUTEX_INSPECTOR;
+                db_dump.add(c->getDbId(), child_buf);
+                c->last_size = child_buf.size();
+                children_hashes_mx[cid] = ch;
             }
+            lk.unlock();
         }
-
     }
-    is_dirty=false;
+    is_dirty = false;
 }
-void data_base::setDirty(const REF_getter<fee_calcer>& bc)
+void data_base::setDirty()
 {
-    parent->setDirty(bc);
+    parent->setDirty();
 }

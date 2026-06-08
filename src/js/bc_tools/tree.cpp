@@ -9,6 +9,7 @@ using namespace BroadcasterTree;
 
 void dump(const BroadcasterTree::TreeNode &t, int level, std::vector<std::pair<int,std::string>> & out)
 {
+    MUTEX_INSPECTOR;
 
     for(auto &c:t.children)
     {
@@ -18,6 +19,7 @@ void dump(const BroadcasterTree::TreeNode &t, int level, std::vector<std::pair<i
 }
 BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,BroadcasterTree::Node>& nodes, const NODE_id& rootName_)
 {
+    MUTEX_INSPECTOR;
     if(nodes.empty())
         throw CommonError("if(nodes.empty())");
 
@@ -44,6 +46,7 @@ BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,Broa
     q.push(&root);
 
     while (!q.empty() && idx_r<ranked.size()) {
+        MUTEX_INSPECTOR;
         BroadcasterTree::TreeNode* cur = q.front();
         q.pop();
 
