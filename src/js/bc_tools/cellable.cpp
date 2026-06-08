@@ -105,6 +105,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
             if(ch!=children_hashes[cid])
             {
                 db_dump.add(c->getDbId(),child_buf);
+                c->last_size=child_buf.size();
                 if(c->calcers_Z.size()>0)
                 {
                     auto portion=child_buf.size()/c->calcers_Z.size();

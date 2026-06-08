@@ -32,6 +32,7 @@ std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_param
     }
     u->balance += amount;
     u->setDirty(by);
+    t.addCalcer(u.get(),by);
 
     t.fee[senderAddress] += v->getFee("mint");
 
@@ -87,6 +88,9 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     to->balance += amount;
     u->setDirty(by);
     to->setDirty(by);
+    t.addCalcer(u.get(),by);
+    t.addCalcer(to.get(),by);
+
 
     t.fee[senderAddress] += fee;
 
@@ -146,6 +150,9 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
 
     nn->setDirty(by);
     us->setDirty(by);
+    t.addCalcer(nn.get(),by);
+    t.addCalcer(us.get(),by);
+
 
     t.fee[senderAddress] += fee;
 
@@ -210,6 +217,10 @@ std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, 
     n->setDirty(by);
     // u->setDirty(by);
     us->setDirty(by);
+    t.addCalcer(n.get(),by);
+    t.addCalcer(us.get(),by);
+
+
 
     t.fee[senderAddress] += fee;
 
@@ -261,6 +272,9 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
     t.logMsg(txid, seqId, "node %s staked on amount %s", node.container.c_str(), amount.toString().c_str());
     n->setDirty(by);
     us->setDirty(by);
+    t.addCalcer(n.get(),by);
+    t.addCalcer(us.get(),by);
+
     return std::nullopt;    
 }
 std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
@@ -315,6 +329,9 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     v->setDirty(by);
     n->setDirty(by);
     u->setDirty(by);
+    t.addCalcer(v.get(),by);
+    t.addCalcer(n.get(),by);
+    t.addCalcer(u.get(),by);
 
     t.fee[senderAddress] += fee;
 

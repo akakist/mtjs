@@ -10,6 +10,11 @@ struct t_params
     REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
     REF_getter<MsgData::attachment_data> att_data;
     _feeCalcers feeCalcers;
+    std::map<REF_getter<data_base>, std::set<REF_getter<fee_calcer>> > calcers;
+    void addCalcer(const REF_getter<data_base>& d,const REF_getter<fee_calcer>& c)
+    {
+        calcers[d].insert(c);
+    }
 
 
     void logMsg(const THASH_id& txId, int seqId, const char* fmt, ...)

@@ -482,7 +482,8 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
     MUTEX_INSPECTOR;
                     execute_transaction(tt->getHash(), t, pk_bin, tj, by);
                     u->nonce += 1;
-                    u->setDirty(by);
+                    u->setDirty(NULL);
+
                 }
             }
         }
@@ -503,7 +504,29 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
 }
 void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_id> &nodes_in_leader_cert)
 {
-    auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
+    std::map<Cellable*, std::set<REF_getter<fee_calcer>>> cc;
+    for(auto & z:t.calcers)
+    {
+        auto cell=z.first->parent;
+        while(cell)
+        {
+            for(auto &x: z.second)
+                cc[cell].insert(x);
+
+            cell=cell->parent;
+        }
+    }
+    for(auto& z: cc)
+    {
+        size_t size=z.first->last_size;
+        size_t portion=size/z.second.size();
+        for(auto &x: z.second) 
+        {
+            x->add(portion);
+        }
+    }
+
+    // auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
     BigInt total_fees;
     for (auto &z : t.feeCalcers.calcers)

@@ -63,6 +63,7 @@ struct Cellable: public Refcountable
 
     Cellable * parent=nullptr;
     const std::string m_id;
+    size_t last_size=0;
     std::set<REF_getter<fee_calcer>> calcers_Z;
 
     std::map<std::string,THASH_id > children_hashes;
