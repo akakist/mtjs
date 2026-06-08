@@ -24,6 +24,7 @@
 #include "msgFactory.h"
 #include "md/md_GetUserStatusREQ.h"
 #include "md/md_GetUserStatusRSP.h"
+#include "init_root.h"
 
 bool GrainReader::Service::on_startService(const systemEvent::startService *)
 {

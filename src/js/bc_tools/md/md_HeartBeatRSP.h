@@ -1,6 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_HeartBeatREQ.h"
+#include "blst_cp.h"
 namespace MsgData
 {
     struct HeartBeatRSP: public Base

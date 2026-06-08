@@ -3,6 +3,7 @@
 #include "jslib/net/http/http_server_request.h"
 #include "jslib/net/http/http_server_response.h"
 #include "common/jsscope.h"
+#include "js_tools.h"
 
 
 bool MTJS::Service::RequestIncoming(const httpEvent::RequestIncoming* e)

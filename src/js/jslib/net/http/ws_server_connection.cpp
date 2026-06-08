@@ -1,6 +1,7 @@
 #include <quickjs.h>
 #include "jslib/net/http/ws_server_connection.h"
 #include "Events/System/Net/httpEvent.h"
+#include "jsscope.h"
 
 JSClassID js_ws_server_connection_class_id;
 

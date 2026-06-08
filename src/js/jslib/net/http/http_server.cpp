@@ -5,6 +5,7 @@
 
 #include "msockaddr_in.h"
 #include "common/rcf.h"
+#include "jsscope.h"
 
 JSClassID js_http_server_class_id;
 

@@ -1,4 +1,11 @@
 #include <fcntl.h>
+#include <optional>
+#include <xyjson.h>
+#include <string>
+#include "commonError.h"
+#include "bigint.h"
+#include "root_contract.h"
+#include "tr_exec.h"
 
 std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 {

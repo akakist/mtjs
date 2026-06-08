@@ -1,5 +1,8 @@
 #pragma once
 #include "md_Base.h"
+#include "BLOCK_id.h"
+#include "bigint.h"
+#include "NODE_id.h"
 namespace MsgData
 {
     struct HeartBeatREQ: public Base

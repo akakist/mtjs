@@ -5,6 +5,7 @@
 #include <string>
 #include <set>
 #include "jsValueGuard.h"
+#include "REF.h"
 
 
 struct EventEmitter: public Refcountable

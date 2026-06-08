@@ -18,6 +18,7 @@
 #include "listenerBuffered1Thread.h"
 #include "events_blockStreamerService.hpp"
 #include "unknown.h"
+#include "tools_mt.h"
 
 bool BlockStreamer::Service::on_startService(const systemEvent::startService *)
 {

@@ -10,6 +10,7 @@
 #include "nodeService.h"
 #include <cstdlib>
 #include <cstddef>
+#include "init_root.h"
 
 void Node::Service::do_sync(const NODE_id &src_node)
 {

@@ -2,6 +2,7 @@
 #include "md_Base.h"
 #include "md_LeaderCertificate.h"
 #include "md_BlockInfo.h"
+#include "blst_cp.h"
 namespace MsgData
 {
     struct BlockAcceptedREQ: public Base

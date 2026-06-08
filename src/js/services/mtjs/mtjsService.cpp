@@ -25,6 +25,7 @@
 #include "md/md_GetUserStatusRSP.h"
 #include "xyjson.h"
 #include <nlohmann/json.hpp>
+#include "js_tools.h"
 extern "C"
 {
 }

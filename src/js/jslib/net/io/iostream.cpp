@@ -7,6 +7,7 @@
 #include "listenerBase.h"
 #include "mtjsEvent.h"
 #include "mtjs_opaque.h"
+#include "stream.h"
 
 struct ConstReadableStringStream: public Stream
 {

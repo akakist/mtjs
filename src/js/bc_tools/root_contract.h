@@ -10,6 +10,9 @@
 #include "hsh.h"
 #include "md/md_LeaderCertificate.h"
 #include <xyjson.h>
+#include <sstream>
+#include "fee_calcer.h"
+// #include <ostringstream>
 
 struct bc_contract:  public data_base
 {

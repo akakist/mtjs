@@ -6,6 +6,7 @@
 #include "ioBuffer.h"
 #include "tools_mt.h"
 #include "events_txValidatorService.hpp"
+#include "init_root.h"
 // #include <SQLiteCpp/Database.h>
 
 bool TxValidator::Service::on_startService(const systemEvent::startService *)

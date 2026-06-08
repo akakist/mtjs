@@ -1,6 +1,8 @@
 #pragma once
 #include "md_Base.h"
 #include "md_TX.h"
+#include "bigint.h"
+
 namespace MsgData
 {
     struct attachment_data: public Base

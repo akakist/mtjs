@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include "root_contract.h"
 #include "QUORUM.h"
+#include "fee_calcer.h"
 
 std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *

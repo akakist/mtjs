@@ -1,5 +1,7 @@
 #include "cellable.h"
 #include "commonError.h"
+#include "blake2bHasher.h"
+#include <sstream>
 
 std::string Cellable::getDbId() const
 {

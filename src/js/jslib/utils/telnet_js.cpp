@@ -1,6 +1,7 @@
 #include "quickjs.h"
 #include "common/mtjs_opaque.h"
 #include "Events/Tools/telnetEvent.h"
+#include "jsscope.h"
 static JSValue js_telnet_register_command(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     mtjs_opaque *op=(mtjs_opaque *)JS_GetContextOpaque(ctx);

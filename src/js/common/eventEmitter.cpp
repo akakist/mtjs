@@ -1,7 +1,8 @@
 #include <string>
 #include <vector>
 #include "eventEmitter.h"
-
+#include "mutexInspector.h"
+#include "js_tools.h"
 int EventEmitter::emit(const std::string& event, int argc, JSValue *argv)
 {
     MUTEX_INSPECTOR;

@@ -16,7 +16,8 @@
 #include <dirent.h>
 #include <utime.h>
 #include <stdint.h>
-
+#include "jsscope.h"
+#include "js_tools.h"
 
 JSClassID js_file_handle_class_id = 0;
 

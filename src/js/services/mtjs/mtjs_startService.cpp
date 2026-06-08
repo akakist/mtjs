@@ -5,6 +5,7 @@
 #include <sstream>
 #include "common/timers.h"
 #include "Events/Tools/webHandlerEvent.h"
+#include "jsscope.h"
 extern "C"
 {
 }

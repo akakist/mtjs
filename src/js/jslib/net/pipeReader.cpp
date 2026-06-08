@@ -7,6 +7,7 @@
 #include "ioStreams.h"
 #include <iostream>
 #include "async_task.h"
+#include "js_tools.h"
 
 
 struct c_pipe_async_reader_buf: public async_task

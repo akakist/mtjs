@@ -7,6 +7,7 @@
 #include <vector>
 #include "db_to_save.h"
 #include "hsh.h"
+#include "THASH_id.h"
 
 struct Cellable;
 
