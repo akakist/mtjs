@@ -31,7 +31,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     for (auto &z : li.transaction_responders)
     {
         auto n = root->getNode(z);
-        stake += n->total_stake;
+        stake += n->getStakes();
     }
     if (stake.toDouble() > root->getValues()->total_staked.toDouble() * QUORUM)
     {
@@ -52,7 +52,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const N
     if (state_Z != STATE_NORMAL)
         return true;
 
-    if (!r->verify(root->getNode(r->node_signer)->bls_pk))
+    if (!r->verify(root->getNode(r->node_signer)->get_bls_pk()))
     {
         logErr2("block_accepted_rsp: verify failed");
         return true;
@@ -71,8 +71,8 @@ bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const N
         if (!n.valid())
             throw CommonError("if(!n.valid())");
 
-        agg_pk.push_back(n->bls_pk);
-        stake += n->total_stake;
+        agg_pk.push_back(n->get_bls_pk());
+        stake += n->getStakes();
     }
     if (!agg_sig.verify(agg_pk, r->new_root_hash.container))
     {
@@ -130,7 +130,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         logErr2("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash");
         return true;
     }
-    if (!r->verify(root->getNode(r->node_validator)->bls_pk))
+    if (!r->verify(root->getNode(r->node_validator)->get_bls_pk()))
     {
         logErr2("block response not validated");
         return true;
@@ -152,7 +152,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     BigInt stakeVal = 0;
     for (auto &z : bt.responses)
     {
-        stakeVal += root->getNode(z->node_validator)->total_stake;
+        stakeVal += root->getNode(z->node_validator)->getStakes();
     }
     if (stakeVal.toDouble() > root->getValues()->total_staked.toDouble() * QUORUM)
     {
@@ -175,7 +175,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         for (auto &z : bt.responses)
         {
             auto n = root->getNode(z->node_validator);
-            agg_pk.push_back(n->bls_pk);
+            agg_pk.push_back(n->get_bls_pk());
             ba->agg_sig.add(z->sig);
             ba->node_validators.push_back(z->node_validator);
         }

@@ -176,14 +176,14 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
     for (auto &nd : ks)
     {
         // auto nn = root->getNode(nd);
-        if(nd->missed_rounds>=100)
+        if(nd->get_missed_rounds()>=100)
             continue;
         BroadcasterTree::Node n;
-        n.name = nd->name_;
-        n.stake_A = nd->total_stake;
-        n.ip = nd->ip;
-        n.missed_rounds = nd->missed_rounds;
-        nodes[nd->name_] = n;
+        n.name = nd->getName();
+        n.stake_A = nd->getStakes();
+        n.ip = nd->get_ip();
+        n.missed_rounds = nd->get_missed_rounds();
+        nodes[nd->getName()] = n;
     }
     if (nodes.size() == 0)
         return true;

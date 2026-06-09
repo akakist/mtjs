@@ -40,8 +40,8 @@ bool root_data::verify_lider_certificate(const REF_getter<MsgData::LeaderCertifi
             auto n = this->getNode(z);
             if (!n.valid())
                 return false;
-            agg_pk.push_back(n->bls_pk);
-            stake += n->total_stake;
+            agg_pk.push_back(n->get_bls_pk());
+            stake += n->stake();
         }
         if (stake.toDouble() < this->getValues()->total_staked.toDouble() * QUORUM)
         {

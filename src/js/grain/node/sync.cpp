@@ -30,7 +30,7 @@ void Node::Service::do_sync(const NODE_id &src_node)
     // send
     auto buffer = gbr->getBuffer();
 
-    sendEvent(n->ip, ServiceEnum::Node,
+    sendEvent(n->get_ip(), ServiceEnum::Node,
               new bcEvent::NodeMsgREQ(this_node_name, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 }
 bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const NODE_id &src_node, const route_t &route)
@@ -121,7 +121,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         for (auto &k : z->blockAcceptedREQ->node_validators)
         {
             auto n = root->getNode(k);
-            agg_pk.push_back(n->bls_pk);
+            agg_pk.push_back(n->get_bls_pk());
         }
         if (!z->blockAcceptedREQ->agg_sig.verify(agg_pk, blake2b_hash(z->blockAcceptedREQ->blockInfo->getBuffer()).container))
         {

@@ -558,14 +558,14 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         auto node = root->getNode(n);
         if (!node.valid())
             throw CommonError("if(!node.valid()) 556677");
-        auto &owner = node->owner_ed_pk;
+        auto owner = node->get_owner();
         auto u = root->getUserState(owner);
         if (!u.valid())
         {
             throw CommonError("if(!u.valid()) 778899");
             // u=root->addUser(upk,NULL);
         }
-        BigInt amt = (total_rewards * node->total_stake) / root->getValues()->total_staked;
+        BigInt amt = (total_rewards * node->getStakes()) / root->getValues()->total_staked;
         u->addBalance(amt);
         u->setDirty();
         if (n == this_node_name && amt > 0)
@@ -580,25 +580,25 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
     auto nodes=t.root->getAllNodes();
     for(auto &n: nodes)
     {
-        if(ns.count(n->name_))
+        if(ns.count(n->getName()))
         {
-            if(n->missed_rounds==0)
+            if(n->get_missed_rounds()==0)
                 continue;
             else
             {
-                n->missed_rounds=0;
+                n->reset_missed_rounds();
                 n->setDirty();
             }
         }
         else
         {
-            if(n->missed_rounds>=100)
+            if(n->get_missed_rounds()>=100)
             {
                 continue;
             }
-            else
+            else    
             {
-                n->missed_rounds++;
+                n->inc_missed_rounds();
                 n->setDirty();
             }
         }
@@ -628,7 +628,7 @@ int Node::Service::nodeDistanceToLeader(const NODE_id &node)
     int npoz = -1;
     for (int i = 0; i < nv.size(); i++)
     {
-        if (node == nv[i]->name_)
+        if (node == nv[i]->getName())
             npoz = i;
     }
     return abs(idx - npoz);
@@ -646,9 +646,9 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
         int tpoz = -1;
         for (int i = 0; i < nv.size(); i++)
         {
-            if (nodeLeft == nv[i]->name_)
+            if (nodeLeft == nv[i]->getName())
                 npoz = i;
-            if (nodeRight == nv[i]->name_)
+            if (nodeRight == nv[i]->getName())
                 tpoz = i;
         }
         return abs(idx - npoz) < abs(idx - tpoz);
@@ -681,7 +681,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     // last_activity_time=iUtils->getNow();
     // logErr2("last_activity_time=iUtils->getNow(); %s %d",__FILE__,__LINE__);
     auto n = root->getNode(m->node_signer);
-    if (!verify_ed_pk(n->ed_pk, m->signature, blake2b_hash(m->msg_payload)))
+    if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {
         logNode("verify failed 11");
         return true;
@@ -724,7 +724,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 {
     auto n = root->getNode(m->node_signer);
-    if (!verify_ed_pk(n->ed_pk, m->signature, blake2b_hash(m->msg_payload)))
+    if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {
         logNode("verify failed @4");
         return true;

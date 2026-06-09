@@ -115,7 +115,7 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
     auto nn = t.root->getNode(name);
     if (!nn.valid())
         return "Node not found";
-    if(nn->owner_ed_pk!=senderAddress)
+    if(nn->get_owner()!=senderAddress)
     {
         return "only node owner can update node info";
     }
@@ -131,21 +131,21 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
     auto ip=params / "ip";
     if (ip.isString())
     {
-        nn->ip = ip.toString();
+        nn->set_ip(ip.toString());
         t.logMsg(txid, seqId, "ip changed");
     }
-    auto pk_ed=params / "pk_ed";
-    if(pk_ed.isString())
-    {
-        nn->ed_pk = base16::decode(pk_ed.toString());
-        t.logMsg(txid, seqId, "pk ed changed");
-    }
-    auto pk_bls=params / "pk_bls";
-    if(pk_bls.isString())
-    {
-        nn->bls_pk.deserializeHexStr(pk_bls.toString());
-        t.logMsg(txid, seqId, "pk bls changed");
-    }
+    // auto pk_ed=params / "pk_ed";
+    // if(pk_ed.isString())
+    // {
+    //     nn->ed_pk = base16::decode(pk_ed.toString());
+    //     t.logMsg(txid, seqId, "pk ed changed");
+    // }
+    // auto pk_bls=params / "pk_bls";
+    // if(pk_bls.isString())
+    // {
+    //     nn->bls_pk.deserializeHexStr(pk_bls.toString());
+    //     t.logMsg(txid, seqId, "pk bls changed");
+    // }
 
 
     nn->setDirty();
@@ -209,11 +209,17 @@ std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, 
     if(!pk_bls.isString())
         return "string param pk_bls required";
 
-    n->name_ = name;
-    n->ip = ip.toString();
-    n->ed_pk = base16::decode(pk_ed.toString());
-    n->bls_pk.deserialize(base16::decode(pk_bls.toString()));
-    n->owner_ed_pk = senderAddress;
+        blst_cpp::PublicKey bls;
+        bls.deserializeHexStr(pk_bls.toString());
+    n->init(name, 
+        senderAddress, 
+        bls, 
+        base16::decode(pk_ed.toString()), ip.toString());
+    // n->name_ = name;
+    // n->ip = ip.toString();
+    // n->ed_pk = base16::decode(pk_ed.toString());
+    // n->bls_pk.deserialize(base16::decode(pk_bls.toString()));
+    // n->owner_ed_pk = senderAddress;
     n->setDirty();
     // u->setDirty();
     us->setDirty();
@@ -260,12 +266,14 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
     {
         return "node not found";
     }
-    BigInt &nodeStake = n->stakes[senderAddress];
+    // BigInt &nodeStake = n->get_stastakes[senderAddress];
 
     us->subBalance(amount);
-    nodeStake += amount;
-    n->total_stake += amount;
-    v->total_staked += amount;
+    n->addStake(senderAddress, amount);
+    //  auto nodeStake = n->getStake(senderAddress);
+    // nodeStake += amount;
+    // n->total_stake += amount;
+    // v->total_staked += amount;
 
     t.fee[senderAddress] += fee;
 
@@ -298,13 +306,14 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     {
         return "nodes not registered";
     }
-    auto nodeStakeIt = n->stakes.find(senderAddress);
-    if (nodeStakeIt == n->stakes.end())
+    auto stake=n->getStake(senderAddress);
+    // auto nodeStakeIt = n->stakes.find(senderAddress);
+    if (stake == 0)
     {
         return "no_stake_found";
     }
-    auto &nodeStake = nodeStakeIt->second;
-    if (nodeStake < amount)
+    // auto &nodeStake = nodeStakeIt->second;
+    if (stake < amount)
     {
         return "insufficient stake in node";
     }
@@ -320,9 +329,11 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     }
     u->addBalance(amount);
 
-    nodeStake -= amount;
+    n->subStake(senderAddress, amount);
+    // nodeStake -= amount;
 
-    n->total_stake -= amount;
+    // n->total_stake -= amount;
+
 
     v->total_staked -= amount;
 
@@ -356,7 +367,7 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
     {
         return "node not found";
     }
-    if (n->owner_ed_pk != senderAddress)
+    if (n->get_owner() != senderAddress)
     {
         return "only node owner can enable node";
     }
@@ -368,7 +379,7 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
     {
         return "Insufficient funds";
     }
-    n->missed_rounds = 0;
+    n->reset_missed_rounds();
     n->setDirty();
 
     t.fee[senderAddress] += fee;

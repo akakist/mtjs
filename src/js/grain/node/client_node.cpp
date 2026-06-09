@@ -56,7 +56,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     for (auto &z : r->node_validators)
     {
         XTRY;
-        agg_pk.push_back(root->getNode(z)->bls_pk);
+        agg_pk.push_back(root->getNode(z)->get_bls_pk());
         XPASS;
     }
 

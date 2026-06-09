@@ -157,6 +157,7 @@ struct bc_node: public data_base
     bc_node(Cellable *p):data_base(hsh::bc_node,p) {
         total_stake=0;
     }
+    private:
     NODE_id name_;
     std::string owner_ed_pk;
     blst_cpp::PublicKey bls_pk;
@@ -165,6 +166,115 @@ struct bc_node: public data_base
     std::map<std::string /*user*/, BigInt> stakes;
     BigInt total_stake;
     int missed_rounds = 0;
+    public:
+    std::string get_ed_pk()
+    {
+        M_LOCK(parent->mx);
+        return ed_pk;
+    }
+    std::string get_ip()
+    {
+        M_LOCK(parent->mx);
+        return ip;
+    }
+    void set_ip(const std::string& _ip)
+    {
+        M_LOCK(parent->mx);
+        ip=_ip;
+    }
+    void inc_missed_rounds()
+    {
+        M_LOCK(parent->mx);
+        missed_rounds++;
+    }
+    void reset_missed_rounds()
+    {
+        M_LOCK(parent->mx);
+        missed_rounds=0;
+    }
+    int get_missed_rounds()
+    {
+        M_LOCK(parent->mx);
+        return missed_rounds;
+    }
+    std::string get_owner()
+    {
+        M_LOCK(parent->mx);
+        return owner_ed_pk;
+    }
+     std::string ip_port()
+    {
+        M_LOCK(parent->mx);
+        return ip;
+    }
+    NODE_id getName()
+    {
+        M_LOCK(parent->mx);
+        return name_;
+    }
+    BigInt getStakes()
+    {
+        BigInt ret=0;
+        M_LOCK(parent->mx);
+        for(auto &z: stakes)
+        {
+            ret+=z.second;
+        }
+        return ret;
+    }
+    BigInt getStake(const std::string& user)
+    {
+        M_LOCK(parent->mx);
+        auto it = stakes.find(user);
+        if (it != stakes.end())
+        {
+            return it->second;
+        }
+        return 0;
+    }
+     BigInt getTotalStake()
+    {
+        M_LOCK(parent->mx);
+        return total_stake;
+
+    }
+    BigInt stake()
+    {
+        M_LOCK(parent->mx);
+        BigInt stake=0;
+        for(auto &z: stakes)
+        {
+            stake+=z.second;
+        }
+        return stake;
+    }
+    blst_cpp::PublicKey get_bls_pk()
+    {
+        M_LOCK(parent->mx);
+        return bls_pk;
+    }
+    void init(const NODE_id& name, const std::string &_owner_ed_pk, const blst_cpp::PublicKey &_bls_pk,
+    const std::string &_ed_pk, const std::string& _ip)
+    {
+        M_LOCK (parent->mx);
+        name_=name;
+        owner_ed_pk=_owner_ed_pk;
+        bls_pk=_bls_pk;
+        ed_pk=_ed_pk;
+        ip=_ip;
+    }
+    void addStake(const std::string& user, const BigInt &amount)
+    {
+        M_LOCK (parent->mx);
+        stakes[user]+=amount;
+    }
+    void subStake(const std::string& user, const BigInt &amount)
+    {
+        M_LOCK (parent->mx);
+        stakes[user]+=amount;
+    }
+
+
     void pack(outBuffer& o)  const final
     {
         data_base::pack(o);

@@ -31,7 +31,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     }
     outBuffer o;
     m->payload_heart_beat->pack(o);
-    if (!m->signature.verify(n->bls_pk, blake2b_hash(o.asString()->container).container))
+    if (!m->signature.verify(n->get_bls_pk(), blake2b_hash(o.asString()->container).container))
     {
         logNode("if(!sig_check.verify(n->bls_pk, blake2b_hash(mhbr.payload)))");
         return false;
@@ -53,8 +53,8 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
             for (auto &z : li.HeartBeatRSP_m)
             {
                 auto nn = root->getNode(z.second->node_signer);
-                hb_staked += nn->total_stake;
-                pk_agg.push_back(nn->bls_pk);
+                hb_staked += nn->getStakes();
+                pk_agg.push_back(nn->get_bls_pk());
                 sig_agg.add(z.second->signature);
             }
         }
@@ -180,7 +180,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     }
     outBuffer o;
     m->hb->pack(o);
-    if (!m->sig.verify(n->bls_pk, blake2b_hash(o.asString()->container).container))
+    if (!m->sig.verify(n->get_bls_pk(), blake2b_hash(o.asString()->container).container))
     {
         logNode("if(!sig_check.verify(n->bls_pk, blake2b_hash(mhbr.payload)))");
         return false;
@@ -200,8 +200,8 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         {
             sig_agg.add(z.second->sig);
             auto nn = root->getNode(z.second->node_signer);
-            pk_agg.push_back(nn->bls_pk);
-            hb_staked += nn->total_stake;
+            pk_agg.push_back(nn->get_bls_pk());
+            hb_staked += nn->getStakes();
         }
     }
     auto pers = (hb_staked.toDouble()) / root->getValues()->total_staked.toDouble();
