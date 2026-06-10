@@ -121,16 +121,18 @@ GrainReader::Service::Service(const SERVICE_id &id, const std::string &nm, IInst
 bool GrainReader::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     conf = e;
-    if (!root.valid())
-        root = getRoot(conf->db.get());
+    root=e->root;
+    // if (!root.valid())
+    //     root = getRoot(conf->db.get());
 
-    init_root(root);
+    // init_root(root);
     return true;
 }
 bool GrainReader::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 {
-    root = getRoot(conf->db.get());
-    init_root(root);
+    root=e->root;
+    // root = getRoot(conf->db.get());
+    // init_root(root);
     return true;
 }
 bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)

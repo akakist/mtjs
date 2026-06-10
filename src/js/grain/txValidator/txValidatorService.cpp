@@ -111,17 +111,19 @@ bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     MUTEX_INSPECTOR;
     conf = e;
-    if (!root.valid())
-        root = getRoot(conf->db.get());
+    // if (!root.valid())
+    //     root = getRoot(conf->db.get());
 
-    init_root(root);
+    // init_root(root);
+    root=e->root;
     return true;
 }
 bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 {
     MUTEX_INSPECTOR;
-    root = getRoot(conf->db.get());
-    init_root(root);
+    root=e->root;
+    // root = getRoot(conf->db.get());
+    // init_root(root);
     return true;
 }
 bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)

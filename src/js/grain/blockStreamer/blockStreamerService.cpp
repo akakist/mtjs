@@ -121,6 +121,7 @@ bool BlockStreamer::Service::ServiceInit(const bcEvent::ServiceInit *e)
 }
 bool BlockStreamer::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 {
+    
     return true;
 }
 

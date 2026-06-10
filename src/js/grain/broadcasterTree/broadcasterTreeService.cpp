@@ -155,16 +155,18 @@ BroadcasterTree::Service::Service(const SERVICE_id &id, const std::string &nm, I
 bool BroadcasterTree::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     conf = e;
-    if (!root.valid())
-        root = getRoot(conf->db.get());
+    // if (!root.valid())
+    //     root = getRoot(conf->db.get());
 
-    init_root(root);
+    // init_root(root);
+    root=e->root;
     return true;
 }
 bool BroadcasterTree::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 {
-    root = getRoot(conf->db.get());
-    init_root(root);
+    root=e->root;
+    // root = getRoot(conf->db.get());
+    // init_root(root);
     return true;
 }
 bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage *e)

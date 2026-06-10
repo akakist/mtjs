@@ -21,6 +21,13 @@
 // #include <SQLiteCpp/Database.h>
 #include <vector>
 
+void Node::Service::do_InvalidateRoot()
+{
+    sendEvent(ServiceEnum::TxValidator, new bcEvent::InvalidateRoot(root, this));
+    sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::InvalidateRoot(root, this));
+    sendEvent(ServiceEnum::GrainReader, new bcEvent::InvalidateRoot(root, this));
+
+}
 bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
 {
     if(state_Z!=STATE_NORMAL)
@@ -102,9 +109,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     prev_root_hash_Z = r->blockInfo->new_root_hash1;
     blocks_leader.clear();
     node_leader_for_client.container.clear();
-    sendEvent(ServiceEnum::TxValidator, new bcEvent::InvalidateRoot(this));
-    sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::InvalidateRoot(this));
-    sendEvent(ServiceEnum::GrainReader, new bcEvent::InvalidateRoot(this));
+    do_InvalidateRoot();
 
     {
         MUTEX_INSPECTOR;

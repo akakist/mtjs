@@ -148,6 +148,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         {
             root = new root_data(db_state.get());
             init_root(root);
+            do_InvalidateRoot();
             state_Z=STATE_SYNCING;
             do_sync(src_node);
             logNode("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());

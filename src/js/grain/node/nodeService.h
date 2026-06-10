@@ -165,6 +165,7 @@ namespace Node
         void broadcast_MsgEvent(const REF_getter<MsgData::Base>& p);
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
 
+        void do_InvalidateRoot();
 
         struct Round
         {

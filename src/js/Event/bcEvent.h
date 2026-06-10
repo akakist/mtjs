@@ -8,6 +8,7 @@
 #include "msg.h"
 #include "md/md_TX.h"
 #include "md/md_BlockDBStore.h"
+#include "root_contract.h"
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
@@ -238,14 +239,21 @@ namespace bcEvent
         }
         ServiceInit(blst_cpp::SecretKey my_sk_bls_,
                     std::string my_sk_ed_, const NODE_id &this_node_name_, const REF_getter<IDatabase> &db_,
+                    const REF_getter<root_data>& _root,
                     const route_t &r)
-            : NoPacked(bcEventEnum::ServiceInit, r), my_sk_bls(my_sk_bls_), my_sk_ed(my_sk_ed_), this_node_name(this_node_name_), db(db_) {}
+            : NoPacked(bcEventEnum::ServiceInit, r), 
+                my_sk_bls(my_sk_bls_), 
+                my_sk_ed(my_sk_ed_), 
+                this_node_name(this_node_name_), 
+                db(db_),
+                root(_root) {}
 
         blst_cpp::SecretKey my_sk_bls;
         std::string my_sk_ed;
 
         NODE_id this_node_name;
         REF_getter<IDatabase> db;
+        REF_getter<root_data> root;
     };
 
     class InvalidateRoot : public Event::NoPacked
@@ -255,8 +263,10 @@ namespace bcEvent
         {
             return NULL;
         }
-        InvalidateRoot(const route_t &r)
-            : NoPacked(bcEventEnum::InvalidateRoot, r) {}
+        InvalidateRoot(const REF_getter<root_data>& _root, const route_t &r)
+            : NoPacked(bcEventEnum::InvalidateRoot, r), root(_root) {}
+        
+        REF_getter<root_data> root;
     };
 
     class BroadcastMessage : public Event::NoPacked
