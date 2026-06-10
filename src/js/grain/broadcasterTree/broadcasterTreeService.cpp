@@ -170,7 +170,7 @@ bool BroadcasterTree::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage *e)
 {
     MUTEX_INSPECTOR;
-    std::map<NODE_id, BroadcasterTree::Node> nodes;
+    std::map<NODE_id, NodeElement> nodes;
 // logErr2("BroadcastMessage from %s", e->node_signer.container.c_str());
     auto ks = root->getAllNodes();
     for (auto &nd : ks)
@@ -178,11 +178,11 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
         // auto nn = root->getNode(nd);
         if(nd->get_missed_rounds()>=100)
             continue;
-        BroadcasterTree::Node n;
-        n.name = nd->getName();
-        n.stake_A = nd->get_full_stake();
-        n.ip = nd->get_ip();
-        n.missed_rounds = nd->get_missed_rounds();
+        NodeElement n=nd->getElement();
+        // n.name = nd->getName();
+        // n.stake_A = nd->get_full_stake();
+        // n.ip = nd->get_ip();
+        // n.missed_rounds = nd->get_missed_rounds();
         nodes[nd->getName()] = n;
     }
     if (nodes.size() == 0)

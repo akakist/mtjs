@@ -17,7 +17,7 @@ void dump(const BroadcasterTree::TreeNode &t, int level, std::vector<std::pair<i
         dump(c,level+1,out);
     }
 }
-BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,BroadcasterTree::Node>& nodes, const NODE_id& rootName_)
+BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,NodeElement>& nodes, const NODE_id& rootName_)
 {
     MUTEX_INSPECTOR;
     if(nodes.empty())

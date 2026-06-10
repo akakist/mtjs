@@ -12,6 +12,7 @@
 #include <xyjson.h>
 #include <sstream>
 #include "fee_calcer.h"
+#include "nodeElement.h"
 // #include <ostringstream>
 
 struct bc_contract:  public data_base
@@ -165,6 +166,20 @@ struct bc_node: public data_base
     std::map<std::string /*user*/, BigInt> stakes;
     int missed_rounds = 0;
     public:
+    NodeElement getElement()
+    {
+        NodeElement n;
+        M_LOCK(parent->mx);
+        n.ip=ip;
+        n.missed_rounds=missed_rounds;
+        n.name=name_;
+        n.stake_A=0;
+        for(auto &z: stakes)
+        {
+            n.stake_A+=z.second;
+        }
+        return n;
+    }
     std::string get_ed_pk()
     {
         M_LOCK(parent->mx);

@@ -4,26 +4,27 @@
 #include "blake2bHasher.h"
 #include "bigint.h"
 #include "NODE_id.h"
+#include "nodeElement.h"
 namespace BroadcasterTree
 {
-    struct Node {
-        NODE_id name;
-        BigInt stake_A;
-        std::string ip;
-        int missed_rounds=0;
-        void hash(Blake2bHasher&h)
-        {
-            h.update(name.container);
-            h.update(stake_A.toString());
-            h.update(ip);
-            h.update(std::to_string(missed_rounds));
-        }
-    };
+    // struct Node {
+    //     NODE_id name;
+    //     BigInt stake_A;
+    //     std::string ip;
+    //     int missed_rounds=0;
+    //     void hash(Blake2bHasher&h)
+    //     {
+    //         h.update(name.container);
+    //         h.update(stake_A.toString());
+    //         h.update(ip);
+    //         h.update(std::to_string(missed_rounds));
+    //     }
+    // };
 
     class TreeNode {
     public:
-        TreeNode(const Node& b): node(b) {}
-        Node node;
+        TreeNode(const NodeElement& b): node(b) {}
+        NodeElement node;
         std::list<TreeNode> children; // стабильные адреса элементов
 
         TreeNode()  {}
@@ -37,15 +38,15 @@ namespace BroadcasterTree
             }
         }
     };
-    TreeNode buildTree(const std::map<NODE_id,Node>& nodes, const NODE_id& rootName);
+    TreeNode buildTree(const std::map<NODE_id,NodeElement>& nodes, const NODE_id& rootName);
 
 } // namespace BroadcasterTree
-inline outBuffer & operator<< (outBuffer& o,const BroadcasterTree::Node& t)
+inline outBuffer & operator<< (outBuffer& o,const NodeElement& t)
 {
     o<<t.name<<t.stake_A<<t.ip;
     return o;
 }
-inline inBuffer & operator>> (inBuffer& o,BroadcasterTree::Node& t)
+inline inBuffer & operator>> (inBuffer& o,NodeElement& t)
 {
     o>>t.name>>t.stake_A>>t.ip;
     return o;
