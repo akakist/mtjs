@@ -60,7 +60,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     auto db_state2=db_state;
     iUtils->add_shutdown_cb([db_state2]() {
 
-        logErr2("close db handler");
+        // logErr2("close db handler");
         db_state2->close();
     });
 
@@ -71,7 +71,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     auto db_h_copy=db_history;
     iUtils->add_shutdown_cb([db_h_copy]() {
 
-        logErr2("close db handler");
+        // logErr2("close db handler");
         db_h_copy->close();
     });
     init_root(root);
@@ -497,7 +497,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
     calc_fee_rewards_nodes(t, nodes_in_leader_cert);
     auto newEpoch = root->getEpoch();
     newEpoch->epoch += 1;
-    newEpoch->prev_leader_cert = t.validateBlockREQ->leader_cert;
+    newEpoch->prev_lc = t.validateBlockREQ->leader_cert->getBuffer();
     newEpoch->setDirty();
 
     rh=proceed_merkle_on_transaction_pool_hashers(root);
@@ -529,6 +529,13 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
     }
 
     // auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
+    BigInt total_staked=0;
+    auto nn=root->getAllNodes();
+    for(auto& n:nn)
+    {
+        total_staked+=n->get_full_stake();
+    }
+
 
     BigInt total_fees;
     for (auto &z : t.feeCalcers.calcers)
@@ -565,7 +572,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
             throw CommonError("if(!u.valid()) 778899");
             // u=root->addUser(upk,NULL);
         }
-        BigInt amt = (total_rewards * node->getStakes()) / root->getValues()->total_staked;
+        BigInt amt = (total_rewards * node->get_full_stake()) / total_staked;
         u->addBalance(amt);
         u->setDirty();
         if (n == this_node_name && amt > 0)
@@ -658,7 +665,7 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 {
     MUTEX_INSPECTOR;
-    // logErr2("@@ %s",__FUNCTION__);
+    logErr2("@@ %s",__FUNCTION__);
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
 //     logErr2("iUtils->getNow(() -last_activity_time %lld iUtils->getNow() %lld last_activity_time %lld",iUtils->getNow()-last_activity_time,
@@ -670,7 +677,7 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
         logNode("do_heart_beat in PutTransactionREQ");
         // do_heart_beat();
         REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
-        rq->prev_leader_cert = root->getEpoch()->prev_leader_cert;
+        rq->prev_lc = root->getEpoch()->prev_lc;
         broadcast_MsgEvent(rq.get());
 
     }

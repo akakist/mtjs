@@ -41,9 +41,15 @@ bool root_data::verify_lider_certificate(const REF_getter<MsgData::LeaderCertifi
             if (!n.valid())
                 return false;
             agg_pk.push_back(n->get_bls_pk());
-            stake += n->stake();
+            stake += n->get_full_stake();
         }
-        if (stake.toDouble() < this->getValues()->total_staked.toDouble() * QUORUM)
+        auto nn=getAllNodes();
+        BigInt ts = 0;
+        for(auto &z: nn)
+        {
+            ts+=z->get_full_stake();
+        }
+        if (stake.toDouble() < ts.toDouble() * QUORUM)
         {
             logErr2("verify lc quorum failed");
             return false;

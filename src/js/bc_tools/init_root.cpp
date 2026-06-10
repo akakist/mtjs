@@ -20,7 +20,7 @@ void init_root(const REF_getter<root_data> &r)
         {
             total+=z;
         }
-        v->total_staked=total;
+        // v->total_staked=total;
         v->setDirty();
     }
     // u_root pk
@@ -59,6 +59,7 @@ void init_root(const REF_getter<root_data> &r)
         blst_cpp::PublicKey bls_pk;
         bls_pk.deserializeHexStr(getenv2(keys[i].first));
         nn->init(name, u_root_pk, bls_pk, base16::decode(getenv2(keys[i].second)), "127.0.0.1:"+std::to_string(2300+i));
+        nn->add_stake(u_root_pk, 100*i);
         // "
         // nn->name_=name;
         // nn->owner_ed_pk=u_root_pk;

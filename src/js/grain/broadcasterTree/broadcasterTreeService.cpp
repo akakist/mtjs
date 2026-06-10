@@ -171,7 +171,7 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
 {
     MUTEX_INSPECTOR;
     std::map<NODE_id, BroadcasterTree::Node> nodes;
-
+// logErr2("BroadcastMessage from %s", e->node_signer.container.c_str());
     auto ks = root->getAllNodes();
     for (auto &nd : ks)
     {
@@ -180,7 +180,7 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
             continue;
         BroadcasterTree::Node n;
         n.name = nd->getName();
-        n.stake_A = nd->getStakes();
+        n.stake_A = nd->get_full_stake();
         n.ip = nd->get_ip();
         n.missed_rounds = nd->get_missed_rounds();
         nodes[nd->getName()] = n;
@@ -188,7 +188,7 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
     if (nodes.size() == 0)
         return true;
     BroadcasterTree::TreeNode root = BroadcasterTree::buildTree(nodes, conf->this_node_name);
-
+    // logErr2("BroadcastMessage tree built with root %s", root.node.name.container.c_str());
     make_broadcast_message_to_tree(e->dstService,e->node_signer,e->signature_pl, e->msg, root, e->route);
     return true;
 }
@@ -253,6 +253,7 @@ void registerBroadcasterTreeService(const char *pn)
 
 bool BroadcasterTree::Service::SendToChild(const bcEvent::SendToChild *e, bool fromNetwork)
 {
+    // logNode("SendToChild from %s to %s", e->node_signer.container.c_str(), e->dstNodeName.container.c_str());
     sendEvent(e->dst_service, new bcEvent::NodeMsgREQ(e->node_signer,e->payload_signature, e->payload, e->route));
     passEvent(new bcEvent::SendToChildAck(e->hash(), poppedFrontRoute(e->route)));
     make_broadcast_message_to_tree(e->dst_service, e->node_signer,e->payload_signature, e->payload, e->bt, e->route);

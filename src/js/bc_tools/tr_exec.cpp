@@ -269,7 +269,7 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
     // BigInt &nodeStake = n->get_stastakes[senderAddress];
 
     us->subBalance(amount);
-    n->addStake(senderAddress, amount);
+    n->add_stake(senderAddress, amount);
     //  auto nodeStake = n->getStake(senderAddress);
     // nodeStake += amount;
     // n->total_stake += amount;
@@ -306,7 +306,7 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     {
         return "nodes not registered";
     }
-    auto stake=n->getStake(senderAddress);
+    auto stake=n->get_user_stake(senderAddress);
     // auto nodeStakeIt = n->stakes.find(senderAddress);
     if (stake == 0)
     {
@@ -329,13 +329,13 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     }
     u->addBalance(amount);
 
-    n->subStake(senderAddress, amount);
+    n->sub_stake(senderAddress, amount);
     // nodeStake -= amount;
 
     // n->total_stake -= amount;
 
 
-    v->total_staked -= amount;
+    // v->total_staked -= amount;
 
     v->setDirty();
     n->setDirty();

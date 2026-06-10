@@ -11,11 +11,11 @@ namespace MsgData
         {
             return new DoHeartBeatREQ();
         }
-        DoHeartBeatREQ():Base(msgid::DoHeartBeatREQ),prev_leader_cert(new LeaderCertificate)
+        DoHeartBeatREQ():Base(msgid::DoHeartBeatREQ)
         {
 
         }
-        REF_getter<LeaderCertificate> prev_leader_cert;
+        std::string prev_lc;
         void update(Blake2bHasher& h) const
         {
             throw CommonError("unimp");
@@ -24,17 +24,13 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            if(prev_leader_cert.valid())
-                b<<1<<prev_leader_cert;
-            else b<<0;
+            b<<prev_lc;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            int valid=b.get_PN();
-            if(valid)
-                b>>prev_leader_cert;
+            b>>prev_lc;
         }
     };
 

@@ -155,7 +155,6 @@ struct bc_node: public data_base
 
 
     bc_node(Cellable *p):data_base(hsh::bc_node,p) {
-        total_stake=0;
     }
     private:
     NODE_id name_;
@@ -164,7 +163,6 @@ struct bc_node: public data_base
     std::string ed_pk;
     std::string ip;
     std::map<std::string /*user*/, BigInt> stakes;
-    BigInt total_stake;
     int missed_rounds = 0;
     public:
     std::string get_ed_pk()
@@ -212,7 +210,7 @@ struct bc_node: public data_base
         M_LOCK(parent->mx);
         return name_;
     }
-    BigInt getStakes()
+    BigInt get_full_stake()
     {
         BigInt ret=0;
         M_LOCK(parent->mx);
@@ -222,7 +220,7 @@ struct bc_node: public data_base
         }
         return ret;
     }
-    BigInt getStake(const std::string& user)
+    BigInt get_user_stake(const std::string& user)
     {
         M_LOCK(parent->mx);
         auto it = stakes.find(user);
@@ -232,22 +230,22 @@ struct bc_node: public data_base
         }
         return 0;
     }
-     BigInt getTotalStake()
-    {
-        M_LOCK(parent->mx);
-        return total_stake;
+    //  BigInt getTotalStake()
+    // {
+    //     M_LOCK(parent->mx);
+    //     return total_stake;
 
-    }
-    BigInt stake()
-    {
-        M_LOCK(parent->mx);
-        BigInt stake=0;
-        for(auto &z: stakes)
-        {
-            stake+=z.second;
-        }
-        return stake;
-    }
+    // }
+    // BigInt stake()
+    // {
+    //     M_LOCK(parent->mx);
+    //     BigInt stake=0;
+    //     for(auto &z: stakes)
+    //     {
+    //         stake+=z.second;
+    //     }
+    //     return stake;
+    // }
     blst_cpp::PublicKey get_bls_pk()
     {
         M_LOCK(parent->mx);
@@ -263,12 +261,12 @@ struct bc_node: public data_base
         ed_pk=_ed_pk;
         ip=_ip;
     }
-    void addStake(const std::string& user, const BigInt &amount)
+    void add_stake(const std::string& user, const BigInt &amount)
     {
         M_LOCK (parent->mx);
         stakes[user]+=amount;
     }
-    void subStake(const std::string& user, const BigInt &amount)
+    void sub_stake(const std::string& user, const BigInt &amount)
     {
         M_LOCK (parent->mx);
         stakes[user]+=amount;
@@ -279,17 +277,19 @@ struct bc_node: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_ed_pk<<bls_pk<<ed_pk<<ip<<stakes<<total_stake<<missed_rounds;
+        o<<name_<<owner_ed_pk<<bls_pk<<ed_pk<<ip<<stakes<<missed_rounds;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>total_stake>>missed_rounds;
+        o>>name_>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>missed_rounds;
     }
     std::string dump() final
     {
+        MUTEX_INSPECTOR;
+        M_LOCK (parent->mx);
         std::ostringstream o;
         o<< "Node: "<< name_.container << std::endl;
         o<< "Owner: "<<  base16::encode(owner_ed_pk) << std::endl;
@@ -297,7 +297,12 @@ struct bc_node: public data_base
         o<< "ed_pk: "<< base16::encode(ed_pk) << std::endl;
         o<< "ip:port: "<< ip << std::endl;
         o<< "missed rounds: "<< missed_rounds << std::endl;
-        o<< "stake: "<< total_stake.toString() << std::endl;
+        BigInt ts=0;
+        for(auto &z:stakes)
+        {
+            ts+=z.second;
+        }
+        o<< "stake: "<< ts.toString() << std::endl;
         o<< "stakers: "<< std::endl;
         for(auto &z: stakes)
         {
@@ -345,7 +350,7 @@ struct bc_values: public data_base
         fees["transfer"]=BigInt(1000);
     }
     std::map<std::string,BigInt> fees;
-    BigInt total_staked;
+    // BigInt total_staked;
     std::set<std::string> emitters_bin;
     BigInt getFee(const std::string &fee_type) const
     {
@@ -359,14 +364,14 @@ struct bc_values: public data_base
     {
         // cost.pack(o);
         o<<1;
-        o<<fees<<total_staked<< emitters_bin;
+        o<<fees<<emitters_bin;
     }
     void unpack(inBuffer& o) final
     {
         // cost.unpack(o);
         auto v=o.get_PN();
 
-        o>>fees>>total_staked>>emitters_bin;
+        o>>fees>>emitters_bin;
     }
     std::string dump() final
     {
@@ -382,32 +387,20 @@ struct bc_epoch: public data_base
         epoch=0;
     }
     BigInt epoch;
-    REF_getter<MsgData::LeaderCertificate> prev_leader_cert;
+    std::string prev_lc;
     void pack(outBuffer& o) const final
     {
         // cost.pack(o);
         o<<1;
         o<<epoch;
-        if(prev_leader_cert.valid())
-        {
-            o<<1;
-            o<<prev_leader_cert;
-        }
-        else
-        {
-            o<<0;
-        }
+        o<<prev_lc;
     }
     void unpack(inBuffer& o) final
     {
         // cost.unpack(o);
         auto v=o.get_PN();
         o>>epoch;
-        int has_leader_cert=o.get_PN();
-        if(has_leader_cert)
-        {
-            o>>prev_leader_cert;
-        }
+        o>> prev_lc;
     }
     std::string dump() final
     {

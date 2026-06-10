@@ -31,9 +31,15 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     for (auto &z : li.transaction_responders)
     {
         auto n = root->getNode(z);
-        stake += n->getStakes();
+        stake += n->get_full_stake();
     }
-    if (stake.toDouble() > root->getValues()->total_staked.toDouble() * QUORUM)
+    auto nn=root->getAllNodes();
+    BigInt total_staked=0;
+    for(auto &n:nn)
+    {
+        total_staked+=n->get_full_stake();
+    }
+    if (stake.toDouble() > total_staked.toDouble() * QUORUM)
     {
         if (hbs.leader_info.leader_cert_2.valid() && hbs.leader_info.leader_cert_2->nodes.size() == li.transaction_responders.size())
         {
@@ -72,20 +78,26 @@ bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const N
             throw CommonError("if(!n.valid())");
 
         agg_pk.push_back(n->get_bls_pk());
-        stake += n->getStakes();
+        stake += n->get_full_stake();
     }
     if (!agg_sig.verify(agg_pk, r->new_root_hash.container))
     {
         logNode("block_accepted_rsp: aggsig !veried");
         return true;
     }
-    if (root->getValues()->total_staked.toDouble() * QUORUM < stake.toDouble())
+    BigInt total_staked=0;
+    auto nn=root->getAllNodes();
+    for(auto& n:nn)
+    {
+        total_staked+=n->get_full_stake();
+    }
+    if (total_staked.toDouble() * QUORUM < stake.toDouble())
     {
         if (!bp.heart_bit_sent_on_block_accepted_rsp)
         {
             bp.heart_bit_sent_on_block_accepted_rsp = true;
             REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
-            rq->prev_leader_cert = root->getEpoch()->prev_leader_cert;
+            rq->prev_lc = root->getEpoch()->prev_lc;
             broadcast_MsgEvent(rq.get());
         }
     }
@@ -152,9 +164,15 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     BigInt stakeVal = 0;
     for (auto &z : bt.responses)
     {
-        stakeVal += root->getNode(z->node_validator)->getStakes();
+        stakeVal += root->getNode(z->node_validator)->get_full_stake();
     }
-    if (stakeVal.toDouble() > root->getValues()->total_staked.toDouble() * QUORUM)
+    BigInt total_staked=0;
+    auto nn=root->getAllNodes();
+    for(auto& n:nn)
+    {
+        total_staked+=n->get_full_stake();
+    }
+    if (stakeVal.toDouble() > total_staked.toDouble() * QUORUM)
     {
         XTRY;
         logNode("Block stake finalized");

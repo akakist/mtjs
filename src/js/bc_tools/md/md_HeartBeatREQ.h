@@ -19,11 +19,13 @@ namespace MsgData
         BLOCK_id prev_root_hash;
         BigInt new_epoch;
         NODE_id node_leader;
+        std::string prev_lc;
         void update(Blake2bHasher& h) const
         {
             h.update(prev_root_hash.container);
             h.update(new_epoch.toString());
             h.update(node_leader.container);
+            h.update(prev_lc);
         }
         void pack(outBuffer& b) const final
         {
@@ -33,6 +35,7 @@ namespace MsgData
             b<<prev_root_hash;
             b<<node_leader;
             b<<new_epoch;
+            b<<prev_lc;
         }
         void unpack(inBuffer& b) final
         {
@@ -41,6 +44,7 @@ namespace MsgData
             b>>prev_root_hash;
             b>>node_leader;
             b>>new_epoch;
+            b>>prev_lc;
         }
         static Base* construct()
         {
