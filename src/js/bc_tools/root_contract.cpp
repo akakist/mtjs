@@ -39,7 +39,11 @@ bool root_data::verify_lider_certificate(const REF_getter<MsgData::LeaderCertifi
         {
             auto n = this->getNode(z);
             if (!n.valid())
+            {
+                logErr2("            if (!n.valid()) %s",z.container.c_str());
                 return false;
+
+            }
             agg_pk.push_back(n->get_bls_pk());
             stake += n->get_full_stake();
         }

@@ -89,35 +89,121 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h, const NODE_id &
 {
     // logNode("HeartBeatREQ from %s", src_node.container.c_str());
     MUTEX_INSPECTOR;
-    if(CheckState(h, src_node))
+    bool need_reply = false;
+    REF_getter<MsgData::LeaderCertificate> remote_lc, local_lc;
+
+    if(h->prev_lc.size())
     {
-        logNode("CheckState failed for HeartBeatREQ from %s", src_node.container.c_str());
+        remote_lc=new MsgData::LeaderCertificate;
+        inBuffer in(h->prev_lc);
+        try{
+            remote_lc->unpack2(in);
+        }
+        catch(std::exception& e)
+        {
+            logNode("catched %s",e.what());
+            return true;
+        }
+    }
+    auto llc=root->getEpoch()->prev_lc;
+    if(llc.size())
+    {
+        local_lc=new MsgData::LeaderCertificate;
+        inBuffer in(llc);
+        local_lc->unpack2(in);
+    }
+    bool remote_verified=false;
+    bool local_verified=false;
+    if(remote_lc.valid())
+    {
+        remote_verified=root->verify_lider_certificate(remote_lc);
+    }
+    else logNode("!if(remote_lc.valid())");
+    if(local_lc.valid())
+    {
+        local_verified=root->verify_lider_certificate(local_lc);
+    }
+    else logNode("if(local_lc.valid())");
+    // if(!remote_lc.valid() && local_lc.valid()))
+    //     return true;
+    
+    // // bool remote_verified=root->verify_lider_certificate(remo)
+    // if(remote_lc.valid()&& local_lc.valid())
+    // {
+
+
+    // }
+    if(local_verified && !remote_verified)
+    {
+        logNode("if(local_verified && !remote_verified)");
         return true;
+    }
+
+    if(!remote_verified && !local_verified)    
+    {
+        logNode("if(!remote_verified && !local_verified)    ");
+        need_reply=true;
+    }
+    if(remote_verified && !local_verified)
+    {
+        logNode("if(remote_verified && !local_verified)");
+        need_reply = true;
+    }
+    if(!need_reply && remote_verified && local_verified)
+    {
+        if(prev_root_hash_Z == h->prev_root_hash)
+            need_reply=true;
+        if (h->new_epoch > root->getEpoch()->epoch + 1)
+        {
+            // logNode("r->new_epoch > root->getEpoch()->epoch + 1  - %s %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str());
+            state_Z = STATE_SYNCING;
+            do_sync(src_node);
+            return true;
+        }
+        if(h->new_epoch < root->getEpoch()->epoch + 1)
+        {
+            logNode("if(h->new_epoch < root->getEpoch()->epoch + 1)");
+            return false;
+        }
+        else need_reply=true;
+
 
     }
+    // if(!need_reply && CheckState(h, src_node))
+    // {
+    //     logNode("CheckState failed for HeartBeatREQ from %s", src_node.container.c_str());
+    //     return true;
+
+    // }
 
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
     bool need_replace = false;
 
-    if (prev_root_hash_Z != h->prev_root_hash)
-    {
-        logNode("invalid root hashe, no answer");
-        return true;
-    }
-    bool need_reply = false;
+    // if (!need_reply && prev_root_hash_Z != h->prev_root_hash)
+    // {
+    //     logNode("invalid root hashe, no answer");
+    //     return true;
+    // }
     if (node_leader_for_client.container.empty())
         node_leader_for_client = h->node_leader;
+
     if (h->node_leader != node_leader_for_client)
     {
         if (isNodeGreaterOrEqual(h->node_leader, node_leader_for_client))
         {
             node_leader_for_client = h->node_leader;
+            // logNode("replace leader to %s",node_leader_for_client.container.c_str());
             need_reply = true;
         }
+        else
+        {
+            // logNode("need_reply = false; %s %d",__FILE__,__LINE__);
+            need_reply = false;
+        } 
     }
-    else
-        need_reply = true;
+    // else
+    //     need_reply = true;
     if (need_reply)
     {
         REF_getter<MsgData::HeartBeatRSP> hbr = new MsgData::HeartBeatRSP();
@@ -251,7 +337,7 @@ void Node::Service::do_heart_beat()
         REF_getter<MsgData::HeartBeatREQ> hb_req =
             new MsgData::HeartBeatREQ(prev_root_hash_Z,
                                       root->getEpoch()->epoch+1,
-                                      this_node_name);
+                                      this_node_name, root->getEpoch()->prev_lc);
 
         broadcast_MsgEvent(hb_req.get());
     }
