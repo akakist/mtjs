@@ -85,7 +85,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     return true;
 }
 
-bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h, const NODE_id &src_node, const route_t &route)
+bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::LeaderCertificate *remote_prev_lc, const NODE_id &src_node, const route_t &route)
 {
     // logNode("HeartBeatREQ from %s", src_node.container.c_str());
     if(state_Z==STATE_SYNCING)
@@ -94,22 +94,22 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h, const NODE_id &
     }
     MUTEX_INSPECTOR;
     bool need_reply = false;
-    REF_getter<MsgData::LeaderCertificate> remote_lc, local_lc;
+    REF_getter<MsgData::LeaderCertificate>  local_lc;
 
-    if(h->prev_lc.size())
-    {
-        remote_lc=new MsgData::LeaderCertificate;
-        inBuffer in(h->prev_lc);
-        try{
-            remote_lc->unpack2(in);
-        }
-        catch(std::exception& e)
-        {
-            logNode("catched %s",e.what());
-            return true;
-        }
-        // logNode("remote prev_lc epoch %s prev_root_hash %s", remote_lc->heart_beat->new_epoch.toString().c_str(), remote_lc->heart_beat->prev_root_hash.str().c_str());
-    }
+    // if(h->prev_lc.size())
+    // {
+    //     remote_lc=new MsgData::LeaderCertificate;
+    //     inBuffer in(h->prev_lc);
+    //     try{
+    //         remote_lc->unpack2(in);
+    //     }
+    //     catch(std::exception& e)
+    //     {
+    //         logNode("catched %s",e.what());
+    //         return true;
+    //     }
+    //     // logNode("remote prev_lc epoch %s prev_root_hash %s", remote_lc->heart_beat->new_epoch.toString().c_str(), remote_lc->heart_beat->prev_root_hash.str().c_str());
+    // }
     auto llc=root->getEpoch()->prev_lc;
     if(llc.size())
     {
@@ -122,9 +122,9 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h, const NODE_id &
     // logNode("HeartBeatREQ from %s new_epoch %s prev_root_hash %s", src_node.container.c_str(), h->new_epoch.toString().c_str(), h->prev_root_hash.str().c_str());
     bool remote_verified=false;
     bool local_verified=false;
-    if(remote_lc.valid())
+    if(remote_prev_lc)
     {
-        remote_verified=root->verify_lider_certificate(remote_lc);
+        remote_verified=root->verify_lider_certificate(remote_prev_lc);
     }
     else logNode("!if(remote_lc.valid())");
     if(local_lc.valid())
@@ -356,7 +356,8 @@ void Node::Service::do_heart_beat()
                                       root->getEpoch()->epoch+1,
                                       this_node_name, root->getEpoch()->prev_lc);
 
-        broadcast_MsgEvent(hb_req.get());
+        REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),root->getEpoch()->prev_lc);
+        broadcast_MsgEvent(lce.get());
     }
 
     return;

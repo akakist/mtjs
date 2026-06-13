@@ -16,6 +16,7 @@
 #include "md/md_TX.h"
 #include "md/md_GetUserStatusREQ.h"
 #include "md/md_GetUserStatusRSP.h"
+#include "md/md_LcEnvelopeREQ.h"
 
 MsgFactory::MsgFactory()
 {
@@ -35,5 +36,6 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::TX, MsgData::TX::construct);
     registerMsg(msgid::GetUserStatusREQ, MsgData::GetUserStatusREQ::construct);
     registerMsg(msgid::GetUserStatusRSP, MsgData::GetUserStatusRSP::construct);
+    registerMsg(msgid::LcEnvelopeREQ, MsgData::LcEnvelopeREQ::construct);
 
 }

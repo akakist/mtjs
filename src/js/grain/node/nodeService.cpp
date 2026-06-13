@@ -683,6 +683,56 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     }
     return true;
 }
+bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id & src_node, const route_t& route)
+{
+    MUTEX_INSPECTOR;
+    // logNode("LcEnvelopeREQ 33333dffffff");
+    inBuffer in(m->msg);
+    auto id = in.get_PN();
+    REF_getter<MsgData::Base> msg = msgFactory.create(id);
+    msg->unpack(in);
+    REF_getter<MsgData::LeaderCertificate> lc;
+    if(m->prev_lc.size())
+    {
+        lc=new MsgData::LeaderCertificate;
+        inBuffer in2(m->prev_lc);
+        lc->unpack2(in2);
+
+    }
+    switch (msg->type)
+    {
+    // case msgid::LcEnvelopeREQ:
+    //     last_activity_time=iUtils->getNow();
+    //     return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route);
+    // case msgid::GetTransactionREQ:
+    //     last_activity_time=iUtils->getNow();
+    //     return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::HeartBeatREQ:
+        last_activity_time=iUtils->getNow();
+        return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()),lc.valid()?lc.get():NULL, src_node, route);
+    // case msgid::ValidateBlockREQ:
+    //     last_activity_time=iUtils->getNow();
+    //     return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
+    // case msgid::BlockAcceptedREQ:
+    //     last_activity_time=iUtils->getNow();
+    //     return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
+    // case msgid::GetSavedBlocksREQ:
+    //     return GetSavedBlocksREQ(static_cast<const MsgData::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
+    // case msgid::DoHeartBeatREQ:
+    //     last_activity_time=iUtils->getNow();
+    //     return DoHeartBeatREQ(static_cast<const MsgData::DoHeartBeatREQ *>(msg.get()), m->node_signer, m->route);
+    // case msgid::ConfirmLeaderREQ:
+    //     last_activity_time=iUtils->getNow();
+    //     return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
+
+    default:
+        throw CommonError("2 MsgData %s", msgName(msg->type));
+    }
+
+    return true;
+}
+
+
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 {
     // last_activity_time=iUtils->getNow();
@@ -701,12 +751,15 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
     switch (msg->type)
     {
+    case msgid::LcEnvelopeREQ:
+        last_activity_time=iUtils->getNow();
+        return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::GetTransactionREQ:
         last_activity_time=iUtils->getNow();
         return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::HeartBeatREQ:
-        last_activity_time=iUtils->getNow();
-        return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()), m->node_signer, m->route);
+    // case msgid::HeartBeatREQ:
+    //     last_activity_time=iUtils->getNow();
+    //     return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ValidateBlockREQ:
         last_activity_time=iUtils->getNow();
         return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
@@ -723,7 +776,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
 
     default:
-        throw CommonError("unjandled MsgData %s", msgName(msg->type));
+        throw CommonError("unjandled3 MsgData %s", msgName(msg->type));
     }
 
     return true;

@@ -51,6 +51,7 @@ tr_exec.h
 TRANSACTION_id.h
 tree.h
 TypedStr.h
+md/md_LcEnvelopeREQ.h
 
 )
 

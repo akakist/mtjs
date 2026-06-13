@@ -67,7 +67,8 @@ namespace msgid
         TX,
         attachment_data,
         GetUserStatusREQ,
-        GetUserStatusRSP
+        GetUserStatusRSP,
+        LcEnvelopeREQ
     };
 
 }

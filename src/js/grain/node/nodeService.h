@@ -34,6 +34,7 @@
 #include "md/md_DoHeartBeatREQ.h"
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
+#include "md/md_LcEnvelopeREQ.h"
 #include "dbHistory.h"
 #include "t_params.h"
 #include "cached_state.h"
@@ -135,8 +136,9 @@ namespace Node
 
         void do_heart_beat();
 
-        // bool HeartBeatREQ(const MsgData::HeartBeatREQ* h,const std::string &heart_beat_payload, const route_t& route);
-        bool HeartBeatREQ(const MsgData::HeartBeatREQ* h,const NODE_id &src_node, const route_t& route);
+        bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route);
+        bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::LeaderCertificate *remote_prev_lc, const NODE_id &src_node, const route_t &route);
+
         bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
         bool GetTransactionREQ(const MsgData::GetTransactionREQ* r, const NODE_id & src_node, const route_t& route);
         bool GetTransactionRSP(const MsgData::GetTransactionRSP* r, const NODE_id & src_node, const route_t& route);

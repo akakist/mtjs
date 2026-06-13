@@ -86,6 +86,9 @@ const char *msgName(int id)
         return "GetUserStatusRSP";
     case msgid::GetUserStatusREQ:
         return "GetUserStatusREQ";
+    case msgid::LcEnvelopeREQ:
+        return "LcEnvelopeREQ";
+        
 
     default:
         return "unknown";
