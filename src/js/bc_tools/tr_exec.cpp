@@ -369,7 +369,7 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
     }
     if (n->get_owner() != senderAddress)
     {
-        return "only node owner can enable node";
+        return "only node owner can enable node owner "+base16::encode(n->get_owner())+" " + base16::encode(senderAddress);
     }
     auto fee=v->getFee("node_enable");
     auto us = t.root->getUserState(senderAddress);

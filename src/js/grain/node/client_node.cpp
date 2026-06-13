@@ -30,8 +30,10 @@ void Node::Service::do_InvalidateRoot()
 }
 bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
 {
-    if(state_Z!=STATE_NORMAL)
+    if(state_Z==STATE_SYNCING)
+    {
         return true;
+    }
     MUTEX_INSPECTOR;
     XTRY;
     // blockDBStore->validateBlockREQ->leader_cert
@@ -39,14 +41,14 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     if (!c.blockDBStore.valid())
     {
-        logErr2("if (!c.blockDBStore.valid())");
+        logNode("if (!c.blockDBStore.valid())");
         return true;
 
     }
 
     if (c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader != src_node)
     {
-        logErr2("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
+        logNode("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
         return true;
     }
 
@@ -108,7 +110,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     prev_root_hash_Z = r->blockInfo->new_root_hash1;
     blocks_leader.clear();
-    node_leader_for_client.container.clear();
+    node_leader_for_client.clear();
     do_InvalidateRoot();
 
     {
@@ -154,24 +156,26 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
-    if(state_Z!=STATE_NORMAL)
+    if(state_Z==STATE_SYNCING)
+    {
         return true;
+    }
     if (CheckState(r->lc->heart_beat.get(), src_node))
         return true;
 
     resetTimer();
-    if (r->lc->heart_beat->node_leader != node_leader_for_client)
+    if (r->lc->heart_beat->node_leader != node_leader_for_client[r->lc->heart_beat->prev_root_hash])
         return true;
     if (!root->verify_lider_certificate(r->lc))
     {
-        logErr2("if(!verify_lider_certificate(rft.payload_lc,node_leader))");
+        logNode("if(!verify_lider_certificate(rft.payload_lc,node_leader))");
         return true;
     }
-    if (node_leader_for_client != r->lc->heart_beat->node_leader)
+    if (node_leader_for_client[r->lc->heart_beat->prev_root_hash] != r->lc->heart_beat->node_leader)
     {
-        if (isNodeGreaterOrEqual(r->lc->heart_beat->node_leader, node_leader_for_client))
+        if (isNodeGreaterOrEqual(r->lc->heart_beat->node_leader, node_leader_for_client[r->lc->heart_beat->prev_root_hash]))
         {
-            node_leader_for_client = r->lc->heart_beat->node_leader;
+            node_leader_for_client[r->lc->heart_beat->prev_root_hash] = r->lc->heart_beat->node_leader;
         }
         else
         {
@@ -203,7 +207,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     MUTEX_INSPECTOR;
     if (state_Z != State::STATE_NORMAL)
     {
-        logErr2("state_Z != State::NORMAL");
         return true;
     }
 
@@ -212,7 +215,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     if (CheckState(r->leader_cert->heart_beat.get(), src_node))
     {
         t.att_data->block_report = {1, "check state heart beat failed"};
-        logErr2("check state heart beat failed");
+        logNode("check state heart beat failed");
         err = true;
     }
     // return true;
@@ -220,11 +223,11 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     resetTimer();
     if (!err)
     {
-        if (r->leader_cert->heart_beat->node_leader != node_leader_for_client)
+        if (r->leader_cert->heart_beat->node_leader != node_leader_for_client[r->leader_cert->heart_beat->prev_root_hash])
         {
             t.att_data->block_report = {1, "cert node leader mismatched"};
             err = true;
-            logErr2("cert node leader mismatched");
+            logNode("cert node leader mismatched");
         }
     }
 
@@ -232,7 +235,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     {
         err = true;
         t.att_data->block_report = {1, "verify_lider_certificate failed"};
-        logErr2("verify_lider_certificate failed");
+        logNode("verify_lider_certificate failed");
     }
 
     if (!err && r->leader_cert->heart_beat->prev_root_hash != prev_root_hash_Z)

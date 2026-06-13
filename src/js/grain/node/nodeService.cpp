@@ -60,7 +60,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     auto db_state2=db_state;
     iUtils->add_shutdown_cb([db_state2]() {
 
-        // logErr2("close db handler");
+        // logNode("close db handler");
         db_state2->close();
     });
 
@@ -71,7 +71,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     auto db_h_copy=db_history;
     iUtils->add_shutdown_cb([db_h_copy]() {
 
-        // logErr2("close db handler");
+        // logNode("close db handler");
         db_h_copy->close();
     });
     init_root(root);
@@ -79,7 +79,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
 
     my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
-    logErr2("ServiceInit nodename %s", this_node_name.container.c_str());
+    logNode("ServiceInit nodename %s", this_node_name.container.c_str());
     sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, root, this));
     sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, root, this));
     sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, root, this));
@@ -312,7 +312,7 @@ static bool match(const std::string &re, const std::string &buf, std::vector<std
 bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 {
     MUTEX_INSPECTOR;
-    logErr2("telnet command %s", e->command.c_str());
+    logNode("telnet command %s", e->command.c_str());
     std::vector<std::string> tokens;
     auto ds = "^ds$";
     auto go = "^go\\s+(.+)$";
@@ -409,7 +409,7 @@ void registerNodeService(const char *pn)
 bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
 {
     MUTEX_INSPECTOR;
-    logErr2("RequestIncoming %s", e->req->url.c_str());
+    logNode("RequestIncoming %s", e->req->url.c_str());
     HTTP::Response r(e->req);
     auto uri = (std::string)e->req->url;
     auto da = iUtils->splitString("/", uri);
@@ -456,7 +456,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
         if (!tt->verify())
         {
             t_err = "verify failed @12";
-            logErr2("verify failed @12");
+            logNode("verify failed @12");
         }
         if (!t_err)
         {
@@ -465,7 +465,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
             if (!u.valid())
             {
                 t_err = "sender invalid";
-                logErr2("sender invalid");
+                logNode("sender invalid");
             }
             if (!t_err)
             {
@@ -474,7 +474,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
                 // nonce.from_string(n);
                 if (u->getNonce() != tt->nonce)
                 {
-                    logErr2("invalid nonce, expected %s got %s", u->getNonce().toString().c_str(), tt->nonce.toString().c_str());
+                    logNode("invalid nonce, expected %s got %s", u->getNonce().toString().c_str(), tt->nonce.toString().c_str());
                     t_err = "invalid nonce";
 
                 }
@@ -550,7 +550,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         }
         else
         {
-            logErr2("balance deduct %s fee %s", u->getBalance().toString().c_str(), z.second->get_fee().toString().c_str());
+            logNode("balance deduct %s fee %s", u->getBalance().toString().c_str(), z.second->get_fee().toString().c_str());
             u->subBalance(z.second->get_fee());
             u->setDirty();
         }
@@ -665,14 +665,14 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 {
     MUTEX_INSPECTOR;
-    logErr2("@@ %s",__FUNCTION__);
+    logNode("@@ %s",__FUNCTION__);
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
-//     logErr2("iUtils->getNow(() -last_activity_time %lld iUtils->getNow() %lld last_activity_time %lld",iUtils->getNow()-last_activity_time,
+//     logNode("iUtils->getNow(() -last_activity_time %lld iUtils->getNow() %lld last_activity_time %lld",iUtils->getNow()-last_activity_time,
 // iUtils->getNow(),last_activity_time);
     if(iUtils->getNow()-last_activity_time>2000000)
     {
-        // logErr2("last_activity_time=iUtils->getNow(); %s %d",__FILE__,__LINE__);
+        // logNode("last_activity_time=iUtils->getNow(); %s %d",__FILE__,__LINE__);
         last_activity_time=iUtils->getNow();
         logNode("do_heart_beat in PutTransactionREQ");
         // do_heart_beat();
@@ -686,7 +686,7 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 {
     // last_activity_time=iUtils->getNow();
-    // logErr2("last_activity_time=iUtils->getNow(); %s %d",__FILE__,__LINE__);
+    // logNode("last_activity_time=iUtils->getNow(); %s %d",__FILE__,__LINE__);
     auto n = root->getNode(m->node_signer);
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {
@@ -767,10 +767,10 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 void Node::Service::logNode(const char *fmt, ...)
 {
 
+    auto epoch = root->getEpoch();
     {
         va_list ap;
         va_start(ap, fmt);
-        auto epoch = root->getEpoch();
         if (!epoch.valid())
         {
             throw CommonError("if(!epoch.valid())");
@@ -779,5 +779,20 @@ void Node::Service::logNode(const char *fmt, ...)
         vfprintf(stdout, fmt, ap);
         fprintf(stdout, "\n");
         va_end(ap);
+    }
+    {
+        va_list ap;
+        va_start(ap, fmt);
+        std::string pn=this_node_name.container+".log";
+        FILE *f = fopen(pn.c_str(), "a");
+        if (f)
+        {
+            fprintf(f, "%lf [Node] [%s] [%s] [%s] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch.toString().c_str());
+            vfprintf(f, fmt, ap);
+            fprintf(f, "\n");
+            fclose(f);
+        }
+        va_end(ap);
+        // fclose(f);
     }
 }

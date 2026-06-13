@@ -60,7 +60,7 @@ bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const N
 
     if (!r->verify(root->getNode(r->node_signer)->get_bls_pk()))
     {
-        logErr2("block_accepted_rsp: verify failed");
+        logNode("block_accepted_rsp: verify failed");
         return true;
     }
     auto &bp = blocks_leader[prev_root_hash_Z];
@@ -114,14 +114,13 @@ bool Node::Service::CheckState(const MsgData::HeartBeatREQ *r, const NODE_id &sr
         // logNode("if (r->prev_root_hash != prev_root_hash_Z) %s %s",r->prev_root_hash.str().c_str(),prev_root_hash_Z.str().c_str());
         if (state_Z == STATE_NORMAL)
         {
-            // logNode("if (state_Z == NORMAL)");
-            // r->
-            // logNode("r->new_epoch %s root->getEpoch()->epoch   - %s  src_node %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str(),src_node.container.c_str());
             if (r->new_epoch > root->getEpoch()->epoch + 1)
             {
                 // logNode("r->new_epoch > root->getEpoch()->epoch + 1  - %s %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str());
-                state_Z = STATE_SYNCING;
-                do_sync(src_node);
+                if(state_Z!=STATE_SYNCING){
+                    state_Z = STATE_SYNCING;
+                    do_sync(src_node);
+                }
             }
             return 1;
         }
@@ -139,12 +138,12 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 
     if (r->blockInfo->prev_root_hash != prev_root_hash_Z)
     {
-        logErr2("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash");
+        logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
         return true;
     }
     if (!r->verify(root->getNode(r->node_validator)->get_bls_pk()))
     {
-        logErr2("block response not validated");
+        logNode("block response not validated");
         return true;
     }
 
@@ -199,11 +198,11 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         }
         if (ba->agg_sig.verify(agg_pk, blake2b_hash(ba->blockInfo->getBuffer()).container))
         {
-            logErr2("ValidateBlockRSP block_accepted test verified OK !!!!!!!!!!!!!!!!!!!!!");
+            logNode("ValidateBlockRSP block_accepted test verified OK !!!!!!!!!!!!!!!!!!!!!");
         }
         else
         {
-            logErr2("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
+            logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
             return true;
         }
         broadcast_MsgEvent(ba.get());

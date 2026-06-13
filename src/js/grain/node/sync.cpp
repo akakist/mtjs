@@ -14,10 +14,8 @@
 
 void Node::Service::do_sync(const NODE_id &src_node)
 {
-    logNode("void Node::Service::do_sync(const NODE_id &src_node)");
-    // if(state_Z==SYNCING)
-    //     return;
-    // state_Z=SYNCING;
+    MUTEX_INSPECTOR;
+    logNode("void Node::Service::do_sync(const NODE_id &src_node) %s",_DMI().c_str());
     auto n = root->getNode(src_node);
     if (!n.valid())
         throw CommonError("if(!n.valid())");
@@ -39,9 +37,6 @@ bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const
     if(state_Z==STATE_SYNCING)
         return true;
 
-    // if(state_Z==SYNCING)
-    //     return;
-    // SQLite::Database dbs(sqlite_pn, SQLite::OPEN_READONLY);
 
     REF_getter<MsgData::GetSavedBlocksRSP> ret = new MsgData::GetSavedBlocksRSP();
 
@@ -92,6 +87,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         logNode("error if(state_Z!=SYNCING)");
     }
     logNode("prev_root_hash %s", prev_root_hash_Z.str().c_str());
+    logNode("GetSavedBlocksRSP received blocks %d", r->blocks_ZZ.size());
     for (auto &z : r->blocks_ZZ)
     {
         logNode("iter block epoch %s", z->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString().c_str());
@@ -127,7 +123,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         {
             throw CommonError("on_get_blocks_rsp: !ba.agg_sig.verify");
         }
-        // logNode("on_get_blocks_rsp: block verified OK");
+        logNode("on_get_blocks_rsp: block verified OK");
         t_params t(root);
         // t.att_data->trs = z.second->att_data->trs;
         t.validateBlockREQ = z->validateBlockREQ;
@@ -139,8 +135,9 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         {
             logNode("on_get_blocks_rsp: block executed OK on epoch %s", z->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString().c_str());
 
-            logNode("db->write_batch(db_to_save_Z); %d", db_to_save_Z.cells.size());
+            // logNode("db->write_batch(db_to_save_Z); %d", db_to_save_Z.cells.size());
             db_state->write_batch(db_to_save_Z);
+            logNode("db->write_batch(db_to_save_Z); done %d granules", db_to_save_Z.cells.size());
             db_to_save_Z.clear();
             prev_root_hash_Z = new_root_hash;
         }
@@ -149,6 +146,10 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             root = new root_data(db_state.get());
             init_root(root);
             do_InvalidateRoot();
+            if(state_Z==STATE_SYNCING)
+            {
+                return true;
+            }
             state_Z=STATE_SYNCING;
             do_sync(src_node);
             logNode("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
@@ -160,7 +161,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
                                   o.asString()->container
                                  ))
         {
-            logErr2("error saving block");
+            logNode("error saving block");
         }
     }
     if (r->last_prev_root_hash != prev_root_hash_Z)
@@ -168,6 +169,10 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         logNode("call3 do_sync();");
 
         logNode("do_sync again: ");
+        // if(state_Z==STATE_SYNCING)
+        // {
+        //     return true;
+        // }
         state_Z=STATE_SYNCING;
         do_sync(src_node);
         return true;

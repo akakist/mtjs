@@ -196,7 +196,8 @@ namespace Node
 
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         std::map<BLOCK_id,block> blocks_leader;
-        NODE_id node_leader_for_client;
+        std::map<BLOCK_id, NODE_id> node_leader_for_client;
+        // NODE_id node_leader_for_client;
 
         struct cli_bl
         {
