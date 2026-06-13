@@ -199,14 +199,14 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     //     logNode("invalid root hashe, no answer");
     //     return true;
     // }
-    if (node_leader_for_client[h->prev_root_hash].container.empty())
-        node_leader_for_client[h->prev_root_hash] = h->node_leader;
+    if (cli_leader_info[h->prev_root_hash].node_leader.container.empty())
+        cli_leader_info[h->prev_root_hash].node_leader = h->node_leader;
 
-    if (h->node_leader != node_leader_for_client[h->prev_root_hash])
+    if (h->node_leader != cli_leader_info[h->prev_root_hash].node_leader)
     {
-        if (isNodeGreaterOrEqual(h->node_leader, node_leader_for_client[h->prev_root_hash]))
+        if (isNodeGreaterOrEqual(h->node_leader, cli_leader_info[h->prev_root_hash].node_leader))
         {
-            node_leader_for_client[h->prev_root_hash] = h->node_leader;
+            cli_leader_info[h->prev_root_hash].node_leader = h->node_leader;
             // logNode("replace leader to %s",node_leader_for_client.container.c_str());
             need_reply = true;
         }
@@ -251,13 +251,13 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
         return true;
     }
     bool need_reply = false;
-    if (node_leader_for_client[h->hb->prev_root_hash].container.empty())
-        node_leader_for_client[h->hb->prev_root_hash] = h->hb->node_leader;
-    if (h->hb->node_leader != node_leader_for_client[h->hb->prev_root_hash] )
+    if (cli_leader_info[h->hb->prev_root_hash].node_leader.container.empty())
+        cli_leader_info[h->hb->prev_root_hash].node_leader = h->hb->node_leader;
+    if (h->hb->node_leader != cli_leader_info[h->hb->prev_root_hash].node_leader )
     {
-        if (isNodeGreaterOrEqual(h->hb->node_leader, node_leader_for_client[h->hb->prev_root_hash]))
+        if (isNodeGreaterOrEqual(h->hb->node_leader, cli_leader_info[h->hb->prev_root_hash].node_leader))
         {
-            node_leader_for_client[h->hb->prev_root_hash] = h->hb->node_leader;
+            cli_leader_info[h->hb->prev_root_hash].node_leader = h->hb->node_leader;
             need_reply = true;
         }
     }

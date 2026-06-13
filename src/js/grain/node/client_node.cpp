@@ -110,7 +110,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     prev_root_hash_Z = r->blockInfo->new_root_hash1;
     blocks_leader.clear();
-    node_leader_for_client.clear();
+    cli_leader_info.clear();
     do_InvalidateRoot();
 
     {
@@ -155,7 +155,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 }
 bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const NODE_id &src_node, const route_t &route)
 {
-    MUTEX_INSPECTOR;
+    MUTEX_INSPECTOR;    
     if(state_Z==STATE_SYNCING)
     {
         return true;
@@ -164,25 +164,30 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
         return true;
 
     resetTimer();
-    if (r->lc->heart_beat->node_leader != node_leader_for_client[r->lc->heart_beat->prev_root_hash])
-        return true;
-    if (!root->verify_lider_certificate(r->lc))
+    if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
     {
-        logNode("if(!verify_lider_certificate(rft.payload_lc,node_leader))");
+        logNode("if(cli_leader_info[prev_root_hash_Z]!=src_node)");
         return true;
     }
-    if (node_leader_for_client[r->lc->heart_beat->prev_root_hash] != r->lc->heart_beat->node_leader)
-    {
-        if (isNodeGreaterOrEqual(r->lc->heart_beat->node_leader, node_leader_for_client[r->lc->heart_beat->prev_root_hash]))
-        {
-            node_leader_for_client[r->lc->heart_beat->prev_root_hash] = r->lc->heart_beat->node_leader;
-        }
-        else
-        {
-            // logNode("invalid node cert");
-            return true;
-        }
-    }
+    // if (r->lc->heart_beat->node_leader != node_leader_for_client[r->lc->heart_beat->prev_root_hash])
+    //     return true;
+    // if (!root->verify_lider_certificate(r->lc))
+    // {
+    //     logNode("if(!verify_lider_certificate(rft.payload_lc,node_leader))");
+    //     return true;
+    // }
+    // if (node_leader_for_client[r->lc->heart_beat->prev_root_hash] != r->lc->heart_beat->node_leader)
+    // {
+    //     if (isNodeGreaterOrEqual(r->lc->heart_beat->node_leader, node_leader_for_client[r->lc->heart_beat->prev_root_hash]))
+    //     {
+    //         node_leader_for_client[r->lc->heart_beat->prev_root_hash] = r->lc->heart_beat->node_leader;
+    //     }
+    //     else
+    //     {
+    //         // logNode("invalid node cert");
+    //         return true;
+    //     }
+    // }
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
     REF_getter<MsgData::GetTransactionRSP> rsp = new MsgData::GetTransactionRSP;
@@ -223,7 +228,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     resetTimer();
     if (!err)
     {
-        if (r->leader_cert->heart_beat->node_leader != node_leader_for_client[r->leader_cert->heart_beat->prev_root_hash])
+        if (r->leader_cert->heart_beat->node_leader != cli_leader_info[r->leader_cert->heart_beat->prev_root_hash].node_leader)
         {
             t.att_data->block_report = {1, "cert node leader mismatched"};
             err = true;

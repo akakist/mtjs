@@ -183,7 +183,6 @@ namespace Node
 
 
             std::vector<std::pair<NODE_id/*node*/,blst_cpp::Signature> > signs;
-            bool executed=false;
             bool block_accepted_sent=false;
             bool heart_bit_sent_on_block_accepted_rsp=false;
 
@@ -198,16 +197,23 @@ namespace Node
 
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         std::map<BLOCK_id,block> blocks_leader;
-        std::map<BLOCK_id, NODE_id> node_leader_for_client;
+        
         // NODE_id node_leader_for_client;
 
-        struct cli_bl
+        struct client_block_info
         {
             REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
             REF_getter<MsgData::attachment_data> att_data= nullptr;
 
         };
-        std::map<BLOCK_id, cli_bl> c_blocks;
+        std::map<BLOCK_id, client_block_info> c_blocks;
+        struct client_leader_info
+        {
+            NODE_id node_leader;
+            bool heart_beat_sent=false;
+        };
+        std::map<BLOCK_id, client_leader_info> cli_leader_info;
+
         BLOCK_id prev_root_hash_Z;
         void do_start_block();
 
