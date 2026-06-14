@@ -85,51 +85,10 @@ bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const N
         logNode("block_accepted_rsp: aggsig !veried");
         return true;
     }
-    // BigInt total_staked=0;
-    // auto nn=root->getAllNodes();
-    // for(auto& n:nn)
-    // {
-    //     total_staked+=n->get_full_stake();
-    // }
-    // if (total_staked.toDouble() * QUORUM < stake.toDouble())
-    // {
-    //     if (!bp.heart_bit_sent_on_block_accepted_rsp)
-    //     {
-    //         bp.heart_bit_sent_on_block_accepted_rsp = true;
-    //         REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
-    //         rq->prev_lc = root->getEpoch()->prev_lc;
-    //         broadcast_MsgEvent(rq.get());
-    //     }
-    // }
 
     XPASS;
     return true;
 }
-#ifdef KALL
-bool Node::Service::CheckState(const MsgData::HeartBeatREQ *r, const NODE_id &src_node) // 1 если невалидно
-{
-    if (r->prev_root_hash != prev_root_hash_Z)
-    {
-        if(r->prev_root_hash.container.size()==0 && prev_root_hash_Z.container.size()!=0)
-            return 1;
-        // logNode("if (r->prev_root_hash != prev_root_hash_Z) %s %s",r->prev_root_hash.str().c_str(),prev_root_hash_Z.str().c_str());
-        if (state_Z == STATE_NORMAL)
-        {
-            if (r->new_epoch > root->getEpoch()->epoch + 1)
-            {
-                // logNode("r->new_epoch > root->getEpoch()->epoch + 1  - %s %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str());
-                if(state_Z!=STATE_SYNCING){
-                    state_Z = STATE_SYNCING;
-                    do_sync(src_node);
-                }
-            }
-            return 1;
-        }
-        return 1;
-    }
-    return 0;
-}
-#endif
 bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;

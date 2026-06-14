@@ -247,6 +247,11 @@ void MTJS::Service::checkForExit()
         return;
     if (opaque.rpcBlockExit)
         return;
+    if(opaque.node_req_promises.size())
+        return;
+    if(opaque.tx_subscription_cb.has_value())    
+        return;
+
     {
         M_LOCKC(opaque.async_deque->m_mutex);
         if (opaque.async_deque->container.size())

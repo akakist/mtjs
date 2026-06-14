@@ -90,8 +90,6 @@ namespace Node
         }
         void clear()
         {
-            // node_leader.container.clear();
-            // leader_info.clear();
         }
     };
     class Service:
@@ -150,7 +148,6 @@ namespace Node
 
         bool GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP* r, const NODE_id & src_node, const route_t& route);
         bool GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ* r, const NODE_id & src_node, const route_t& route);
-        bool DoHeartBeatREQ(const MsgData::DoHeartBeatREQ* r, const NODE_id & src_node, const route_t& route);
         bool ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
         bool ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
 
@@ -193,7 +190,7 @@ namespace Node
 
         };
         _db_to_save db_to_save_Z;
-        REF_getter<MsgData::BlockDBStore> prepareBlockDBStore(const t_params& t);
+        // REF_getter<MsgData::BlockDBStore> prepareBlockDBStore(const t_params& t);
 
 
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;

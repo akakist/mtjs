@@ -45,8 +45,8 @@ try {
     console.log("Start");
     try {
         const sk = std.getenv('u_root_ed_sk');
-        setInterval(() => {
-        }, 5000);
+//        setInterval(() => {
+//        }, 5000);
         await exec();
     }
     catch (e) {

@@ -43,7 +43,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         logNode("invalid leader 12");
         return true;
     }
-    // blockDBStore->validateBlockREQ->leader_cert
     auto& c=c_blocks[r->blockInfo->prev_root_hash];
 
     if (!c.blockDBStore.valid())
@@ -59,8 +58,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         return true;
     }
 
-    // if (CheckState(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat.get(), src_node))
-    //     return true;
     if (state_Z != State::STATE_NORMAL)
         return true;
 
@@ -157,13 +154,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     {
         do_heart_beat();
     }
-    // blockDBStore = nullptr;
-    // {
-    //     MUTEX_INSPECTOR;
-    //     XTRY;
-    //     do_heart_beat();
-    //     XPASS;
-    // }
     XPASS;
     return true;
 }
@@ -174,8 +164,6 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     {
         return true;
     }
-    // if (CheckState(r->lc->heart_beat.get(), src_node))
-    //     return true;
 
     resetTimer();
     if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
@@ -183,31 +171,6 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
         logNode("invalid leader 14");
         return true;
     }
-    // if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
-    // {
-    //     logNode("if(cli_leader_info[prev_root_hash_Z]!=src_node)");
-    //     return true;
-    // }
-    // if (r->lc->heart_beat->node_leader != node_leader_for_client[r->lc->heart_beat->prev_root_hash])
-    //     return true;
-    // if (!root->verify_lider_certificate(r->lc))
-    // {
-    //     logNode("if(!verify_lider_certificate(rft.payload_lc,node_leader))");
-    //     return true;
-    // }
-    // if (node_leader_for_client[r->lc->heart_beat->prev_root_hash] != r->lc->heart_beat->node_leader)
-    // {
-    //     if (isNodeGreaterOrEqual(r->lc->heart_beat->node_leader, node_leader_for_client[r->lc->heart_beat->prev_root_hash]))
-    //     {
-    //         node_leader_for_client[r->lc->heart_beat->prev_root_hash] = r->lc->heart_beat->node_leader;
-    //     }
-    //     else
-    //     {
-    //         // logNode("invalid node cert");
-    //         return true;
-    //     }
-    // }
-    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
     REF_getter<MsgData::GetTransactionRSP> rsp = new MsgData::GetTransactionRSP;
     for (auto &z : transaction_pool_of_leader)

@@ -14,7 +14,6 @@
 bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
-// logNode("@@@@@@@@@@@@@@@@@@ HeartBeatRSP");
     auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     if (prev_root_hash_Z != m->payload_heart_beat->prev_root_hash)
@@ -99,7 +98,6 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
 }
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::LeaderCertificate *remote_prev_lc, const NODE_id &src_node, const route_t &route)
 {
-    // logNode("HeartBeatREQ from %s", src_node.container.c_str());
     if(state_Z==STATE_SYNCING)
     {
         return true;
@@ -108,30 +106,14 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     bool need_reply = false;
     REF_getter<MsgData::LeaderCertificate>  local_lc;
 
-    // if(h->prev_lc.size())
-    // {
-    //     remote_lc=new MsgData::LeaderCertificate;
-    //     inBuffer in(h->prev_lc);
-    //     try{
-    //         remote_lc->unpack2(in);
-    //     }
-    //     catch(std::exception& e)
-    //     {
-    //         logNode("catched %s",e.what());
-    //         return true;
-    //     }
-    //     // logNode("remote prev_lc epoch %s prev_root_hash %s", remote_lc->heart_beat->new_epoch.toString().c_str(), remote_lc->heart_beat->prev_root_hash.str().c_str());
-    // }
     auto llc=root->getEpoch()->prev_lc;
     if(llc.size())
     {
         local_lc=new MsgData::LeaderCertificate;
         inBuffer in(llc);
         local_lc->unpack2(in);
-        // logNode("local prev_lc epoch %s prev_root_hash %s", local_lc->heart_beat->new_epoch.toString().c_str(), local_lc->heart_beat->prev_root_hash.str().c_str());    
     }
     
-    // logNode("HeartBeatREQ from %s new_epoch %s prev_root_hash %s", src_node.container.c_str(), h->new_epoch.toString().c_str(), h->prev_root_hash.str().c_str());
     bool remote_verified=false;
     bool local_verified=false;
     if(remote_prev_lc)
@@ -144,15 +126,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         local_verified=root->verify_lider_certificate(local_lc);
     }
     else logNode("!if(local_lc.valid())");
-    // if(!remote_lc.valid() && local_lc.valid()))
-    //     return true;
-    
-    // // bool remote_verified=root->verify_lider_certificate(remo)
-    // if(remote_lc.valid()&& local_lc.valid())
-    // {
 
-
-    // }
     if(local_verified && !remote_verified)
     {
         /// не отвечаем, поскольку ремоте нода не имеет сертификата
@@ -222,73 +196,8 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
                     }
                 }
         }
-        // if(prev_root_hash_Z == h->prev_root_hash)
-        //     need_reply=true;
-        // if (h->new_epoch > root->getEpoch()->epoch + 1)
-        // {
-        //     // logNode("r->new_epoch > root->getEpoch()->epoch + 1  - %s %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str());
-        //     if(state_Z!=STATE_SYNCING){
-        //         state_Z = STATE_SYNCING;
-        //         do_sync(src_node);
-        //     }
-        //     return true;
-        // }
-        // if(h->new_epoch < root->getEpoch()->epoch + 1)
-        // {
-        //     logNode("if(h->new_epoch < root->getEpoch()->epoch + 1) %s %s from %s",h->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str(), src_node.container.c_str()  );
-        //     return false;
-        // }
-        // else need_reply=true;
-
 
     }
-    // if(!need_reply && CheckState(h, src_node))
-    // {
-    //     logNode("CheckState failed for HeartBeatREQ from %s", src_node.container.c_str());
-    //     return true;
-
-    // }
-
-    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
-
-    // bool need_replace = false;
-
-    // if (!need_reply && prev_root_hash_Z != h->prev_root_hash)
-    // {
-    //     logNode("invalid root hashe, no answer");
-    //     return true;
-    // }
-    // if (cli_leader_info[h->prev_root_hash].node_leader.container.empty())
-    //     cli_leader_info[h->prev_root_hash].node_leader = h->node_leader;
-
-    // if (h->node_leader != cli_leader_info[h->prev_root_hash].node_leader)
-    // {
-    //     if (isNodeGreaterOrEqual(h->node_leader, cli_leader_info[h->prev_root_hash].node_leader))
-    //     {
-    //         cli_leader_info[h->prev_root_hash].node_leader = h->node_leader;
-    //         // logNode("replace leader to %s",node_leader_for_client.container.c_str());
-    //         need_reply = true;
-    //     }
-    //     else
-    //     {
-    //         // logNode("need_reply = false; %s %d",__FILE__,__LINE__);
-    //         need_reply = false;
-    //     } 
-    // }
-    // else
-    //     need_reply = true;
-    // if (need_reply)
-    // {
-    //     // logNode("hb reply from %s to %s",this_node_name.container.c_str(), src_node.container.c_str());
-    //     REF_getter<MsgData::HeartBeatRSP> hbr = new MsgData::HeartBeatRSP();
-    //     // msg::heart_beat_rsp hba;
-    //     hbr->payload_heart_beat = h;
-    //     hbr->node_signer = this_node_name;
-    //     hbr->signature.sign(my_sk_bls, blake2b_hash(h->getBuffer()).container);
-
-    //     pass_NodeMsgRSP(hbr.get(),route);
-    // }
-    // else logNode("no need reply HeartBeatREQ from %s", src_node.container.c_str());
     return true;
 }
 bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const NODE_id &src_node, const route_t &route)
@@ -301,7 +210,6 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
     }
 
     resetTimer();
-    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
     bool need_replace = false;
 
@@ -421,17 +329,6 @@ void Node::Service::do_heart_beat()
     }
 
     return;
-}
-bool Node::Service::DoHeartBeatREQ(const MsgData::DoHeartBeatREQ *r, const NODE_id &src_node, const route_t &route)
-{
-    // logNode("DoHeartBeatREQ from %s", src_node.container.c_str());
-    if(state_Z==STATE_SYNCING)
-    {
-        return true;
-    }
-
-    do_heart_beat();
-    return true;
 }
 
 void Node::Service::make_leader_certificate()

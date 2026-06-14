@@ -15,17 +15,13 @@
 void Node::Service::do_sync(const NODE_id &src_node)
 {
     MUTEX_INSPECTOR;
-    logNode("void Node::Service::do_sync(const NODE_id &src_node) %s",_DMI().c_str());
+    logNode("void Node::Service::do_sync(const NODE_id &src_node) ");
     auto n = root->getNode(src_node);
     if (!n.valid())
         throw CommonError("if(!n.valid())");
     REF_getter<MsgData::GetSavedBlocksREQ> gbr = new MsgData::GetSavedBlocksREQ();
-    // gbr->epoch = root->getEpoch()->epoch;
     gbr->prev_root_hash = prev_root_hash_Z;
     logNode("do_sync: @@@@@@@@@@@@@@@@ REQUEST for blocks since '%s'", gbr->prev_root_hash.str().c_str());
-    // msg::node_message_ed nm(gbr->getBuffer(), this_node_name, my_sk_ed);
-    // broadcast_MsgEvent(gbr);
-    // send
     auto buffer = gbr->getBuffer();
 
     sendEvent(n->get_ip(), ServiceEnum::Node,
@@ -72,7 +68,6 @@ bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const
 
     logNode("GetSavedBlocksREQ QUERY RESULTS size %d", ret->blocks_ZZ.size());
 
-    // ret->lastEpoch = root->getEpoch()->epoch;
     pass_NodeMsgRSP(ret.get(), route);
 
     return true;
@@ -106,12 +101,10 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         {
 
             logNode("inval root hash %s %s", z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.str().c_str(), prev_root_hash_Z.str().c_str());
-            // logNode("received invalid block %s", z.second->epoch.toString().c_str());
             continue;
         }
         else
             logNode("ok received block %s", z->blockAcceptedREQ->blockInfo->prev_epoch.toString().c_str());
-        // throw CommonError("if(hb.epoch!=root->getValues(NULL)->epoch) %s %s",z.second->epoch.toString().c_str(), root->getEpoch(NULL)->epoch.toString().c_str()   );
 
         std::vector<blst_cpp::PublicKey> agg_pk;
         for (auto &k : z->blockAcceptedREQ->node_validators)
@@ -125,7 +118,6 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         }
         logNode("on_get_blocks_rsp: block verified OK");
         t_params t(root);
-        // t.att_data->trs = z.second->att_data->trs;
         t.validateBlockREQ = z->validateBlockREQ;
         auto rh = execute_block(t, z->validateBlockREQ->leader_cert->nodes);
 
@@ -135,7 +127,6 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         {
             logNode("on_get_blocks_rsp: block executed OK on epoch %s", z->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString().c_str());
 
-            // logNode("db->write_batch(db_to_save_Z); %d", db_to_save_Z.cells.size());
             db_state->write_batch(db_to_save_Z);
             logNode("db->write_batch(db_to_save_Z); done %d granules", db_to_save_Z.cells.size());
             db_to_save_Z.clear();
@@ -169,10 +160,6 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         logNode("call3 do_sync();");
 
         logNode("do_sync again: ");
-        // if(state_Z==STATE_SYNCING)
-        // {
-        //     return true;
-        // }
         state_Z=STATE_SYNCING;
         do_sync(src_node);
         return true;

@@ -30,7 +30,7 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::BlockAcceptedRSP, MsgData::BlockAcceptedRSP::construct);
     registerMsg(msgid::GetSavedBlocksREQ, MsgData::GetSavedBlocksREQ::construct);
     registerMsg(msgid::GetSavedBlocksRSP, MsgData::GetSavedBlocksRSP::construct);
-    registerMsg(msgid::DoHeartBeatREQ, MsgData::DoHeartBeatREQ::construct);
+    // registerMsg(msgid::DoHeartBeatREQ, MsgData::DoHeartBeatREQ::construct);
     registerMsg(msgid::ConfirmLeaderREQ, MsgData::ConfirmLeaderREQ::construct);
     registerMsg(msgid::ConfirmLeaderRSP, MsgData::ConfirmLeaderRSP::construct);
     registerMsg(msgid::TX, MsgData::TX::construct);
