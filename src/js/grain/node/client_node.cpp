@@ -35,7 +35,14 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         return true;
     }
     MUTEX_INSPECTOR;
+
     XTRY;
+
+    if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
+    {
+        logNode("invalid leader 12");
+        return true;
+    }
     // blockDBStore->validateBlockREQ->leader_cert
     auto& c=c_blocks[r->blockInfo->prev_root_hash];
 
@@ -52,8 +59,8 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         return true;
     }
 
-    if (CheckState(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat.get(), src_node))
-        return true;
+    // if (CheckState(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat.get(), src_node))
+    //     return true;
     if (state_Z != State::STATE_NORMAL)
         return true;
 
@@ -143,13 +150,20 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XPASS;
     }
     c_blocks.clear();
-    // blockDBStore = nullptr;
+
+    stage_is_working=false;
+
+    if(transaction_pool_of_leader.size())
     {
-        MUTEX_INSPECTOR;
-        XTRY;
         do_heart_beat();
-        XPASS;
     }
+    // blockDBStore = nullptr;
+    // {
+    //     MUTEX_INSPECTOR;
+    //     XTRY;
+    //     do_heart_beat();
+    //     XPASS;
+    // }
     XPASS;
     return true;
 }
@@ -160,15 +174,20 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     {
         return true;
     }
-    if (CheckState(r->lc->heart_beat.get(), src_node))
-        return true;
+    // if (CheckState(r->lc->heart_beat.get(), src_node))
+    //     return true;
 
     resetTimer();
     if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
     {
-        logNode("if(cli_leader_info[prev_root_hash_Z]!=src_node)");
+        logNode("invalid leader 14");
         return true;
     }
+    // if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
+    // {
+    //     logNode("if(cli_leader_info[prev_root_hash_Z]!=src_node)");
+    //     return true;
+    // }
     // if (r->lc->heart_beat->node_leader != node_leader_for_client[r->lc->heart_beat->prev_root_hash])
     //     return true;
     // if (!root->verify_lider_certificate(r->lc))
@@ -188,7 +207,7 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     //         return true;
     //     }
     // }
-    sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
+    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
     REF_getter<MsgData::GetTransactionRSP> rsp = new MsgData::GetTransactionRSP;
     for (auto &z : transaction_pool_of_leader)
@@ -217,12 +236,18 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
     t_params t(root);
     bool err = false;
-    if (CheckState(r->leader_cert->heart_beat.get(), src_node))
+    if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
     {
-        t.att_data->block_report = {1, "check state heart beat failed"};
-        logNode("check state heart beat failed");
-        err = true;
+        logNode("invalid leader 15");
+        return true;
     }
+
+    // if (CheckState(r->leader_cert->heart_beat.get(), src_node))
+    // {
+    //     t.att_data->block_report = {1, "check state heart beat failed"};
+    //     logNode("check state heart beat failed");
+    //     err = true;
+    // }
     // return true;
 
     resetTimer();

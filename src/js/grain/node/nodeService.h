@@ -138,6 +138,7 @@ namespace Node
 
         bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route);
         bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::LeaderCertificate *remote_prev_lc, const NODE_id &src_node, const route_t &route);
+        void reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route);
 
         bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
         bool GetTransactionREQ(const MsgData::GetTransactionREQ* r, const NODE_id & src_node, const route_t& route);
@@ -222,7 +223,7 @@ namespace Node
 
         void do_sync(const NODE_id &src_node);
 
-        bool CheckState(const MsgData::HeartBeatREQ *r, const NODE_id & src_node);
+        // bool CheckState(const MsgData::HeartBeatREQ *r, const NODE_id & src_node);
 
         void calc_fee_rewards_nodes(t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert);
 
@@ -241,6 +242,7 @@ namespace Node
         void logNode(const char* fmt, ...);
         IInstance *iInstance=NULL;
         State state_Z=STATE_NORMAL;
+        bool stage_is_working = false;
 
         std::vector<std::string> telnet_data_path;
 

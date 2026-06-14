@@ -85,26 +85,27 @@ bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const N
         logNode("block_accepted_rsp: aggsig !veried");
         return true;
     }
-    BigInt total_staked=0;
-    auto nn=root->getAllNodes();
-    for(auto& n:nn)
-    {
-        total_staked+=n->get_full_stake();
-    }
-    if (total_staked.toDouble() * QUORUM < stake.toDouble())
-    {
-        if (!bp.heart_bit_sent_on_block_accepted_rsp)
-        {
-            bp.heart_bit_sent_on_block_accepted_rsp = true;
-            REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
-            rq->prev_lc = root->getEpoch()->prev_lc;
-            broadcast_MsgEvent(rq.get());
-        }
-    }
+    // BigInt total_staked=0;
+    // auto nn=root->getAllNodes();
+    // for(auto& n:nn)
+    // {
+    //     total_staked+=n->get_full_stake();
+    // }
+    // if (total_staked.toDouble() * QUORUM < stake.toDouble())
+    // {
+    //     if (!bp.heart_bit_sent_on_block_accepted_rsp)
+    //     {
+    //         bp.heart_bit_sent_on_block_accepted_rsp = true;
+    //         REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
+    //         rq->prev_lc = root->getEpoch()->prev_lc;
+    //         broadcast_MsgEvent(rq.get());
+    //     }
+    // }
 
     XPASS;
     return true;
 }
+#ifdef KALL
 bool Node::Service::CheckState(const MsgData::HeartBeatREQ *r, const NODE_id &src_node) // 1 если невалидно
 {
     if (r->prev_root_hash != prev_root_hash_Z)
@@ -128,7 +129,7 @@ bool Node::Service::CheckState(const MsgData::HeartBeatREQ *r, const NODE_id &sr
     }
     return 0;
 }
-
+#endif
 bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;

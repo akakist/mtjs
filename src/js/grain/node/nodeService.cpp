@@ -208,8 +208,11 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
             return true;
 
         DBG(logNode("case timers::TIMER_START_HEART_BEAT:"));
-
-        do_heart_beat();
+        resetTimer();
+        if(transaction_pool_of_leader.size())
+        {
+            do_heart_beat();
+        }
         return true;
     }
     break;
@@ -670,17 +673,22 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
 //     logNode("iUtils->getNow(() -last_activity_time %lld iUtils->getNow() %lld last_activity_time %lld",iUtils->getNow()-last_activity_time,
 // iUtils->getNow(),last_activity_time);
-    if(iUtils->getNow()-last_activity_time>2000000)
+    if(!stage_is_working)
     {
-        // logNode("last_activity_time=iUtils->getNow(); %s %d",__FILE__,__LINE__);
-        last_activity_time=iUtils->getNow();
-        logNode("do_heart_beat in PutTransactionREQ");
-        // do_heart_beat();
-        REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
-        rq->prev_lc = root->getEpoch()->prev_lc;
-        broadcast_MsgEvent(rq.get());
-
+        stage_is_working=true;
+        do_heart_beat();
     }
+    // if(iUtils->getNow()-last_activity_time>2000000)
+    // {
+    //     // logNode("last_activity_time=iUtils->getNow(); %s %d",__FILE__,__LINE__);
+    //     last_activity_time=iUtils->getNow();
+    //     logNode("do_heart_beat in PutTransactionREQ");
+    //     // do_heart_beat();
+    //     REF_getter<MsgData::DoHeartBeatREQ> rq = new MsgData::DoHeartBeatREQ();
+    //     rq->prev_lc = root->getEpoch()->prev_lc;
+    //     broadcast_MsgEvent(rq.get());
+
+    // }
     return true;
 }
 bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id & src_node, const route_t& route)

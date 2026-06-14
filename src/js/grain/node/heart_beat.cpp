@@ -84,7 +84,19 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     XPASS;
     return true;
 }
+void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route)
+{
+        stage_is_working=true;
+        resetTimer();
+        REF_getter<MsgData::HeartBeatRSP> hbr = new MsgData::HeartBeatRSP();
+        // msg::heart_beat_rsp hba;
+        hbr->payload_heart_beat = h;
+        hbr->node_signer = this_node_name;
+        hbr->signature.sign(my_sk_bls, blake2b_hash(h->getBuffer()).container);
 
+        pass_NodeMsgRSP(hbr.get(),route);
+
+}
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::LeaderCertificate *remote_prev_lc, const NODE_id &src_node, const route_t &route)
 {
     // logNode("HeartBeatREQ from %s", src_node.container.c_str());
@@ -143,17 +155,23 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     // }
     if(local_verified && !remote_verified)
     {
+        /// не отвечаем, поскольку ремоте нода не имеет сертификата
         logNode("if(local_verified && !remote_verified)");
         return true;
     }
 
     if(!remote_verified && !local_verified)    
     {
+        /// отвечаем, поскольку это кейс старта с генезиса
         logNode("if(!remote_verified && !local_verified)    ");
-        need_reply=true;
+        // need_reply=true;
+        reply_HeartBeatRSP(h,route);
+        return true;
     }
     if(remote_verified && !local_verified)
     {
+        /// если локально нет сертиката, нода стартанула с генезиса, а у удаленной есть сертификат
+        /// то надо синхронизироваться, переходим в синк, не отвечаем
         logNode("if(remote_verified && !local_verified)");
         if(state_Z!=STATE_SYNCING){
             state_Z = STATE_SYNCING;
@@ -161,25 +179,66 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         }
         return true;
     }
-    if(!need_reply && remote_verified && local_verified)
+    if(remote_verified && local_verified)
     {
-        if(prev_root_hash_Z == h->prev_root_hash)
-            need_reply=true;
-        if (h->new_epoch > root->getEpoch()->epoch + 1)
+        if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch)
         {
-            // logNode("r->new_epoch > root->getEpoch()->epoch + 1  - %s %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str());
-            if(state_Z!=STATE_SYNCING){
-                state_Z = STATE_SYNCING;
-                do_sync(src_node);
-            }
+            logNode("        if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch)");
             return true;
         }
-        if(h->new_epoch < root->getEpoch()->epoch + 1)
+        else if(remote_prev_lc->heart_beat->new_epoch > local_lc->heart_beat->new_epoch)
         {
-            logNode("if(h->new_epoch < root->getEpoch()->epoch + 1) %s %s from %s",h->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str(), src_node.container.c_str()  );
-            return false;
+            state_Z = STATE_SYNCING;
+            do_sync(src_node);
+            return true;
         }
-        else need_reply=true;
+        else if(remote_prev_lc->heart_beat->new_epoch == local_lc->heart_beat->new_epoch)
+        {
+                /// оба в одинаковой эпохе
+                
+                /// просто проверка на всякий случай.
+                if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)
+                    throw CommonError("if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)");
+                /// тоже проверка на всякий случай
+                if(prev_root_hash_Z!=h->prev_root_hash)    
+                    throw CommonError("if(prev_root_hash_Z!=h->prev_root_hash)    ");
+                
+                auto& ci=cli_leader_info[h->prev_root_hash];
+                if(ci.node_leader.container.empty())
+                    ci.node_leader=this_node_name;
+
+                if (isNodeGreaterOrEqual(h->node_leader, ci.node_leader))
+                {
+                    ci.node_leader=h->node_leader;
+                    reply_HeartBeatRSP(h,route);
+                    return true;
+                }
+                else
+                {
+                    if(!ci.heart_beat_sent)
+                    {
+                        ci.heart_beat_sent=true;
+                        do_heart_beat();
+                    }
+                }
+        }
+        // if(prev_root_hash_Z == h->prev_root_hash)
+        //     need_reply=true;
+        // if (h->new_epoch > root->getEpoch()->epoch + 1)
+        // {
+        //     // logNode("r->new_epoch > root->getEpoch()->epoch + 1  - %s %s",r->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str());
+        //     if(state_Z!=STATE_SYNCING){
+        //         state_Z = STATE_SYNCING;
+        //         do_sync(src_node);
+        //     }
+        //     return true;
+        // }
+        // if(h->new_epoch < root->getEpoch()->epoch + 1)
+        // {
+        //     logNode("if(h->new_epoch < root->getEpoch()->epoch + 1) %s %s from %s",h->new_epoch.toString().c_str(), root->getEpoch()->epoch.toString().c_str(), src_node.container.c_str()  );
+        //     return false;
+        // }
+        // else need_reply=true;
 
 
     }
@@ -190,45 +249,45 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
 
     // }
 
-    sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
+    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
-    bool need_replace = false;
+    // bool need_replace = false;
 
     // if (!need_reply && prev_root_hash_Z != h->prev_root_hash)
     // {
     //     logNode("invalid root hashe, no answer");
     //     return true;
     // }
-    if (cli_leader_info[h->prev_root_hash].node_leader.container.empty())
-        cli_leader_info[h->prev_root_hash].node_leader = h->node_leader;
+    // if (cli_leader_info[h->prev_root_hash].node_leader.container.empty())
+    //     cli_leader_info[h->prev_root_hash].node_leader = h->node_leader;
 
-    if (h->node_leader != cli_leader_info[h->prev_root_hash].node_leader)
-    {
-        if (isNodeGreaterOrEqual(h->node_leader, cli_leader_info[h->prev_root_hash].node_leader))
-        {
-            cli_leader_info[h->prev_root_hash].node_leader = h->node_leader;
-            // logNode("replace leader to %s",node_leader_for_client.container.c_str());
-            need_reply = true;
-        }
-        else
-        {
-            // logNode("need_reply = false; %s %d",__FILE__,__LINE__);
-            need_reply = false;
-        } 
-    }
+    // if (h->node_leader != cli_leader_info[h->prev_root_hash].node_leader)
+    // {
+    //     if (isNodeGreaterOrEqual(h->node_leader, cli_leader_info[h->prev_root_hash].node_leader))
+    //     {
+    //         cli_leader_info[h->prev_root_hash].node_leader = h->node_leader;
+    //         // logNode("replace leader to %s",node_leader_for_client.container.c_str());
+    //         need_reply = true;
+    //     }
+    //     else
+    //     {
+    //         // logNode("need_reply = false; %s %d",__FILE__,__LINE__);
+    //         need_reply = false;
+    //     } 
+    // }
     // else
     //     need_reply = true;
-    if (need_reply)
-    {
-        // logNode("hb reply from %s to %s",this_node_name.container.c_str(), src_node.container.c_str());
-        REF_getter<MsgData::HeartBeatRSP> hbr = new MsgData::HeartBeatRSP();
-        // msg::heart_beat_rsp hba;
-        hbr->payload_heart_beat = h;
-        hbr->node_signer = this_node_name;
-        hbr->signature.sign(my_sk_bls, blake2b_hash(h->getBuffer()).container);
+    // if (need_reply)
+    // {
+    //     // logNode("hb reply from %s to %s",this_node_name.container.c_str(), src_node.container.c_str());
+    //     REF_getter<MsgData::HeartBeatRSP> hbr = new MsgData::HeartBeatRSP();
+    //     // msg::heart_beat_rsp hba;
+    //     hbr->payload_heart_beat = h;
+    //     hbr->node_signer = this_node_name;
+    //     hbr->signature.sign(my_sk_bls, blake2b_hash(h->getBuffer()).container);
 
-        pass_NodeMsgRSP(hbr.get(),route);
-    }
+    //     pass_NodeMsgRSP(hbr.get(),route);
+    // }
     // else logNode("no need reply HeartBeatREQ from %s", src_node.container.c_str());
     return true;
 }
@@ -241,7 +300,8 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
         return true;
     }
 
-    sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
+    resetTimer();
+    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 
     bool need_replace = false;
 
