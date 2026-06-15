@@ -3,6 +3,11 @@
 #include "md_TX.h"
 #include "bigint.h"
 
+struct EmitNode {
+    std::vector<std::pair<std::string,std::string>> emits;                    // события на этом уровне
+    std::map<std::string, EmitNode> children;          // дочерние узлы
+};
+
 namespace MsgData
 {
     struct attachment_data: public Base
@@ -11,6 +16,7 @@ namespace MsgData
         {
 
         }
+        EmitNode blockRoot;
         // std::vector<REF_getter<TX>> trs;
         std::pair<int,std::string> block_report={0,""};
         std::map<THASH_id,transaction_report> transaction_reports;

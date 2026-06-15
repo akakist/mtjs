@@ -489,10 +489,11 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
             }
         }
         if (!t_err)
-            t.setTxSuccess(tx_hash);
+            t.emit_tx(tx_hash, "result", R"({"success":true})");
         else
-            t.setTxError(tx_hash, *t_err);
+            t.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());    
     }
+
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
     calc_fee_rewards_nodes(t, nodes_in_leader_cert);
     auto newEpoch = root->getEpoch();

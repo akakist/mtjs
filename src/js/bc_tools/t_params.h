@@ -11,56 +11,85 @@ struct t_params
     REF_getter<MsgData::attachment_data> att_data;
     _feeCalcers feeCalcers;
     std::map<REF_getter<data_base>, std::set<REF_getter<fee_calcer>> > calcers;
+    std::map<std::string, BigInt> fee;
+
     void addCalcer(const REF_getter<data_base>& d,const REF_getter<fee_calcer>& c)
     {
         calcers[d].insert(c);
     }
 
 
-    void logMsg(const THASH_id& txId, int seqId, const char* fmt, ...)
+    void emit_command(const THASH_id& txId, int seqId, const std::string& command, const char* fmt, ...)
     {
-
         va_list ap;
         char str[1024];
         va_start(ap, fmt);
-        vsnprintf(str, sizeof(str), fmt, ap);
+        int len = vsnprintf(str, sizeof(str), fmt, ap);
+        bool overflow=false;
+        if (len >= (int)sizeof(str)) {
+            overflow=true;
+        }
         va_end(ap);
-        att_data->transaction_reports[txId].instruction_reports[seqId].logMsgs.push_back(str);
-
+        att_data->blockRoot.children[txId.container].children[std::to_string(seqId)].emits.push_back({command,overflow?"\"overflow\"":str});
     }
-    void logError(const THASH_id& txId, int seqId, const char* fmt, ...)
+    void emit_tx(const THASH_id& txId, const std::string& command, const char* fmt, ...)
     {
-
         va_list ap;
         char str[1024];
         va_start(ap, fmt);
-        vsnprintf(str, sizeof(str), fmt, ap);
+        int len = vsnprintf(str, sizeof(str), fmt, ap);
+        bool overflow=false;
+        if (len >= (int)sizeof(str)) {
+            overflow=true;
+        }
         va_end(ap);
-        auto& r=att_data->transaction_reports[txId].instruction_reports[seqId];
-        r.err_str=str;
-        r.err_code=1;
-
+        att_data->blockRoot.children[txId.container].emits.push_back({command,overflow?"\"overflow\"":str});
     }
-    void setError(const THASH_id& txId, int seqId,const std::string& err)
+    void emit_block(const std::string& command,const char* fmt, ...)
     {
-        auto& r=att_data->transaction_reports[txId].instruction_reports[seqId];
-        r.err_str=err;
-        r.err_code=1;
+        va_list ap;
+        char str[1024];
+        va_start(ap, fmt);
+        int len = vsnprintf(str, sizeof(str), fmt, ap);
+        bool overflow=false;
+        if (len >= (int)sizeof(str)) {
+            overflow=true;
+        }
+        va_end(ap);
+        att_data->blockRoot.emits.push_back({command,overflow?"\"overflow\"":str});
     }
-    void setTxError(const THASH_id& txHash,const std::string& err)
-    {
-        auto& r=att_data->transaction_reports[txHash];
-        r.err_str=err;
-        r.err_code=1;
+    // void logError(const THASH_id& txId, int seqId, const char* fmt, ...)
+    // {
 
-    }
-    void setTxSuccess(const THASH_id& txHash)
-    {
-        auto& r=att_data->transaction_reports[txHash];
-        r.err_code=0;
+    //     va_list ap;
+    //     char str[1024];
+    //     va_start(ap, fmt);
+    //     vsnprintf(str, sizeof(str), fmt, ap);
+    //     va_end(ap);
+    //     auto& r=att_data->transaction_reports[txId].instruction_reports[seqId];
+    //     r.err_str=str;
+    //     r.err_code=1;
 
-    }
+    // }
+    // void setError(const THASH_id& txId, int seqId,const std::string& err)
+    // {
+    //     auto& r=att_data->transaction_reports[txId].instruction_reports[seqId];
+    //     r.err_str=err;
+    //     r.err_code=1;
+    // }
+    // void setTxError(const THASH_id& txHash,const std::string& err)
+    // {
+    //     auto& r=att_data->transaction_reports[txHash];
+    //     r.err_str=err;
+    //     r.err_code=1;
 
-    std::map<std::string, BigInt> fee;
+    // }
+    // void setTxSuccess(const THASH_id& txHash)
+    // {
+    //     auto& r=att_data->transaction_reports[txHash];
+    //     r.err_code=0;
+
+    // }
+
 
 };

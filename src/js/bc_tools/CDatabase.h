@@ -68,6 +68,7 @@ struct CDatabase: public IDatabase
     CDatabase(const std::string& path)
     {
         db = nullptr;
+        #ifdef KALL
         rocksdb::Options options;
         options.create_if_missing = true;
         options.atomic_flush = true;            // safer flushes
@@ -77,6 +78,45 @@ struct CDatabase: public IDatabase
         options.level_compaction_dynamic_level_bytes = true;
         options.keep_log_file_num = 3;        // хранить только 3 старых лога
         options.max_log_file_size = 10 * 1024 * 1024; // 10 MB
+        #endif
+        rocksdb::Options options;
+        options.create_if_missing = true;
+        options.atomic_flush = true;
+
+        // ========== Фоновые потоки ==========
+        options.max_background_jobs = 8;        // хорошо
+        options.max_background_compactions = 6; // явно выделяем под компакцию
+
+        // ========== Memtable ==========
+        options.write_buffer_size = 128 * 1024 * 1024;  // 128MB (было 64)
+        options.max_write_buffer_number = 4;              // максимум 4 мемтаблицы
+        options.min_write_buffer_number_to_merge = 2;
+
+        // ========== L0 компакция (критично!) ==========
+        options.level0_file_num_compaction_trigger = 2;   // было 4 → старт при 2 файлах
+        options.level0_slowdown_writes_trigger = 8;       // замедление при 8
+        options.level0_stop_writes_trigger = 12;          // останов при 12 (не должно достигаться)
+
+        // ========== Размеры файлов и уровней ==========
+        options.target_file_size_base = 64 * 1024 * 1024; // 64MB (ок)
+        options.target_file_size_multiplier = 1;
+        options.max_bytes_for_level_base = 512 * 1024 * 1024; // 512MB для L1
+        options.level_compaction_dynamic_level_bytes = true; // хорошо
+
+        // ========== Логи ==========
+        options.keep_log_file_num = 3;
+        options.max_log_file_size = 10 * 1024 * 1024;
+
+// ========== Блочный кэш (важно для чтения) ==========
+// rocksdb::BlockBasedTableOptions table_options;
+// table_options.block_cache = rocksdb::NewLRUCache(512 * 1024 * 1024); // 512 MB cache
+// options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
+
+
+// std::shared_ptr<rocksdb::Cache> cache = rocksdb::NewLRUCache(512 * 1024 * 1024); // 512MB
+// options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(
+//     rocksdb::BlockBasedTableOptions{cache}
+// ));        
 //        options.max_open_files=800;
         // options.compaction_on_commit = true;
 //        options.level0_file_num_compaction_trigger = 2;

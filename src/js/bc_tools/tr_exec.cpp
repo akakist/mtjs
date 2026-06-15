@@ -36,7 +36,9 @@ std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_param
 
     t.fee[senderAddress] += v->getFee("mint");
 
-    t.logMsg(txid, seqId, "amount %s sucessfully minted on your balance", amount.toString().c_str());
+    t.emit_command(txid, seqId,"mint",R"({"to":"%s","amount":"%s"})",
+        base16::encode(senderAddress).c_str(),
+        amount.toString().c_str());
 
     return std::nullopt;
 }
@@ -94,7 +96,11 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
 
     t.fee[senderAddress] += fee;
 
-    t.logMsg(txid, seqId, "amount %s sucessfully transferred to %s", amount.toString().c_str(), base16::encode(to_addr).c_str());
+    t.emit_command(txid, seqId, "transfer", R"({"from":"%s","to":"%s","amount":"%s"})", 
+        base16::encode(senderAddress).c_str(), 
+        base16::encode(to_addr).c_str(), 
+        amount.toString().c_str()
+        );
 
     return std::nullopt;
 }
@@ -132,20 +138,10 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
     if (ip.isString())
     {
         nn->set_ip(ip.toString());
-        t.logMsg(txid, seqId, "ip changed");
+        // t.logMsg(txid, seqId, "ip changed");
+        t.emit_command(txid, seqId, "node_change_ip",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.toString().c_str());
+        
     }
-    // auto pk_ed=params / "pk_ed";
-    // if(pk_ed.isString())
-    // {
-    //     nn->ed_pk = base16::decode(pk_ed.toString());
-    //     t.logMsg(txid, seqId, "pk ed changed");
-    // }
-    // auto pk_bls=params / "pk_bls";
-    // if(pk_bls.isString())
-    // {
-    //     nn->bls_pk.deserializeHexStr(pk_bls.toString());
-    //     t.logMsg(txid, seqId, "pk bls changed");
-    // }
 
 
     nn->setDirty();
@@ -156,7 +152,7 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
 
     t.fee[senderAddress] += fee;
 
-    t.logMsg(txid, seqId, "node %s updated", name.container.c_str());
+    // t.logMsg(txid, seqId, "node %s updated", name.container.c_str());
 
     return std::nullopt;
 }
@@ -230,7 +226,8 @@ std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, 
 
     t.fee[senderAddress] += fee;
 
-    t.logMsg(txid, seqId, "node %s registered", name.container.c_str());
+    // t.logMsg(txid, seqId, "node %s registered", name.container.c_str());
+    t.emit_command(txid, seqId, "node_create",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.toString().c_str());
 
     return std::nullopt;
 }
@@ -277,7 +274,12 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
 
     t.fee[senderAddress] += fee;
 
-    t.logMsg(txid, seqId, "node %s staked on amount %s", node.container.c_str(), amount.toString().c_str());
+    // t.logMsg(txid, seqId, "node %s staked on amount %s", node.container.c_str(), amount.toString().c_str());
+    t.emit_command(txid, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
+        node.container.c_str(),
+        amount.toString().c_str(),
+        base16::encode(senderAddress).c_str()
+    );
     n->setDirty();
     us->setDirty();
     t.addCalcer(n.get(),by);
@@ -346,7 +348,12 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
 
     t.fee[senderAddress] += fee;
 
-    t.logMsg(txid, seqId, "node %s unstaked on amount %s", node.container.c_str(), amount.toString().c_str());
+    // t.logMsg(txid, seqId, "node %s unstaked on amount %s", node.container.c_str(), amount.toString().c_str());
+    t.emit_command(txid, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
+        node.container.c_str(),
+        base16::encode(senderAddress).c_str(),
+        amount.toString().c_str()
+    );
 
     return std::nullopt;
 }
@@ -384,7 +391,8 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
 
     t.fee[senderAddress] += fee;
 
-    t.logMsg(txid, seqId, "node %s enabled", node.container.c_str());
+    // t.logMsg(txid, seqId, "node %s enabled", node.container.c_str());
+    t.emit_command(txid, seqId, "node_enable",R"({"node":"%s"})", node.container.c_str());
 
     return std::nullopt;
 }

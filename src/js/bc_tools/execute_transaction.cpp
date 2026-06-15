@@ -20,7 +20,8 @@ void execute_transaction(const THASH_id &tx_id, t_params &t, const std::string &
             auto params= item/"params";
             if(!contract.isString() || !method.isString() || !params.isObject())
             {
-                t.setError(tx_id,ii,"contract method params fields required");
+                t.emit_command(tx_id, ii, "error", 
+                    R"({"code":-32602,"error":"contract, method, params fields required"})");
                 err=true;
             }
             // throw CommonError("if(!contract.isString() || !method.isString() || !params.isObject())");
@@ -45,11 +46,15 @@ void execute_transaction(const THASH_id &tx_id, t_params &t, const std::string &
                     err = TR::execute_node_enable(params, t, senderAddress, by, tx_id, ii);
                 else
                 {
-                    t.logError(tx_id, ii, "unhandled method %s for root contract", method.toString().c_str());
+                    t.emit_command(tx_id, ii, "error", 
+                        R"({"error":"unhandled method %s for root contract"})", 
+                        method.toString().c_str());
                 }
                 if (err)
                 {
-                    t.setError(tx_id, ii, *err);
+                    t.emit_command(tx_id, ii, "error", 
+                        R"({"error":"%s"})", 
+                        err->c_str());                
                 }
 
             }
