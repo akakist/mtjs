@@ -218,24 +218,26 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     {
         if (r->leader_cert->heart_beat->node_leader != cli_leader_info[r->leader_cert->heart_beat->prev_root_hash].node_leader)
         {
-            t.att_data->block_report = {1, "cert node leader mismatched"};
+            t.emit_block("error", R"({"code":-32602,"error":"cert node leader mismatched"})");
+            // t.att_data->block_report = {1, "cert node leader mismatched"};
             err = true;
             logNode("cert node leader mismatched");
         }
     }
 
-    if (!err && !root->verify_lider_certificate(r->leader_cert))
+    if (!err && !root->verify_leader_certificate(r->leader_cert))
     {
         err = true;
-        t.att_data->block_report = {1, "verify_lider_certificate failed"};
-        logNode("verify_lider_certificate failed");
+        t.emit_block("error", R"({"code":-32602,"error":"verify_leader_certificate failed"})");
+        // t.att_data->block_report = {1, "verify_leader_certificate failed"};
+        logNode("verify_leader_certificate failed");
     }
 
     if (!err && r->leader_cert->heart_beat->prev_root_hash != prev_root_hash_Z)
     {
         if (root->getEpoch()->epoch + 1 != r->leader_cert->heart_beat->new_epoch)
         {
-            t.att_data->block_report = {1, "epoch invalid"};
+            t.emit_block("error", R"({"code":-32602,"error":"epoch invalid"})");
             err = true;
             logNode("if (root->getEpoch()->epoch+1 < r->leader_cert->heart_beat->new_epoch)");
             // setBlockId(r->leader_cert->heart_beat->prev_root_hash);

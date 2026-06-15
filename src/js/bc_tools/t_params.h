@@ -30,7 +30,7 @@ struct t_params
             overflow=true;
         }
         va_end(ap);
-        att_data->blockRoot.children[txId.container].children[std::to_string(seqId)].emits.push_back({command,overflow?"\"overflow\"":str});
+        att_data->blockRoot.children[base16::encode(txId.container)].children[std::to_string(seqId)].emits.push_back({command,overflow?"\"overflow\"":str});
     }
     void emit_tx(const THASH_id& txId, const std::string& command, const char* fmt, ...)
     {
@@ -43,7 +43,7 @@ struct t_params
             overflow=true;
         }
         va_end(ap);
-        att_data->blockRoot.children[txId.container].emits.push_back({command,overflow?"\"overflow\"":str});
+        att_data->blockRoot.children[base16::encode(txId.container)].emits.push_back({command,overflow?"\"overflow\"":str});
     }
     void emit_block(const std::string& command,const char* fmt, ...)
     {

@@ -551,14 +551,16 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         }
         else
         {
-            logNode("balance deduct %s fee %s", u->getBalance().toString().c_str(), z.second->get_fee().toString().c_str());
+            // logNode("balance deduct %s fee %s", u->getBalance().toString().c_str(), z.second->get_fee().toString().c_str());
             u->subBalance(z.second->get_fee());
             u->setDirty();
         }
         total_fees += z.second->get_fee();
         t.att_data->fees[z.first] = z.second->get_fee();
+        t.emit_block("fee",R"({"address":"%s","fee":"%s"})",base16::encode(z.first).c_str(),z.second->get_fee().toString().c_str());
         z.second->reset();
     }
+    t.emit_block("total_fee",R"({"fee":"%s"})",total_fees.toString().c_str());
     // iUtils->getNow
     BigInt total_rewards = (total_fees * 9) / 10;
     for (auto &n : nodes_in_leader_cert)
@@ -576,9 +578,10 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         BigInt amt = (total_rewards * node->get_full_stake()) / total_staked;
         u->addBalance(amt);
         u->setDirty();
-        if (n == this_node_name && amt > 0)
-            logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
+        // if (n == this_node_name && amt > 0)
+        //     logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
         t.att_data->rewards[n] = amt;
+        t.emit_block("reward",R"({"node":"%s","amount":"%s"})",n.container.c_str(), amt.toString().c_str());
     }
     std::set<NODE_id> ns;
     for(auto& z:nodes_in_leader_cert)

@@ -17,8 +17,12 @@ struct data_base : public Refcountable
 {
     int type;
     Cellable *parent;
-    data_base(int t, Cellable* _parent): Refcountable("data_base"),
-        type(t), parent(_parent) {}
+
+    time_t create_time=0;
+    int ttl=-1;
+
+    data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
+        type(t), parent(_parent), create_time(_create_time),ttl(_ttl) {}
     ~data_base()
     {
     }
@@ -27,11 +31,13 @@ struct data_base : public Refcountable
     {
         o<<1;
         o<<type;
+        o<<create_time<<ttl;
     }
     virtual void unpack(inBuffer& in)
     {
         int ver=in.get_PN();
         in>>type;
+        in>>create_time>>ttl;
     }
     std::string getBuffer()
     {

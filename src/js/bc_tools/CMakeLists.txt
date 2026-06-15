@@ -52,6 +52,7 @@ TRANSACTION_id.h
 tree.h
 TypedStr.h
 md/md_LcEnvelopeREQ.h
+get_tariff.h
 
 )
 

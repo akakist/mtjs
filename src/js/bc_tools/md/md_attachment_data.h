@@ -6,7 +6,32 @@
 struct EmitNode {
     std::vector<std::pair<std::string,std::string>> emits;                    // события на этом уровне
     std::map<std::string, EmitNode> children;          // дочерние узлы
+    void update(Blake2bHasher &b) const
+    {
+        for(auto &z:emits)
+        {
+            b.update(z.first);
+            b.update(z.second);
+        }
+        for(auto &z:children)
+        {
+            b.update(z.first);
+            z.second.update(b);
+        }
+    }
 };
+inline outBuffer & operator<< (outBuffer& b,const EmitNode &s)
+{
+    b<<s.emits;
+    b<<s.children;
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  EmitNode &s)
+{
+    b>>s.emits;
+    b>>s.children;
+    return b;
+}
 
 namespace MsgData
 {
@@ -18,23 +43,23 @@ namespace MsgData
         }
         EmitNode blockRoot;
         // std::vector<REF_getter<TX>> trs;
-        std::pair<int,std::string> block_report={0,""};
-        std::map<THASH_id,transaction_report> transaction_reports;
+        // std::pair<int,std::string> block_report={0,""};
+        // std::map<THASH_id,transaction_report> transaction_reports;
         std::map<std::string,BigInt> fees;
         std::map<NODE_id,BigInt> rewards;
-        std::vector<std::string> emitted_events;
+        // std::vector<std::string> emitted_events;
 
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<block_report<<transaction_reports<<fees<<rewards<<emitted_events;
+            b<<fees<<rewards<<blockRoot;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>block_report>>transaction_reports>>fees>>rewards>>emitted_events;
+            b>>fees>>rewards>>blockRoot;
         }
 
         // void clear()
@@ -46,16 +71,17 @@ namespace MsgData
         // }
         void update(Blake2bHasher &h) const
         {
+            blockRoot.update(h);
             // for(auto &z:trs)
             // {
             //     z->update(h);
             // }
-            h.update(std::to_string(block_report.first));
-            h.update(block_report.second);
-            for(auto &z: transaction_reports)
-            {
-                z.second.update(h);
-            }
+            // h.update(std::to_string(block_report.first));
+            // h.update(block_report.second);
+            // for(auto &z: transaction_reports)
+            // {
+            //     z.second.update(h);
+            // }
             for(auto &z: fees)
             {
                 h.update(z.first);
@@ -66,10 +92,10 @@ namespace MsgData
                 h.update(z.first.container);
                 h.update(z.second.toString());
             }
-            for(const auto &z: emitted_events)
-            {
-                h.update(z);
-            }
+            // for(const auto &z: emitted_events)
+            // {
+            //     h.update(z);
+            // }
         }
     };
 

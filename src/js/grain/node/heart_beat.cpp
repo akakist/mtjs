@@ -105,7 +105,11 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     MUTEX_INSPECTOR;
     bool need_reply = false;
     REF_getter<MsgData::LeaderCertificate>  local_lc;
-
+    if(h->block_timestamp < (time(NULL)-60) || h->block_timestamp > (time(NULL)+60))
+    {
+        logNode("block timestamp not valid");
+        return true;
+    }
     auto llc=root->getEpoch()->prev_lc;
     if(llc.size())
     {
@@ -118,12 +122,12 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     bool local_verified=false;
     if(remote_prev_lc)
     {
-        remote_verified=root->verify_lider_certificate(remote_prev_lc);
+        remote_verified=root->verify_leader_certificate(remote_prev_lc);
     }
     else logNode("!if(remote_lc.valid())");
     if(local_lc.valid())
     {
-        local_verified=root->verify_lider_certificate(local_lc);
+        local_verified=root->verify_leader_certificate(local_lc);
     }
     else logNode("!if(local_lc.valid())");
 
@@ -322,7 +326,7 @@ void Node::Service::do_heart_beat()
         REF_getter<MsgData::HeartBeatREQ> hb_req =
             new MsgData::HeartBeatREQ(prev_root_hash_Z,
                                       root->getEpoch()->epoch+1,
-                                      this_node_name, root->getEpoch()->prev_lc);
+                                      this_node_name, root->getEpoch()->prev_lc, time(NULL));
 
         REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),root->getEpoch()->prev_lc);
         broadcast_MsgEvent(lce.get());

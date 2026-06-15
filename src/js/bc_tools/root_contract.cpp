@@ -28,7 +28,7 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     { return new bc_epoch(p); }
 };
 
-bool root_data::verify_lider_certificate(const REF_getter<MsgData::LeaderCertificate> &lc)
+bool root_data::verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     /// проверка сертификата лидера
     {
@@ -435,4 +435,104 @@ REF_getter<root_data> getRoot(IDatabase *db)
         logErr2("cannot read #root_hash#");
 
     return r;
+}
+#include <nlohmann/json.hpp>
+std::string bc_contract::dump()
+{
+    nlohmann::json j;
+    j["create_time"]=create_time;
+    j["ttl"]=ttl;
+    j["name"]=name_;
+    j["owner"]=base16::encode(owner);
+    j["src"]=src;
+    // std::ostringstream o;
+    // o<<"Contract: "  << name_ << std::endl;
+    // o<< "Owner: " << base16::encode(owner) << std::endl;
+    // o<< "Src: " << src << std::endl;
+
+    return j.dump(2);
+}
+std::string bc_user_state::dump()
+{
+    M_LOCK(parent->mx);
+    nlohmann::json j;
+    j["balance"]=balance.toString();
+    j["nonce"]=nonce.toString();
+    return j.dump(2);
+}
+
+std::string bc_node::dump()
+{
+    MUTEX_INSPECTOR;
+    M_LOCK (parent->mx);
+    nlohmann::json j;
+    j["owner"]=base16::encode(owner_ed_pk);
+    j["ed_pk"]=base16::encode(ed_pk);
+    j["bls_pk"]=base16::encode(bls_pk.serialize());
+    j["name"]=name_.container;
+    j["ip"]=ip;
+    j["missed_rounds"]=missed_rounds;
+    BigInt total_stake=0;
+    for(auto &z: stakes)
+    {
+        nlohmann::json js;
+        js["address"]=base16::encode(z.first);
+        js["amount"]=z.second.toString();
+        // js.push_back(base16::encode(z.first));
+        // js.push_back(z.second.toString());
+        j["stakes"].push_back(js);
+        total_stake+=z.second;
+    }
+    j["total_stake"]=total_stake.toString();
+    logErr2("j %s",j.dump(2).c_str());
+    return j.dump(2);
+}
+
+std::string bc_values::dump()
+{
+    /*
+        std::map<std::string,BigInt> fees;
+    std::set<std::string> emitters_bin;
+*/
+    nlohmann::json j;
+    for(auto &z: emitters_bin)
+    {
+        j["emitters"].push_back(base16::encode(z));
+    }
+    for(auto& z: fees)
+    {
+        nlohmann::json jj;
+        jj["type"]=z.first;
+        jj["value"]=z.second.toString();
+        j["fees"].push_back(jj);
+    }
+    return j.dump(2);
+}
+std::string bc_epoch::dump() 
+{
+    nlohmann::json j;
+    j["epoch"]=epoch.toString();
+    if(prev_lc.size())
+    {
+        inBuffer in(prev_lc);
+        REF_getter<MsgData::LeaderCertificate> lc=new MsgData::LeaderCertificate();
+        lc->unpack2(in);
+        auto &jp=j["prev_lc"];
+        for(auto& z: lc->nodes)
+        {
+            jp["signers"].push_back(z.container);
+        }
+        jp["aggsig"]=base16::encode(lc->agg_sig.serialize());
+        auto &hb=jp["hb"];
+        hb["block_timestamp"]=lc->heart_beat->block_timestamp;
+        hb["node_leader"]=lc->heart_beat->node_leader.container;
+        hb["epoch"]=lc->heart_beat->new_epoch.toString();
+        hb["prev_root_hash"]=base16::encode(lc->heart_beat->prev_root_hash.container);
+        return j.dump(2);
+
+        // j["prev_lc"]["epoch"]=lc->
+    }
+// BigInt epoch;
+// std::string prev_lc;
+    return "Values";
 }

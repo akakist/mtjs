@@ -63,6 +63,7 @@ void execute_transaction(const THASH_id &tx_id, t_params &t, const std::string &
     }
     else
     {
-        t.att_data->block_report= {1,"tx body must be array"};
+        t.emit_block("error", R"({"code":-32602,"error":"tx body must be array"})");
+        // t.att_data->block_report= {1,"tx body must be array"};
     }
 }

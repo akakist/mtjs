@@ -548,6 +548,143 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
 }
 extern "C" JSValue parse_yyjson(JSContext *ctx, const char *json_str, size_t len);
 
+#include <nlohmann/json.hpp>
+
+void to_json(nlohmann::json& j, const EmitNode& node) {
+    MUTEX_INSPECTOR;
+    XTRY;
+    // Сначала добавляем эмиты текущего уровня
+    nlohmann::json emits_array = nlohmann::json::array();
+    for (const auto& emit_pair : node.emits) 
+    {
+        XTRY;
+        MUTEX_INSPECTOR;
+        nlohmann::json emit_obj;
+        emit_obj["cmd"] = emit_pair.first;
+        try{
+            MUTEX_INSPECTOR;
+            logErr2("parse %s", emit_pair.second.c_str());
+            emit_obj["data"] = nlohmann::json::parse(emit_pair.second);
+
+        }
+        catch(std::exception& e)
+        {
+            logErr2("Failed to parse JSON for emit data: %s, error: %s", emit_pair.second.c_str(), e.what());
+            // emit_obj["data"] = emit_pair.second;
+        }
+        emits_array.push_back(emit_obj);
+        XPASS;
+    }
+    j["emits"] = emits_array;
+    
+    // Затем рекурсивно обрабатываем детей
+    for (const auto& child_pair : node.children) 
+    {
+        XTRY;
+        j["children"][child_pair.first] = child_pair.second;
+        XPASS;
+    }
+    XPASS;
+}
+#ifdef KALL
+std::string dump_emit_node_compact(const EmitNode& node) {
+    std::string result;
+    result += "{\"emits\":[";
+    
+    for (size_t i = 0; i < node.emits.size(); ++i) {
+        const auto& emit = node.emits[i];
+        result += "[\"" + emit.first + "\"," + emit.second + "]";
+        if (i + 1 < node.emits.size()) result += ",";
+    }
+    
+    result += "]";
+    
+    if (!node.children.empty()) {
+        result += ",\"children\":{";
+        for (auto it = node.children.begin(); it != node.children.end(); ++it) {
+            result += "\"" + it->first + "\":" + dump_emit_node_compact(it->second);
+            if (std::next(it) != node.children.end()) result += ",";
+        }
+        result += "}";
+    }
+    
+    result += "}";
+    return result;
+}
+#endif
+JSValue emit_node_to_js(JSContext* ctx, const EmitNode& node) {
+    JSValue obj = JS_NewObject(ctx);
+    
+    // ===== emits =====
+    JSValue emits_arr = JS_NewArray(ctx);
+    for (size_t i = 0; i < node.emits.size(); ++i) {
+        JSValue emit_arr = JS_NewArray(ctx);
+        JS_SetPropertyUint32(ctx, emit_arr, 0, JS_NewString(ctx, node.emits[i].first.c_str()));
+        JSValue data_obj = JS_ParseJSON(ctx, node.emits[i].second.c_str(), node.emits[i].second.size(), "");
+        JS_SetPropertyUint32(ctx, emit_arr, 1, data_obj);
+        // JS_SetPropertyUint32(ctx, emit_arr, 1, JS_NewString(ctx, node.emits[i].second.c_str()));
+        JS_SetPropertyUint32(ctx, emits_arr, i, emit_arr);
+    }
+    JS_SetPropertyStr(ctx, obj, "emits", emits_arr);
+    
+    // ===== children (только если не пустые) =====
+    if (!node.children.empty()) {
+        JSValue children_obj = JS_NewObject(ctx);
+        for (const auto& [key, child] : node.children) {
+            JS_SetPropertyStr(ctx, children_obj, key.c_str(), emit_node_to_js(ctx, child));
+        }
+        JS_SetPropertyStr(ctx, obj, "children", children_obj);
+    }
+    
+    return obj;
+}
+#ifdef KALL
+std::string dump_emit_node(const EmitNode& node, int indent = 0) {
+    std::string result;
+    std::string indent_str(indent, ' ');
+    
+    result += indent_str + "{\n";
+    result += indent_str + "  \"emits\": [\n";
+    for (size_t i = 0; i < node.emits.size(); ++i) {
+        const auto& emit = node.emits[i];
+        result += indent_str + "    [\"" + emit.first + "\", " + emit.second + "]";
+        if (i + 1 < node.emits.size()) result += ",";
+        result += "\n";
+    }
+    if(node.children.size())
+        result += indent_str + "  ],\n";
+    else
+        result += indent_str + "  ]\n";
+    
+    if (!node.children.empty()) {
+        result += indent_str + "  \"children\": {\n";
+        for (auto it = node.children.begin(); it != node.children.end(); ++it) {
+            result += indent_str + "    \"" + it->first + "\": " + dump_emit_node(it->second, indent + 4);
+            if (std::next(it) != node.children.end()) result += ",";
+            result += "\n";
+        }
+        result += indent_str + "  }\n";
+    } else {
+        // result += indent_str + "  \"children\": {}\n";
+    }
+    result += indent_str + "}";
+    
+    return result;
+}
+#endif
+#ifdef KALL
+std::string dump_emit_node(const EmitNode& node) 
+{
+    MUTEX_INSPECTOR;
+    nlohmann::json j;
+    XTRY;
+    to_json(j, node);
+    XPASS;
+    XTRY;
+    return j.dump(); // с отступами
+    XPASS;
+}
+#endif
 bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 {
     MUTEX_INSPECTOR;
@@ -558,54 +695,62 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     // pb->unpack2(in);
     for (size_t ti = 0; ti < e->blockStore->validateBlockREQ->transaction_bodies.size(); ti++)
     {
+        XTRY;
         // xy::json::
-        nlohmann::json jtr;
+        // nlohmann::json jtr;
         // jtr["instructions"] = yyjson::MutableArray();
         // nlohmann::json ins;
         if (opaque.tx_subscription_cb.has_value())
         {
+            XTRY;
             THASH_id tx_hash = e->blockStore->validateBlockREQ->transaction_bodies[ti]->getHash();
-            jtr["tx_hash"] = base16::encode(tx_hash.container);
+            // jtr["tx_hash"] = base16::encode(tx_hash.container);
             // logErr2("ClientTxSubscribeRSP: tx_hash %s",base16::encode(tx_hash.container).c_str());
             JSScope<10, 10> scope(js_ctx);
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);
-            auto &tx_report = e->att_data->transaction_reports[tx_hash];
+            // auto &tx_report = e->att_data->transaction_reports[tx_hash];
             
-            logErr2("tx_report.instruction_reports size %d",tx_report.instruction_reports.size());
-            for (int ii = 0; ii < tx_report.instruction_reports.size(); ii++)
-            {
-                nlohmann::json ii_json;
-                ii_json["errcode"] = tx_report.instruction_reports[ii].err_code;
-                ii_json["errstr"] = tx_report.instruction_reports[ii].err_str;
-                // logErr2("err_str %d %d %s",ti,ii,pb->att_data.instruction_reports[ti][ii].err_str.c_str());
-                nlohmann::json logmsgs_json;
-                auto &lms = tx_report.instruction_reports[ii].logMsgs;
-                for (auto &z : lms)
-                {
-                    // logErr2("logmsgs %d %d %d %s",ti,ii,k,pb->att_data.instruction_reports[ti][ii].logMsgs[k].c_str());
-                    logmsgs_json.push_back(z);
-                }
-                ii_json["logMsgs"] = logmsgs_json;
-                jtr["instructions"].push_back(ii_json);
-            }
-            jtr["errcode"]=tx_report.err_code;
-            jtr["errstr"]=tx_report.err_str;
+            // logErr2("tx_report.instruction_reports size %d",tx_report.instruction_reports.size());
+            // for (int ii = 0; ii < tx_report.instruction_reports.size(); ii++)
+            // {
+            //     nlohmann::json ii_json;
+            //     ii_json["errcode"] = tx_report.instruction_reports[ii].err_code;
+            //     ii_json["errstr"] = tx_report.instruction_reports[ii].err_str;
+            //     // logErr2("err_str %d %d %s",ti,ii,pb->att_data.instruction_reports[ti][ii].err_str.c_str());
+            //     nlohmann::json logmsgs_json;
+            //     auto &lms = tx_report.instruction_reports[ii].logMsgs;
+            //     for (auto &z : lms)
+            //     {
+            //         // logErr2("logmsgs %d %d %d %s",ti,ii,k,pb->att_data.instruction_reports[ti][ii].logMsgs[k].c_str());
+            //         logmsgs_json.push_back(z);
+            //     }
+            //     ii_json["logMsgs"] = logmsgs_json;
+            //     jtr["instructions"].push_back(ii_json);
+            // }
+            // jtr["errcode"]=tx_report.err_code;
+            // jtr["errstr"]=tx_report.err_str;
             if (!JS_IsFunction(js_ctx, opaque.tx_subscription_cb->get()))
             {
                 throw CommonError("callback not a function");
             }
-            std::string str=jtr.dump(); 
+            // std::string str; 
+            XTRY;
+            // str=dump_emit_node_compact(e->att_data->blockRoot); 
+            XPASS;
             // jtr.write(str);
             // logErr2("json %s",str.c_str());
-            JSValue obj = JS_ParseJSON(js_ctx, str.data(), str.size(), "<input>");
+            JSValue obj=emit_node_to_js(js_ctx, e->att_data->blockRoot);
+            // JSValue obj = JS_ParseJSON(js_ctx, str.data(), str.size(), "<input>");
             scope.addValue(obj);
             JSValue argv[1];
             argv[0] = obj;
             JSValue func_result = JS_Call(js_ctx, opaque.tx_subscription_cb->get(), global_obj, 1, argv);
             scope.addValue(func_result);
             qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
+            XPASS;
         }
+        XPASS;
     }
     XPASS;
     return true;

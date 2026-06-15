@@ -18,7 +18,7 @@
 struct bc_contract:  public data_base
 {
 
-    bc_contract(Cellable *p):data_base(hsh::bc_contract,p) {}
+    bc_contract(Cellable *p):data_base(hsh::bc_contract,p, 0,-1) {}
     std::string name_;
     std::string owner;
     std::string src;
@@ -36,20 +36,12 @@ struct bc_contract:  public data_base
         b>>name_>>owner>>src;
 
     }
-    std::string dump() final
-    {
-        std::ostringstream o;
-        o<<"Contract: "  << name_ << std::endl;
-        o<< "Owner: " << base16::encode(owner) << std::endl;
-        o<< "Src: " << src << std::endl;
-
-        return o.str();
-    }
+    std::string dump() final;
 };
 struct bc_user: public data_base
 {
 
-    bc_user(Cellable* p): data_base(hsh::bc_user,p) {
+    bc_user(Cellable* p): data_base(hsh::bc_user,p, 0,-1) {
     }
     std::string pkbin_еd;
     // std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
@@ -89,7 +81,7 @@ struct bc_user: public data_base
 struct bc_user_state: public data_base
 {
 
-    bc_user_state(Cellable* p): data_base(hsh::bc_user_state,p) {
+    bc_user_state(Cellable* p): data_base(hsh::bc_user_state,p, 0,-1) {
         nonce=0;
         balance=0;
     }
@@ -139,15 +131,7 @@ struct bc_user_state: public data_base
         auto v=o.get_PN();
         o>>balance>>nonce;
     }
-    std::string dump() final
-    {
-        M_LOCK(parent->mx);
-        std::ostringstream o;
-        o<< "Balance: " << balance.toString() << std::endl;
-        o<< "Nonce: " << nonce.toString() <<std::endl;
-        o<< std::endl;
-        return o.str();
-    }
+    std::string dump() final;
 
 };
 
@@ -155,7 +139,7 @@ struct bc_node: public data_base
 {
 
 
-    bc_node(Cellable *p):data_base(hsh::bc_node,p) {
+    bc_node(Cellable *p):data_base(hsh::bc_node,p,0,-1) {
     }
     private:
     NODE_id name_;
@@ -245,22 +229,6 @@ struct bc_node: public data_base
         }
         return 0;
     }
-    //  BigInt getTotalStake()
-    // {
-    //     M_LOCK(parent->mx);
-    //     return total_stake;
-
-    // }
-    // BigInt stake()
-    // {
-    //     M_LOCK(parent->mx);
-    //     BigInt stake=0;
-    //     for(auto &z: stakes)
-    //     {
-    //         stake+=z.second;
-    //     }
-    //     return stake;
-    // }
     blst_cpp::PublicKey get_bls_pk()
     {
         M_LOCK(parent->mx);
@@ -301,59 +269,15 @@ struct bc_node: public data_base
 
         o>>name_>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>missed_rounds;
     }
-    std::string dump() final
-    {
-        MUTEX_INSPECTOR;
-        M_LOCK (parent->mx);
-        std::ostringstream o;
-        o<< "Node: "<< name_.container << std::endl;
-        o<< "Owner: "<<  base16::encode(owner_ed_pk) << std::endl;
-        o<< "bls_pk: "<< base16::encode(bls_pk.serialize()) << std::endl;
-        o<< "ed_pk: "<< base16::encode(ed_pk) << std::endl;
-        o<< "ip:port: "<< ip << std::endl;
-        o<< "missed rounds: "<< missed_rounds << std::endl;
-        BigInt ts=0;
-        for(auto &z:stakes)
-        {
-            ts+=z.second;
-        }
-        o<< "stake: "<< ts.toString() << std::endl;
-        o<< "stakers: "<< std::endl;
-        for(auto &z: stakes)
-        {
-            o<< "\t"<< base16::encode(z.first) << " -> " << z.second.toString() << std::endl;
-        }
-        return o.str();
-    }
+    std::string dump() final;
 
 };
 
 struct bc_values: public data_base
 {
 
-    // enum __fee_types
-    // {
-    //     contract_deploy,
-    //     contract_transfer,
-    //     node_create,
-    //     node_update,
-    //     node_enable_from_manual,
-    //     node_enable_from_offline,
-    //     nick_create,
-    //     nick_transfer,
-    //     cell_in_contract_create,
-    //     freeze_contract,
-    //     mint,
-    //     unstake,
-    //     stake,
-    //     transfer,
-    //     register_nick,
 
-    //     // FEE_TYPE_END
-    // };
-
-    bc_values(Cellable *p): data_base(hsh::bc_values,p) {
-        // fees.resize(FEE_TYPE_END);
+bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         fees["contract_deploy"]=BigInt(5000);
         fees["contract_transfer"]=BigInt(1000);
         fees["node_create"]=BigInt(20000);
@@ -365,7 +289,6 @@ struct bc_values: public data_base
         fees["transfer"]=BigInt(1000);
     }
     std::map<std::string,BigInt> fees;
-    // BigInt total_staked;
     std::set<std::string> emitters_bin;
     BigInt getFee(const std::string &fee_type) const
     {
@@ -388,17 +311,14 @@ struct bc_values: public data_base
 
         o>>fees>>emitters_bin;
     }
-    std::string dump() final
-    {
-        return "Values";
-    }
+    std::string dump() final;
 
 };
 
 struct bc_epoch: public data_base
 {
 
-    bc_epoch(Cellable* p): data_base(hsh::bc_epoch,p) {
+    bc_epoch(Cellable* p): data_base(hsh::bc_epoch,p,0,-1) {
         epoch=0;
     }
     BigInt epoch;
@@ -417,10 +337,7 @@ struct bc_epoch: public data_base
         o>>epoch;
         o>> prev_lc;
     }
-    std::string dump() final
-    {
-        return "Values";
-    }
+    std::string dump() final;
 
 };
 
@@ -435,7 +352,7 @@ struct root_data: public Cellable
     root_data(IDatabase *db_): Cellable(nullptr,"r"),db(db_)
     {
     }
-    bool verify_lider_certificate(const REF_getter<MsgData::LeaderCertificate>& lc);
+    bool verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate>& lc);
 
     std::vector<std::string> getContractPath(const std::string &name);
     std::vector<std::string> getNodePath(const std::string &name);
