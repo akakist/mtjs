@@ -128,6 +128,11 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             logNode("on_get_blocks_rsp: block executed OK on epoch %s", z->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString().c_str());
 
             db_state->write_batch(db_to_save_Z);
+            // sendEvent(ServiceEnum::GrainWriter,
+            //     new bcEvent::WriteGranules(db_to_save_Z,
+            //         t.validateBlockREQ->leader_cert->heart_beat->new_epoch,
+            //         db_state,this));
+
             logNode("db->write_batch(db_to_save_Z); done %d granules", db_to_save_Z.cells.size());
             db_to_save_Z.clear();
             prev_root_hash_Z = new_root_hash;

@@ -96,7 +96,11 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         logNode("db_state->write_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
-    db_state->write_batch(db_to_save_Z);
+    sendEvent(ServiceEnum::GrainWriter,
+        new bcEvent::WriteGranules(db_to_save_Z,
+            r->blockInfo->prev_epoch,
+            db_state,this));
+    // db_state->write_batch(db_to_save_Z);
     db_to_save_Z.clear();
 
     {

@@ -23,6 +23,7 @@ void registerTxValidatorService(const char* pn);
 void registerBlockValidatorService(const char* pn);
 void registerBroadcasterTreeService(const char* pn);
 void registerGrainReaderService(const char* pn);
+void registerGrainWriterService(const char* pn);
 void registerBlockStreamerService(const char* pn);
 struct par {
     int n; /// n defises
@@ -98,6 +99,7 @@ int mainMTJS(int argc, char** argv )
         registerBlockValidatorService(NULL);
         registerBroadcasterTreeService(NULL);
         registerGrainReaderService(NULL);
+        registerGrainWriterService(NULL);
         registerBlockStreamerService(NULL);
 
 

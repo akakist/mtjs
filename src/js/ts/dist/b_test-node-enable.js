@@ -40,13 +40,11 @@ async function exec() {
     console.log(rsp);
     // }
 }
-//console.log(std.getenv("PATH"));
+console.log(std.getenv("PATH"));
 try {
     console.log("Start");
     try {
         const sk = std.getenv('u_root_ed_sk');
-//        setInterval(() => {
-//        }, 5000);
         await exec();
     }
     catch (e) {

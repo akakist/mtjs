@@ -17,6 +17,7 @@ namespace ServiceEnum
     const SERVICE_id BroadcasterTree(ghash("@g_BroadcasterTree"));
     const SERVICE_id GrainReader(ghash("@g_GrainReader"));
     const SERVICE_id BlockStreamer(ghash("@g_BlockStreamer"));
+    const SERVICE_id GrainWriter(ghash("@g_GrainWriter"));
     // const SERVICE_id LeaderElection(ghash("@g_LeaderElection"));
 
 }
@@ -40,6 +41,8 @@ namespace bcEventEnum
     const EVENT_id PutTransactionREQ(ghash("@g_PutTransactionREQ"));
     const EVENT_id GetUserStatusREQ(ghash("@g_GetUserStatusREQ"));
     const EVENT_id GetUserStatusRSP(ghash("@g_GetUserStatusRSP"));
+    const EVENT_id WriteGranules(ghash("@g_WriteGranules"));
+    const EVENT_id WriteBlock(ghash("@g_WriteBlock"));
 
 }
 
@@ -472,4 +475,24 @@ namespace bcEvent
             o<<user_pk_ed;
         }
     };
+    class WriteGranules : public Event::NoPacked
+    {
+
+    public:
+        static Base *construct(const route_t &r)
+        {
+            return NULL;
+        }
+        WriteGranules(const _db_to_save  & _gs, 
+            const BigInt &_ep,
+            const REF_getter<IDatabase> &_db,
+            const route_t &r)
+            : NoPacked(bcEventEnum::WriteGranules, r), gs(_gs),
+            epoch(_ep),db(_db) {}
+
+        const _db_to_save gs;
+        const BigInt epoch;
+        const REF_getter<IDatabase> db;
+    };
+ 
 }
