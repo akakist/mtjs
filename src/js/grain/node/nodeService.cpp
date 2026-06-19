@@ -118,11 +118,11 @@ void Node::Service::collectTransactions()
 {
     MUTEX_INSPECTOR;
     std::map<std::string /*user addr*/,
-        std::map<BigInt /*nonce*/, std::vector<REF_getter<MsgData::TX> > > > ordered;
+        std::map<uint64_t /*nonce*/, std::vector<REF_getter<MsgData::TX> > > > ordered;
     for (auto &z : transaction_pool_of_leader)
     {
         std::string &pk = z.second->pk_ed_bin;
-        BigInt &nonce=z.second->nonce;
+        auto &nonce=z.second->nonce;
         ordered[pk][nonce].push_back(z.second);
     }
     transaction_pool_of_leader.clear();
@@ -474,7 +474,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
             {
                 if (u->getNonce() != tt->nonce)
                 {
-                    logNode("invalid nonce, expected %s got %s", u->getNonce().toString().c_str(), tt->nonce.toString().c_str());
+                    logNode("invalid nonce, expected %lld got %lld", u->getNonce(), tt->nonce);
                     t_err = "invalid nonce";
 
                 }
@@ -796,7 +796,7 @@ void Node::Service::logNode(const char *fmt, ...)
         {
             throw CommonError("if(!epoch.valid())");
         }
-        fprintf(stdout, "%lf [Node] [%s] [%s] [%s] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch.toString().c_str());
+        fprintf(stdout, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch);
         vfprintf(stdout, fmt, ap);
         fprintf(stdout, "\n");
         va_end(ap);
@@ -808,7 +808,7 @@ void Node::Service::logNode(const char *fmt, ...)
         FILE *f = fopen(pn.c_str(), "a");
         if (f)
         {
-            fprintf(f, "%lf [Node] [%s] [%s] [%s] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch.toString().c_str());
+            fprintf(f, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch);
             vfprintf(f, fmt, ap);
             fprintf(f, "\n");
             fclose(f);

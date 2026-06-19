@@ -43,7 +43,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         logNode("invalid leader 12");
         return true;
     }
-    auto& c=c_blocks[r->blockInfo->prev_root_hash];
+    auto& c=c_blocks[r->blockInfo->heart_beat->prev_root_hash];
 
     if (!c.blockDBStore.valid())
     {
@@ -98,7 +98,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     }
     sendEvent(ServiceEnum::GrainWriter,
         new bcEvent::WriteGranules(db_to_save_Z,
-            r->blockInfo->prev_epoch,
+            r->blockInfo->heart_beat->new_epoch,
             db_state,this));
     // db_state->write_batch(db_to_save_Z);
     db_to_save_Z.clear();
@@ -265,11 +265,11 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         c.att_data=t.att_data;
 
         REF_getter<MsgData::BlockInfo> block = new MsgData::BlockInfo();
-        block->prev_root_hash = prev_root_hash_Z;
+        // block->prev_root_hash = prev_root_hash_Z;
         block->new_root_hash1 = new_root_hash;
 
         block->attachment_hash = t.att_data->getHash();
-        block->payload_heart_beat = r->leader_cert->heart_beat;
+        block->heart_beat = r->leader_cert->heart_beat;
 
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
         rsp->node_validator = this_node_name;

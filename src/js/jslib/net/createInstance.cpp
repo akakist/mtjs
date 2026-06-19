@@ -159,9 +159,9 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     auto sk = base16::decode(scope.toStdString(argv[3]));
     auto pk = extract_public_ed(sk);
     auto nonce_str = scope.toStdString(argv[4]);
-    BigInt nonce;
+    uint64_t nonce=0;
     try
-    {        nonce.from_string(nonce_str);
+    {        nonce=std::atoll(nonce_str.c_str());
     }    
     catch (std::exception &e)
     {

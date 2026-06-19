@@ -94,6 +94,7 @@ try{
                 HTTP_max_post=1000000
                 HTTP_doc_urls=/pics,/html,/css
                 HTTP_document_root=./www
+                GrainWriter_snapshot_modulus=10000
                 Node_my_sk_bls_env_key=k_node${i}_bls_sk
                 Node_my_sk_ed_env_key=k_node${i}_ed_sk
                 Node_this_node_name=n${i}

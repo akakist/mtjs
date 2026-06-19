@@ -85,11 +85,11 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
     logNode("GetSavedBlocksRSP received blocks %d", r->blocks_ZZ.size());
     for (auto &z : r->blocks_ZZ)
     {
-        logNode("iter block epoch %s", z->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString().c_str());
-        logNode("cur epoch %s", root->getEpoch()->epoch.toString().c_str());
+        logNode("iter block epoch %ld", z->validateBlockREQ->leader_cert->heart_beat->new_epoch);
+        logNode("cur epoch %ld", root->getEpoch()->epoch);
 
         logNode("iter prev_root_hash in validateBlockREQ %s", z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.str().c_str());
-        logNode("iter prev_root_hash in blockAcceptedREQ %s", z->blockAcceptedREQ->blockInfo->prev_root_hash.str().c_str());
+        logNode("iter prev_root_hash in blockAcceptedREQ %s", z->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash.str().c_str());
         if (prev_root_hash_Z != z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash)
         {
             logNode("prev root hash not matched '%s' != '%s'", prev_root_hash_Z.str().c_str(),z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.str().c_str());
@@ -104,7 +104,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             continue;
         }
         else
-            logNode("ok received block %s", z->blockAcceptedREQ->blockInfo->prev_epoch.toString().c_str());
+            logNode("ok received block %ld", z->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
 
         std::vector<blst_cpp::PublicKey> agg_pk;
         for (auto &k : z->blockAcceptedREQ->node_validators)
@@ -125,7 +125,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
 
         if (new_root_hash == z->blockAcceptedREQ->blockInfo->new_root_hash1)
         {
-            logNode("on_get_blocks_rsp: block executed OK on epoch %s", z->validateBlockREQ->leader_cert->heart_beat->new_epoch.toString().c_str());
+            logNode("on_get_blocks_rsp: block executed OK on epoch %ld", z->validateBlockREQ->leader_cert->heart_beat->new_epoch);
 
             db_state->write_batch(db_to_save_Z);
             // sendEvent(ServiceEnum::GrainWriter,

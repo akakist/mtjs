@@ -52,7 +52,9 @@ bool GrainWriter::Service::on_timer(const timerEvent::TickTimer *e)
 bool GrainWriter::Service::on_alarm(const timerEvent::TickAlarm *e)
 {
     MUTEX_INSPECTOR;
-    return false;
+    logErr2("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CREATE SNAPSHOT");
+    db_state->create_snapshot();
+    return true;
 }
 
 bool GrainWriter::Service::handleEvent(const REF_getter<Event::Base> &e)
@@ -130,6 +132,7 @@ GrainWriter::Service::Service(const SERVICE_id &id, const std::string &nm, IInst
       ListenerBuffered1Thread(nm, id),
       Broadcaster(ins)
 {
+    snapshot_modulus=ins->getConfig()->get_int64_t("snapshot_modulus",10000,"every this modulus of epoch make snapshot");
 }
 bool GrainWriter::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
@@ -185,6 +188,8 @@ bool GrainWriter::Service::WriteGranules(const bcEvent::WriteGranules *e)
         db_to_save.add(z.first,z.second);
     }
     db_state=e->db;
+    if(e->epoch % snapshot_modulus == 0)
+        sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(1,NULL,NULL,1.,this));
 
     return true;
 }

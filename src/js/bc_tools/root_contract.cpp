@@ -457,7 +457,7 @@ std::string bc_user_state::dump()
     M_LOCK(parent->mx);
     nlohmann::json j;
     j["balance"]=balance.toString();
-    j["nonce"]=nonce.toString();
+    j["nonce"]=nonce;
     return j.dump(2);
 }
 
@@ -511,7 +511,7 @@ std::string bc_values::dump()
 std::string bc_epoch::dump() 
 {
     nlohmann::json j;
-    j["epoch"]=epoch.toString();
+    j["epoch"]=epoch;
     if(prev_lc.size())
     {
         inBuffer in(prev_lc);
@@ -526,7 +526,7 @@ std::string bc_epoch::dump()
         auto &hb=jp["hb"];
         hb["block_timestamp"]=lc->heart_beat->block_timestamp;
         hb["node_leader"]=lc->heart_beat->node_leader.container;
-        hb["epoch"]=lc->heart_beat->new_epoch.toString();
+        hb["epoch"]=lc->heart_beat->new_epoch;
         hb["prev_root_hash"]=base16::encode(lc->heart_beat->prev_root_hash.container);
         return j.dump(2);
 

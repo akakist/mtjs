@@ -96,7 +96,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     if (state_Z != STATE_NORMAL)
         return true;
 
-    if (r->blockInfo->prev_root_hash != prev_root_hash_Z)
+    if (r->blockInfo->heart_beat->prev_root_hash != prev_root_hash_Z)
     {
         logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
         return true;
@@ -112,7 +112,12 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     {
         if (bt.responses[0]->blockInfo->getHash() != r->blockInfo->getHash())
         {
+            // std::cout << 
             logNode("if(bt.responses[0]->payload_block->getBuffer()!=r->getBuffer())");
+            nlohmann::json j1,j2;
+            bt.responses[0]->blockInfo->dump(j1);
+            r->blockInfo->dump(j2);
+            logNode("1::::: %s\n2:::: %s",j1.dump(2).c_str(),j2.dump(2).c_str());
             return true;
         }
     }

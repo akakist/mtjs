@@ -1,6 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_HeartBeatREQ.h"
+#include <nlohmann/json.hpp>
 namespace MsgData
 {
     struct BlockInfo: public Base
@@ -10,43 +11,53 @@ namespace MsgData
         {
             return new BlockInfo();
         }
-        BlockInfo():Base(msgid::BlockInfo),payload_heart_beat(new HeartBeatREQ())
+        BlockInfo():Base(msgid::BlockInfo),heart_beat(new HeartBeatREQ())
         {
 
         }
-        BigInt prev_epoch;
-        BLOCK_id prev_root_hash;
+        // uint64_t prev_epoch;
+        // BLOCK_id prev_root_hash;
         BLOCK_id new_root_hash1;
         THASH_id attachment_hash;
-        REF_getter<HeartBeatREQ> payload_heart_beat;
+        REF_getter<HeartBeatREQ> heart_beat;
+        void dump(nlohmann::json& j)
+        {
+            // j["prev_epoch"]=prev_epoch;
+            // j["prev_root_hash"]=prev_root_hash.str();
+            j["new_root_hash1"]=new_root_hash1.str();
+            j["attachment_hash"]=attachment_hash.str();
+            if(heart_beat.valid())
+                heart_beat->dump(j);
+            
+        }
         void update(Blake2bHasher& h) const
         {
-            h.update(prev_epoch.toString());
-            h.update(prev_root_hash.container);
+            // h.update(std::to_string(prev_epoch));
+            // h.update(prev_root_hash.container);
             h.update(new_root_hash1.container);
             h.update(attachment_hash.container);
-            payload_heart_beat->update(h);
+            heart_beat->update(h);
         }
 
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<prev_epoch;
-            b<<prev_root_hash;
+            // b<<prev_epoch;
+            // b<<prev_root_hash;
             b<<new_root_hash1;
             b<<attachment_hash;
-            b<<payload_heart_beat;
+            b<<heart_beat;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>prev_epoch;
-            b>>prev_root_hash;
+            // b>>prev_epoch;
+            // b>>prev_root_hash;
             b>>new_root_hash1;
             b>>attachment_hash;
-            b>>payload_heart_beat;
+            b>>heart_beat;
         }
 
     };

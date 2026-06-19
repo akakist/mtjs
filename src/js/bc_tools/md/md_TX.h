@@ -22,7 +22,7 @@ namespace MsgData
         // THASH_id hash;
         std::string pk_ed_bin;
         std::string sig_ed_bin;
-        BigInt nonce;
+        uint64_t nonce;
 
         void pack(outBuffer& b) const final
         {
@@ -43,7 +43,7 @@ namespace MsgData
             // throw CommonError("unimpl");
             h.update(tx_body);
             h.update(pk_ed_bin);
-            h.update(nonce.toString());
+            h.update(std::to_string(nonce));
         }
         bool verify()
         {

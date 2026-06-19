@@ -86,6 +86,7 @@ try {
                 HTTP_document_root=./www
                 Node_my_sk_bls_env_key=k_node${i}_bls_sk
                 Node_my_sk_ed_env_key=k_node${i}_ed_sk
+		GrainWriter_snapshot_modulus=10000
                 Node_this_node_name=n${i}
                 Node_sqlite_pn=db/s${i}
         `);

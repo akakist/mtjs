@@ -87,7 +87,7 @@ struct bc_user_state: public data_base
     }
     private:
     BigInt balance;
-    BigInt nonce;
+    uint64_t nonce;
     public:
     BigInt getBalance()
     {
@@ -109,7 +109,7 @@ struct bc_user_state: public data_base
         M_LOCK(parent->mx);
         balance-=n;
     }
-    BigInt getNonce()
+    uint64_t getNonce()
     {
         M_LOCK(parent->mx);
         return nonce;
@@ -321,7 +321,7 @@ struct bc_epoch: public data_base
     bc_epoch(Cellable* p): data_base(hsh::bc_epoch,p,0,-1) {
         epoch=0;
     }
-    BigInt epoch;
+    uint64_t epoch;
     std::string prev_lc;
     void pack(outBuffer& o) const final
     {

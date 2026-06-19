@@ -532,7 +532,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
         JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, rs->balance.toString().c_str()));
-        JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, rs->nonce.toString().c_str()));
+        JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, std::to_string(rs->nonce).c_str()));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
         scope.addValue(ret);
         opaque.node_req_promises.erase(e->hash_of_request.container);

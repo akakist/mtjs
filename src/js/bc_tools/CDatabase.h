@@ -1,12 +1,16 @@
 #pragma once
 #include "IDatabase.h"
 #include <rocksdb/db.h>
+#include <rocksdb/utilities/checkpoint.h>
 #include <iostream>
+#include <ctime>
+
 
 struct CDatabase: public IDatabase
 {
 
     rocksdb::DB *db;
+    std::string path_;
     void close()
     {
         db->Close();
@@ -65,7 +69,7 @@ struct CDatabase: public IDatabase
         }
         return !status.ok();
     }
-    CDatabase(const std::string& path)
+    CDatabase(const std::string& path):path_(path)
     {
         db = nullptr;
         #ifdef KALL
@@ -132,4 +136,50 @@ struct CDatabase: public IDatabase
     {
         delete db;
     }
+    std::string timestr()
+    {
+        struct tm tm;
+        time_t t = time(NULL);
+        struct tm *ttm = localtime_r(&t, &tm);
+        if (!ttm)
+            throw CommonError("if(!ttm)");
+        char bn[100];
+        snprintf(bn, sizeof(bn), "%04d-%02d-%02d-%02d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour,tm.tm_min,tm.tm_sec);
+
+        return bn;
+
+    }
+//     #include <memory>
+// #include <rocksdb/db.h>
+// #include <rocksdb/utilities/checkpoint.h>
+
+// rocksdb::DB* db; // уже открытая БД
+
+// Создание снапшота
+    bool create_snapshot() 
+    {
+    // Создаем умный указатель для Checkpoint. Он сам вызовет delete.
+    rocksdb::Checkpoint* checkpoint=NULL;
+    
+    // Создаем объект Checkpoint
+    rocksdb::Status s = rocksdb::Checkpoint::Create(db, &checkpoint);
+    if (!s.ok()) {
+        std::cerr << "Checkpoint creation failed: " << s.ToString() << std::endl;
+        delete checkpoint;
+        return false;
+    }
+    std::string snapshot_path=path_+"-snapshot-"+timestr();
+    // Создаем снапшот
+    // 0 означает, что RocksDB сама решит, делать ли flush
+    s = checkpoint->CreateCheckpoint(snapshot_path, 0);
+    
+    if (!s.ok()) {
+        std::cerr << "Checkpoint creation failed: " << s.ToString() << std::endl;
+        delete checkpoint;
+        return false;
+    }
+    
+    delete checkpoint;
+    return true;
+}
 };

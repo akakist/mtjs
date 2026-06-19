@@ -10,11 +10,11 @@ namespace MsgData
         {
         }
         BigInt balance;
-        BigInt nonce;
+        uint64_t nonce;
         void update(Blake2bHasher& h) const
         {
             h.update(balance.toString());
-            h.update(nonce.toString());
+            h.update(std::to_string(nonce));
         }
 
         void pack(outBuffer& b) const final
