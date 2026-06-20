@@ -28,7 +28,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     auto &li = hbs.leader_info;
     if(li.TIMER_VALIDATE_BLOCK_DELAY_set)
     {
-        logNode("TIMER_VALIDATE_BLOCK_DELAY_set is true, so do not reset timer");
+        // logNode("TIMER_VALIDATE_BLOCK_DELAY_set is true, so do not reset timer");
         return true;
     }
     li.transaction_responders.insert(src_node);
