@@ -13,6 +13,7 @@
 #include <sstream>
 #include "fee_calcer.h"
 #include "nodeElement.h"
+#include "ADDRESS_id.h"
 // #include <ostringstream>
 
 struct bc_contract:  public data_base
@@ -143,11 +144,11 @@ struct bc_node: public data_base
     }
     private:
     NODE_id name_;
-    std::string owner_ed_pk;
+    ADDRESS_id owner_address;
     blst_cpp::PublicKey bls_pk;
     std::string ed_pk;
     std::string ip;
-    std::map<std::string /*user*/, BigInt> stakes;
+    std::map<ADDRESS_id /*user*/, BigInt> stakes;
     int missed_rounds = 0;
     public:
     NodeElement getElement()
@@ -194,10 +195,10 @@ struct bc_node: public data_base
         M_LOCK(parent->mx);
         return missed_rounds;
     }
-    std::string get_owner()
+    ADDRESS_id get_owner()
     {
         M_LOCK(parent->mx);
-        return owner_ed_pk;
+        return owner_address;
     }
      std::string ip_port()
     {
@@ -219,7 +220,7 @@ struct bc_node: public data_base
         }
         return ret;
     }
-    BigInt get_user_stake(const std::string& user)
+    BigInt get_user_stake(const ADDRESS_id& user)
     {
         M_LOCK(parent->mx);
         auto it = stakes.find(user);
@@ -234,25 +235,25 @@ struct bc_node: public data_base
         M_LOCK(parent->mx);
         return bls_pk;
     }
-    void init(const NODE_id& name, const std::string &_owner_ed_pk, const blst_cpp::PublicKey &_bls_pk,
+    void init(const NODE_id& name, const ADDRESS_id &_owner_address, const blst_cpp::PublicKey &_bls_pk,
     const std::string &_ed_pk, const std::string& _ip)
     {
         M_LOCK (parent->mx);
         name_=name;
-        owner_ed_pk=_owner_ed_pk;
+        owner_address=_owner_address;
         bls_pk=_bls_pk;
         ed_pk=_ed_pk;
         ip=_ip;
     }
-    void add_stake(const std::string& user, const BigInt &amount)
+    void add_stake(const ADDRESS_id& user, const BigInt &amount)
     {
         M_LOCK (parent->mx);
         stakes[user]+=amount;
     }
-    void sub_stake(const std::string& user, const BigInt &amount)
+    void sub_stake(const ADDRESS_id& user, const BigInt &amount)
     {
         M_LOCK (parent->mx);
-        stakes[user]+=amount;
+        stakes[user]-=amount;
     }
 
 
@@ -260,14 +261,14 @@ struct bc_node: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_ed_pk<<bls_pk<<ed_pk<<ip<<stakes<<missed_rounds;
+        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<missed_rounds;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_ed_pk>>bls_pk>>ed_pk>>ip>>stakes>>missed_rounds;
+        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>missed_rounds;
     }
     std::string dump() final;
 
@@ -289,7 +290,7 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         fees["transfer"]=BigInt(1000);
     }
     std::map<std::string,BigInt> fees;
-    std::set<std::string> emitters_bin;
+    std::set<ADDRESS_id> emitters_bin;
     BigInt getFee(const std::string &fee_type) const
     {
         auto it=fees.find(fee_type);
@@ -356,8 +357,8 @@ struct root_data: public Cellable
 
     std::vector<std::string> getContractPath(const std::string &name);
     std::vector<std::string> getNodePath(const std::string &name);
-    std::vector<std::string> getUserPath(const std::string &pk);
-    std::vector<std::string> getUserStatePath(const std::string &pk);
+    std::vector<std::string> getUserPath(const ADDRESS_id &addr);
+    std::vector<std::string> getUserStatePath(const ADDRESS_id &addr);
 
     REF_getter<bc_contract> getContract(const std::string &name);
     REF_getter<bc_contract> addContract(const std::string &name, const REF_getter<fee_calcer>& bca);
@@ -369,10 +370,10 @@ struct root_data: public Cellable
 
 
 
-    REF_getter<bc_user> getUser(const std::string &pk);
+    REF_getter<bc_user> getUser(const ADDRESS_id &pk);
 
-    REF_getter<bc_user_state> getUserState(const std::string &pk);
-    REF_getter<bc_user_state>   checkUserState(const std::string &pk);
+    REF_getter<bc_user_state> getUserState(const ADDRESS_id &pk);
+    REF_getter<bc_user_state>   checkUserState(const ADDRESS_id &pk);
 
 
     // std::vector<NODE_id> getNodesNames();

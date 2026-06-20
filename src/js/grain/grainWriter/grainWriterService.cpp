@@ -153,7 +153,8 @@ bool GrainWriter::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 }
 bool GrainWriter::Service::ClientMsg(const bcEvent::ClientMsg *e)
 {
-
+    throw CommonError("unhandled GrainWriter ClientMsg %s", e->msg.c_str());
+#ifdef KALL
     MUTEX_INSPECTOR;
     inBuffer in(e->msg);
 
@@ -178,7 +179,7 @@ bool GrainWriter::Service::ClientMsg(const bcEvent::ClientMsg *e)
     }
     break;
     }
-
+#endif
     return true;
 }
 bool GrainWriter::Service::WriteGranules(const bcEvent::WriteGranules *e)

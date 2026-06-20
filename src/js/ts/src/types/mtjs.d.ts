@@ -46,6 +46,7 @@ declare global
         // tx_sign(tx:Objectstring, sk:string): string;
         tx_submit(nodeaddr:string,  timeout:number, msg:string,sk:string, nonce:string): Promise<object>;
         tx_subscribe(nodeaddr:string, callback: (params:tx_report) => void): void;
+        addr_from_pk(pk:string): string;
         pipe: Pipe;
         STDIN: STDIN;
         rpc:rpcModule;

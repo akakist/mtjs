@@ -6,8 +6,11 @@
 #include "bigint.h"
 #include "root_contract.h"
 #include "tr_exec.h"
+#include "ADDRESS_id.h"
+#include "PK_id.h"
 
-std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_params &t, 
+        const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 {
     auto v = t.root->getValues();
     auto it = v->emitters_bin.find(senderAddress);
@@ -37,12 +40,13 @@ std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_param
     t.fee[senderAddress] += v->getFee("mint");
 
     t.emit_command(txid, seqId,"mint",R"({"to":"%s","amount":"%s"})",
-        base16::encode(senderAddress).c_str(),
+        base16::encode(senderAddress.addr).c_str(),
         amount.toString().c_str());
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_params &t, 
+    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 {
     auto v = t.root->getValues();
 
@@ -58,8 +62,10 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     auto _to=params / "to";
     if(!_to.isString())
         return "param to must be string";
-    auto to_addr=base16::decode(_to.toString());
-    if(to_addr.size()!=senderAddress.size())
+    ADDRESS_id to_addr;
+
+    to_addr.addr=base16::decode(_to.toString());
+    if(to_addr.addr.size()!=senderAddress.addr.size())
         return "param to has invalid size";
 
     auto u = t.root->getUserState(senderAddress);
@@ -72,7 +78,7 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     {
         return "cannot transfer to self";
     }
-    if (to_addr.size() != senderAddress.size())
+    if (to_addr.addr.size() != senderAddress.addr.size())
     {
         return "invalid destination address";
     }
@@ -97,14 +103,15 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     t.fee[senderAddress] += fee;
 
     t.emit_command(txid, seqId, "transfer", R"({"from":"%s","to":"%s","amount":"%s"})", 
-        base16::encode(senderAddress).c_str(), 
-        base16::encode(to_addr).c_str(), 
+        base16::encode(senderAddress.addr).c_str(), 
+        base16::encode(to_addr.addr).c_str(), 
         amount.toString().c_str()
         );
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, t_params &t, 
+    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 {
     // if(senderAddress!=)
     auto v = t.root->getValues();
@@ -157,7 +164,8 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
     return std::nullopt;
 }
 
-std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, t_params &t, 
+    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
 {
     auto v = t.root->getValues();
     NODE_id name;
@@ -231,7 +239,8 @@ std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, 
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t_params & t,
+    const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v = t.root->getValues();
     auto _amount = params / "amount";
@@ -278,7 +287,7 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
     t.emit_command(txid, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
         node.container.c_str(),
         amount.toString().c_str(),
-        base16::encode(senderAddress).c_str()
+        base16::encode(senderAddress.addr).c_str()
     );
     n->setDirty();
     us->setDirty();
@@ -287,7 +296,8 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params, t_params & t,
+    const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v = t.root->getValues();
     auto _amount = params / "amount";
@@ -351,14 +361,15 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
     // t.logMsg(txid, seqId, "node %s unstaked on amount %s", node.container.c_str(), amount.toString().c_str());
     t.emit_command(txid, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
         node.container.c_str(),
-        base16::encode(senderAddress).c_str(),
+        base16::encode(senderAddress.addr).c_str(),
         amount.toString().c_str()
     );
 
     return std::nullopt;
 }
 
-std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, t_params & t,const std::string& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, t_params & t,
+    const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
 {
     auto v = t.root->getValues();
     auto _node = params / "node";
@@ -376,7 +387,7 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
     }
     if (n->get_owner() != senderAddress)
     {
-        return "only node owner can enable node owner "+base16::encode(n->get_owner())+" " + base16::encode(senderAddress);
+        return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(senderAddress.addr);
     }
     auto fee=v->getFee("node_enable");
     auto us = t.root->getUserState(senderAddress);
@@ -396,64 +407,4 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
 
     return std::nullopt;
 }
-
-// std::optional<std::string> TR::execute(const tx::createContract &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
-// {
-//     auto v = t.root->getValues();
-//     auto u = t.root->getUser(senderAddress);
-//     if (!u.valid())
-//         return "sender not found";
-
-//     auto cc = t.root->getContract(c.name);
-//     if (cc.valid())
-//         return "contract name already exists";
-
-//     cc = t.root->addContract(c.name, by);
-
-//     cc->owner = senderAddress;
-//     cc->name_ = c.name;
-//     cc->src = c.src;
-
-//     u->contracts.insert(c.name);
-//     u->setDirty();
-//     cc->setDirty();
-
-//     t.fee[senderAddress] += v->fees[bc_values::contract_deploy];
-
-//     t.logMsg(txid, seqId, "contract %s deployed successfully", c.name.c_str());
-
-//     return std::nullopt;
-//     return std::nullopt;
-
-// }
-
-// std::optional<std::string> TR::execute(const tx::createContract &c, t_params &t, const std::string &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
-// {
-//     auto v = t.root->getValues();
-//     auto u = t.root->getUser(senderAddress);
-//     if (!u.valid())
-//         return "sender not found";
-
-//     auto cc = t.root->getContract(c.name);
-//     if (cc.valid())
-//         return "contract name already exists";
-
-//     cc = t.root->addContract(c.name, by);
-
-//     cc->owner = senderAddress;
-//     cc->name_ = c.name;
-//     cc->src = c.src;
-
-//     u->contracts.insert(c.name);
-//     u->setDirty();
-//     cc->setDirty();
-
-//     t.fee[senderAddress] += v->fees[bc_values::contract_deploy];
-
-//     t.logMsg(txid, seqId, "contract %s deployed successfully", c.name.c_str());
-
-//     return std::nullopt;
-// }
-
-
 

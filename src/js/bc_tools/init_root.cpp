@@ -9,11 +9,13 @@ void init_root(const REF_getter<root_data> &r)
         stakes.push_back(100*i);
     }
     std::string u_root_pk=base16::decode(getenv2("k_root_ed_pk"));
+    ADDRESS_id u_root_address;
+    u_root_address.addr=blake2b_hash(u_root_pk).container;
     if(!r->checkValues().valid())
     {
         auto v=r->getValues();
-        if(!v->emitters_bin.count(u_root_pk))
-            v->emitters_bin.insert(u_root_pk);
+        if(!v->emitters_bin.count(u_root_address))
+            v->emitters_bin.insert(u_root_address);
 
         int total=0;
         for(auto &z: stakes)
@@ -24,9 +26,9 @@ void init_root(const REF_getter<root_data> &r)
         v->setDirty();
     }
     // u_root pk
-    if(!r->checkUserState(u_root_pk).valid())
+    if(!r->checkUserState(u_root_address).valid())
     {
-        auto u=r->getUserState(u_root_pk);
+        auto u=r->getUserState(u_root_address);
         if(!u.valid())
         {
             throw CommonError("cannot find root user state");
@@ -58,8 +60,8 @@ void init_root(const REF_getter<root_data> &r)
         REF_getter<bc_node> nn=r->addNode(name,NULL);
         blst_cpp::PublicKey bls_pk;
         bls_pk.deserializeHexStr(getenv2(keys[i].first));
-        nn->init(name, u_root_pk, bls_pk, base16::decode(getenv2(keys[i].second)), "127.0.0.1:"+std::to_string(2300+i));
-        nn->add_stake(u_root_pk, 100*i);
+        nn->init(name, u_root_address, bls_pk, base16::decode(getenv2(keys[i].second)), "127.0.0.1:"+std::to_string(2300+i));
+        nn->add_stake(u_root_address, 100*i);
         nn->setDirty();
         // r->;
 

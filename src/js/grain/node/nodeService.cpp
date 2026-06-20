@@ -454,8 +454,10 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
         auto tt=t.validateBlockREQ->transaction_bodies[ti];
         auto tx_hash=tt->getHash();
         auto &pk_bin=tt->pk_ed_bin;
+        ADDRESS_id senderAddress;
+        senderAddress.addr=blake2b_hash(pk_bin).container;
         auto &tj = tt->tx_body;
-        REF_getter<fee_calcer> by = t.feeCalcers.get(pk_bin);
+        REF_getter<fee_calcer> by = t.feeCalcers.get(senderAddress);
         if (!tt->verify())
         {
             t_err = "verify failed @12";
@@ -464,7 +466,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
         if (!t_err)
         {
             MUTEX_INSPECTOR;
-            auto u = root->getUserState(pk_bin);
+            auto u = root->getUserState(senderAddress);
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -481,7 +483,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
                 if (!t_err)
                 {
                     MUTEX_INSPECTOR;
-                    execute_transaction(tt->getHash(), t, pk_bin, tj, by);
+                    execute_transaction(tt->getHash(), t, senderAddress, tj, by);
                     u->incNonce();
                     u->setDirty();
 
@@ -557,7 +559,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         }
         total_fees += z.second->get_fee();
         t.att_data->fees[z.first] = z.second->get_fee();
-        t.emit_block("fee",R"({"address":"%s","fee":"%s"})",base16::encode(z.first).c_str(),z.second->get_fee().toString().c_str());
+        t.emit_block("fee",R"({"address":"%s","fee":"%s"})",base16::encode(z.first.addr).c_str(),z.second->get_fee().toString().c_str());
         z.second->reset();
     }
     t.emit_block("total_fee",R"({"fee":"%s"})",total_fees.toString().c_str());

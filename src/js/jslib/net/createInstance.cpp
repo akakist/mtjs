@@ -131,7 +131,7 @@ JSValue js_tx_subscribe(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 ////////////////
 JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-
+    logErr2("js_tx_submit");
     JSScope<10, 10> scope(ctx);
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
     if (argc != 5)
@@ -177,7 +177,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     auto hash = t->getHash();
     t->sig_ed_bin = sign_ed(sk, hash.container);
     // auto hash = blake2b_hash(t->tx_body+t->nonce.toString());
-
+    logErr2("op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(t, op->listener_->serviceId));");
     op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(t, op->listener_->serviceId));
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, timeout, op->listener_));
@@ -199,7 +199,21 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     return g_prom.release();
 }
-
+JSValue js_addr_from_pk(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    MUTEX_INSPECTOR;
+    JSScope<10, 10> scope(ctx);
+    // mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
+    if (argc != 1)
+        return JS_ThrowInternalError(ctx, "number of argument must be 1");
+    if (!JS_IsString(argv[0]))
+        return JS_ThrowInternalError(ctx, "pk not specified, must be string");
+    auto pk = base16::decode(scope.toStdString(argv[0]));
+    auto addr = blake2b_hash(pk);
+    auto addr_str = base16::encode(addr.container);
+    logErr2("addr from pk: %s", addr_str.c_str());
+    return JS_NewString(ctx, addr_str.c_str());
+}
 /////////////////
 JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
@@ -217,14 +231,15 @@ JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
         return JS_ThrowInternalError(ctx, "timeout not specified");
 
     std::string node_addr = (std::string)scope.toStdString(argv[0]);
-    std::string address = base16::decode(scope.toStdString(argv[1]));
+    ADDRESS_id address;
+    address.addr = base16::decode(scope.toStdString(argv[1]));
     // std::string nick=(std::string)scope.toStdString(argv[1]);
     double to;
     if (JS_ToFloat64(ctx, &to, argv[2]))
         return JS_ThrowInternalError(ctx, "timeout parse error");
 
     REF_getter<MsgData::GetUserStatusREQ> rq = new MsgData::GetUserStatusREQ();
-    rq->user_pk_bin_ed = address;
+    rq->user_address = address;
     rq->rnd.resize(10);
     RAND_bytes((unsigned char *)rq->rnd.data(), rq->rnd.size());
 
@@ -259,4 +274,5 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     // JS_SetPropertyStr(ctx, mtjs_obj, "tx_sign", JS_NewCFunction(ctx, js_tx_sign, "tx_sign", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_subscribe", JS_NewCFunction(ctx, js_tx_subscribe, "tx_subscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_user_info", JS_NewCFunction(ctx, js_get_user_info, "get_user_info", 2));
+    JS_SetPropertyStr(ctx, mtjs_obj, "addr_from_pk", JS_NewCFunction(ctx, js_addr_from_pk, "addr_from_pk", 1));
 }

@@ -14,7 +14,7 @@ let root_pk=std.getenv('k_root_ed_pk');
 let users: string[] = [];
 for (let i = 0; i < 20; i++) {
     let pk = std.getenv(`k_u${i}_ed_pk`);
-    if (pk) users.push(pk);
+    if (pk) users.push(mtjs.addr_from_pk(pk));
 }
 let nodes: string[] = [];
 for (let i = 0; i < 20; i++) {
@@ -26,7 +26,7 @@ async function exec() {
             mtjs.tx_subscribe(node, (params)=>{
                 console.log("tx report from js:", JSON.stringify(params));
             });
-            const ui=await mtjs.get_user_info(node,root_pk!,1.5)
+            const ui=await mtjs.get_user_info(node,mtjs.addr_from_pk(root_pk!),1.5)
             const nonce=ui.nonce;
             console.log(ui);
             let tx=

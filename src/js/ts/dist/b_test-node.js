@@ -14,8 +14,9 @@ let users = [];
 for (let i = 0; i < 20; i++) {
     let pk = std.getenv(`k_u${i}_ed_pk`);
     if (pk)
-        users.push(pk);
+        users.push(mtjs.addr_from_pk(pk));
 }
+console.log(JSON.stringify(users));
 let nodes = [];
 for (let i = 0; i < 20; i++) {
     nodes.push(`n${i}`);
@@ -25,7 +26,7 @@ async function exec() {
         mtjs.tx_subscribe(node, (params) => {
             console.log("tx report from js:", JSON.stringify(params));
         });
-        const ui = await mtjs.get_user_info(node, root_pk, 1.5);
+        const ui = await mtjs.get_user_info(node, mtjs.addr_from_pk(root_pk), 1.5);
         const nonce = ui.nonce;
         console.log(ui);
         let tx = [
@@ -84,9 +85,9 @@ try {
                 HTTP_max_post=1000000
                 HTTP_doc_urls=/pics,/html,/css
                 HTTP_document_root=./www
+                GrainWriter_snapshot_modulus=10000
                 Node_my_sk_bls_env_key=k_node${i}_bls_sk
                 Node_my_sk_ed_env_key=k_node${i}_ed_sk
-		GrainWriter_snapshot_modulus=10000
                 Node_this_node_name=n${i}
                 Node_sqlite_pn=db/s${i}
         `);

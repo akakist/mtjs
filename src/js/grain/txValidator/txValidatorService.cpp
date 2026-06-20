@@ -129,6 +129,7 @@ bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
 {
     MUTEX_INSPECTOR;
+logErr2("TxValidator AddTxREQ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
     std::optional<std::string> err;
     auto hash = e->tx->getHash();
@@ -155,7 +156,7 @@ bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
 
 bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg *e)
 {
-
+logErr2("TxValidator ClientMsg");
     MUTEX_INSPECTOR;
     inBuffer in(e->msg);
 

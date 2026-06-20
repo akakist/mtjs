@@ -2,7 +2,7 @@
 
 #include "REF.h"
 #include "bigint.h"
-
+#include "ADDRESS_id.h"
 
 struct fee_calcer: public Refcountable
 {
@@ -28,8 +28,8 @@ public:
 
 struct _feeCalcers
 {
-    std::map<std::string /*pk*/,REF_getter<fee_calcer>> calcers;
-    REF_getter<fee_calcer> get(const std::string &pk)
+    std::map<ADDRESS_id, REF_getter<fee_calcer>> calcers;
+    REF_getter<fee_calcer> get(const ADDRESS_id &pk)
     {
         auto it=calcers.find(pk);
         if(it==calcers.end())

@@ -2,7 +2,7 @@
 #include "md_Base.h"
 #include "md_TX.h"
 #include "bigint.h"
-
+#include "ADDRESS_id.h"
 struct EmitNode {
     std::vector<std::pair<std::string,std::string>> emits;                    // события на этом уровне
     std::map<std::string, EmitNode> children;          // дочерние узлы
@@ -45,7 +45,7 @@ namespace MsgData
         // std::vector<REF_getter<TX>> trs;
         // std::pair<int,std::string> block_report={0,""};
         // std::map<THASH_id,transaction_report> transaction_reports;
-        std::map<std::string,BigInt> fees;
+        std::map<ADDRESS_id,BigInt> fees;
         std::map<NODE_id,BigInt> rewards;
         // std::vector<std::string> emitted_events;
 
@@ -84,7 +84,7 @@ namespace MsgData
             // }
             for(auto &z: fees)
             {
-                h.update(z.first);
+                h.update(z.first.addr);
                 h.update(z.second.toString());
             }
             for(auto &z: rewards)

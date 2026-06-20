@@ -172,7 +172,7 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     resetTimer();
     if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
     {
-        logNode("invalid leader 14");
+        logNode("invalid leader #14  %s %s", cli_leader_info[prev_root_hash_Z].node_leader.container.c_str(), src_node.container.c_str());
         return true;
     }
 
@@ -205,7 +205,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     bool err = false;
     if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
     {
-        logNode("invalid leader 15");
+        logNode("invalid leader #15");
         return true;
     }
 

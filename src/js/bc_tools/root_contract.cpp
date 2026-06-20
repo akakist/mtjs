@@ -197,36 +197,36 @@ REF_getter<bc_values> root_data::checkValues()
     return NULL;
 }
 
-std::vector<std::string> root_data::getUserPath(const std::string &pk_bin)
+std::vector<std::string> root_data::getUserPath(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTORS("getUserPath");
-    if (pk_bin.size() != 32)
-        throw CommonError("    if(pk_bin.size()!=32) %d %s", pk_bin.size(), _DMI().c_str());
+    if (addr.addr.size() != 32)
+        throw CommonError("    if(pk_bin.size()!=32) %d %s", addr.addr.size(), _DMI().c_str());
     std::vector<std::string> p;
     p.push_back("u");
-    std::string pk_hex = base16::encode(pk_bin);
-    appendRelativeInternalPath(p, pk_hex, 5);
+    std::string addr_hex = base16::encode(addr.addr);
+    appendRelativeInternalPath(p, addr_hex, 5);
     // p.push_back(pk_hex);
     return p;
 }
-std::vector<std::string> root_data::getUserStatePath(const std::string &pk_bin)
+std::vector<std::string> root_data::getUserStatePath(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTORS("getUserStatePath");
-    if (pk_bin.size() != 32)
-        throw CommonError("    if(pk_bin.size()!=32) %d %s", pk_bin.size(), _DMI().c_str());
+    if (addr.addr.size() != 32)
+        throw CommonError("    if(pk_bin.size()!=32) %d %s", addr.addr.size(), _DMI().c_str());
     std::vector<std::string> p;
     p.reserve(10);
     p.push_back("s");
-    std::string pk_hex = base16::encode(pk_bin);
-    appendRelativeInternalPath(p, pk_hex, 5);
+    std::string addr_hex = base16::encode(addr.addr);
+    appendRelativeInternalPath(p, addr_hex, 5);
     // p.push_back(pk_hex);
     return p;
 }
 
-REF_getter<bc_user> root_data::getUser(const std::string &pk)
+REF_getter<bc_user> root_data::getUser(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTOR;
-    auto v = getUserPath(pk);
+    auto v = getUserPath(addr);
     auto cc = getByPathOrCreate(this, v, db.get());
     if (!cc.valid())
         return NULL;
@@ -242,10 +242,10 @@ REF_getter<bc_user> root_data::getUser(const std::string &pk)
     cc->payload_ctor_idx = hsh::bc_user;
     return u;
 }
-REF_getter<bc_user_state> root_data::getUserState(const std::string &pk)
+REF_getter<bc_user_state> root_data::getUserState(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTOR;
-    auto v = getUserStatePath(pk);
+    auto v = getUserStatePath(addr);
     auto cc = getByPathOrCreate(this, v, db.get());
     if (!cc.valid())
         return NULL;
@@ -262,10 +262,10 @@ REF_getter<bc_user_state> root_data::getUserState(const std::string &pk)
     cc->payload_ctor_idx = hsh::bc_user_state;
     return u;
 }
-REF_getter<bc_user_state> root_data::checkUserState(const std::string &pk)
+REF_getter<bc_user_state> root_data::checkUserState(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTOR;
-    auto v = getUserStatePath(pk);
+    auto v = getUserStatePath(addr);
     auto cc = getByPathNoCreate(this, v, db.get());
     if (!cc.valid())
         return NULL;
@@ -466,7 +466,7 @@ std::string bc_node::dump()
     MUTEX_INSPECTOR;
     M_LOCK (parent->mx);
     nlohmann::json j;
-    j["owner"]=base16::encode(owner_ed_pk);
+    j["owner"]=base16::encode(owner_address.addr);
     j["ed_pk"]=base16::encode(ed_pk);
     j["bls_pk"]=base16::encode(bls_pk.serialize());
     j["name"]=name_.container;
@@ -476,7 +476,7 @@ std::string bc_node::dump()
     for(auto &z: stakes)
     {
         nlohmann::json js;
-        js["address"]=base16::encode(z.first);
+        js["address"]=base16::encode(z.first.addr);
         js["amount"]=z.second.toString();
         // js.push_back(base16::encode(z.first));
         // js.push_back(z.second.toString());
@@ -497,7 +497,9 @@ std::string bc_values::dump()
     nlohmann::json j;
     for(auto &z: emitters_bin)
     {
-        j["emitters"].push_back(base16::encode(z));
+        ADDRESS_id a;
+        a.addr=blake2b_hash(z.addr).container;
+        j["emitters"].push_back(base16::encode(a.addr));
     }
     for(auto& z: fees)
     {
