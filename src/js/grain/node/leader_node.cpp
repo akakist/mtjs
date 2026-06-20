@@ -26,6 +26,11 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     }
     auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
+    if(li.TIMER_VALIDATE_BLOCK_DELAY_set)
+    {
+        logNode("TIMER_VALIDATE_BLOCK_DELAY_set is true, so do not reset timer");
+        return true;
+    }
     li.transaction_responders.insert(src_node);
     BigInt stake = 0;
     for (auto &z : li.transaction_responders)
@@ -41,12 +46,20 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     }
     if (stake.toDouble() > total_staked.toDouble() * QUORUM)
     {
+        auto curtime=iUtils->getNow();
+        auto diff_mks=curtime-li.request_for_transactions_time;
+        logNode("diff_mks %ld, stake %s, total_staked %s", diff_mks, stake.toString().c_str(), total_staked.toString().c_str());
+        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_VALIDATE_BLOCK_DELAY,NULL,NULL,double(diff_mks)/1000000., this));
+        li.TIMER_VALIDATE_BLOCK_DELAY_set=true;
+
+#ifdef KALL        
         if (hbs.leader_info.leader_cert_2.valid() && hbs.leader_info.leader_cert_2->nodes.size() == li.transaction_responders.size())
         {
             do_start_block();
             logNode("do_start_block();");
             li.transaction_responders.clear();
         }
+#endif
     }
     XPASS;
     return true;
@@ -108,6 +121,9 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     }
 
     auto &bt = blocks_leader[prev_root_hash_Z];
+    auto h=r->blockInfo->getHash();
+    bt.responses[h].push_back(r);
+#ifdef KALL
     if (bt.responses.size())
     {
         if (bt.responses[0]->blockInfo->getHash() != r->blockInfo->getHash())
@@ -121,12 +137,13 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             return true;
         }
     }
+#endif
     if (bt.block_accepted_sent)
         return true;
     // auto & bh=bt[bl.root_hash];
-    bt.responses.push_back(r);
+    // bt.responses.push_back(r);
     BigInt stakeVal = 0;
-    for (auto &z : bt.responses)
+    for (auto &z : bt.responses[h])
     {
         stakeVal += root->getNode(z->node_validator)->get_full_stake();
     }
@@ -141,20 +158,20 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         XTRY;
         logNode("Block stake finalized");
         REF_getter<MsgData::BlockAcceptedREQ> ba = new MsgData::BlockAcceptedREQ();
-        if (!bt.blockInfo.valid())
+        if (!bt.blockInfo[h].valid())
         {
-            bt.blockInfo = r->blockInfo;
+            bt.blockInfo[h] = r->blockInfo;
         }
-        else if (bt.blockInfo->getBuffer() != r->blockInfo->getBuffer())
+        else if (bt.blockInfo[h]->getBuffer() != r->blockInfo->getBuffer())
             throw CommonError("else if(bh.block_payload!=r->payload_block)");
 
-        ba->blockInfo = bt.blockInfo;
-        if (!bt.blockInfo.valid())
-            throw CommonError("if(!bt.block_payload.valid())");
+        ba->blockInfo = r->blockInfo;
+        // if (!bt.blockInfo.valid())
+        //     throw CommonError("if(!bt.block_payload.valid())");
         std::vector<blst_cpp::PublicKey> agg_pk;
         auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
         // ba->leader_certificateZ = hbs.leader_info.leader_cert_2;
-        for (auto &z : bt.responses)
+        for (auto &z : bt.responses[h])
         {
             auto n = root->getNode(z->node_validator);
             agg_pk.push_back(n->get_bls_pk());
@@ -173,6 +190,24 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         broadcast_MsgEvent(ba.get());
 
         bt.block_accepted_sent = true;
+
+        //// slash missed nodes;
+        for(auto& z: bt.responses)
+        {
+            if(z.first!=h)
+            {
+                for(auto& z2: z.second)
+                {
+                    logNode("@@@@@@@@@@@@@@@@ slash node %s for missed block validation", z2->node_validator.container.c_str()); 
+                    // auto n=root->getNode(z2->node_validator);
+                    // n->inc_missed_rounds();
+                    // n->setDirty();
+                }
+            }
+            // auto n=root->getNode(z->node_validator);
+            // n->set_missed_rounds(0);
+            // n->setDirty();
+        }
         XPASS;
     }
     XPASS;

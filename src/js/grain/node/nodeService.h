@@ -54,23 +54,26 @@ namespace Node
         TIMER_START_HEART_BEAT,
         TIMER_RESTART_BLOCK,
         TIMER_PERIODIC_CLOCK,
+        TIMER_VALIDATE_BLOCK_DELAY,
     };
     struct heart_beat_node_info
     {
         heart_beat_node_info() : leader_cert_2(nullptr) {
 
             // responses.clear();
-            clear();
+            // clear();
 
         }
+        bool TIMER_VALIDATE_BLOCK_DELAY_set=false;
         bool request_for_transactions_sent=false;
         bool confirm_leader_sent=false;
         REF_getter< MsgData::LeaderCertificate> leader_cert_2;
         std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > HeartBeatRSP_m;
         std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > ConfirmLeaderRSP_m;
         std::set<NODE_id> transaction_responders;
+        uint64_t request_for_transactions_time=0;
 
-        void clear()
+        void clear__1()
         {
             request_for_transactions_sent=false;
             leader_cert_2=nullptr;
@@ -161,7 +164,7 @@ namespace Node
 
 
 
-        void do_request_for_transactions(const Node::heart_beat_node_info& li);
+        void do_request_for_transactions( Node::heart_beat_node_info& li);
 
         void broadcast_MsgEvent(const REF_getter<MsgData::Base>& p);
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
@@ -175,12 +178,12 @@ namespace Node
 
         struct block
         {
-            REF_getter<MsgData::BlockInfo> blockInfo=nullptr;
-            std::vector<REF_getter<MsgData::ValidateBlockRSP> > responses;
+            std::map<THASH_id /*blockinfo hash*/,REF_getter<MsgData::BlockInfo> > blockInfo;
+            std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >responses;
 
 
 
-            std::vector<std::pair<NODE_id/*node*/,blst_cpp::Signature> > signs;
+            // std::map<THASH_id /*blockinfo hash*/, std::vector<std::pair<NODE_id/*node*/,blst_cpp::Signature> > >signs__1;
             bool block_accepted_sent=false;
             bool heart_bit_sent_on_block_accepted_rsp=false;
 

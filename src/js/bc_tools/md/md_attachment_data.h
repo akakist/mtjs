@@ -42,9 +42,6 @@ namespace MsgData
 
         }
         EmitNode blockRoot;
-        // std::vector<REF_getter<TX>> trs;
-        // std::pair<int,std::string> block_report={0,""};
-        // std::map<THASH_id,transaction_report> transaction_reports;
         std::map<ADDRESS_id,BigInt> fees;
         std::map<NODE_id,BigInt> rewards;
         // std::vector<std::string> emitted_events;
@@ -62,26 +59,9 @@ namespace MsgData
             b>>fees>>rewards>>blockRoot;
         }
 
-        // void clear()
-        // {
-        //     trs.clear();
-        //     transaction_reports.clear();
-        //     fees.clear();
-        //     rewards.clear();
-        // }
         void update(Blake2bHasher &h) const
         {
             blockRoot.update(h);
-            // for(auto &z:trs)
-            // {
-            //     z->update(h);
-            // }
-            // h.update(std::to_string(block_report.first));
-            // h.update(block_report.second);
-            // for(auto &z: transaction_reports)
-            // {
-            //     z.second.update(h);
-            // }
             for(auto &z: fees)
             {
                 h.update(z.first.addr);
@@ -92,20 +72,11 @@ namespace MsgData
                 h.update(z.first.container);
                 h.update(z.second.toString());
             }
-            // for(const auto &z: emitted_events)
-            // {
-            //     h.update(z);
-            // }
         }
     };
 
 
 }
-// inline outBuffer& operator<< (outBuffer& b,const REF_getter<MsgData::attachment_data> &s)
-// {
-//     s->pack(b);
-//     return b;
-// }
 inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::attachment_data> &s)
 {
     b<<1;

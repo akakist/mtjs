@@ -191,6 +191,25 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     switch (e->tid)
     {
+    case timers::TIMER_VALIDATE_BLOCK_DELAY:
+    {
+        if (state_Z != STATE_NORMAL)
+            return true;
+        auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
+        auto &li = hbs.leader_info;
+        do_start_block();
+        logNode("do_start_block();");
+        li.transaction_responders.clear();
+        return true;
+        /*
+                if (hbs.leader_info.leader_cert_2.valid() && hbs.leader_info.leader_cert_2->nodes.size() == li.transaction_responders.size())
+        {
+            do_start_block();
+            logNode("do_start_block();");
+            li.transaction_responders.clear();
+        }
+*/
+    }
     case timers::TIMER_RESTART_BLOCK:
     {
         if (state_Z != STATE_NORMAL)
@@ -428,12 +447,13 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
     return true;
 }
 
-void Node::Service::do_request_for_transactions(const heart_beat_node_info& li)
+void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
 {
     MUTEX_INSPECTOR;
 
     REF_getter<MsgData::GetTransactionREQ> rt = new MsgData::GetTransactionREQ();
     rt->lc = li.leader_cert_2;
+    li.request_for_transactions_time = iUtils->getNow();
     broadcast_MsgEvent(rt.get());
 }
 

@@ -24,7 +24,7 @@ for (let i = 0; i < 20; i++) {
 async function exec() {
     while (true) {
         mtjs.tx_subscribe(node, (params) => {
-            console.log("tx report from js:", JSON.stringify(params));
+//            console.log("tx report from js:", JSON.stringify(params));
         });
         const ui = await mtjs.get_user_info(node, mtjs.addr_from_pk(root_pk), 1.5);
         const nonce = ui.nonce;
