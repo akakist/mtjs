@@ -90,7 +90,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         sec.use_ssl = false;
         sendEvent(ServiceEnum::RPC, new rpcEvent::DoListen(z, sec));
     }
-    sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
+    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
     sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 1., this));
 
     std::string res;
@@ -218,20 +218,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         auto &li = hbs.leader_info;
         li.request_for_transactions_sent = true;
         do_request_for_transactions(li);
-        return true;
-    }
-    break;
-    case timers::TIMER_START_HEART_BEAT:
-    {
-        if (state_Z != STATE_NORMAL)
-            return true;
-
-        DBG(logNode("case timers::TIMER_START_HEART_BEAT:"));
-        resetTimer();
-        if(transaction_pool_of_leader.size())
-        {
-            do_heart_beat();
-        }
         return true;
     }
     break;
@@ -460,7 +446,7 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
 // #include "sql"
 void Node::Service::resetTimer()
 {
-    sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
+    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 }
 BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &nodes_in_leader_cert)
 {

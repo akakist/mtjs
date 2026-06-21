@@ -154,32 +154,6 @@ bool GrainWriter::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 bool GrainWriter::Service::ClientMsg(const bcEvent::ClientMsg *e)
 {
     throw CommonError("unhandled GrainWriter ClientMsg %s", e->msg.c_str());
-#ifdef KALL
-    MUTEX_INSPECTOR;
-    inBuffer in(e->msg);
-
-    auto p = in.get_PN();
-    REF_getter<MsgData::Base> b=msgFactory.create(p);
-    b->unpack(in);
-    auto hash=b->getHash();
-
-    switch(p)
-    {
-    case msgid::GetUserStatusREQ:
-    {
-        auto pp=(MsgData::GetUserStatusREQ*) b.get();
-        auto u = root->getUserState(pp->user_pk_bin_ed);
-
-        REF_getter<MsgData::GetUserStatusRSP> rsp=new MsgData::GetUserStatusRSP;
-        rsp->balance=u->getBalance();
-        rsp->nonce=u->getNonce();
-        passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
-
-
-    }
-    break;
-    }
-#endif
     return true;
 }
 bool GrainWriter::Service::WriteGranules(const bcEvent::WriteGranules *e)

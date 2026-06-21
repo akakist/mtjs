@@ -347,7 +347,7 @@ bool MTJS::Service::TickTimer(const timerEvent::TickTimer *e)
     {
         MUTEX_INSPECTOR;
         TimerTask *t = (TimerTask *)e->cookie.get();
-        logErr2("TickTimer: %lld", std::stoll(e->data->container));
+        // logErr2("TickTimer: %lld", std::stoll(e->data->container));
         JSValue global_obj = JS_GetGlobalObject(js_ctx);
         scope.addValue(global_obj);
         JSValue ac[t->fargs.size()];
@@ -586,32 +586,6 @@ void to_json(nlohmann::json& j, const EmitNode& node) {
     }
     XPASS;
 }
-#ifdef KALL
-std::string dump_emit_node_compact(const EmitNode& node) {
-    std::string result;
-    result += "{\"emits\":[";
-    
-    for (size_t i = 0; i < node.emits.size(); ++i) {
-        const auto& emit = node.emits[i];
-        result += "[\"" + emit.first + "\"," + emit.second + "]";
-        if (i + 1 < node.emits.size()) result += ",";
-    }
-    
-    result += "]";
-    
-    if (!node.children.empty()) {
-        result += ",\"children\":{";
-        for (auto it = node.children.begin(); it != node.children.end(); ++it) {
-            result += "\"" + it->first + "\":" + dump_emit_node_compact(it->second);
-            if (std::next(it) != node.children.end()) result += ",";
-        }
-        result += "}";
-    }
-    
-    result += "}";
-    return result;
-}
-#endif
 JSValue emit_node_to_js(JSContext* ctx, const EmitNode& node) {
     JSValue obj = JS_NewObject(ctx);
     
@@ -638,53 +612,6 @@ JSValue emit_node_to_js(JSContext* ctx, const EmitNode& node) {
     
     return obj;
 }
-#ifdef KALL
-std::string dump_emit_node(const EmitNode& node, int indent = 0) {
-    std::string result;
-    std::string indent_str(indent, ' ');
-    
-    result += indent_str + "{\n";
-    result += indent_str + "  \"emits\": [\n";
-    for (size_t i = 0; i < node.emits.size(); ++i) {
-        const auto& emit = node.emits[i];
-        result += indent_str + "    [\"" + emit.first + "\", " + emit.second + "]";
-        if (i + 1 < node.emits.size()) result += ",";
-        result += "\n";
-    }
-    if(node.children.size())
-        result += indent_str + "  ],\n";
-    else
-        result += indent_str + "  ]\n";
-    
-    if (!node.children.empty()) {
-        result += indent_str + "  \"children\": {\n";
-        for (auto it = node.children.begin(); it != node.children.end(); ++it) {
-            result += indent_str + "    \"" + it->first + "\": " + dump_emit_node(it->second, indent + 4);
-            if (std::next(it) != node.children.end()) result += ",";
-            result += "\n";
-        }
-        result += indent_str + "  }\n";
-    } else {
-        // result += indent_str + "  \"children\": {}\n";
-    }
-    result += indent_str + "}";
-    
-    return result;
-}
-#endif
-#ifdef KALL
-std::string dump_emit_node(const EmitNode& node) 
-{
-    MUTEX_INSPECTOR;
-    nlohmann::json j;
-    XTRY;
-    to_json(j, node);
-    XPASS;
-    XTRY;
-    return j.dump(); // с отступами
-    XPASS;
-}
-#endif
 bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 {
     MUTEX_INSPECTOR;

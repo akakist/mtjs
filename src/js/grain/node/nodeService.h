@@ -51,7 +51,7 @@ namespace Node
 {
     enum timers
     {
-        TIMER_START_HEART_BEAT,
+        // TIMER_START_HEART_BEAT,
         TIMER_RESTART_BLOCK,
         TIMER_PERIODIC_CLOCK,
         TIMER_VALIDATE_BLOCK_DELAY,

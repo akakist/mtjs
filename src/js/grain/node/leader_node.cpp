@@ -52,14 +52,6 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_VALIDATE_BLOCK_DELAY,NULL,NULL,double(diff_mks)/1000000., this));
         li.TIMER_VALIDATE_BLOCK_DELAY_set=true;
 
-#ifdef KALL        
-        if (hbs.leader_info.leader_cert_2.valid() && hbs.leader_info.leader_cert_2->nodes.size() == li.transaction_responders.size())
-        {
-            do_start_block();
-            logNode("do_start_block();");
-            li.transaction_responders.clear();
-        }
-#endif
     }
     XPASS;
     return true;
@@ -123,21 +115,6 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     auto &bt = blocks_leader[prev_root_hash_Z];
     auto h=r->blockInfo->getHash();
     bt.responses[h].push_back(r);
-#ifdef KALL
-    if (bt.responses.size())
-    {
-        if (bt.responses[0]->blockInfo->getHash() != r->blockInfo->getHash())
-        {
-            // std::cout << 
-            logNode("if(bt.responses[0]->payload_block->getBuffer()!=r->getBuffer())");
-            nlohmann::json j1,j2;
-            bt.responses[0]->blockInfo->dump(j1);
-            r->blockInfo->dump(j2);
-            logNode("1::::: %s\n2:::: %s",j1.dump(2).c_str(),j2.dump(2).c_str());
-            return true;
-        }
-    }
-#endif
     if (bt.block_accepted_sent)
         return true;
     // auto & bh=bt[bl.root_hash];

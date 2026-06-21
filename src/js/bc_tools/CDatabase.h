@@ -72,17 +72,6 @@ struct CDatabase: public IDatabase
     CDatabase(const std::string& path):path_(path)
     {
         db = nullptr;
-        #ifdef KALL
-        rocksdb::Options options;
-        options.create_if_missing = true;
-        options.atomic_flush = true;            // safer flushes
-        options.max_background_jobs = 8;        // tune for your CPU
-        options.write_buffer_size = 64 * 1024 * 1024; // 64MB memtable
-        options.target_file_size_base = 64 * 1024 * 1024;
-        options.level_compaction_dynamic_level_bytes = true;
-        options.keep_log_file_num = 3;        // хранить только 3 старых лога
-        options.max_log_file_size = 10 * 1024 * 1024; // 10 MB
-        #endif
         rocksdb::Options options;
         options.create_if_missing = true;
         options.atomic_flush = true;

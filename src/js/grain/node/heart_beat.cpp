@@ -176,10 +176,18 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
                 
                 /// просто проверка на всякий случай.
                 if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)
-                    throw CommonError("if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)");
+                {
+                        logNode("if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)\nremote_prev_lc->heart_beat->prev_root_hash %s local_lc->heart_beat->prev_root_hash %s", remote_prev_lc->heart_beat->prev_root_hash.str().c_str(), local_lc->heart_beat->prev_root_hash.str().c_str());
+                        return true;
+                }
+                    // throw CommonError("if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)");
                 /// тоже проверка на всякий случай
                 if(prev_root_hash_Z!=h->prev_root_hash)    
-                    throw CommonError("if(prev_root_hash_Z!=h->prev_root_hash)    ");
+                {
+                    logNode("if(prev_root_hash_Z!=h->prev_root_hash)    prev_root_hash_Z %s h->prev_root_hash %s", prev_root_hash_Z.str().c_str(), h->prev_root_hash.str().c_str());
+                    return true;
+                }
+                    // throw CommonError("if(prev_root_hash_Z!=h->prev_root_hash)    ");
                 
                 auto& ci=cli_leader_info[h->prev_root_hash];
                 if(ci.node_leader.container.empty())
@@ -321,7 +329,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 void Node::Service::do_heart_beat()
 {
     blocks_leader.clear();
-    sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
+    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
     {
         REF_getter<MsgData::HeartBeatREQ> hb_req =
             new MsgData::HeartBeatREQ(prev_root_hash_Z,

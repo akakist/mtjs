@@ -316,26 +316,6 @@ void getChildrenRecursive(Cellable *c, std::vector<REF_getter<data_base>> &res, 
             lk.lock();
         }
     }
-#ifdef KALL
-    for (auto &z : c->children_hashes_mx)
-    {
-        auto key = z.first;
-        auto it = c->children_ptrs_mx.find(key);
-        if (it != c->children_ptrs_mx.end())
-        {
-            getChildrenRecursive(it->second.get(), res, db);
-        }
-        else
-        {
-            auto cc = c->getLeafNoCreate(key, db);
-            if (!cc.valid())
-            {
-                throw CommonError("if(!cc.valid())");
-            }
-            getChildrenRecursive(cc.get(), res, db);
-        }
-    }
-#endif
 }
 std::vector<REF_getter<bc_node>> root_data::getAllNodes()
 {

@@ -276,6 +276,7 @@ int mainMTJS(int argc, char** argv )
             sleep(1);
         // delete iUtils;
         iUtils->execute_shutdown_cbs();
+        printf("@@ %s",iUtils->getIThreadNameController()->dump_mutex_inspectors().c_str());
         return 0;
 
     } catch (CommonError& e)
