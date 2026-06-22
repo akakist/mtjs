@@ -17,6 +17,8 @@
 #include "md/md_GetUserStatusREQ.h"
 #include "md/md_GetUserStatusRSP.h"
 #include "md/md_LcEnvelopeREQ.h"
+#include "md/md_DoYouHaveBlockREQ.h"
+#include "md/md_DoYouHaveBlockRSP.h"
 
 MsgFactory::MsgFactory()
 {
@@ -37,5 +39,7 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetUserStatusREQ, MsgData::GetUserStatusREQ::construct);
     registerMsg(msgid::GetUserStatusRSP, MsgData::GetUserStatusRSP::construct);
     registerMsg(msgid::LcEnvelopeREQ, MsgData::LcEnvelopeREQ::construct);
+    registerMsg(msgid::DoYouHaveBlockREQ, MsgData::DoYouHaveBlockREQ::construct);
+    registerMsg(msgid::DoYouHaveBlockRSP, MsgData::DoYouHaveBlockRSP::construct);
 
 }

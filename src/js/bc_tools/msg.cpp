@@ -88,6 +88,10 @@ const char *msgName(int id)
         return "GetUserStatusREQ";
     case msgid::LcEnvelopeREQ:
         return "LcEnvelopeREQ";
+    case msgid::DoYouHaveBlockREQ:
+        return "DoYouHaveBlockREQ";
+    case msgid::DoYouHaveBlockRSP:
+        return "DoYouHaveBlockRSP";
         
 
     default:

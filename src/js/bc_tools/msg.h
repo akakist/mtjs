@@ -68,7 +68,9 @@ namespace msgid
         attachment_data,
         GetUserStatusREQ,
         GetUserStatusRSP,
-        LcEnvelopeREQ
+        LcEnvelopeREQ,
+	DoYouHaveBlockREQ,
+	DoYouHaveBlockRSP
     };
 
 }

@@ -11,5 +11,7 @@ namespace TR {
     std::optional<std::string> execute_node_stake(const yyjson::Value &params, t_params & t,const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
     std::optional<std::string> execute_unstake_node(const yyjson::Value &params, t_params & t,const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
     std::optional<std::string> execute_node_enable(const yyjson::Value &params, t_params & t,const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
+    std::optional<std::string> execute_contract_deploy(const yyjson::Value &params, t_params & t,const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
+    std::optional<std::string> execute_contract_update(const yyjson::Value &params, t_params & t,const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId);
 
 }

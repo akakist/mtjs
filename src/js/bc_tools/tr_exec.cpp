@@ -408,3 +408,114 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
     return std::nullopt;
 }
 
+
+
+
+std::optional<std::string> TR::execute_contract_deploy(const yyjson::Value &params, t_params &t, 
+    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+{
+    auto v = t.root->getValues();
+    std::string name;
+    auto _name=params / "name";
+    if(!_name.isString())
+    {
+        return "no string param name";
+    }
+    name = _name.toString();
+    for (auto &z : name)
+    {
+        if (!isalnum(z))
+        {
+            return "allowed only isalnum symbols";
+        }
+        if (isalpha(z) && isupper(z))
+        {
+            return "allowed only lowercase symbols";
+        }
+    }
+
+    auto nn = t.root->getContract(name);
+    if (nn.valid())
+        return "Contract already registered with name";
+
+    auto us = t.root->getUserState(senderAddress);
+    if (!us.valid())
+        return "if(!us.valid())";
+    auto fee=v->getFee("contract_deploy");
+    if (us->getBalance() < fee)
+        return "Not enough funds";
+
+
+    auto n = t.root->addContract(name, by);
+
+    auto src=params / "src";
+    if(!src.isString())
+        return "string param src required";
+
+    {
+        M_LOCK(n->parent->mx);
+        n->src=src.toString();
+        n->owner=senderAddress;
+    }
+
+    n->setDirty();
+    us->setDirty();
+    t.addCalcer(n.get(),by);
+    t.addCalcer(us.get(),by);
+
+    t.fee[senderAddress] += fee;
+
+    t.emit_command(txid, seqId, "contract_deploy",R"({"name":"%s","owner":"%s"})",name.c_str(),base16::encode(senderAddress.addr).c_str());
+
+    return std::nullopt;
+}
+std::optional<std::string> TR::execute_contract_update(const yyjson::Value &params, t_params &t, 
+    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+{
+    auto v = t.root->getValues();
+    std::string name;
+    auto _name=params / "name";
+    if(!_name.isString())
+    {
+        return "no string param name";
+    }
+    name = _name.toString();
+
+    auto n = t.root->getContract(name);
+    if (!n.valid())
+        return "contract not exists";
+
+    auto us = t.root->getUserState(senderAddress);
+    if(senderAddress!=n->owner)
+    {
+        return "sender is not contract owner";
+    }
+    if (!us.valid())
+        return "if(!us.valid())";
+    auto fee=v->getFee("contract_update");
+    if (us->getBalance() < fee)
+        return "Not enough funds";
+
+
+    // auto n = t.root->addContract(name, by);
+
+    auto src=params / "src";
+    if(!src.isString())
+        return "string param src required";
+
+    {
+        M_LOCK(n->parent->mx);
+        n->src=src.toString();
+    }
+
+    n->setDirty();
+    us->setDirty();
+    t.addCalcer(n.get(),by);
+    t.addCalcer(us.get(),by);
+
+    t.fee[senderAddress] += fee;
+
+    t.emit_command(txid, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",name.c_str(),base16::encode(senderAddress.addr).c_str());
+
+    return std::nullopt;
+}

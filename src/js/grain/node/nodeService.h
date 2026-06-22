@@ -35,6 +35,8 @@
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
 #include "md/md_LcEnvelopeREQ.h"
+#include "md/md_DoYouHaveBlockREQ.h"
+#include "md/md_DoYouHaveBlockRSP.h"
 #include "dbHistory.h"
 #include "t_params.h"
 #include "cached_state.h"
@@ -55,6 +57,7 @@ namespace Node
         TIMER_RESTART_BLOCK,
         TIMER_PERIODIC_CLOCK,
         TIMER_VALIDATE_BLOCK_DELAY,
+        TIMER_SYNC_TIMEDOUT
     };
     struct heart_beat_node_info
     {
@@ -154,6 +157,9 @@ namespace Node
         bool ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
         bool ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
 
+        bool DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const NODE_id & src_node, const route_t& route);
+        bool DoYouHaveBlockRSP(const MsgData::DoYouHaveBlockRSP* m, const NODE_id & src_node, const route_t& route);
+
         bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);
 
@@ -183,7 +189,6 @@ namespace Node
 
 
 
-            // std::map<THASH_id /*blockinfo hash*/, std::vector<std::pair<NODE_id/*node*/,blst_cpp::Signature> > >signs__1;
             bool block_accepted_sent=false;
             bool heart_bit_sent_on_block_accepted_rsp=false;
 
@@ -199,7 +204,6 @@ namespace Node
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         std::map<BLOCK_id,block> blocks_leader;
         
-        // NODE_id node_leader_for_client;
 
         struct client_block_info
         {
@@ -213,7 +217,15 @@ namespace Node
             NODE_id node_leader;
             bool heart_beat_sent=false;
         };
+
         std::map<BLOCK_id, client_leader_info> cli_leader_info;
+
+        struct _sync
+        {
+            bool do_you_have_sent=false;
+            std::set<NODE_id> havers;
+        };
+        std::map<BLOCK_id,_sync> syncs;
 
         BLOCK_id prev_root_hash_Z;
         void do_start_block();

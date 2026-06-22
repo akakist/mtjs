@@ -44,6 +44,10 @@ void execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &s
                     err = TR::execute_unstake_node(params, t, senderAddress, by, tx_id, ii);
                 else if (meth == "node_enable")
                     err = TR::execute_node_enable(params, t, senderAddress, by, tx_id, ii);
+                else if (meth == "contract_deploy")
+                    err = TR::execute_contract_deploy(params, t, senderAddress, by, tx_id, ii);
+                else if (meth == "contract_update")
+                    err = TR::execute_contract_update(params, t, senderAddress, by, tx_id, ii);
                 else
                 {
                     t.emit_command(tx_id, ii, "error", 
@@ -57,6 +61,11 @@ void execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &s
                         err->c_str());                
                 }
 
+            }
+            if(!err)
+            {
+                /// exec js contract
+                
             }
 
         }

@@ -183,6 +183,17 @@ void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b)
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
+    if(e->tid==timers::TIMER_PERIODIC_CLOCK)
+    {
+        auto diff=double(iUtils->getNow()-last_activity_time)/1000000.;
+
+        // logNode("idle time sec %lf",double(iUtils->getNow()-last_activity_time)/1000000.);
+        if(diff>2. && transaction_pool_of_leader.size())
+        {
+            do_heart_beat();
+        }
+        // if(iUtils->getNow()-last_activity_time)
+    }
     return true;
 }
 bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
@@ -191,6 +202,9 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     switch (e->tid)
     {
+    case timers::TIMER_SYNC_TIMEDOUT:
+        logNode("FAILED SYNC, NODE STOPPED---------------------------------------------------------------");
+    break;
     case timers::TIMER_VALIDATE_BLOCK_DELAY:
     {
         if (state_Z != STATE_NORMAL)
@@ -438,6 +452,10 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
     MUTEX_INSPECTOR;
 
     REF_getter<MsgData::GetTransactionREQ> rt = new MsgData::GetTransactionREQ();
+    if(!li.leader_cert_2.valid())
+    {
+        throw CommonError("if(!li.leader_cert_2.valid())");
+    }
     rt->lc = li.leader_cert_2;
     li.request_for_transactions_time = iUtils->getNow();
     broadcast_MsgEvent(rt.get());
@@ -733,6 +751,9 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
     switch (msg->type)
     {
+    case msgid::DoYouHaveBlockREQ:
+        last_activity_time=iUtils->getNow();
+        return DoYouHaveBlockREQ(static_cast<const MsgData::DoYouHaveBlockREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::LcEnvelopeREQ:
         last_activity_time=iUtils->getNow();
         return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route);
@@ -773,6 +794,8 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     switch (id)
     {
+    case msgid::DoYouHaveBlockRSP:
+        return DoYouHaveBlockRSP(static_cast<const MsgData::DoYouHaveBlockRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::HeartBeatRSP:
         return HeartBeatRSP(static_cast<const MsgData::HeartBeatRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderRSP:

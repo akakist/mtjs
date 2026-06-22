@@ -91,8 +91,6 @@ JSValue js_add_instance(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 
         std::string cnf = (std::string)scope.toStdStringView(argv[1]);
 
-        // if(!JS_IsObject(argv[0]))
-        //     return JS_ThrowTypeError(ctx, "if(!JS_IsObject(argv[0]))");
 
         IInstance *instance1 = iUtils->createNewInstance(iname);
         ConfigObj *cnf1 = new ConfigObj(iname, cnf);
@@ -271,7 +269,6 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     logErr2("js_register_add_instance");
     JS_SetPropertyStr(ctx, mtjs_obj, "addInstance", JS_NewCFunction(ctx, js_add_instance, "addInstance", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_submit", JS_NewCFunction(ctx, js_tx_submit, "tx_submit", 2));
-    // JS_SetPropertyStr(ctx, mtjs_obj, "tx_sign", JS_NewCFunction(ctx, js_tx_sign, "tx_sign", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_subscribe", JS_NewCFunction(ctx, js_tx_subscribe, "tx_subscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_user_info", JS_NewCFunction(ctx, js_get_user_info, "get_user_info", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "addr_from_pk", JS_NewCFunction(ctx, js_addr_from_pk, "addr_from_pk", 1));

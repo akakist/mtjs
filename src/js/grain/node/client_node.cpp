@@ -43,7 +43,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         logNode("invalid leader 12");
         return true;
     }
-    auto& c=c_blocks[r->blockInfo->heart_beat->prev_root_hash];
+    auto& c=c_blocks[r->blockInfo->heart_beat->prev_root_hash_1];
 
     if (!c.blockDBStore.valid())
     {
@@ -108,7 +108,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XTRY;
         outBuffer o;
         o<<c.blockDBStore;
-        db_history->writeBlock(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->new_epoch, c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
+        db_history->writeBlock(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->new_epoch, c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.container,
                                o.asString()->container
                               );
         XPASS;
@@ -220,7 +220,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     resetTimer();
     if (!err)
     {
-        if (r->leader_cert->heart_beat->node_leader != cli_leader_info[r->leader_cert->heart_beat->prev_root_hash].node_leader)
+        if (r->leader_cert->heart_beat->node_leader != cli_leader_info[r->leader_cert->heart_beat->prev_root_hash_1].node_leader)
         {
             t.emit_block("error", R"({"code":-32602,"error":"cert node leader mismatched"})");
             // t.att_data->block_report = {1, "cert node leader mismatched"};
@@ -237,7 +237,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         logNode("verify_leader_certificate failed");
     }
 
-    if (!err && r->leader_cert->heart_beat->prev_root_hash != prev_root_hash_Z)
+    if (!err && r->leader_cert->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
     {
         if (root->getEpoch()->epoch + 1 != r->leader_cert->heart_beat->new_epoch)
         {
@@ -247,7 +247,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             // setBlockId(r->leader_cert->heart_beat->prev_root_hash);
             // return true;
         }
-        logNode("ERROR: ValidateBlock block %s, nextblock %s", r->leader_cert->heart_beat->prev_root_hash.str().c_str(), prev_root_hash_Z.str().c_str());
+        logNode("ERROR: ValidateBlock block %s, nextblock %s", r->leader_cert->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z.str().c_str());
     }
     if (!err)
     {

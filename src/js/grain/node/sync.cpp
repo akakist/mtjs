@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include <cstddef>
 #include "init_root.h"
+#include "md_DoYouHaveBlockREQ.h"
+#include "md_DoYouHaveBlockRSP.h"
 
 void Node::Service::do_sync(const NODE_id &src_node)
 {
@@ -83,24 +85,36 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
     }
     logNode("prev_root_hash %s", prev_root_hash_Z.str().c_str());
     logNode("GetSavedBlocksRSP received blocks %d", r->blocks_ZZ.size());
+    if(r->blocks_ZZ.size()==0)
+    {
+        /// blocks not found
+        auto &s=syncs[prev_root_hash_Z];
+        if(!s.do_you_have_sent)
+        {
+            broadcast_MsgEvent(new MsgData::DoYouHaveBlockREQ(prev_root_hash_Z));
+            s.do_you_have_sent=true;    
+            sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(timers::TIMER_SYNC_TIMEDOUT,NULL,NULL,3,this));
+        }
+        return true;
+    }
     for (auto &z : r->blocks_ZZ)
     {
         logNode("iter block epoch %ld", z->validateBlockREQ->leader_cert->heart_beat->new_epoch);
         logNode("cur epoch %ld", root->getEpoch()->epoch);
 
-        logNode("iter prev_root_hash in validateBlockREQ %s", z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.str().c_str());
-        logNode("iter prev_root_hash in blockAcceptedREQ %s", z->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash.str().c_str());
-        if (prev_root_hash_Z != z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash)
+        logNode("iter prev_root_hash in validateBlockREQ %s", z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.str().c_str());
+        logNode("iter prev_root_hash in blockAcceptedREQ %s", z->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str());
+        if (prev_root_hash_Z != z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1)
         {
-            logNode("prev root hash not matched '%s' != '%s'", prev_root_hash_Z.str().c_str(),z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.str().c_str());
+            logNode("prev root hash not matched '%s' != '%s'", prev_root_hash_Z.str().c_str(),z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.str().c_str());
             continue;
         }
         else
             logNode("prev root hash matched !!!");
-        if (z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash != prev_root_hash_Z)
+        if (z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
         {
 
-            logNode("inval root hash %s %s", z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.str().c_str(), prev_root_hash_Z.str().c_str());
+            logNode("inval root hash %s %s", z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z.str().c_str());
             continue;
         }
         else
@@ -153,7 +167,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         }
         outBuffer o;
         o<<z;
-        if(db_history->writeBlock(z->validateBlockREQ->leader_cert->heart_beat->new_epoch, z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash.container,
+        if(db_history->writeBlock(z->validateBlockREQ->leader_cert->heart_beat->new_epoch, z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.container,
                                   o.asString()->container
                                  ))
         {
@@ -177,5 +191,30 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
     state_Z = State::STATE_NORMAL;
     logNode("State::NORMAL");
     XPASS;
+    return true;
+}
+
+
+bool Node::Service::DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const NODE_id & src_node, const route_t& route)
+{
+    logErr2("@@ %s",__PRETTY_FUNCTION__);
+    std::string res;
+    if (db_history->get(m->prev_root_hash.container, &res))
+    {
+        logNode("cannot find block %s", m->prev_root_hash.str().c_str());
+        return true;
+    }
+    pass_NodeMsgRSP(new MsgData::DoYouHaveBlockRSP(true,m->prev_root_hash), route);
+    return true;
+}
+bool Node::Service::DoYouHaveBlockRSP(const MsgData::DoYouHaveBlockRSP* m, const NODE_id & src_node, const route_t& route)
+{
+    logErr2("@@ %s",__PRETTY_FUNCTION__);
+    auto& s=syncs[m->prev_root_hash];
+    s.havers.insert(src_node);
+    if(s.havers.size()==1)
+    {
+        do_sync(src_node);
+    }
     return true;
 }

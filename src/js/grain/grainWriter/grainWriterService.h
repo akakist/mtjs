@@ -41,7 +41,7 @@ namespace GrainWriter
         _db_to_save db_to_save;
         REF_getter<IDatabase> db_state;
 
-        int snapshot_modulus=10000;
+        int snapshot_modulus=1000;
     public:
         void deinit()
         {

@@ -16,9 +16,9 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     XTRY;
     auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
-    if (prev_root_hash_Z != m->payload_heart_beat->prev_root_hash)
+    if (prev_root_hash_Z != m->payload_heart_beat->prev_root_hash_1)
     {
-        logNode("heat beat expired %s %s", prev_root_hash_Z.str().c_str(), m->payload_heart_beat->prev_root_hash.str().c_str());
+        logNode("heat beat expired %s %s", prev_root_hash_Z.str().c_str(), m->payload_heart_beat->prev_root_hash_1.str().c_str());
         return false;
     }
 
@@ -175,21 +175,22 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
                 /// оба в одинаковой эпохе
                 
                 /// просто проверка на всякий случай.
-                if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)
+                if(remote_prev_lc->heart_beat->prev_root_hash_1!=local_lc->heart_beat->prev_root_hash_1)
                 {
-                        logNode("if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)\nremote_prev_lc->heart_beat->prev_root_hash %s local_lc->heart_beat->prev_root_hash %s", remote_prev_lc->heart_beat->prev_root_hash.str().c_str(), local_lc->heart_beat->prev_root_hash.str().c_str());
+                        logNode("if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)\nremote_prev_lc->heart_beat->prev_root_hash %s local_lc->heart_beat->prev_root_hash %s", remote_prev_lc->heart_beat->prev_root_hash_1.str().c_str(), local_lc->heart_beat->prev_root_hash_1.str().c_str());
                         return true;
                 }
                     // throw CommonError("if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)");
                 /// тоже проверка на всякий случай
-                if(prev_root_hash_Z!=h->prev_root_hash)    
+                if(prev_root_hash_Z!=h->prev_root_hash_1)    
                 {
-                    logNode("if(prev_root_hash_Z!=h->prev_root_hash)    prev_root_hash_Z %s h->prev_root_hash %s", prev_root_hash_Z.str().c_str(), h->prev_root_hash.str().c_str());
+                    /// нужно сделать голосование за прев-блок
+                    logNode("if(prev_root_hash_Z!=h->prev_root_hash)    prev_root_hash_Z %s h->prev_root_hash %s from node %s", prev_root_hash_Z.str().c_str(), h->prev_root_hash_1.str().c_str(),src_node.container.c_str());
                     return true;
                 }
                     // throw CommonError("if(prev_root_hash_Z!=h->prev_root_hash)    ");
                 
-                auto& ci=cli_leader_info[h->prev_root_hash];
+                auto& ci=cli_leader_info[h->prev_root_hash_1];
                 if(ci.node_leader.container.empty())
                     ci.node_leader=this_node_name;
 
@@ -225,19 +226,19 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
 
     bool need_replace = false;
 
-    if (prev_root_hash_Z != h->hb->prev_root_hash)
+    if (prev_root_hash_Z != h->hb->prev_root_hash_1)
     {
         logNode("invalid root hash, no answer this node %s src_node %s", this_node_name.container.c_str(), src_node.container.c_str());
         return true;
     }
     bool need_reply = false;
-    if (cli_leader_info[h->hb->prev_root_hash].node_leader.container.empty())
-        cli_leader_info[h->hb->prev_root_hash].node_leader = h->hb->node_leader;
-    if (h->hb->node_leader != cli_leader_info[h->hb->prev_root_hash].node_leader )
+    if (cli_leader_info[h->hb->prev_root_hash_1].node_leader.container.empty())
+        cli_leader_info[h->hb->prev_root_hash_1].node_leader = h->hb->node_leader;
+    if (h->hb->node_leader != cli_leader_info[h->hb->prev_root_hash_1].node_leader )
     {
-        if (isNodeGreaterOrEqual(h->hb->node_leader, cli_leader_info[h->hb->prev_root_hash].node_leader))
+        if (isNodeGreaterOrEqual(h->hb->node_leader, cli_leader_info[h->hb->prev_root_hash_1].node_leader))
         {
-            cli_leader_info[h->hb->prev_root_hash].node_leader = h->hb->node_leader;
+            cli_leader_info[h->hb->prev_root_hash_1].node_leader = h->hb->node_leader;
             need_reply = true;
         }
     }
@@ -265,9 +266,9 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 
     auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
-    if (prev_root_hash_Z != m->hb->prev_root_hash)
+    if (prev_root_hash_Z != m->hb->prev_root_hash_1)
     {
-        logNode("heat beat expired %s %s", prev_root_hash_Z.str().c_str(), m->hb->prev_root_hash.str().c_str());
+        logNode("heat beat expired %s %s", prev_root_hash_Z.str().c_str(), m->hb->prev_root_hash_1.str().c_str());
         return false;
     }
 

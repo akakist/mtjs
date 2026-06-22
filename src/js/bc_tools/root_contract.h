@@ -21,7 +21,7 @@ struct bc_contract:  public data_base
 
     bc_contract(Cellable *p):data_base(hsh::bc_contract,p, 0,-1) {}
     std::string name_;
-    std::string owner;
+    ADDRESS_id  owner;
     std::string src;
     void pack(outBuffer&b) const final
     {
@@ -44,7 +44,7 @@ struct bc_user: public data_base
 
     bc_user(Cellable* p): data_base(hsh::bc_user,p, 0,-1) {
     }
-    std::string pkbin_еd;
+    ADDRESS_id address;
     // std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
     // std::set<NODE_id> nodes;
     // std::set<std::string> contracts;
@@ -53,7 +53,7 @@ struct bc_user: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<pkbin_еd
+        o<<address
          // <<my_stakes<<nodes<<contracts
          ;
     }
@@ -61,14 +61,14 @@ struct bc_user: public data_base
     {
         data_base::unpack(o);
         auto v=o.get_PN();
-        o>>pkbin_еd
+        o>>address
          // >>my_stakes>>nodes>>contracts
          ;
     }
     std::string dump() final
     {
         std::ostringstream o;
-        o<<"PK: "  << base16::encode(pkbin_еd) << std::endl;
+        o<<"ADDRESS: "  << base16::encode(address.addr) << std::endl;
         o<< std::endl;
 
 

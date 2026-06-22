@@ -1,7 +1,7 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 import { sleep } from "os";
-const node = "127.0.0.1:2301";
+const node = "127.0.0.1:2305";
 let sk = std.getenv('k_root_ed_sk');
 let root_pk = std.getenv('k_root_ed_pk');
 // let u0 = std.getenv('k_u0_ed_pk');
@@ -16,16 +16,14 @@ for (let i = 0; i < 20; i++) {
     if (pk)
         users.push(mtjs.addr_from_pk(pk));
 }
-console.log(JSON.stringify(users));
 let nodes = [];
 for (let i = 0; i < 20; i++) {
     nodes.push(`n${i}`);
 }
 async function exec() {
-    while (true) 
-    {
+    while (true) {
         mtjs.tx_subscribe(node, (params) => {
-            console.log("tx report from js:", JSON.stringify(params));
+//            console.log("tx report from js:", JSON.stringify(params));
         });
         const ui = await mtjs.get_user_info(node, mtjs.addr_from_pk(root_pk), 1.5);
         const nonce = ui.nonce;
@@ -97,8 +95,8 @@ try {
     console.log("Start");
     try {
         const sk = std.getenv('u_root_ed_sk');
-//#        setInterval(() => {
-//#        }, 5000);
+//        setInterval(() => {
+//        }, 5000);
         await exec();
     }
     catch (e) {
