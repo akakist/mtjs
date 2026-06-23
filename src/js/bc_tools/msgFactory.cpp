@@ -7,7 +7,6 @@
 #include "md/md_ValidateBlockREQ.h"
 #include "md/md_ValidateBlockRSP.h"
 #include "md/md_BlockAcceptedREQ.h"
-#include "md/md_BlockAcceptedRSP.h"
 #include "md/md_GetSavedBlocksREQ.h"
 #include "md/md_GetSavedBlocksRSP.h"
 #include "md/md_DoHeartBeatREQ.h"
@@ -29,10 +28,8 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::ValidateBlockREQ, MsgData::ValidateBlockREQ::construct);
     registerMsg(msgid::ValidateBlockRSP, MsgData::ValidateBlockRSP::construct);
     registerMsg(msgid::BlockAcceptedREQ, MsgData::BlockAcceptedREQ::construct);
-    registerMsg(msgid::BlockAcceptedRSP, MsgData::BlockAcceptedRSP::construct);
     registerMsg(msgid::GetSavedBlocksREQ, MsgData::GetSavedBlocksREQ::construct);
     registerMsg(msgid::GetSavedBlocksRSP, MsgData::GetSavedBlocksRSP::construct);
-    // registerMsg(msgid::DoHeartBeatREQ, MsgData::DoHeartBeatREQ::construct);
     registerMsg(msgid::ConfirmLeaderREQ, MsgData::ConfirmLeaderREQ::construct);
     registerMsg(msgid::ConfirmLeaderRSP, MsgData::ConfirmLeaderRSP::construct);
     registerMsg(msgid::TX, MsgData::TX::construct);

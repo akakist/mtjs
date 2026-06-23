@@ -6,10 +6,8 @@
 #include "commonError.h"
 #include "corelib/mutexInspector.h"
 #include "Event/bcEvent.h"
-// #include <SQLiteCpp/Statement.h>
 #include <string>
 #include <time.h>
-#include "md_BlockAcceptedRSP.h"
 #include "md_BlockDBStore.h"
 #include "md_ValidateBlockRSP.h"
 #include "ioBuffer.h"
@@ -126,13 +124,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     {
         MUTEX_INSPECTOR;
         XTRY;
-        REF_getter<MsgData::BlockAcceptedRSP> br = new MsgData::BlockAcceptedRSP();
-        br->new_root_hash = prev_root_hash_Z;
-        br->node_signer = this_node_name;
-        br->sign(my_sk_bls);
-
         resetTimer();
-        pass_NodeMsgRSP(br.get(), route);
         XPASS;
     }
 
@@ -241,7 +233,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
     if (!err && r->leader_cert->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
     {
-        if (root->getEpoch()->epoch + 1 != r->leader_cert->heart_beat->new_epoch)
+        if (root->getEpoch()->epoch.container + 1 != r->leader_cert->heart_beat->new_epoch.container)
         {
             t.emit_block("error", R"({"code":-32602,"error":"epoch invalid"})");
             err = true;
@@ -257,7 +249,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         // auto new_root_hash =
         t.validateBlockREQ = r;
 
-        auto new_root_hash = execute_block(t, r->leader_cert->nodes);
+        auto new_root_hash = execute_block(t, r->leader_cert);
 
         auto &c = c_blocks[prev_root_hash_Z];
         if (!c.blockDBStore.valid())

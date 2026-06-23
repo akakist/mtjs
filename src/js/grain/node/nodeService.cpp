@@ -466,7 +466,7 @@ void Node::Service::resetTimer()
 {
     // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
 }
-BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &nodes_in_leader_cert)
+BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     MUTEX_INSPECTOR;
 
@@ -507,9 +507,9 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
                 if (!t_err)
                 {
                     MUTEX_INSPECTOR;
-                    execute_transaction(tt->getHash(), t, senderAddress, tj, by);
+                    execute_transaction(tt->getHash(), t, senderAddress, tj, by, lc->heart_beat->new_epoch);
                     u->incNonce();
-                    u->setDirty();
+                    u->setDirty(lc->heart_beat->new_epoch);
 
                 }
             }
@@ -521,16 +521,16 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const std::vector<NODE_id> &
     }
 
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
-    calc_fee_rewards_nodes(t, nodes_in_leader_cert);
+    calc_fee_rewards_nodes(t, lc);
     auto newEpoch = root->getEpoch();
-    newEpoch->epoch += 1;
+    newEpoch->epoch.container += 1;
     newEpoch->prev_lc = t.validateBlockREQ->leader_cert->getBuffer();
-    newEpoch->setDirty();
+    newEpoch->setDirty(lc->heart_beat->new_epoch);
 
     rh=proceed_merkle_on_transaction_pool_hashers(root);
     return rh;
 }
-void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_id> &nodes_in_leader_cert)
+void Node::Service::calc_fee_rewards_nodes(t_params &t, const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     MUTEX_INSPECTOR;
     std::map<Cellable*, std::set<REF_getter<fee_calcer>>> cc;
@@ -573,13 +573,13 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         if (u->getBalance() < z.second->get_fee())
         {
             u->setBalance(0);
-            u->setDirty();
+            u->setDirty(lc->heart_beat->new_epoch);
         }
         else
         {
             // logNode("balance deduct %s fee %s", u->getBalance().toString().c_str(), z.second->get_fee().toString().c_str());
             u->subBalance(z.second->get_fee());
-            u->setDirty();
+            u->setDirty(lc->heart_beat->new_epoch);
         }
         total_fees += z.second->get_fee();
         t.att_data->fees[z.first] = z.second->get_fee();
@@ -589,7 +589,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
     t.emit_block("total_fee",R"({"fee":"%s"})",total_fees.toString().c_str());
     // iUtils->getNow
     BigInt total_rewards = (total_fees * 9) / 10;
-    for (auto &n : nodes_in_leader_cert)
+    for (auto &n : lc->nodes)
     {
         auto node = root->getNode(n);
         if (!node.valid())
@@ -603,14 +603,14 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
         }
         BigInt amt = (total_rewards * node->get_full_stake()) / total_staked;
         u->addBalance(amt);
-        u->setDirty();
+        u->setDirty(lc->heart_beat->new_epoch);
         // if (n == this_node_name && amt > 0)
         //     logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
         t.att_data->rewards[n] = amt;
         t.emit_block("reward",R"({"node":"%s","amount":"%s"})",n.container.c_str(), amt.toString().c_str());
     }
     std::set<NODE_id> ns;
-    for(auto& z:nodes_in_leader_cert)
+    for(auto& z:lc->nodes)
     {
         ns.insert(z);
     }
@@ -624,7 +624,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
             else
             {
                 n->reset_missed_rounds();
-                n->setDirty();
+                n->setDirty(lc->heart_beat->new_epoch);
             }
         }
         else
@@ -636,7 +636,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const std::vector<NODE_i
             else    
             {
                 n->inc_missed_rounds();
-                n->setDirty();
+                n->setDirty(lc->heart_beat->new_epoch);
             }
         }
     }
@@ -804,8 +804,6 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
         return GetTransactionRSP(static_cast<const MsgData::GetTransactionRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ValidateBlockRSP:
         return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
-    case msgid::BlockAcceptedRSP:
-        return BlockAcceptedRSP(static_cast<const MsgData::BlockAcceptedRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::GetSavedBlocksRSP:
         return GetSavedBlocksRSP(static_cast<const MsgData::GetSavedBlocksRSP *>(ee.get()), m->node_signer, m->route);
     default:
@@ -827,7 +825,7 @@ void Node::Service::logNode(const char *fmt, ...)
         {
             throw CommonError("if(!epoch.valid())");
         }
-        fprintf(stdout, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch);
+        fprintf(stdout, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch.container);
         vfprintf(stdout, fmt, ap);
         fprintf(stdout, "\n");
         va_end(ap);
@@ -839,7 +837,7 @@ void Node::Service::logNode(const char *fmt, ...)
         FILE *f = fopen(pn.c_str(), "a");
         if (f)
         {
-            fprintf(f, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch);
+            fprintf(f, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch.container);
             vfprintf(f, fmt, ap);
             fprintf(f, "\n");
             fclose(f);

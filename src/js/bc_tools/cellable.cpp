@@ -157,7 +157,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     }
     is_dirty = false;
 }
-void data_base::setDirty()
+void data_base::setDirty(const EPOCH_id& epoch)
 {
-    parent->setDirty();
+    parent->setDirty(epoch);
 }

@@ -10,7 +10,7 @@
 #include "PK_id.h"
 
 std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_params &t, 
-        const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+        const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
     auto it = v->emitters_bin.find(senderAddress);
@@ -34,7 +34,7 @@ std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_param
         return "mint: sender state not found";
     }
     u->addBalance(amount);
-    u->setDirty();
+    u->setDirty(epoch);
     t.addCalcer(u.get(),by);
 
     t.fee[senderAddress] += v->getFee("mint");
@@ -46,7 +46,7 @@ std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_param
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_params &t, 
-    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
 
@@ -94,8 +94,8 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     }
     u->subBalance(amount);
     to->addBalance(amount);
-    u->setDirty();
-    to->setDirty();
+    u->setDirty(epoch);
+    to->setDirty(epoch);
     t.addCalcer(u.get(),by);
     t.addCalcer(to.get(),by);
 
@@ -111,7 +111,7 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, t_params &t, 
-    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     // if(senderAddress!=)
     auto v = t.root->getValues();
@@ -151,8 +151,8 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
     }
 
 
-    nn->setDirty();
-    us->setDirty();
+    nn->setDirty(epoch);
+    us->setDirty(epoch);
     t.addCalcer(nn.get(),by);
     t.addCalcer(us.get(),by);
 
@@ -165,7 +165,7 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
 }
 
 std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, t_params &t, 
-    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
     NODE_id name;
@@ -201,7 +201,7 @@ std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, 
         return "Not enough funds";
 
 
-    auto n = t.root->addNode(name, by);
+    auto n = t.root->addNode(name, by,epoch);
 
     auto ip=params / "ip";
     auto pk_ed=params / "pk_ed";
@@ -224,9 +224,9 @@ std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, 
     // n->ed_pk = base16::decode(pk_ed.toString());
     // n->bls_pk.deserialize(base16::decode(pk_bls.toString()));
     // n->owner_ed_pk = senderAddress;
-    n->setDirty();
+    n->setDirty(epoch);
     // u->setDirty();
-    us->setDirty();
+    us->setDirty(epoch);
     t.addCalcer(n.get(),by);
     t.addCalcer(us.get(),by);
 
@@ -240,7 +240,7 @@ std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, 
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t_params & t,
-    const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+    const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
     auto _amount = params / "amount";
@@ -289,15 +289,15 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
         amount.toString().c_str(),
         base16::encode(senderAddress.addr).c_str()
     );
-    n->setDirty();
-    us->setDirty();
+    n->setDirty(epoch);
+    us->setDirty(epoch);
     t.addCalcer(n.get(),by);
     t.addCalcer(us.get(),by);
 
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params, t_params & t,
-    const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+    const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
     auto _amount = params / "amount";
@@ -349,9 +349,9 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
 
     // v->total_staked -= amount;
 
-    v->setDirty();
-    n->setDirty();
-    u->setDirty();
+    v->setDirty(epoch);
+    n->setDirty(epoch);
+    u->setDirty(epoch);
     t.addCalcer(v.get(),by);
     t.addCalcer(n.get(),by);
     t.addCalcer(u.get(),by);
@@ -369,7 +369,7 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
 }
 
 std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, t_params & t,
-    const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId)
+    const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
     auto _node = params / "node";
@@ -398,7 +398,7 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
         return "Insufficient funds";
     }
     n->reset_missed_rounds();
-    n->setDirty();
+    n->setDirty(epoch);
 
     t.fee[senderAddress] += fee;
 
@@ -412,7 +412,7 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
 
 
 std::optional<std::string> TR::execute_contract_deploy(const yyjson::Value &params, t_params &t, 
-    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
     std::string name;
@@ -446,7 +446,7 @@ std::optional<std::string> TR::execute_contract_deploy(const yyjson::Value &para
         return "Not enough funds";
 
 
-    auto n = t.root->addContract(name, by);
+    auto n = t.root->addContract(name, by,epoch);
 
     auto src=params / "src";
     if(!src.isString())
@@ -458,8 +458,8 @@ std::optional<std::string> TR::execute_contract_deploy(const yyjson::Value &para
         n->owner=senderAddress;
     }
 
-    n->setDirty();
-    us->setDirty();
+    n->setDirty(epoch);
+    us->setDirty(epoch);
     t.addCalcer(n.get(),by);
     t.addCalcer(us.get(),by);
 
@@ -470,7 +470,7 @@ std::optional<std::string> TR::execute_contract_deploy(const yyjson::Value &para
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_contract_update(const yyjson::Value &params, t_params &t, 
-    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId)
+    const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
     std::string name;
@@ -508,8 +508,8 @@ std::optional<std::string> TR::execute_contract_update(const yyjson::Value &para
         n->src=src.toString();
     }
 
-    n->setDirty();
-    us->setDirty();
+    n->setDirty(epoch);
+    us->setDirty(epoch);
     t.addCalcer(n.get(),by);
     t.addCalcer(us.get(),by);
 

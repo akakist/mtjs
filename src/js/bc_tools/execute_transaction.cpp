@@ -4,7 +4,7 @@
 // #include "msg_tx.h"
 #include "t_params.h"
 #include <optional>
-void execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, const std::string &tx_cmds, const REF_getter<fee_calcer> &by)
+void execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, const std::string &tx_cmds, const REF_getter<fee_calcer> &by, const EPOCH_id epoch)
 {
     yyjson::Document doc(tx_cmds);
     yyjson::Value root = doc.root();
@@ -31,23 +31,23 @@ void execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &s
                 auto meth=method.toString();
                 // logErr2("method %s",meth.c_str());
                 if (meth == "mint")
-                    err = TR::execute_mint(params, t, senderAddress, by, tx_id, ii);
+                    err = TR::execute_mint(params, t, senderAddress, by, tx_id, ii, epoch);
                 else if (meth == "transfer")
-                    err = TR::execute_transfer(params, t, senderAddress, by, tx_id, ii);
+                    err = TR::execute_transfer(params, t, senderAddress, by, tx_id, ii,epoch);
                 else if (meth == "node_create")
-                    err = TR::execute_node_create(params, t, senderAddress, by, tx_id, ii);
+                    err = TR::execute_node_create(params, t, senderAddress, by, tx_id, ii, epoch);
                 else if (meth == "node_update")
-                    err = TR::execute_node_update(params, t, senderAddress, by, tx_id, ii);
+                    err = TR::execute_node_update(params, t, senderAddress, by, tx_id, ii, epoch);
                 else if (meth == "node_stake")
-                    err = TR::execute_node_stake(params, t, senderAddress, by, tx_id, ii);
+                    err = TR::execute_node_stake(params, t, senderAddress, by, tx_id, ii, epoch);
                 else if (meth == "node_unstake")
-                    err = TR::execute_unstake_node(params, t, senderAddress, by, tx_id, ii);
+                    err = TR::execute_unstake_node(params, t, senderAddress, by, tx_id, ii,epoch);
                 else if (meth == "node_enable")
-                    err = TR::execute_node_enable(params, t, senderAddress, by, tx_id, ii);
+                    err = TR::execute_node_enable(params, t, senderAddress, by, tx_id, ii,epoch);
                 else if (meth == "contract_deploy")
-                    err = TR::execute_contract_deploy(params, t, senderAddress, by, tx_id, ii);
+                    err = TR::execute_contract_deploy(params, t, senderAddress, by, tx_id, ii,epoch);
                 else if (meth == "contract_update")
-                    err = TR::execute_contract_update(params, t, senderAddress, by, tx_id, ii);
+                    err = TR::execute_contract_update(params, t, senderAddress, by, tx_id, ii,epoch);
                 else
                 {
                     t.emit_command(tx_id, ii, "error", 

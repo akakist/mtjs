@@ -484,14 +484,14 @@ namespace bcEvent
             return NULL;
         }
         WriteGranules(const _db_to_save  & _gs, 
-            const uint64_t &_ep,
+            const EPOCH_id &_ep,
             const REF_getter<IDatabase> &_db,
             const route_t &r)
             : NoPacked(bcEventEnum::WriteGranules, r), gs(_gs),
             epoch(_ep),db(_db) {}
 
         const _db_to_save gs;
-        const uint64_t epoch;
+        const EPOCH_id epoch;
         const REF_getter<IDatabase> db;
     };
  

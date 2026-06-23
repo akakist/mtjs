@@ -41,7 +41,7 @@ struct DB_history : public Refcountable
         fwrite(data.data(),data.size(),1,f);
         fclose(f);
     }
-    bool writeBlock(const BigInt& epoch, const std::string& prev_root_hash, const std::string& data) {
+    bool writeBlock(const EPOCH_id& epoch, const std::string& prev_root_hash, const std::string& data) {
 
         write_chunked(data);
 
@@ -56,11 +56,11 @@ struct DB_history : public Refcountable
                                );
         query.bind(1, prev_root_hash.data(),prev_root_hash.size());
         query.bind(2, data.data(),data.size());
-        query.bind(3, epoch.toString());
+        query.bind(3, (int64_t) epoch.container);
         query.exec();
-        if(epoch>20000)
+        if(epoch.container>20000)
         {
-            dbs.exec("DELETE FROM blocks where epoch<"+epoch.toString()+"-20000");
+            dbs.exec("DELETE FROM blocks where epoch<"+ std::to_string(epoch.container)+"-20000");
         }
         return 0;
     }

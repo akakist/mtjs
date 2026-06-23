@@ -320,9 +320,9 @@ struct bc_epoch: public data_base
 {
 
     bc_epoch(Cellable* p): data_base(hsh::bc_epoch,p,0,-1) {
-        epoch=0;
+        epoch.container=0;
     }
-    uint64_t epoch;
+    EPOCH_id epoch;
     std::string prev_lc;
     void pack(outBuffer& o) const final
     {
@@ -361,7 +361,7 @@ struct root_data: public Cellable
     std::vector<std::string> getUserStatePath(const ADDRESS_id &addr);
 
     REF_getter<bc_contract> getContract(const std::string &name);
-    REF_getter<bc_contract> addContract(const std::string &name, const REF_getter<fee_calcer>& bca);
+    REF_getter<bc_contract> addContract(const std::string &name, const REF_getter<fee_calcer>& bca, const EPOCH_id& epoch);
 
     REF_getter<bc_values> getValues();
     REF_getter<bc_values> checkValues();
@@ -381,7 +381,7 @@ struct root_data: public Cellable
 
 
     REF_getter<bc_node> getNode(const NODE_id &name);
-    REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc);
+    REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const EPOCH_id& epoch);
 
 
 

@@ -8,6 +8,7 @@
 #include "db_to_save.h"
 #include "hsh.h"
 #include "THASH_id.h"
+#include "EPOCH_id.h"
 
 struct Cellable;
 
@@ -26,7 +27,7 @@ struct data_base : public Refcountable
     ~data_base()
     {
     }
-    void setDirty();
+    void setDirty(const EPOCH_id& epoch);
     virtual void pack(outBuffer& o) const
     {
         o<<1;
@@ -84,18 +85,20 @@ struct Cellable: public Refcountable
 public:
     /// @brief выставляется и читается в потоке ноды, мутекс не нужен.
     bool is_dirty=false;
+    EPOCH_id last_update_epoch;
 
     Cellable(Cellable* _parent, const std::string & id):Refcountable("cellable"),  parent(_parent), m_id(id)
     {
     }
-    void setDirty()
+    void setDirty(const EPOCH_id& epoch)
     {
         is_dirty=true;
+        last_update_epoch=epoch;
         // if(bc.valid())
         //     calcers_Z.insert(bc);
         if(parent)
         {
-            parent->setDirty();
+            parent->setDirty(epoch);
         }
     }
     std::string dump();
@@ -115,6 +118,7 @@ public:
         o<<1;
         // o<<m_id;
         o<<payload_ctor_idx;
+        o<<last_update_epoch;
         {
             MutexLocker lk(mx);
             o<<children_hashes_mx;
@@ -130,6 +134,7 @@ public:
         int v=in.get_PN();
         // in>>m_id;
         in>>payload_ctor_idx;
+        in>>last_update_epoch;
         {
             MutexLocker lk(mx);
             in>>children_hashes_mx;

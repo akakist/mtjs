@@ -163,7 +163,7 @@ bool GrainWriter::Service::WriteGranules(const bcEvent::WriteGranules *e)
         db_to_save.add(z.first,z.second);
     }
     db_state=e->db;
-    if(e->epoch % snapshot_modulus == 0)
+    if(e->epoch.container % snapshot_modulus == 0)
         sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(1,NULL,NULL,1.,this));
 
     return true;

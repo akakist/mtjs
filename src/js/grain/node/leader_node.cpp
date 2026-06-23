@@ -56,44 +56,6 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     XPASS;
     return true;
 }
-bool Node::Service::BlockAcceptedRSP(const MsgData::BlockAcceptedRSP *r, const NODE_id &src_node, const route_t &route)
-{
-    XTRY;
-    MUTEX_INSPECTOR;
-    if (state_Z != STATE_NORMAL)
-        return true;
-
-    if (!r->verify(root->getNode(r->node_signer)->get_bls_pk()))
-    {
-        logNode("block_accepted_rsp: verify failed");
-        return true;
-    }
-    auto &bp = blocks_leader[prev_root_hash_Z];
-    bp.acceptors.insert({r->node_signer, r});
-
-    blst_cpp::AggregateSignature agg_sig;
-    std::vector<blst_cpp::PublicKey> agg_pk;
-    BigInt stake;
-    stake = 0;
-    for (auto &z : bp.acceptors)
-    {
-        agg_sig.add(z.second->sig_bls);
-        auto n = root->getNode(z.first);
-        if (!n.valid())
-            throw CommonError("if(!n.valid())");
-
-        agg_pk.push_back(n->get_bls_pk());
-        stake += n->get_full_stake();
-    }
-    if (!agg_sig.verify(agg_pk, r->new_root_hash.container))
-    {
-        logNode("block_accepted_rsp: aggsig !veried");
-        return true;
-    }
-
-    XPASS;
-    return true;
-}
 bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;

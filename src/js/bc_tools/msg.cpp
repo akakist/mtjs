@@ -62,8 +62,6 @@ const char *msgName(int id)
         return "BlockInfo";
     case msgid::BlockAcceptedREQ:
         return "BlockAcceptedREQ";
-    case msgid::BlockAcceptedRSP:
-        return "BlockAcceptedRSP";
     case msgid::GetTransactionREQ:
         return "GetTransactionREQ";
     case msgid::GetTransactionRSP:

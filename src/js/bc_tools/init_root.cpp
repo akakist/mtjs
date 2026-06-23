@@ -3,6 +3,8 @@
 void init_root(const REF_getter<root_data> &r)
 {
     MUTEX_INSPECTOR;
+        EPOCH_id e;
+        e.container=0;
     std::vector<int> stakes;
     for(int i=0; i<20; i++)
     {
@@ -23,7 +25,7 @@ void init_root(const REF_getter<root_data> &r)
             total+=z;
         }
         // v->total_staked=total;
-        v->setDirty();
+        v->setDirty(e);
     }
     // u_root pk
     if(!r->checkUserState(u_root_address).valid())
@@ -34,7 +36,7 @@ void init_root(const REF_getter<root_data> &r)
             throw CommonError("cannot find root user state");
         }
         u->addBalance(1000000);
-        u->setDirty();
+        u->setDirty(e);
 
     }
 
@@ -57,12 +59,12 @@ void init_root(const REF_getter<root_data> &r)
         auto n=r->getNode(name);
         if(n.valid()) continue;
 
-        REF_getter<bc_node> nn=r->addNode(name,NULL);
+        REF_getter<bc_node> nn=r->addNode(name,NULL,e);
         blst_cpp::PublicKey bls_pk;
         bls_pk.deserializeHexStr(getenv2(keys[i].first));
         nn->init(name, u_root_address, bls_pk, base16::decode(getenv2(keys[i].second)), "127.0.0.1:"+std::to_string(2300+i));
         nn->add_stake(u_root_address, 100*i);
-        nn->setDirty();
+        nn->setDirty(e);
         // r->;
 
     }

@@ -123,7 +123,7 @@ REF_getter<bc_contract> root_data::getContract(const std::string &name)
     return dynamic_cast<bc_contract *>(cc->data.get());
 }
 
-REF_getter<bc_contract> root_data::addContract(const std::string &name, const REF_getter<fee_calcer> &bca)
+REF_getter<bc_contract> root_data::addContract(const std::string &name, const REF_getter<fee_calcer> &bca, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
     auto v = getContractPath(name);
@@ -135,7 +135,7 @@ REF_getter<bc_contract> root_data::addContract(const std::string &name, const RE
     REF_getter<bc_contract> bc = new bc_contract(cc.get());
     cc->data = bc.get();
     cc->payload_ctor_idx = hsh::bc_contract;
-    cc->setDirty();
+    cc->setDirty(epoch);
     return bc;
 }
 REF_getter<bc_epoch> root_data::getEpoch()
@@ -350,7 +350,7 @@ std::vector<REF_getter<bc_node>> root_data::getAllNodes()
     // }
     // return v;
 }
-REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer> &bc)
+REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer> &bc, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
 
@@ -366,7 +366,7 @@ REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee
     REF_getter<bc_node> n = new bc_node(cc.get());
     cc->data = n.get();
     cc->payload_ctor_idx = hsh::bc_node;
-    cc->setDirty();
+    cc->setDirty(epoch);
     return n;
 }
 
@@ -493,7 +493,7 @@ std::string bc_values::dump()
 std::string bc_epoch::dump() 
 {
     nlohmann::json j;
-    j["epoch"]=epoch;
+    j["epoch"]=epoch.container;
     if(prev_lc.size())
     {
         inBuffer in(prev_lc);
@@ -508,7 +508,7 @@ std::string bc_epoch::dump()
         auto &hb=jp["hb"];
         hb["block_timestamp"]=lc->heart_beat->block_timestamp;
         hb["node_leader"]=lc->heart_beat->node_leader.container;
-        hb["epoch"]=lc->heart_beat->new_epoch;
+        hb["epoch"]=lc->heart_beat->new_epoch.container;
         hb["prev_root_hash"]=base16::encode(lc->heart_beat->prev_root_hash_1.container);
         return j.dump(2);
 

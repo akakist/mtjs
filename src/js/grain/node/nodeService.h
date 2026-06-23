@@ -30,7 +30,6 @@
 #include "md/md_GetTransactionRSP.h"
 #include "md/md_GetTransactionREQ.h"
 #include "md/md_BlockAcceptedREQ.h"
-#include "md/md_BlockAcceptedRSP.h"
 #include "md/md_DoHeartBeatREQ.h"
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
@@ -150,7 +149,6 @@ namespace Node
         bool ValidateBlockREQ(const MsgData::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockRSP(const MsgData::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
         bool BlockAcceptedREQ(const MsgData::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route);
-        bool BlockAcceptedRSP(const MsgData::BlockAcceptedRSP* r, const NODE_id & src_node, const route_t& route);
 
         bool GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP* r, const NODE_id & src_node, const route_t& route);
         bool GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ* r, const NODE_id & src_node, const route_t& route);
@@ -192,7 +190,7 @@ namespace Node
             bool block_accepted_sent=false;
             bool heart_bit_sent_on_block_accepted_rsp=false;
 
-            std::map<NODE_id, REF_getter<MsgData::BlockAcceptedRSP> > acceptors;
+            std::set<NODE_id > acceptors;
 
             heart_beat_info    heart_beat_store;
 
@@ -231,13 +229,13 @@ namespace Node
         void do_start_block();
 
         void collectTransactions();
-        BLOCK_id execute_block(t_params &t,  const std::vector<NODE_id> &nodes_in_leader_cert);
+        BLOCK_id execute_block(t_params &t,  const REF_getter<MsgData::LeaderCertificate> &lc);
 
         void do_sync(const NODE_id &src_node);
 
         // bool CheckState(const MsgData::HeartBeatREQ *r, const NODE_id & src_node);
 
-        void calc_fee_rewards_nodes(t_params& t, const std::vector<NODE_id> &nodes_in_leader_cert);
+        void calc_fee_rewards_nodes(t_params& t, const REF_getter<MsgData::LeaderCertificate> &lc);
 
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
 

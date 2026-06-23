@@ -348,9 +348,11 @@ void Node::Service::do_heart_beat()
     blocks_leader.clear();
     // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
     {
+        EPOCH_id e=root->getEpoch()->epoch;
+        e.container+=1;
         REF_getter<MsgData::HeartBeatREQ> hb_req =
             new MsgData::HeartBeatREQ(prev_root_hash_Z,
-                                      root->getEpoch()->epoch+1,
+                                      e,
                                       this_node_name, root->getEpoch()->prev_lc, time(NULL));
 
         REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),root->getEpoch()->prev_lc);
