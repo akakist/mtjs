@@ -96,13 +96,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         logNode("db_state->write_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
-    sendEvent(ServiceEnum::GrainWriter,
-        new bcEvent::WriteGranules(db_to_save_Z,
-            r->blockInfo->heart_beat->new_epoch,
-            db_state,this));
-    // db_state->write_batch(db_to_save_Z);
-    db_to_save_Z.clear();
-
     {
         MUTEX_INSPECTOR;
         XTRY;
@@ -114,6 +107,14 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XPASS;
     }
 
+    sendEvent(ServiceEnum::GrainWriter,
+        new bcEvent::WriteGranules(db_to_save_Z,
+            r->blockInfo->heart_beat->new_epoch,
+            db_state,this));
+    // db_state->write_batch(db_to_save_Z);
+    db_to_save_Z.clear();
+
+
     sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(c.blockDBStore, c.att_data, this));
 
     prev_root_hash_Z = r->blockInfo->new_root_hash1;
@@ -121,6 +122,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     cli_leader_info.clear();
     do_InvalidateRoot();
 
+    
     {
         MUTEX_INSPECTOR;
         XTRY;
