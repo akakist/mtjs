@@ -60,7 +60,7 @@ async function exec() {
         // console.log("signed tx:", m);
         const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(tx), sk, nonce);
         console.log(rsp);
-        sleep(1000);
+        sleep(300);
     }
 }
 console.log(std.getenv("PATH"));

@@ -21,6 +21,7 @@ for (let i = 0; i < 20; i++) {
     nodes.push(`n${i}`);
 }
 async function exec() {
+    let i=0;
         while(true)
         {
             mtjs.tx_subscribe(node, (params)=>{
@@ -65,8 +66,8 @@ async function exec() {
 
             // const m=mtjs.tx_sign(tx, sk!);
             // console.log("signed tx:", m);
-
-            const rsp=await mtjs.tx_submit(node,1, JSON.stringify(tx), sk!, nonce);
+            i++;
+            const rsp=await mtjs.tx_submit(nodes[i%20],1, JSON.stringify(tx), sk!, nonce);
             console.log(rsp);
             sleep(1000);
         }

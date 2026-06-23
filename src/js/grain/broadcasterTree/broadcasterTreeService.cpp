@@ -179,7 +179,11 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
     {
         // auto nn = root->getNode(nd);
         if(nd->get_missed_rounds()>=100)
-            continue;
+        {
+            /// TODO
+            // continue;
+
+        }
         NodeElement n=nd->getElement();
         // n.name = nd->getName();
         // n.stake_A = nd->get_full_stake();

@@ -18,20 +18,22 @@ let root_pk = std.getenv('k_root_ed_pk');
 // for (let i = 0; i < 20; i++) {
 //     nodes.push(`n${i}`);
 // }
+
 async function exec() {
     // while(true)
     // {
-    mtjs.tx_subscribe(node, (params) => {
-        console.log("tx report from js:", JSON.stringify(params));
-    });
-    const ui = await mtjs.get_user_info(node, root_pk, 1.5);
+//    mtjs.tx_subscribe(node, (params) => {
+//        console.log("tx report from js:", JSON.stringify(params));
+//
+//    });
+    const ui = await mtjs.get_user_info(node, mtjs.addr_from_pk(root_pk), 1.5);
     const nonce = ui.nonce;
     console.log(ui);
     let tx = [
         {
             contract: "root",
             method: "node_enable",
-            params: { node: "n10" }
+            params: { node: "n0" }
         }
     ];
     // const m=mtjs.tx_sign(tx, sk!);

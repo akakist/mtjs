@@ -120,6 +120,10 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     
     bool remote_verified=false;
     bool local_verified=false;
+    if(!remote_prev_lc)
+    {
+        logNode("remote prtev lc NULL %s", src_node.container.c_str());
+    }
     if(remote_prev_lc)
     {
         remote_verified=root->verify_leader_certificate(remote_prev_lc);
@@ -185,7 +189,19 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
                 if(prev_root_hash_Z!=h->prev_root_hash_1)    
                 {
                     /// нужно сделать голосование за прев-блок
+                    /// делаем просто хартбит. В это случае поврежденная нода отваливается 
+                    // по missed_rounds. Вывезет та нода, у которой консенсусный рут хеш
+                    /// нужно искать гонки, где-то с мутексами проблема есть.
+                    /// с другой стороны такой вариант, 
+                    /// когда нода отваливается из-за очень редкой ошибки, уже пойдет.
+                    /// главное - нет затыкания протокола
                     logNode("if(prev_root_hash_Z!=h->prev_root_hash)    prev_root_hash_Z %s h->prev_root_hash %s from node %s", prev_root_hash_Z.str().c_str(), h->prev_root_hash_1.str().c_str(),src_node.container.c_str());
+                    auto& ci=cli_leader_info[prev_root_hash_Z];
+                    if(!ci.heart_beat_sent)
+                    {
+                        ci.heart_beat_sent=true;
+                        do_heart_beat();
+                    }
                     return true;
                 }
                     // throw CommonError("if(prev_root_hash_Z!=h->prev_root_hash)    ");
