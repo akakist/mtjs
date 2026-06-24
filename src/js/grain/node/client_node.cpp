@@ -223,7 +223,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         }
     }
 
-    if (!err && !root->verify_leader_certificate(r->leader_cert))
+    if (!err && ! verify_leader_certificate(r->leader_cert))
     {
         err = true;
         t.emit_block("error", R"({"code":-32602,"error":"verify_leader_certificate failed"})");

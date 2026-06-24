@@ -126,12 +126,12 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     }
     if(remote_prev_lc)
     {
-        remote_verified=root->verify_leader_certificate(remote_prev_lc);
+        remote_verified=verify_leader_certificate(remote_prev_lc);
     }
     else logNode("!if(remote_lc.valid())");
     if(local_lc.valid())
     {
-        local_verified=root->verify_leader_certificate(local_lc);
+        local_verified=verify_leader_certificate(local_lc);
     }
     else logNode("!if(local_lc.valid())");
 

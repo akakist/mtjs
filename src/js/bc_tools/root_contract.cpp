@@ -28,47 +28,6 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     { return new bc_epoch(p); }
 };
 
-bool root_data::verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate> &lc)
-{
-    /// проверка сертификата лидера
-    {
-        MUTEX_INSPECTOR;
-        std::vector<blst_cpp::PublicKey> agg_pk;
-        BigInt stake;
-        for (auto &z : lc->nodes)
-        {
-            auto n = this->getNode(z);
-            if (!n.valid())
-            {
-                logErr2("            if (!n.valid()) %s",z.container.c_str());
-                return false;
-
-            }
-            agg_pk.push_back(n->get_bls_pk());
-            stake += n->get_full_stake();
-        }
-        auto nn=getAllNodes();
-        BigInt ts = 0;
-        for(auto &z: nn)
-        {
-            ts+=z->get_full_stake();
-        }
-        if (stake.toDouble() < ts.toDouble() * QUORUM)
-        {
-            logErr2("verify lc quorum failed");
-            return false;
-        }
-        // throw CommonError("if(stake.toDouble() < root->getValues(NULL)->total_staked.toDouble() * QUORUM)");
-        if (!lc->agg_sig.verify(agg_pk, blake2b_hash(lc->heart_beat->getBuffer()).container))
-        {
-            logErr2("verify lc - sign invalid");
-            ;
-            return false;
-        }
-    }
-
-    return true;
-}
 
 REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string> &v, IDatabase *db)
 {

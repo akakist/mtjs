@@ -14,6 +14,7 @@
 #include "IInstance.h"
 #include "broadcaster.h"
 #include "THASH_id.h"
+#include "QUORUM.h"
 #include "corelib/mutexInspector.h"
 #include "Event/bcEvent.h"
 #include <exception>
@@ -692,6 +693,48 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
     }
     return 0;
 }
+bool Node::Service::verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate> &lc)
+{
+    /// проверка сертификата лидера
+    {
+        MUTEX_INSPECTOR;
+        std::vector<blst_cpp::PublicKey> agg_pk;
+        BigInt stake;
+        for (auto &z : lc->nodes)
+        {
+            auto n = root->getNode(z);
+            if (!n.valid())
+            {
+                logErr2("            if (!n.valid()) %s",z.container.c_str());
+                return false;
+
+            }
+            agg_pk.push_back(n->get_bls_pk());
+            stake += n->get_full_stake();
+        }
+        auto nn=root->getAllNodes();
+        BigInt ts = 0;
+        for(auto &z: nn)
+        {
+            ts+=z->get_full_stake();
+        }
+        if (stake.toDouble() < ts.toDouble() * QUORUM)
+        {
+            logErr2("verify lc quorum failed");
+            return false;
+        }
+        // throw CommonError("if(stake.toDouble() < root->getValues(NULL)->total_staked.toDouble() * QUORUM)");
+        if (!lc->agg_sig.verify(agg_pk, blake2b_hash(lc->heart_beat->getBuffer()).container))
+        {
+            logErr2("verify lc - sign invalid");
+            ;
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 {
     MUTEX_INSPECTOR;

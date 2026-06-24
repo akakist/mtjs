@@ -238,6 +238,8 @@ namespace Node
         void calc_fee_rewards_nodes(t_params& t, const REF_getter<MsgData::LeaderCertificate> &lc);
 
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
+    
+        bool verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate>& lc);
 
         REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;
