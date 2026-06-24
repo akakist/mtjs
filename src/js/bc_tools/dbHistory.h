@@ -41,7 +41,7 @@ struct DB_history : public Refcountable
         fwrite(data.data(),data.size(),1,f);
         fclose(f);
     }
-    bool writeBlock(const EPOCH_id& epoch, const std::string& prev_root_hash, const std::string& data) {
+    bool writeBlock(const EPOCH_id& epoch, uint64_t block_timestamp,  const std::string& prev_root_hash, const std::string& data) {
 
         write_chunked(data);
 
@@ -52,11 +52,12 @@ struct DB_history : public Refcountable
         initDB(dbs);
 
         SQLite::Statement query(dbs,
-                                "INSERT OR REPLACE INTO blocks (prev_root_hash, data, epoch) VALUES (?, ?, ?)"
+                                "INSERT OR REPLACE INTO blocks (prev_root_hash, data, epoch, block_timestamp) VALUES (?, ?, ?, ?)"
                                );
         query.bind(1, prev_root_hash.data(),prev_root_hash.size());
         query.bind(2, data.data(),data.size());
         query.bind(3, (int64_t) epoch.container);
+        query.bind(4, (int64_t) block_timestamp);
         query.exec();
         if(epoch.container>20000)
         {
@@ -103,10 +104,12 @@ struct DB_history : public Refcountable
             db.exec(R"(CREATE TABLE IF NOT EXISTS blocks (
                 prev_root_hash BLOB NOT NULL,
                 epoch INTEGER NOT NULL,
+                block_timestamp INTEGER NOT NULL,
                 data BLOB NOT NULL
             ))");
             db.exec("CREATE INDEX IF NOT EXISTS idx_prev_hash ON blocks(prev_root_hash);");
             db.exec("CREATE INDEX IF NOT EXISTS idx_epoch ON blocks(epoch);");
+            db.exec("CREATE INDEX IF NOT EXISTS idx_ts ON blocks(block_timestamp);");
 
             return true;
         } catch (...) {

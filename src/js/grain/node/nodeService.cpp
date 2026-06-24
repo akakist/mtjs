@@ -470,7 +470,7 @@ void Node::Service::resetTimer()
 BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     MUTEX_INSPECTOR;
-
+    M_LOCK(root->state_mutex);
     // outBuffer o;
     for (int ti = 0; ti < t.validateBlockREQ->transaction_bodies.size(); ti++)
     {

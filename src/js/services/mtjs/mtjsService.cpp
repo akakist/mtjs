@@ -623,52 +623,35 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     for (size_t ti = 0; ti < e->blockStore->validateBlockREQ->transaction_bodies.size(); ti++)
     {
         XTRY;
-        // xy::json::
-        // nlohmann::json jtr;
-        // jtr["instructions"] = yyjson::MutableArray();
-        // nlohmann::json ins;
         if (opaque.tx_subscription_cb.has_value())
         {
             XTRY;
-            THASH_id tx_hash = e->blockStore->validateBlockREQ->transaction_bodies[ti]->getHash();
-            // jtr["tx_hash"] = base16::encode(tx_hash.container);
-            // logErr2("ClientTxSubscribeRSP: tx_hash %s",base16::encode(tx_hash.container).c_str());
             JSScope<10, 10> scope(js_ctx);
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);
-            // auto &tx_report = e->att_data->transaction_reports[tx_hash];
             
-            // logErr2("tx_report.instruction_reports size %d",tx_report.instruction_reports.size());
-            // for (int ii = 0; ii < tx_report.instruction_reports.size(); ii++)
-            // {
-            //     nlohmann::json ii_json;
-            //     ii_json["errcode"] = tx_report.instruction_reports[ii].err_code;
-            //     ii_json["errstr"] = tx_report.instruction_reports[ii].err_str;
-            //     // logErr2("err_str %d %d %s",ti,ii,pb->att_data.instruction_reports[ti][ii].err_str.c_str());
-            //     nlohmann::json logmsgs_json;
-            //     auto &lms = tx_report.instruction_reports[ii].logMsgs;
-            //     for (auto &z : lms)
-            //     {
-            //         // logErr2("logmsgs %d %d %d %s",ti,ii,k,pb->att_data.instruction_reports[ti][ii].logMsgs[k].c_str());
-            //         logmsgs_json.push_back(z);
-            //     }
-            //     ii_json["logMsgs"] = logmsgs_json;
-            //     jtr["instructions"].push_back(ii_json);
-            // }
-            // jtr["errcode"]=tx_report.err_code;
-            // jtr["errstr"]=tx_report.err_str;
+            THASH_id tx_hash = e->blockStore->validateBlockREQ->transaction_bodies[ti]->getHash();
+            auto it=opaque.node_tx_cb.find(tx_hash.container);
+            if(it!=opaque.node_tx_cb.end())
+            {
+                auto tx_it=e->att_data->blockRoot.children.find(base16::encode(tx_hash.container));
+                if(tx_it==e->att_data->blockRoot.children.end())
+                    throw CommonError("if(tx_it==e->att_data->blockRoot.children.end())");
+                JSValue obj2=emit_node_to_js(js_ctx, tx_it->second);
+                JSValue argv1[1];
+                argv1[0] = obj2;
+                JSValue func_result = JS_Call(js_ctx, it->second.get(), global_obj, 1, argv1);
+                scope.addValue(func_result);
+                qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
+                opaque.node_tx_cb.erase(it);
+
+            }
+            // else logErr2("node_tx_cb not found %s",base16::encode(tx_hash.container).c_str());
             if (!JS_IsFunction(js_ctx, opaque.tx_subscription_cb->get()))
             {
                 throw CommonError("callback not a function");
             }
-            // std::string str; 
-            XTRY;
-            // str=dump_emit_node_compact(e->att_data->blockRoot); 
-            XPASS;
-            // jtr.write(str);
-            // logErr2("json %s",str.c_str());
             JSValue obj=emit_node_to_js(js_ctx, e->att_data->blockRoot);
-            // JSValue obj = JS_ParseJSON(js_ctx, str.data(), str.size(), "<input>");
             scope.addValue(obj);
             JSValue argv[1];
             argv[0] = obj;

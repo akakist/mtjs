@@ -39,6 +39,16 @@ REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vect
     }
     return cur;
 }
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db)
+{
+    // M_LOCK(cur->lock);
+    for (auto &z : v)
+    {
+        MutexLockerDeferred l(cur->mx);
+        cur = cur->getLeafOrCreate(z, db,l);
+    }
+    return cur;
+}
 REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vector<std::string> &v, IDatabase *db)
 {
     // M_LOCK(cur->lock);
@@ -51,6 +61,43 @@ REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vect
     }
     return cur;
 }
+void root_data::getDiff(cdiff& out, const EPOCH_id &epoch)
+{
+    M_LOCK(state_mutex);
+    _getDiff(out,epoch,db.get());
+}
+
+void root_data::apply_diff(const cdiff& out)
+{
+    M_LOCK(state_mutex);
+    for(auto &e: out.container)
+    {
+        auto &epoch=e.first;
+        for(auto &z:e.second)
+        {
+            auto& path=z.first;
+            auto& buf=z.second.first;
+            int ctor=z.second.second;
+            REF_getter<Cellable> cell=getByPathOrCreate(this,path,db.get());
+            if(cell->payload_ctor_idx && cell->payload_ctor_idx!=ctor)
+            {
+                throw CommonError("if(cell->payload_ctor_idx && cell->payload_ctor_idx!=ctor)");
+            }
+            if(cell->payload_ctor_idx!=ctor)
+                cell->payload_ctor_idx=ctor;
+            data=db_constructors[cell->payload_ctor_idx](cell.get());
+            inBuffer in(buf);
+            data->unpack(in);
+            if(data->last_update_epoch!=epoch)
+                throw CommonError("if(data->last_update_epoch!=epoch)");
+            data->setDirty(data->last_update_epoch);
+        }
+    }
+}
+// void getDiff(std::map<std::string,std::string>& out)
+// {
+
+// }
 
 std::vector<std::string> root_data::getContractPath(const std::string &name)
 {
@@ -94,7 +141,7 @@ REF_getter<bc_contract> root_data::addContract(const std::string &name, const RE
     REF_getter<bc_contract> bc = new bc_contract(cc.get());
     cc->data = bc.get();
     cc->payload_ctor_idx = hsh::bc_contract;
-    cc->setDirty(epoch);
+    cc->data->setDirty(epoch);
     return bc;
 }
 REF_getter<bc_epoch> root_data::getEpoch()
@@ -325,7 +372,7 @@ REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee
     REF_getter<bc_node> n = new bc_node(cc.get());
     cc->data = n.get();
     cc->payload_ctor_idx = hsh::bc_node;
-    cc->setDirty(epoch);
+    cc->data->setDirty(epoch);
     return n;
 }
 

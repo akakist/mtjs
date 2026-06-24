@@ -132,8 +132,8 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     logErr2("js_tx_submit");
     JSScope<10, 10> scope(ctx);
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    if (argc != 5)
-        return JS_ThrowInternalError(ctx, "number of argument must be 5");
+    if (argc != 6)
+        return JS_ThrowInternalError(ctx, "number of argument must be 6");
 
     if (!JS_IsString(argv[0]))
         return JS_ThrowInternalError(ctx, "node addr not specified, must be string");
@@ -145,6 +145,8 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
         return JS_ThrowInternalError(ctx, "sk not specified, must be string");
     if (!JS_IsString(argv[4]))
         return JS_ThrowInternalError(ctx, "nonce not specified, must be string");
+    if (!JS_IsFunction(ctx, argv[5]))
+        return JS_ThrowInternalError(ctx, "callback not specified, must be function");
 
     auto node_addr = scope.toStdString(argv[0]);
     // logErr2("node_addr %s", node_addr.c_str());
@@ -157,6 +159,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     auto sk = base16::decode(scope.toStdString(argv[3]));
     auto pk = extract_public_ed(sk);
     auto nonce_str = scope.toStdString(argv[4]);
+    // JSValueGuard g_func(ctx,JS_DupValue(ctx,argv[5]));
     uint64_t nonce=0;
     try
     {        nonce=std::atoll(nonce_str.c_str());
@@ -180,6 +183,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, timeout, op->listener_));
 
+    op->node_tx_cb.emplace(hash.container,JSValueGuard(ctx,JS_DupValue(ctx,argv[5])));
     auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
     JSValue prom[2];

@@ -22,21 +22,21 @@ async function exec() {
     // while(true)
     // {
     mtjs.tx_subscribe(node, (params) => {
-        console.log("tx report from js:", JSON.stringify(params));
+        // console.log("tx report from js:", JSON.stringify(params));
     });
-    const ui = await mtjs.get_user_info(node, root_pk, 1.5);
+    const ui = await mtjs.get_user_info(node, mtjs.addr_from_pk(root_pk), 1.5);
     const nonce = ui.nonce;
     console.log(ui);
     let tx = [
         {
             contract: "root",
             method: "node_enable",
-            params: { node: "n10" }
+            params: { node: "n9" }
         }
     ];
     // const m=mtjs.tx_sign(tx, sk!);
     // console.log("signed tx:", m);
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(tx), sk, nonce);
+    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(tx), sk, nonce, (obj) => { console.log(JSON.stringify(obj, null, 2)); });
     console.log(rsp);
     // }
 }

@@ -99,18 +99,24 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XTRY;
         outBuffer o;
         o<<c.blockDBStore;
-        db_history->writeBlock(c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->new_epoch, c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.container,
-                               o.asString()->container
+        auto &hb=c.blockDBStore->validateBlockREQ->leader_cert->heart_beat;
+        db_history->writeBlock(hb->new_epoch, 
+                                hb->block_timestamp,
+                                hb->prev_root_hash_1.container,
+                                o.asString()->container
                               );
         XPASS;
     }
-
-    sendEvent(ServiceEnum::GrainWriter,
-        new bcEvent::WriteGranules(db_to_save_Z,
-            r->blockInfo->heart_beat->new_epoch,
-            db_state,this));
-    // db_state->write_batch(db_to_save_Z);
+    db_state->write_batch(db_to_save_Z);
+    logErr2("written %d granules",db_to_save_Z.cells.size());
     db_to_save_Z.clear();
+
+    // sendEvent(ServiceEnum::GrainWriter,
+    //     new bcEvent::WriteGranules(db_to_save_Z,
+    //         r->blockInfo->heart_beat->new_epoch,
+    //         db_state,this));
+    // db_state->write_batch(db_to_save_Z);
+    // db_to_save_Z.clear();
 
 
     sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(c.blockDBStore, c.att_data, this));

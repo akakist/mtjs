@@ -122,6 +122,42 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string &id, IDatabase 
     }
     return cc;
 }
+void Cellable::_getDiff(cdiff& out, const EPOCH_id &epoch, IDatabase* db)
+{
+    if(last_update_epoch<epoch)
+        return;
+    std::deque<std::string> path;
+    get_path(path);
+    if(data.valid())
+    {
+        auto e=data->last_update_epoch;
+        out.add(e,path,data->getBuffer(),payload_ctor_idx); 
+    }
+    // out[path]={getBuffer();
+    MutexLockerDeferred lk(mx);
+    lk.lock();
+    auto hashes=children_hashes_mx;
+    lk.unlock();
+    for(auto& z:hashes)
+    {
+        REF_getter<Cellable> child;
+        lk.lock();
+        auto it=children_ptrs_mx.find(z.first);
+        if(it!=children_ptrs_mx.end())
+            child=it->second;
+        else
+        {
+            lk.unlock();
+            child=getLeafNoCreate(z.first,db,lk);
+            if(!child.valid())
+                throw CommonError("if(!child.valid())");
+        }
+        if(!child.valid())
+            throw CommonError("if(!child.valid())");
+        child->_getDiff(out,epoch,db);
+    }
+}
+
 void Cellable::calc_tree_hash(_db_to_save &db_dump)
 {
     MUTEX_INSPECTOR;
@@ -159,5 +195,6 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
 }
 void data_base::setDirty(const EPOCH_id& epoch)
 {
-    parent->setDirty(epoch);
+    last_update_epoch=epoch;
+    parent->setDirty__(epoch);
 }

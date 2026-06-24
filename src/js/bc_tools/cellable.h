@@ -12,7 +12,26 @@
 
 struct Cellable;
 
-
+struct cdiff
+{
+    std::map<EPOCH_id, std::map<std::deque<std::string>,std::pair<std::string,int>>>container;
+    void add(const EPOCH_id& ep, const std::deque<std::string>& path, const std::string& body, int ctor_idx)
+    {
+        container[ep][path]={body,ctor_idx};
+    }
+};
+inline outBuffer & operator<< (outBuffer& b,const cdiff &s)
+{
+    b<<1;
+    b<<s.container;
+    return b;
+}
+inline inBuffer & operator>> (inBuffer& b,  cdiff &s)
+{
+    auto ver=b.get_PN();
+    b>>s.container;
+    return b;
+}
 
 struct data_base : public Refcountable
 {
@@ -22,8 +41,12 @@ struct data_base : public Refcountable
     time_t create_time=0;
     int ttl=-1;
 
+    EPOCH_id last_update_epoch;
+
     data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
-        type(t), parent(_parent), create_time(_create_time),ttl(_ttl) {}
+        type(t), parent(_parent), create_time(_create_time),ttl(_ttl) {
+            last_update_epoch.container=0;
+        }
     ~data_base()
     {
     }
@@ -33,12 +56,14 @@ struct data_base : public Refcountable
         o<<1;
         o<<type;
         o<<create_time<<ttl;
+        o<<last_update_epoch;
     }
     virtual void unpack(inBuffer& in)
     {
         int ver=in.get_PN();
         in>>type;
         in>>create_time>>ttl;
+        in>>last_update_epoch;
     }
     std::string getBuffer()
     {
@@ -90,7 +115,7 @@ public:
     Cellable(Cellable* _parent, const std::string & id):Refcountable("cellable"),  parent(_parent), m_id(id)
     {
     }
-    void setDirty(const EPOCH_id& epoch)
+    void setDirty__(const EPOCH_id& epoch)
     {
         is_dirty=true;
         last_update_epoch=epoch;
@@ -98,7 +123,7 @@ public:
         //     calcers_Z.insert(bc);
         if(parent)
         {
-            parent->setDirty(epoch);
+            parent->setDirty__(epoch);
         }
     }
     std::string dump();
@@ -112,6 +137,14 @@ public:
         {
             parent->get_path(s);
         }
+    }
+    void get_path(std::deque<std::string> &s) const
+    {
+        if(parent)
+        {
+            parent->get_path(s);
+        }
+        s.push_back(this->m_id);
     }
     virtual void pack(outBuffer& o)
     {
@@ -177,7 +210,8 @@ public:
     REF_getter<Cellable> getLeafNoCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
 
     void calc_tree_hash(_db_to_save &db_dump);
-
+    // void _getDiff(std::map<std::deque<std::string>,std::string>& out, const EPOCH_id &epoch, IDatabase* db);
+    void _getDiff(cdiff& out, const EPOCH_id &epoch, IDatabase* db);
 };
 // static const char* base16_TABLE[62] = {
 //     "0","1","2","3","4","5","6","7","8","9",

@@ -343,6 +343,8 @@ struct bc_epoch: public data_base
 };
 
 REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db);
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db);
+
 REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db);
 
 
@@ -353,6 +355,9 @@ struct root_data: public Cellable
     root_data(IDatabase *db_): Cellable(nullptr,"r"),db(db_)
     {
     }
+    Mutex state_mutex;
+    void getDiff(cdiff& out, const EPOCH_id &epoch);
+    void apply_diff(const cdiff& out);
 
     std::vector<std::string> getContractPath(const std::string &name);
     std::vector<std::string> getNodePath(const std::string &name);

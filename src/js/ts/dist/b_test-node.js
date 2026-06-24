@@ -22,6 +22,8 @@ for (let i = 0; i < 10; i++) {
 }
 async function exec() {
     let i = 0;
+    return;
+//    if(false)
     while (true) {
         mtjs.tx_subscribe(node, (params) => {
             console.log("tx report from js:", JSON.stringify(params));
@@ -60,9 +62,11 @@ async function exec() {
         // const m=mtjs.tx_sign(tx, sk!);
         // console.log("signed tx:", m);
         i++;
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(tx), sk, nonce);
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(tx), sk, nonce, (obj) => {
+            console.log("TX REPORT " + JSON.stringify(obj, null, 2));
+        });
         console.log(rsp);
-        sleep(200);
+        sleep(1000);
     }
 }
 console.log(std.getenv("PATH"));
@@ -99,8 +103,8 @@ try {
     console.log("Start");
     try {
         const sk = std.getenv('u_root_ed_sk');
-//        setInterval(() => {
-//        }, 5000);
+        setInterval(() => {
+        }, 5000);
         await exec();
     }
     catch (e) {
