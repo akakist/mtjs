@@ -6,7 +6,7 @@ void init_root(const REF_getter<root_data> &r)
         EPOCH_id e;
         e.container=0;
     std::vector<int> stakes;
-    for(int i=0; i<20; i++)
+    for(int i=0; i<10; i++)
     {
         stakes.push_back(100*i);
     }
@@ -41,7 +41,7 @@ void init_root(const REF_getter<root_data> &r)
     }
 
     std::vector<std::pair<std::string, std::string>> keys;
-    for (size_t i = 0; i < 20; i++)
+    for (size_t i = 0; i < 10; i++)
     {
         keys.push_back(
         {
@@ -52,7 +52,7 @@ void init_root(const REF_getter<root_data> &r)
     }
 
 
-    for(int i=0; i<20; i++)
+    for(int i=0; i<10; i++)
     {
         NODE_id name;
         name.container="n"+std::to_string(i);

@@ -12,12 +12,12 @@ let root_pk=std.getenv('k_root_ed_pk');
 // let u4 = std.getenv('k_u4_ed_pk');
 // let users=[u0!,u1!,u2!,u3!,u4!];
 let users: string[] = [];
-for (let i = 0; i < 20; i++) {
+for (let i = 0; i < 10; i++) {
     let pk = std.getenv(`k_u${i}_ed_pk`);
     if (pk) users.push(mtjs.addr_from_pk(pk));
 }
 let nodes: string[] = [];
-for (let i = 0; i < 20; i++) {
+for (let i = 0; i < 10; i++) {
     nodes.push(`n${i}`);
 }
 async function exec() {
@@ -67,7 +67,7 @@ async function exec() {
             // const m=mtjs.tx_sign(tx, sk!);
             // console.log("signed tx:", m);
             i++;
-            const rsp=await mtjs.tx_submit(nodes[i%20],1, JSON.stringify(tx), sk!, nonce);
+            const rsp=await mtjs.tx_submit(nodes[i%10],1, JSON.stringify(tx), sk!, nonce);
             console.log(rsp);
             sleep(1000);
         }
@@ -75,7 +75,9 @@ async function exec() {
 
 console.log(std.getenv("PATH"));
 try{
-    const nums=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19];
+    const nums=[0,1,2,3,4,5,6,7,8,9
+        // ,10,11,12,13,14,15,16,17,18,19
+    ];
     for(let i of nums)
     {
         mtjs.addInstance(`MTJS${i}`,`

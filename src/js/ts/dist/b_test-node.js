@@ -1,7 +1,7 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 import { sleep } from "os";
-const node = "127.0.0.1:2305";
+const node = "127.0.0.1:2301";
 let sk = std.getenv('k_root_ed_sk');
 let root_pk = std.getenv('k_root_ed_pk');
 // let u0 = std.getenv('k_u0_ed_pk');
@@ -11,19 +11,20 @@ let root_pk = std.getenv('k_root_ed_pk');
 // let u4 = std.getenv('k_u4_ed_pk');
 // let users=[u0!,u1!,u2!,u3!,u4!];
 let users = [];
-for (let i = 0; i < 20; i++) {
+for (let i = 0; i < 10; i++) {
     let pk = std.getenv(`k_u${i}_ed_pk`);
     if (pk)
         users.push(mtjs.addr_from_pk(pk));
 }
 let nodes = [];
-for (let i = 0; i < 20; i++) {
+for (let i = 0; i < 10; i++) {
     nodes.push(`n${i}`);
 }
 async function exec() {
+    let i = 0;
     while (true) {
         mtjs.tx_subscribe(node, (params) => {
-//            console.log("tx report from js:", JSON.stringify(params));
+            console.log("tx report from js:", JSON.stringify(params));
         });
         const ui = await mtjs.get_user_info(node, mtjs.addr_from_pk(root_pk), 1.5);
         const nonce = ui.nonce;
@@ -58,14 +59,17 @@ async function exec() {
         }
         // const m=mtjs.tx_sign(tx, sk!);
         // console.log("signed tx:", m);
+        i++;
         const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(tx), sk, nonce);
         console.log(rsp);
-        sleep(300);
+        sleep(200);
     }
 }
 console.log(std.getenv("PATH"));
 try {
-    const nums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+    const nums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+        // ,10,11,12,13,14,15,16,17,18,19
+    ];
     for (let i of nums) {
         mtjs.addInstance(`MTJS${i}`, `
             Start=Node
@@ -84,7 +88,7 @@ try {
                 HTTP_max_post=1000000
                 HTTP_doc_urls=/pics,/html,/css
                 HTTP_document_root=./www
-                GrainWriter_snapshot_modulus=10000
+                GrainWriter_snapshot_modulus=1000
                 Node_my_sk_bls_env_key=k_node${i}_bls_sk
                 Node_my_sk_ed_env_key=k_node${i}_ed_sk
                 Node_this_node_name=n${i}
