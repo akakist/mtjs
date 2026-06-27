@@ -103,8 +103,13 @@ std::vector<std::string> root_data::getContractPath(const std::string &name)
 {
     std::vector<std::string> p;
     p.push_back("c");
-    appendRelativeInternalPath(p, name, 3);
-    // p.push_back(name);
+    auto h=ghash(name.c_str());
+    char buf[2];
+    buf[0] = "0123456789abcdef"[h % 16];
+    buf[1] = "0123456789abcdef"[(h >> 8) % 16];
+    p.push_back({buf,1});
+    p.push_back({buf+1,1});
+    p.push_back(name);
     return p;
 }
 
@@ -112,8 +117,14 @@ std::vector<std::string> root_data::getNodePath(const std::string &name)
 {
     std::vector<std::string> p;
     p.push_back("n");
-    appendRelativeInternalPath(p, name, 2);
-    // p.push_back(name);
+    auto h=ghash(name.c_str());
+    char buf[2];
+    buf[0] = "0123456789abcdef"[h % 16];
+    buf[1] = "0123456789abcdef"[(h >> 8) % 16];
+    p.push_back({buf,1});
+    p.push_back({buf+1,1});
+    p.push_back(name);
+
     return p;
 }
 
@@ -442,7 +453,7 @@ std::string bc_user_state::dump()
 {
     M_LOCK(parent->mx);
     nlohmann::json j;
-    j["balance"]=balance.toString();
+    // j["balance"]=balance.toString();
     j["nonce"]=nonce;
     return j.dump(2);
 }

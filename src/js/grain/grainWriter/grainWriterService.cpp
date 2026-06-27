@@ -22,8 +22,8 @@
 #include "events_grainWriterService.hpp"
 #include "unknown.h"
 #include "msgFactory.h"
-#include "md/md_GetUserStatusREQ.h"
-#include "md/md_GetUserStatusRSP.h"
+#include "md/md_GetUserNonceREQ.h"
+#include "md/md_GetUserNonceRSP.h"
 #include "init_root.h"
 
 bool GrainWriter::Service::on_startService(const systemEvent::startService *)
@@ -53,7 +53,7 @@ bool GrainWriter::Service::on_alarm(const timerEvent::TickAlarm *e)
 {
     MUTEX_INSPECTOR;
     logErr2("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CREATE SNAPSHOT");
-    db_state->create_snapshot();
+    // db_state->create_snapshot();
     return true;
 }
 

@@ -69,7 +69,7 @@ async function exec() {
             i++;
             const rsp=await mtjs.tx_submit(node,1, JSON.stringify(tx), sk!, nonce,
             (obj)=>{
-                console.log("TX REPORT "+JSON.stringify(obj,null,2));
+                console.log("TX REPORT "+JSON.stringify(obj));
             });
             console.log(rsp);
             sleep(200);

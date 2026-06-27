@@ -16,6 +16,8 @@
 #include "s_ed.h"
 #include "t_params.h"
 #include "tools_mt.h"
+#include "QUORUM.h"
+#include "md/md_LcRSP.h"
 // #include <SQLiteCpp/Database.h>
 #include <vector>
 
@@ -94,12 +96,12 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         logNode("db_state->write_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
+    auto &hb=c.blockDBStore->validateBlockREQ->leader_cert->heart_beat;
     {
         MUTEX_INSPECTOR;
         XTRY;
         outBuffer o;
         o<<c.blockDBStore;
-        auto &hb=c.blockDBStore->validateBlockREQ->leader_cert->heart_beat;
         db_history->writeBlock(hb->new_epoch, 
                                 hb->block_timestamp,
                                 hb->prev_root_hash_1.container,
@@ -110,6 +112,10 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     db_state->write_batch(db_to_save_Z);
     logErr2("written %d granules",db_to_save_Z.cells.size());
     db_to_save_Z.clear();
+    if(hb->new_epoch.container%SNAPSHOT_BLOCKS==0)
+    {
+        db_state->create_snapshot(hb->new_epoch);
+    }
 
     // sendEvent(ServiceEnum::GrainWriter,
     //     new bcEvent::WriteGranules(db_to_save_Z,
@@ -189,6 +195,12 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
     auto buffer = e->getBuffer();
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
     passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
+}
+bool Node::Service::LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route)
+{
+    auto lc=root->getEpoch()->prev_lc;
+    pass_NodeMsgRSP(new MsgData::LcRSP(lc), route);
+    return true;
 }
 
 int get_global_refcount();

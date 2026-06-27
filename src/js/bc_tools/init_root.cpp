@@ -30,12 +30,15 @@ void init_root(const REF_getter<root_data> &r)
     // u_root pk
     if(!r->checkUserState(u_root_address).valid())
     {
-        auto u=r->getUserState(u_root_address);
+        auto u=r->getUser(u_root_address);
         if(!u.valid())
         {
             throw CommonError("cannot find root user state");
         }
-        u->addBalance(1000000);
+        {
+            M_LOCK(u->parent->mx);
+            u->balance+=1000000;
+        }
         u->setDirty(e);
 
     }

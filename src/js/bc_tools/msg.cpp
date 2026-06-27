@@ -80,12 +80,16 @@ const char *msgName(int id)
         return "TX";
     case msgid::attachment_data:
         return "attachment_data";
-    case msgid::GetUserStatusRSP:
-        return "GetUserStatusRSP";
-    case msgid::GetUserStatusREQ:
-        return "GetUserStatusREQ";
+    case msgid::GetUserNonceRSP:
+        return "GetUserNonceRSP";
+    case msgid::GetUserNonceREQ:
+        return "GetUserNonceREQ";
     case msgid::LcEnvelopeREQ:
         return "LcEnvelopeREQ";
+    case msgid::LcREQ:
+        return "LcREQ";
+    case msgid::LcRSP:
+        return "LcRSP";
     case msgid::DoYouHaveBlockREQ:
         return "DoYouHaveBlockREQ";
     case msgid::DoYouHaveBlockRSP:

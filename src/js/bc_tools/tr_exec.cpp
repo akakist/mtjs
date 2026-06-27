@@ -28,12 +28,16 @@ std::optional<std::string> TR::execute_mint(const yyjson::Value &params, t_param
     BigInt amount;
     amount.from_string(_amount.toString());
 
-    auto u = t.root->getUserState(senderAddress);
+    auto u = t.root->getUser(senderAddress);
     if (!u.valid())
     {
-        return "mint: sender state not found";
+        return "mint: sender not found";
     }
-    u->addBalance(amount);
+    {
+        M_LOCK(u->parent->mx);
+        u->balance+=amount;
+    }
+    // u->addBalance(amount);
     u->setDirty(epoch);
     t.addCalcer(u.get(),by);
 
@@ -68,7 +72,7 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     if(to_addr.addr.size()!=senderAddress.addr.size())
         return "param to has invalid size";
 
-    auto u = t.root->getUserState(senderAddress);
+    auto u = t.root->getUser(senderAddress);
     if (!u.valid())
     {
         return "sender userstate invalid";
@@ -82,18 +86,28 @@ std::optional<std::string> TR::execute_transfer(const yyjson::Value &params, t_p
     {
         return "invalid destination address";
     }
-    auto to = t.root->getUserState(to_addr);
+    auto to = t.root->getUser(to_addr);
     if (!to.valid())
     {
         return "destination user not found";
     }
     auto fee=v->getFee("transfer");
-    if (u->getBalance() < fee + amount)
     {
-        return "Not enough funds";
+        M_LOCK(u->parent->mx);
+        if(u->balance < fee + amount)
+            return "Not enough funds";
+        u->balance-=amount;
     }
-    u->subBalance(amount);
-    to->addBalance(amount);
+    // if (u->getBalance() < fee + amount)
+    // {
+    //     return "Not enough funds";
+    // }
+    // u->subBalance(amount);
+    {
+        M_LOCK(to->parent->mx);
+        to->balance+=amount;
+    }
+    // to->addBalance(amount);
     u->setDirty(epoch);
     to->setDirty(epoch);
     t.addCalcer(u.get(),by);
@@ -132,12 +146,15 @@ std::optional<std::string> TR::execute_node_update(const yyjson::Value &params, 
     {
         return "only node owner can update node info";
     }
-    auto us = t.root->getUserState(senderAddress);
+    auto us = t.root->getUser(senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("node_update");
-    if (us->getBalance() < fee)
+    {
+        M_LOCK(us->parent->mx);
+        if(us->balance < fee)
         return "Not enough funds";
+    }
 
 
 
@@ -193,12 +210,15 @@ std::optional<std::string> TR::execute_node_create(const yyjson::Value &params, 
     if (nn.valid())
         return "Node already registered with name";
 
-    auto us = t.root->getUserState(senderAddress);
+    auto us = t.root->getUser(senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("node_create");
-    if (us->getBalance() < fee)
-        return "Not enough funds";
+    {
+        M_LOCK(us->parent->mx);
+        if (us->balance < fee)
+            return "Not enough funds";
+    }
 
 
     auto n = t.root->addNode(name, by,epoch);
@@ -258,14 +278,10 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
     NODE_id node;
     node.container = _node.toString();
 
-    auto us = t.root->getUserState(senderAddress);
+    auto us = t.root->getUser(senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("node_stake");
-    if (us->getBalance() < amount + fee)
-    {
-        return "Insufficient funds";
-    }
 
     auto n=t.root->getNode(node);
     if(!n.valid())
@@ -273,8 +289,20 @@ std::optional<std::string> TR::execute_node_stake(const yyjson::Value &params, t
         return "node not found";
     }
     // BigInt &nodeStake = n->get_stastakes[senderAddress];
+    {
+        M_LOCK(us->parent->mx);
+        if (us->balance < amount + fee)
+        {
+            return "Insufficient funds";
+        }
 
-    us->subBalance(amount);
+    // }
+
+    // {
+    //     M_LOCK(us->parent->mx);
+        us->balance-=amount;
+    }
+    // us->subBalance(amount);
     n->add_stake(senderAddress, amount);
     //  auto nodeStake = n->getStake(senderAddress);
     // nodeStake += amount;
@@ -330,16 +358,23 @@ std::optional<std::string> TR::execute_unstake_node(const yyjson::Value &params,
         return "insufficient stake in node";
     }
 
-    auto u = t.root->getUserState(senderAddress);
+    auto u = t.root->getUser(senderAddress);
 
     if (!u.valid())
         return "FATAL:  dst addr not found";
     auto fee=v->getFee("node_unstake");
-    if(u->getBalance() < fee)
     {
-        return "Insufficient funds to unstake";
+
     }
-    u->addBalance(amount);
+    {
+        M_LOCK(u->parent->mx);
+        if(u->balance < fee)
+        {
+            return "Insufficient funds to unstake";
+        }
+        u->balance+=amount;
+
+    }
 
     n->sub_stake(senderAddress, amount);
     // nodeStake -= amount;
@@ -390,12 +425,15 @@ std::optional<std::string> TR::execute_node_enable(const yyjson::Value &params, 
         return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(senderAddress.addr);
     }
     auto fee=v->getFee("node_enable");
-    auto us = t.root->getUserState(senderAddress);
+    auto us = t.root->getUser(senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    if (us->getBalance() < fee)
     {
-        return "Insufficient funds";
+        M_LOCK(us->parent->mx);     
+        if (us->balance < fee)
+        {
+            return "Insufficient funds";
+        }
     }
     n->reset_missed_rounds();
     n->setDirty(epoch);
@@ -438,12 +476,15 @@ std::optional<std::string> TR::execute_contract_deploy(const yyjson::Value &para
     if (nn.valid())
         return "Contract already registered with name";
 
-    auto us = t.root->getUserState(senderAddress);
+    auto us = t.root->getUser(senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("contract_deploy");
-    if (us->getBalance() < fee)
-        return "Not enough funds";
+    {
+        M_LOCK(us->parent->mx);
+        if (us->balance < fee)
+            return "Not enough funds";
+    }
 
 
     auto n = t.root->addContract(name, by,epoch);
@@ -485,16 +526,20 @@ std::optional<std::string> TR::execute_contract_update(const yyjson::Value &para
     if (!n.valid())
         return "contract not exists";
 
-    auto us = t.root->getUserState(senderAddress);
     if(senderAddress!=n->owner)
     {
         return "sender is not contract owner";
     }
+    auto us = t.root->getUser(senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("contract_update");
-    if (us->getBalance() < fee)
-        return "Not enough funds";
+    {
+        M_LOCK(us->parent->mx);
+        if (us->balance < fee)
+            return "Not enough funds";
+    }
+    
 
 
     // auto n = t.root->addContract(name, by);

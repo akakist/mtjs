@@ -56,6 +56,23 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     XPASS;
     return true;
 }
+bool Node::Service::LcRSP(const MsgData::LcRSP* m, const NODE_id & src_node, const route_t& route)
+{
+    if(m->prev_lc.size())
+    {
+        REF_getter<MsgData::LeaderCertificate> lc=new MsgData::LeaderCertificate;
+        inBuffer in(m->prev_lc);
+        lc->unpack2(in);
+        if(verify_leader_certificate(lc))
+        {
+            logErr2("cert from %s verified",src_node.container.c_str());
+            lc_responses[lc->heart_beat->new_epoch][src_node]=lc;
+            sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_LC_REQ_TIMEDOUT,NULL,NULL,0.5,this));
+        }
+    }
+    return true;
+}
+
 bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;

@@ -67,9 +67,11 @@ namespace msgid
         BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP,
         TX,
         attachment_data,
-        GetUserStatusREQ,
-        GetUserStatusRSP,
+        GetUserNonceREQ,
+        GetUserNonceRSP,
         LcEnvelopeREQ,
+        LcREQ,
+        LcRSP,
 	DoYouHaveBlockREQ,
 	DoYouHaveBlockRSP
     };

@@ -46,6 +46,8 @@
 #include "init_root.h"
 #include "nodeService.h"
 #include "CDatabase.h"
+#include "md/md_LcREQ.h"
+#include "md/md_LcRSP.h"
 
 bool Node::Service::on_startService(const systemEvent::startService *)
 {
@@ -103,14 +105,20 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     }
 
     logNode("do_heart_beat in startService");
-    do_heart_beat();
+    // do_heart_beat();
 
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^ds$", "show current element dump", ListenerBase::serviceId));
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^go\\s+(.+)$", "go to child element", ListenerBase::serviceId));
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^back$", "go to parent", ListenerBase::serviceId));
 
 
-    do_heart_beat();
+    // do_heart_beat();
+
+    REF_getter<MsgData::LcREQ> lr=new MsgData::LcREQ();
+    broadcast_MsgEvent(lr.get());
+    sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_LC_REQ_TIMEDOUT,NULL,NULL,1.,this));
+    state_Z=State::STATE_NORMAL;
+
 
     return true;
 }
@@ -203,6 +211,62 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     switch (e->tid)
     {
+    case timers::TIMER_LC_REQ_TIMEDOUT:
+    {
+        logNode("timers::TIMER_LC_REQ_TIMEDOUT");
+        for(auto& z:lc_responses)
+        {
+            logErr2("lc epoch %lld, resps %d",z.first.container,z.second.size());
+        }
+        if(lc_responses.empty())
+            return true;
+        if(lc_responses.size())
+        {
+            REF_getter<MsgData::LeaderCertificate> local_lc=NULL;
+            auto &local_lcb=root->getEpoch()->prev_lc;
+            if(local_lcb.size())
+            {
+                local_lc=new MsgData::LeaderCertificate;
+                inBuffer in2(local_lcb);
+                local_lc->unpack2(in2);
+            }
+
+            auto &z=lc_responses.rbegin()->second;
+            if(z.size())
+            {
+                if(local_lc.valid() && local_lc->heart_beat->prev_root_hash_1 == z.rbegin()->second->heart_beat->prev_root_hash_1)
+                {
+                        logErr2("NODE STATE OK");
+                        state_Z=State::STATE_NORMAL;
+                        return true;
+                }
+                else
+                {
+                    if(
+                       (local_lc.valid() && local_lc->heart_beat->new_epoch < z.rbegin()->second->heart_beat->new_epoch)
+                       ||!local_lc.valid()
+                    )
+                    {
+                        std::vector<NODE_id> nn;
+                        for(auto& x: z)
+                        {
+                            nn.push_back(x.first);
+                        }
+                        auto node=nn[rand()%nn.size()];
+                        do_sync(node);
+                        return true;
+                    }
+                    else
+                        state_Z=State::STATE_NORMAL;
+
+                }
+            }
+        }
+        state_Z=State::STATE_NORMAL;
+
+        return true;
+    }
+    break;
     case timers::TIMER_SYNC_TIMEDOUT:
         logNode("FAILED SYNC, NODE STOPPED---------------------------------------------------------------");
     break;
@@ -568,20 +632,25 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const REF_getter<MsgData
     BigInt total_fees;
     for (auto &z : t.feeCalcers.calcers)
     {
-        auto u = root->getUserState(z.first);
+        auto u = root->getUser(z.first);
         if (!u.valid())
             throw CommonError("if(!u.valid()) 334455");
-        if (u->getBalance() < z.second->get_fee())
         {
-            u->setBalance(0);
-            u->setDirty(lc->heart_beat->new_epoch);
+            M_LOCK(u->parent->mx);
+            u->balance-=z.second->get_fee();
+            // if (u->balance < z.second->get_fee())
+            // {
+            //     u->setBalance(0);
+            //     u->setDirty(lc->heart_beat->new_epoch);
+            // }
+            // else
+            // {
+            //     // logNode("balance deduct %s fee %s", u->getBalance().toString().c_str(), z.second->get_fee().toString().c_str());
+            //     u->subBalance(z.second->get_fee());
+            //     
+            // }
         }
-        else
-        {
-            // logNode("balance deduct %s fee %s", u->getBalance().toString().c_str(), z.second->get_fee().toString().c_str());
-            u->subBalance(z.second->get_fee());
-            u->setDirty(lc->heart_beat->new_epoch);
-        }
+        u->setDirty(lc->heart_beat->new_epoch);
         total_fees += z.second->get_fee();
         t.att_data->fees[z.first] = z.second->get_fee();
         t.emit_block("fee",R"({"address":"%s","fee":"%s"})",base16::encode(z.first.addr).c_str(),z.second->get_fee().toString().c_str());
@@ -596,14 +665,18 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const REF_getter<MsgData
         if (!node.valid())
             throw CommonError("if(!node.valid()) 556677");
         auto owner = node->get_owner();
-        auto u = root->getUserState(owner);
+        auto u = root->getUser(owner);
         if (!u.valid())
         {
             throw CommonError("if(!u.valid()) 778899");
             // u=root->addUser(upk,NULL);
         }
         BigInt amt = (total_rewards * node->get_full_stake()) / total_staked;
-        u->addBalance(amt);
+        {
+            M_LOCK (u->parent->mx);
+            u->balance+=amt;
+        }
+        // u->addBalance(amt);
         u->setDirty(lc->heart_beat->new_epoch);
         // if (n == this_node_name && amt > 0)
         //     logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
@@ -814,6 +887,9 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     case msgid::ConfirmLeaderREQ:
         last_activity_time=iUtils->getNow();
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::LcREQ:
+        // last_activity_time=iUtils->getNow();
+        return LcREQ(static_cast<const MsgData::LcREQ *>(msg.get()), m->node_signer, m->route);
 
     default:
         throw CommonError("unjandled3 MsgData %s", msgName(msg->type));
@@ -821,6 +897,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
     return true;
 }
+
 bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 {
     auto n = root->getNode(m->node_signer);
@@ -849,6 +926,8 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
         return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::GetSavedBlocksRSP:
         return GetSavedBlocksRSP(static_cast<const MsgData::GetSavedBlocksRSP *>(ee.get()), m->node_signer, m->route);
+    case msgid::LcRSP:
+        return LcRSP(static_cast<const MsgData::LcRSP *>(ee.get()), m->node_signer, m->route);
     default:
         throw CommonError("unhandled22 p020 %s", msgName(id));
         break;

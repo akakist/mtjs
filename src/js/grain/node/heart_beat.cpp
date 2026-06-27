@@ -138,14 +138,14 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     if(local_verified && !remote_verified)
     {
         /// не отвечаем, поскольку ремоте нода не имеет сертификата
-        logNode("if(local_verified && !remote_verified)");
+        logNode("if(local_verified && !remote_verified) return ");
         return true;
     }
 
     if(!remote_verified && !local_verified)    
     {
         /// отвечаем, поскольку это кейс старта с генезиса
-        logNode("if(!remote_verified && !local_verified)    ");
+        logNode("if(!remote_verified && !local_verified)   reply_HeartBeatRSP return ");
         // need_reply=true;
         reply_HeartBeatRSP(h,route);
         return true;
@@ -154,9 +154,10 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     {
         /// если локально нет сертиката, нода стартанула с генезиса, а у удаленной есть сертификат
         /// то надо синхронизироваться, переходим в синк, не отвечаем
-        logNode("if(remote_verified && !local_verified)");
+        logNode("if(remote_verified && !local_verified) do sync return");
         if(state_Z!=STATE_SYNCING){
             state_Z = STATE_SYNCING;
+            logNode("do sync");
             do_sync(src_node);
         }
         return true;
@@ -165,7 +166,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     {
         if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch)
         {
-            logNode("        if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch)");
+            logNode("if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch) return");
             return true;
         }
         else if(remote_prev_lc->heart_beat->new_epoch > local_lc->heart_beat->new_epoch)

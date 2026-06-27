@@ -6,22 +6,20 @@
 #include "md_Base.h"
 namespace MsgData
 {
-    struct LcEnvelopeREQ: public Base
+    struct LcRSP: public Base
     {
 
-        LcEnvelopeREQ():Base(msgid::LcEnvelopeREQ)
+        LcRSP():Base(msgid::LcRSP)
         {
 
         }
-        LcEnvelopeREQ(const std::string& _msg, const std::string& _prev_lc):Base(msgid::LcEnvelopeREQ),
-            msg(_msg),  prev_lc(_prev_lc)
+        LcRSP(const std::string& _prev_lc):Base(msgid::LcRSP),
+            prev_lc(_prev_lc)
         {
         }
-        std::string msg;
         std::string prev_lc;
         void update(Blake2bHasher& h) const
         {
-            h.update(msg);
             h.update(prev_lc);
         }
         void pack(outBuffer& b) const final
@@ -29,35 +27,33 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<msg;
             b<<prev_lc;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>msg;
             b>>prev_lc;
         }
         static Base* construct()
         {
-            return new LcEnvelopeREQ();
+            return new LcRSP();
         }
 
     };
 
 }
-inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::LcEnvelopeREQ> &s)
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::LcRSP> &s)
 {
     b<<1;
     s->pack(b);
     return b;
 }
-inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::LcEnvelopeREQ> &s)
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::LcRSP> &s)
 {
     auto ver=b.get_PN();
     if(!s.valid())
-        s=new MsgData::LcEnvelopeREQ();
+        s=new MsgData::LcRSP();
     s->unpack2(b);
     return b;
 }

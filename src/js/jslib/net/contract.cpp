@@ -29,7 +29,37 @@
 #include "md/md_GetUserNonceREQ.h"
 #include "js_tools.h"
 // #include ""
-
+#ifdef KALL
+void setup_contract_context(JSContext* ctx, const Transaction& tx, const Block& block) {
+    JSValue global = JS_GetGlobalObject(ctx);
+    
+    // Отправитель
+    JS_SetPropertyStr(ctx, global, "txSender", 
+        JS_NewString(ctx, tx.from.c_str()));
+    
+    // Хеш транзакции
+    JS_SetPropertyStr(ctx, global, "txHash", 
+        JS_NewString(ctx, tx.hash.c_str()));
+    
+    // Nonce
+    JS_SetPropertyStr(ctx, global, "txNonce", 
+        JS_NewBigUint64(ctx, tx.nonce));
+    
+    // Время блока
+    JS_SetPropertyStr(ctx, global, "txTimestamp", 
+        JS_NewBigUint64(ctx, block.timestamp));
+    
+    // Высота блока
+    JS_SetPropertyStr(ctx, global, "txBlockHeight", 
+        JS_NewBigUint64(ctx, block.height));
+    
+    // Адрес контракта
+    JS_SetPropertyStr(ctx, global, "contractAddress", 
+        JS_NewString(ctx, contract_address.c_str()));
+    
+    JS_FreeValue(ctx, global);
+}
+#endif
 static std::string js_obj_to_kv(JSContext *ctx,
                                 JSValueConst obj)
 {

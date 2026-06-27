@@ -39,8 +39,8 @@ namespace bcEventEnum
     const EVENT_id StreamBlock(ghash("@g_StreamBlock"));
     const EVENT_id HeartBeatREQ(ghash("@g_HeartBeatREQ"));
     const EVENT_id PutTransactionREQ(ghash("@g_PutTransactionREQ"));
-    const EVENT_id GetUserStatusREQ(ghash("@g_GetUserStatusREQ"));
-    const EVENT_id GetUserStatusRSP(ghash("@g_GetUserStatusRSP"));
+    const EVENT_id GetUserNonceREQ(ghash("@g_GetUserNonceREQ"));
+    const EVENT_id GetUserNonceRSP(ghash("@g_GetUserNonceRSP"));
     const EVENT_id WriteGranules(ghash("@g_WriteGranules"));
     const EVENT_id WriteBlock(ghash("@g_WriteBlock"));
 
@@ -450,21 +450,21 @@ namespace bcEvent
             o<<tx_hash<<errcode<<errmsg;
         }
     };
-    class GetUserStatusREQ : public Event::Base
+    class GetUserNonceREQ : public Event::Base
     {
 
     public:
         static Base *construct(const route_t &r)
         {
-            return new GetUserStatusREQ(r);
+            return new GetUserNonceREQ(r);
         }
-        GetUserStatusREQ(const std::string& _user_pk_ed, const route_t &r)
-            : Base(bcEventEnum::GetUserStatusREQ, r), user_pk_ed(_user_pk_ed) {}
+        GetUserNonceREQ(const std::string& _user_pk_ed, const route_t &r)
+            : Base(bcEventEnum::GetUserNonceREQ, r), user_pk_ed(_user_pk_ed) {}
 
         std::string user_pk_ed;
 
-        GetUserStatusREQ(const route_t &r)
-            : Base(bcEventEnum::GetUserStatusREQ, r) {}
+        GetUserNonceREQ(const route_t &r)
+            : Base(bcEventEnum::GetUserNonceREQ, r) {}
 
         void unpack(inBuffer &o)
         {

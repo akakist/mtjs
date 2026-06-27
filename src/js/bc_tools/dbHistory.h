@@ -6,6 +6,7 @@
 #include "commonError.h"
 #include <sys/stat.h>
 #include <SQLiteCpp/Database.h>
+#include "QUORUM.h"
 #define TM_RADIX (3600)
 
 struct DB_history : public Refcountable
@@ -43,28 +44,50 @@ struct DB_history : public Refcountable
     }
     bool writeBlock(const EPOCH_id& epoch, uint64_t block_timestamp,  const std::string& prev_root_hash, const std::string& data) {
 
-        write_chunked(data);
-
-        auto pn=base_path+".db";
-
-        SQLite::Database dbs(pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
-
-        initDB(dbs);
-
-        SQLite::Statement query(dbs,
-                                "INSERT OR REPLACE INTO blocks (prev_root_hash, data, epoch, block_timestamp) VALUES (?, ?, ?, ?)"
-                               );
-        query.bind(1, prev_root_hash.data(),prev_root_hash.size());
-        query.bind(2, data.data(),data.size());
-        query.bind(3, (int64_t) epoch.container);
-        query.bind(4, (int64_t) block_timestamp);
-        query.exec();
-        if(epoch.container>20000)
+        // write_chunked(data);
         {
-            dbs.exec("DELETE FROM blocks where epoch<"+ std::to_string(epoch.container)+"-20000");
+
+            auto pn=base_path+".db";
+
+            SQLite::Database dbs(pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
+
+            initDB(dbs);
+
+            SQLite::Statement query(dbs,
+                                    "INSERT OR REPLACE INTO blocks (prev_root_hash, data, epoch, block_timestamp) VALUES (?, ?, ?, ?)"
+                                );
+            query.bind(1, prev_root_hash.data(),prev_root_hash.size());
+            query.bind(2, data.data(),data.size());
+            query.bind(3, (int64_t) epoch.container);
+            query.bind(4, (int64_t) block_timestamp);
+            query.exec();
+            if(epoch.container>20000)
+            {
+                dbs.exec("DELETE FROM blocks where epoch<"+ std::to_string(epoch.container)+"-"+std::to_string(HOT_STORE_SIZE));
+            }
+        }
+        {
+            auto n=epoch.container/10000;
+            char pn[100];
+            snprintf(pn,sizeof(pn),"%s-%09lx.db",base_path.c_str(),n);
+            // auto pn=base_path+".db";
+            SQLite::Database dbs(pn, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
+
+            initDB(dbs);
+            SQLite::Statement query(dbs,
+                                    "INSERT OR REPLACE INTO blocks (prev_root_hash, data, epoch, block_timestamp) VALUES (?, ?, ?, ?)"
+                                );
+            query.bind(1, prev_root_hash.data(),prev_root_hash.size());
+            query.bind(2, data.data(),data.size());
+            query.bind(3, (int64_t) epoch.container);
+            query.bind(4, (int64_t) block_timestamp);
+
+            query.exec();
+
         }
         return 0;
     }
+
     bool get(const std::string &prev_root_hash, std::string *v)
     {
         {

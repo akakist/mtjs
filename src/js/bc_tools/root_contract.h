@@ -14,6 +14,7 @@
 #include "fee_calcer.h"
 #include "nodeElement.h"
 #include "ADDRESS_id.h"
+#include "CONTRACT_id.h"
 // #include <ostringstream>
 
 struct bc_contract:  public data_base
@@ -44,35 +45,34 @@ struct bc_user: public data_base
 
     bc_user(Cellable* p): data_base(hsh::bc_user,p, 0,-1) {
     }
-    ADDRESS_id address;
+    // ADDRESS_id address;
     // std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
     // std::set<NODE_id> nodes;
     // std::set<std::string> contracts;
+    BigInt balance;
+    std::map<CONTRACT_id, BigInt> contract_deposits;
+
 
     void pack(outBuffer& o) const final
     {
         data_base::pack(o);
         o<<1;
-        o<<address
-         // <<my_stakes<<nodes<<contracts
-         ;
+        o<<balance<<contract_deposits;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
-        o>>address
-         // >>my_stakes>>nodes>>contracts
-         ;
+        o>>balance>>contract_deposits;
     }
     std::string dump() final
     {
         std::ostringstream o;
-        o<<"ADDRESS: "  << base16::encode(address.addr) << std::endl;
+        // o<<"ADDRESS: "  << base16::encode(address.addr) << std::endl;
         o<< std::endl;
 
 
-        o<< std::endl;
+        // o<< std::endl;
 
 
         return o.str();
@@ -84,32 +84,32 @@ struct bc_user_state: public data_base
 
     bc_user_state(Cellable* p): data_base(hsh::bc_user_state,p, 0,-1) {
         nonce=0;
-        balance=0;
+        // balance=0;
     }
     private:
-    BigInt balance;
+    // BigInt balance;
     uint64_t nonce;
     public:
-    BigInt getBalance()
-    {
-        M_LOCK(parent->mx);
-        return balance;
-    }
-    void addBalance(const BigInt &n)
-    {
-        M_LOCK(parent->mx);
-        balance+=n;
-    }
-    void setBalance(const BigInt &n)
-    {
-        M_LOCK(parent->mx);
-        balance=n;
-    }
-    void subBalance(const BigInt &n)
-    {
-        M_LOCK(parent->mx);
-        balance-=n;
-    }
+    // BigInt getBalance()
+    // {
+    //     M_LOCK(parent->mx);
+    //     // return balance;
+    // }
+    // void addBalance(const BigInt &n)
+    // {
+    //     M_LOCK(parent->mx);
+    //     balance+=n;
+    // }
+    // void setBalance(const BigInt &n)
+    // {
+    //     M_LOCK(parent->mx);
+    //     balance=n;
+    // }
+    // void subBalance(const BigInt &n)
+    // {
+    //     M_LOCK(parent->mx);
+    //     balance-=n;
+    // }
     uint64_t getNonce()
     {
         M_LOCK(parent->mx);
@@ -124,13 +124,13 @@ struct bc_user_state: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<balance<<nonce;
+        o<<nonce;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
-        o>>balance>>nonce;
+        o>>nonce;
     }
     std::string dump() final;
 

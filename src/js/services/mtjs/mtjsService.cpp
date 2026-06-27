@@ -22,7 +22,7 @@
 #include "errcodes.h"
 
 #include "sv.h"
-#include "md/md_GetUserStatusRSP.h"
+#include "md/md_GetUserNonceRSP.h"
 #include "xyjson.h"
 #include <nlohmann/json.hpp>
 #include "js_tools.h"
@@ -524,14 +524,14 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
     b->unpack(in);
     switch(p)
     {
-    case msgid::GetUserStatusRSP:
+    case msgid::GetUserNonceRSP:
     {
-        auto *rs=(MsgData::GetUserStatusRSP*) b.get();
+        auto *rs=(MsgData::GetUserNonceRSP*) b.get();
         auto *ctx = it->second.ctx;
         JSScope<20, 20> scope(it->second.ctx);
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, rs->balance.toString().c_str()));
+        // JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, rs->balance.toString().c_str()));
         JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, std::to_string(rs->nonce).c_str()));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
         scope.addValue(ret);

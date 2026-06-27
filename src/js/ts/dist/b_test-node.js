@@ -61,7 +61,7 @@ async function exec() {
         // console.log("signed tx:", m);
         i++;
         const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(tx), sk, nonce, (obj) => {
-            console.log("TX REPORT " + JSON.stringify(obj, null, 2));
+            console.log("TX REPORT " + JSON.stringify(obj));
         });
         console.log(rsp);
         sleep(200);
@@ -96,6 +96,7 @@ try {
                 Node_this_node_name=n${i}
                 Node_sqlite_pn=db/s${i}
         `);
+	sleep(100);
     }
     sleep(200);
     console.log("Start");

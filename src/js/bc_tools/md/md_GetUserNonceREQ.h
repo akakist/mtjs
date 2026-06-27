@@ -3,10 +3,10 @@
 #include "md_LeaderCertificate.h"
 namespace MsgData
 {
-    struct GetUserStatusREQ: public Base
+    struct GetUserNonceREQ: public Base
     {
 
-        GetUserStatusREQ():Base(msgid::GetUserStatusREQ)
+        GetUserNonceREQ():Base(msgid::GetUserNonceREQ)
         {
         }
         ADDRESS_id user_address;
@@ -35,22 +35,22 @@ namespace MsgData
 
         static Base* construct()
         {
-            return new GetUserStatusREQ();
+            return new GetUserNonceREQ();
         }
     };
 
 }
-inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetUserStatusREQ> &s)
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetUserNonceREQ> &s)
 {
     b<<1;
     s->pack(b);
     return b;
 }
-inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetUserStatusREQ> &s)
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetUserNonceREQ> &s)
 {
     auto ver=b.get_PN();
     if(!s.valid())
-        s=new MsgData::GetUserStatusREQ();
+        s=new MsgData::GetUserNonceREQ();
     s->unpack2(b);
     return b;
 }

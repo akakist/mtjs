@@ -145,7 +145,7 @@ struct CDatabase: public IDatabase
 // rocksdb::DB* db; // уже открытая БД
 
 // Создание снапшота
-    bool create_snapshot() 
+    bool create_snapshot(const EPOCH_id &epoch) 
     {
     // Создаем умный указатель для Checkpoint. Он сам вызовет delete.
     rocksdb::Checkpoint* checkpoint=NULL;
@@ -157,10 +157,12 @@ struct CDatabase: public IDatabase
         delete checkpoint;
         return false;
     }
-    std::string snapshot_path=path_+"-snapshot-"+timestr();
+    char pn[100];
+    snprintf(pn, sizeof(pn),"%s-snapshot-%09lx",path_.c_str(), epoch.container/SNAPSHOT_BLOCKS);
+    // std::string snapshot_path=path_+"-snapshot-"+timestr();
     // Создаем снапшот
     // 0 означает, что RocksDB сама решит, делать ли flush
-    s = checkpoint->CreateCheckpoint(snapshot_path, 0);
+    s = checkpoint->CreateCheckpoint(pn, 0);
     
     if (!s.ok()) {
         std::cerr << "Checkpoint creation failed: " << s.ToString() << std::endl;

@@ -13,11 +13,14 @@
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
 #include "md/md_TX.h"
-#include "md/md_GetUserStatusREQ.h"
-#include "md/md_GetUserStatusRSP.h"
+#include "md/md_GetUserNonceREQ.h"
+#include "md/md_GetUserNonceRSP.h"
 #include "md/md_LcEnvelopeREQ.h"
 #include "md/md_DoYouHaveBlockREQ.h"
 #include "md/md_DoYouHaveBlockRSP.h"
+#include "md/md_LcREQ.h"
+#include "md/md_LcRSP.h"
+
 
 MsgFactory::MsgFactory()
 {
@@ -33,9 +36,11 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::ConfirmLeaderREQ, MsgData::ConfirmLeaderREQ::construct);
     registerMsg(msgid::ConfirmLeaderRSP, MsgData::ConfirmLeaderRSP::construct);
     registerMsg(msgid::TX, MsgData::TX::construct);
-    registerMsg(msgid::GetUserStatusREQ, MsgData::GetUserStatusREQ::construct);
-    registerMsg(msgid::GetUserStatusRSP, MsgData::GetUserStatusRSP::construct);
+    registerMsg(msgid::GetUserNonceREQ, MsgData::GetUserNonceREQ::construct);
+    registerMsg(msgid::GetUserNonceRSP, MsgData::GetUserNonceRSP::construct);
     registerMsg(msgid::LcEnvelopeREQ, MsgData::LcEnvelopeREQ::construct);
+    registerMsg(msgid::LcREQ, MsgData::LcREQ::construct);
+    registerMsg(msgid::LcRSP, MsgData::LcRSP::construct);
     registerMsg(msgid::DoYouHaveBlockREQ, MsgData::DoYouHaveBlockREQ::construct);
     registerMsg(msgid::DoYouHaveBlockRSP, MsgData::DoYouHaveBlockRSP::construct);
 

@@ -22,8 +22,8 @@
 #include "events_grainReaderService.hpp"
 #include "unknown.h"
 #include "msgFactory.h"
-#include "md/md_GetUserStatusREQ.h"
-#include "md/md_GetUserStatusRSP.h"
+#include "md/md_GetUserNonceREQ.h"
+#include "md/md_GetUserNonceRSP.h"
 #include "init_root.h"
 
 bool GrainReader::Service::on_startService(const systemEvent::startService *)
@@ -148,15 +148,15 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
 
     switch(p)
     {
-    case msgid::GetUserStatusREQ:
+    case msgid::GetUserNonceREQ:
     {
         ADDRESS_id addr;
-        auto pp=(MsgData::GetUserStatusREQ*) b.get();
+        auto pp=(MsgData::GetUserNonceREQ*) b.get();
         // addr.container=blake2b_hash(pp->user_pk_bin_ed).container;
         auto u = root->getUserState(pp->user_address);
 
-        REF_getter<MsgData::GetUserStatusRSP> rsp=new MsgData::GetUserStatusRSP;
-        rsp->balance=u->getBalance();
+        REF_getter<MsgData::GetUserNonceRSP> rsp=new MsgData::GetUserNonceRSP;
+        // rsp->balance=u->getBalance();
         rsp->nonce=u->getNonce();
         passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
 

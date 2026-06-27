@@ -36,6 +36,8 @@
 #include "md/md_LcEnvelopeREQ.h"
 #include "md/md_DoYouHaveBlockREQ.h"
 #include "md/md_DoYouHaveBlockRSP.h"
+#include "md/md_LcREQ.h"
+#include "md/md_LcRSP.h"
 #include "dbHistory.h"
 #include "t_params.h"
 #include "cached_state.h"
@@ -56,7 +58,8 @@ namespace Node
         TIMER_RESTART_BLOCK,
         TIMER_PERIODIC_CLOCK,
         TIMER_VALIDATE_BLOCK_DELAY,
-        TIMER_SYNC_TIMEDOUT
+        TIMER_SYNC_TIMEDOUT,
+        TIMER_LC_REQ_TIMEDOUT
     };
     struct heart_beat_node_info
     {
@@ -157,6 +160,8 @@ namespace Node
 
         bool DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const NODE_id & src_node, const route_t& route);
         bool DoYouHaveBlockRSP(const MsgData::DoYouHaveBlockRSP* m, const NODE_id & src_node, const route_t& route);
+        bool LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route);
+        bool LcRSP(const MsgData::LcRSP* m, const NODE_id & src_node, const route_t& route);
 
         bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);
@@ -227,6 +232,8 @@ namespace Node
 
         BLOCK_id prev_root_hash_Z;
         void do_start_block();
+
+        std::map<EPOCH_id, std::map<NODE_id, REF_getter<MsgData::LeaderCertificate> > >lc_responses;
 
         void collectTransactions();
         BLOCK_id execute_block(t_params &t,  const REF_getter<MsgData::LeaderCertificate> &lc);
