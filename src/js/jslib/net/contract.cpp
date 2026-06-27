@@ -247,7 +247,7 @@ JSValue js_addr_from_pk(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     return JS_NewString(ctx, addr_str.c_str());
 }
 /////////////////
-JSValue js_get_user_info(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+JSValue js_get_user_nonce(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     MUTEX_INSPECTOR;
     JSScope<10, 10> scope(ctx);
@@ -304,6 +304,6 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     JS_SetPropertyStr(ctx, mtjs_obj, "addInstance", JS_NewCFunction(ctx, js_add_instance, "addInstance", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_submit", JS_NewCFunction(ctx, js_tx_submit, "tx_submit", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_subscribe", JS_NewCFunction(ctx, js_tx_subscribe, "tx_subscribe", 2));
-    JS_SetPropertyStr(ctx, mtjs_obj, "get_user_info", JS_NewCFunction(ctx, js_get_user_info, "get_user_info", 2));
+    JS_SetPropertyStr(ctx, mtjs_obj, "get_user_nonce", JS_NewCFunction(ctx, js_get_user_nonce, "get_user_nonce", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "addr_from_pk", JS_NewCFunction(ctx, js_addr_from_pk, "addr_from_pk", 1));
 }

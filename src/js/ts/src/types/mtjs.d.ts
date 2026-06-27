@@ -41,7 +41,7 @@ declare global
         http: httpModule;
         async asyncExecute(command: string): Promise<void>;
         addInstance(name:string, conf:string);
-        get_user_info(nodeaddr:string, nick:string, timeout: number): Promise<userInfo>;
+        get_user_nonce(nodeaddr:string, nick:string, timeout: number): Promise<userInfo>;
         // mint(nodeaddr:string, sk:string, params:object): Promise<object>;
         // tx_sign(tx:Objectstring, sk:string): string;
         tx_submit(nodeaddr:string,  timeout:number, msg:string,sk:string, nonce:string, callback:(params:object) => void ): Promise<object>;

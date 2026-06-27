@@ -12,7 +12,7 @@ async function exec() {
         //     mtjs.tx_subscribe(node, (params)=>{
         //         console.log("tx report from js:", JSON.stringify(params));
         //     });
-        //     const ui=await mtjs.get_user_info(node, { sk: sk , timeout: 1 })
+        //     const ui=await mtjs.get_user_nonce(node, { sk: sk , timeout: 1 })
         //     const nonce=ui.nonce;
         //     console.log(ui);
         //     const rsp=await mtjs.mint(node, { sk:sk, amount:"2000", timeout:4, nonce: nonce })
@@ -27,7 +27,7 @@ async function exec() {
                         console.log("tx report from js:", JSON.stringify(params));
                     });
             console.log("zaza4");
-                    const ui=await mtjs.get_user_info(node, "root",1 )
+                    const ui=await mtjs.get_user_nonce(node, "root",1 )
                     console.log("ui "+ui);
                     // return;
 
