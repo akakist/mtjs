@@ -14,6 +14,7 @@
 bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
+    // logNode("@@ HeartBeatRSP");
     auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     if (prev_root_hash_Z != m->payload_heart_beat->prev_root_hash_1)
@@ -85,7 +86,8 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 }
 void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route)
 {
-        stage_is_working=true;
+    // logNode("reply_HeartBeatRSP");
+        // stage_is_working=true;
         REF_getter<MsgData::HeartBeatRSP> hbr = new MsgData::HeartBeatRSP();
         // msg::heart_beat_rsp hba;
         hbr->payload_heart_beat = h;
@@ -97,10 +99,13 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
 }
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::LeaderCertificate *remote_prev_lc, const NODE_id &src_node, const route_t &route)
 {
+    
+
     if(state_Z==STATE_SYNCING)
     {
         return true;
     }
+    
     MUTEX_INSPECTOR;
     bool need_reply = false;
     REF_getter<MsgData::LeaderCertificate>  local_lc;
@@ -110,6 +115,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         return true;
     }
     auto llc=root->getEpoch()->prev_lc;
+    
     if(llc.size())
     {
         local_lc=new MsgData::LeaderCertificate;
@@ -117,12 +123,14 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         local_lc->unpack2(in);
     }
     
+    
     bool remote_verified=false;
     bool local_verified=false;
     if(!remote_prev_lc)
     {
         logNode("remote prtev lc NULL %s", src_node.container.c_str());
     }
+    
     if(remote_prev_lc)
     {
         remote_verified=verify_leader_certificate(remote_prev_lc);
@@ -133,6 +141,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         local_verified=verify_leader_certificate(local_lc);
     }
     else logNode("!if(local_lc.valid())");
+    
 
     if(local_verified && !remote_verified)
     {
@@ -140,6 +149,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         logNode("if(local_verified && !remote_verified) return ");
         return true;
     }
+    
 
     if(!remote_verified && !local_verified)    
     {
@@ -149,6 +159,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         reply_HeartBeatRSP(h,route);
         return true;
     }
+    
     if(remote_verified && !local_verified)
     {
         /// если локально нет сертиката, нода стартанула с генезиса, а у удаленной есть сертификат
@@ -161,8 +172,10 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         }
         return true;
     }
+    
     if(remote_verified && local_verified)
     {
+    
         if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch)
         {
             logNode("if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch) return");
@@ -170,12 +183,14 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         }
         else if(remote_prev_lc->heart_beat->new_epoch > local_lc->heart_beat->new_epoch)
         {
+    
             state_Z = STATE_SYNCING;
             do_sync(src_node);
             return true;
         }
         else if(remote_prev_lc->heart_beat->new_epoch == local_lc->heart_beat->new_epoch)
         {
+    
                 /// оба в одинаковой эпохе
                 
                 /// просто проверка на всякий случай.
@@ -188,6 +203,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
                 /// тоже проверка на всякий случай
                 if(prev_root_hash_Z!=h->prev_root_hash_1)    
                 {
+    
                     /// нужно сделать голосование за прев-блок
                     /// делаем просто хартбит. В это случае поврежденная нода отваливается 
                     // по missed_rounds. Вывезет та нода, у которой консенсусный рут хеш
@@ -212,16 +228,24 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
 
                 if (isNodeGreaterOrEqual(h->node_leader, ci.node_leader))
                 {
+    
                     ci.node_leader=h->node_leader;
                     reply_HeartBeatRSP(h,route);
                     return true;
                 }
                 else
                 {
+    
                     if(!ci.heart_beat_sent)
                     {
+    
                         ci.heart_beat_sent=true;
                         do_heart_beat();
+                    }
+                    else 
+                    {
+                        // logNode("!if(!ci.heart_beat_sent)");
+
                     }
                 }
         }
@@ -344,6 +368,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 
 void Node::Service::do_heart_beat()
 {
+    // logNode("@@ %s",__FUNCTION__);
     blocks_leader.clear();
     {
         EPOCH_id e=root->getEpoch()->epoch;
@@ -354,6 +379,7 @@ void Node::Service::do_heart_beat()
                                       this_node_name, root->getEpoch()->prev_lc, time(NULL));
 
         REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),root->getEpoch()->prev_lc);
+        // logNode("broadcast heart beat");
         broadcast_MsgEvent(lce.get());
     }
 

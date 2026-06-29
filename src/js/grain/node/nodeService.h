@@ -42,7 +42,6 @@
 #include "t_params.h"
 #include "cached_state.h"
 #include "contract_rt.h"
-#include <mysql/mysql.h>
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 // #define HEART_BEAT_INTERVAL_SEC 5
 
@@ -285,10 +284,9 @@ namespace Node
 
         JSRuntime *contract_runtime=NULL;
 
-        MYSQL* mysql=nullptr;
-        std::string db_user;
-        std::string db_password;
-        std::string db_socket;
+        // std::string db_user;
+        // std::string db_password;
+        // std::string db_socket;
 
     };
 

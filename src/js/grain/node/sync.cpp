@@ -132,13 +132,9 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         }
         logNode("on_get_blocks_rsp: block verified OK");
         t_params t(root);
-        logNode("KALL %s %d",__FILE__,__LINE__);
         t.validateBlockREQ = z->validateBlockREQ;
-        logNode("KALL %s %d",__FILE__,__LINE__);
         auto rh = execute_block(t, z->validateBlockREQ->leader_cert);
-        logNode("KALL %s %d",__FILE__,__LINE__);
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
-        logNode("KALL %s %d",__FILE__,__LINE__);
 
         if (new_root_hash == z->blockAcceptedREQ->blockInfo->new_root_hash1)
         {
@@ -159,13 +155,11 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         else
         {
             logNode("!if (new_root_hash == z->blockAcceptedREQ->blockInfo->new_root_hash1)");
-            logNode("KALL %s %d",__FILE__,__LINE__);
             root = getRoot(db_state.get());
             // init_root(root);
             do_InvalidateRoot();
             if(state_Z==STATE_SYNCING)
             {
-                logNode("KALL %s %d",__FILE__,__LINE__);
                 return true;
             }
             state_Z=STATE_SYNCING;
@@ -173,7 +167,6 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             logNode("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
             return true;
         }
-        logNode("KALL %s %d",__FILE__,__LINE__);
         outBuffer o;
         o<<z;
         if(db_history->writeBlock(z->validateBlockREQ->leader_cert->heart_beat->new_epoch, 

@@ -55,24 +55,6 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 {
     MUTEX_INSPECTOR;
 
-    mysql=mysql_init(mysql);
-    if(!mysql_real_connect(mysql,nullptr,
-        db_user.size()?db_user.c_str():nullptr,
-        db_password.c_str(),
-        this_node_name.container.c_str(),
-        0,
-        db_socket.size()?db_socket.c_str():nullptr,
-        0))
-        {
-                unsigned int err = mysql_errno(mysql);
-                const char* err_msg = mysql_error(mysql);
-                
-                logErr2("MySQL connection failed: [%d] %s\n", err, err_msg);                
-                mysql_close(mysql);
-                // throw CommonError("mysql failed");
-                return true;
-        }
-        logErr2("mysql connected ok");
 
 
     last_activity_time=iUtils->getNow();
@@ -223,11 +205,19 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
     MUTEX_INSPECTOR;
     if(e->tid==timers::TIMER_PERIODIC_CLOCK)
     {
+        // logNode("if(e->tid==timers::TIMER_PERIODIC_CLOCK)");
         auto diff=double(iUtils->getNow()-last_activity_time)/1000000.;
 
         // logNode("idle time sec %lf",double(iUtils->getNow()-last_activity_time)/1000000.);
-        if(diff>2. && transaction_pool_of_leader.size())
+        if(diff>3. )
         {
+            logNode("if(diff>2. && transaction_pool_of_leader.size())");
+            last_activity_time=iUtils->getNow();
+            stage_is_working=false;
+            c_blocks.clear();
+            cli_leader_info.clear();
+            blocks_leader.clear();
+
             do_heart_beat();
         }
         // if(iUtils->getNow()-last_activity_time)
@@ -489,8 +479,6 @@ Node::Service::~Service()
 {
     JS_FreeRuntime(contract_runtime);
 
-    if(mysql)
-        mysql_close(mysql);
 }
 
 Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *ins)
@@ -507,9 +495,9 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
     my_sk_ed_env_key = ins->getConfig()->get_string("my_sk_ed_env_key", "sk_ed_env_key", "env key of ed key");
     this_node_name.container = ins->getConfig()->get_string("this_node_name", "n0", "registered name of node");
 
-    db_user=ins->getConfig()->get_string2("db_user", "root", "mariadb db user");
-    db_password=ins->getConfig()->get_string2("db_password", "123", "mariadb db password");
-    db_socket=ins->getConfig()->get_string2("db_socket", "", "mariadb db password");
+    // db_user=ins->getConfig()->get_string2("db_user", "root", "mariadb db user");
+    // db_password=ins->getConfig()->get_string2("db_password", "123", "mariadb db password");
+    // db_socket=ins->getConfig()->get_string2("db_socket", "", "mariadb db password");
     contract_runtime=JS_NewRuntime();
 }
 
@@ -856,6 +844,7 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     logNode("@@ %s",__FUNCTION__);
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
+    logNode("stage_is_working %d",stage_is_working);
     if(!stage_is_working)
     {
         stage_is_working=true;
@@ -871,6 +860,7 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
     auto id = in.get_PN();
     REF_getter<MsgData::Base> msg = msgFactory.create(id);
     msg->unpack(in);
+    
     REF_getter<MsgData::LeaderCertificate> lc;
     if(m->prev_lc.size())
     {
@@ -879,10 +869,12 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
         lc->unpack2(in2);
 
     }
+    
     switch (msg->type)
     {
     case msgid::HeartBeatREQ:
-        last_activity_time=iUtils->getNow();
+    
+        // last_activity_time=iUtils->getNow();
         return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()),lc.valid()?lc.get():NULL, src_node, route);
 
     default:
@@ -910,13 +902,13 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     switch (msg->type)
     {
     case msgid::DoYouHaveBlockREQ:
-        last_activity_time=iUtils->getNow();
+        // last_activity_time=iUtils->getNow();
         return DoYouHaveBlockREQ(static_cast<const MsgData::DoYouHaveBlockREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::LcEnvelopeREQ:
-        last_activity_time=iUtils->getNow();
+        // last_activity_time=iUtils->getNow();
         return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::GetTransactionREQ:
-        last_activity_time=iUtils->getNow();
+        // last_activity_time=iUtils->getNow();
         return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ValidateBlockREQ:
         last_activity_time=iUtils->getNow();
@@ -927,7 +919,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     case msgid::GetSavedBlocksREQ:
         return GetSavedBlocksREQ(static_cast<const MsgData::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderREQ:
-        last_activity_time=iUtils->getNow();
+        // last_activity_time=iUtils->getNow();
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::LcREQ:
         // last_activity_time=iUtils->getNow();
@@ -1130,7 +1122,7 @@ void Node::Service::logNode(const char *fmt, ...)
         fprintf(stdout, "\n");
         va_end(ap);
     }
-    {
+    if(0){
         va_list ap;
         va_start(ap, fmt);
         std::string pn=this_node_name.container+".log";
@@ -1143,6 +1135,7 @@ void Node::Service::logNode(const char *fmt, ...)
             fclose(f);
         }
         va_end(ap);
+        
         // fclose(f);
     }
 }

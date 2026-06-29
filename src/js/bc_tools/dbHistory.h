@@ -122,7 +122,8 @@ struct DB_history : public Refcountable
         try {
             // Включить WAL для производительности (опционально)
             db.exec("PRAGMA journal_mode=WAL;");
-            db.exec("PRAGMA synchronous=NORMAL;");
+            db.exec("PRAGMA synchronous=OFF;");
+            db.exec("PRAGMA busy_timeout = 5000;");
 
             db.exec(R"(CREATE TABLE IF NOT EXISTS blocks (
                 prev_root_hash BLOB NOT NULL,
