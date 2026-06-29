@@ -33,7 +33,9 @@ struct CDatabase: public IDatabase
     int put_cell(const std::string& k, const std::string& v)
     {
         rocksdb::Status s;
-        s = db->Put(rocksdb::WriteOptions(), k, v);
+        rocksdb::WriteOptions w;
+        w.sync=true;
+        s = db->Put(w, k, v);
         if (!s.ok()) std::cerr << "Put failed: " << s.ToString() << "\n";
         // db->Flush(rocksdb::FlushOptions());
         return !s.ok();

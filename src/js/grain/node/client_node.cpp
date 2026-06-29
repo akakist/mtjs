@@ -61,7 +61,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     if (state_Z != State::STATE_NORMAL)
         return true;
 
-    resetTimer();
     if (! c.blockDBStore.valid())
         throw CommonError("if (!blockDBStore.valid())");
     c.blockDBStore->blockAcceptedREQ = r;
@@ -132,15 +131,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     cli_leader_info.clear();
     do_InvalidateRoot();
 
-    
-    {
-        MUTEX_INSPECTOR;
-        XTRY;
-        resetTimer();
-        XPASS;
-    }
-
-    iUtils->getNow();
+    // iUtils->getNow();
 
     for (auto &z : c.blockDBStore->validateBlockREQ->transaction_bodies)
     {
@@ -175,7 +166,6 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
         return true;
     }
 
-    resetTimer();
     if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
     {
         logNode("invalid leader #14  %s %s", cli_leader_info[prev_root_hash_Z].node_leader.container.c_str(), src_node.container.c_str());
@@ -221,15 +211,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         return true;
     }
 
-    // if (CheckState(r->leader_cert->heart_beat.get(), src_node))
-    // {
-    //     t.att_data->block_report = {1, "check state heart beat failed"};
-    //     logNode("check state heart beat failed");
-    //     err = true;
-    // }
-    // return true;
 
-    resetTimer();
     if (!err)
     {
         if (r->leader_cert->heart_beat->node_leader != cli_leader_info[r->leader_cert->heart_beat->prev_root_hash_1].node_leader)

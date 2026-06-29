@@ -105,6 +105,9 @@ try{
                 Node_my_sk_ed_env_key=k_node${i}_ed_sk
                 Node_this_node_name=n${i}
                 Node_sqlite_pn=db/s${i}
+                db_user=root
+                db_password=gaga123
+                db_socket=/run/mysqld/mysqld.sock
         `);
     }
      sleep(200);

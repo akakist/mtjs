@@ -48,10 +48,33 @@
 #include "CDatabase.h"
 #include "md/md_LcREQ.h"
 #include "md/md_LcRSP.h"
-
+#include "tr_exec.h"
+#include "xyjson_to_quickjs.hpp"
+#include "js_tools.h"
 bool Node::Service::on_startService(const systemEvent::startService *)
 {
     MUTEX_INSPECTOR;
+
+    mysql=mysql_init(mysql);
+    if(!mysql_real_connect(mysql,nullptr,
+        db_user.size()?db_user.c_str():nullptr,
+        db_password.c_str(),
+        this_node_name.container.c_str(),
+        0,
+        db_socket.size()?db_socket.c_str():nullptr,
+        0))
+        {
+                unsigned int err = mysql_errno(mysql);
+                const char* err_msg = mysql_error(mysql);
+                
+                logErr2("MySQL connection failed: [%d] %s\n", err, err_msg);                
+                mysql_close(mysql);
+                // throw CommonError("mysql failed");
+                return true;
+        }
+        logErr2("mysql connected ok");
+
+
     last_activity_time=iUtils->getNow();
 
     SECURE sec;
@@ -93,7 +116,6 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         sec.use_ssl = false;
         sendEvent(ServiceEnum::RPC, new rpcEvent::DoListen(z, sec));
     }
-    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
     sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 1., this));
 
     std::string res;
@@ -167,6 +189,13 @@ void Node::Service::do_start_block()
             // msg::block_request b;
             b->leader_cert = li.leader_cert_2;
 
+            std::set<std::string> nnn;
+            for(auto& z:b->leader_cert->nodes)
+            {
+                nnn.insert(z.container);
+            }
+            logNode("LC nodes %s",iUtils->join(" ",nnn).c_str());
+
             auto &bt = blocks_leader[prev_root_hash_Z];
             // logNode("before collectTransactions sz %d", transaction_pool_of_leader.size());
             collectTransactions();
@@ -213,6 +242,10 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     {
     case timers::TIMER_LC_REQ_TIMEDOUT:
     {
+        if(state_Z==State::STATE_SYNCING)
+        {
+            return true;
+        }
         logNode("timers::TIMER_LC_REQ_TIMEDOUT");
         for(auto& z:lc_responses)
         {
@@ -454,6 +487,10 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 
 Node::Service::~Service()
 {
+    JS_FreeRuntime(contract_runtime);
+
+    if(mysql)
+        mysql_close(mysql);
 }
 
 Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *ins)
@@ -469,6 +506,11 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
     my_sk_bls_env_key = ins->getConfig()->get_string("my_sk_bls_env_key", "sk_bls_env_key", "env key of bls key");
     my_sk_ed_env_key = ins->getConfig()->get_string("my_sk_ed_env_key", "sk_ed_env_key", "env key of ed key");
     this_node_name.container = ins->getConfig()->get_string("this_node_name", "n0", "registered name of node");
+
+    db_user=ins->getConfig()->get_string2("db_user", "root", "mariadb db user");
+    db_password=ins->getConfig()->get_string2("db_password", "123", "mariadb db password");
+    db_socket=ins->getConfig()->get_string2("db_socket", "", "mariadb db password");
+    contract_runtime=JS_NewRuntime();
 }
 
 bool Node::Service::on_RequestIncoming(const webHandlerEvent::RequestIncoming *)
@@ -527,10 +569,6 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
 }
 
 // #include "sql"
-void Node::Service::resetTimer()
-{
-    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
-}
 BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     MUTEX_INSPECTOR;
@@ -572,6 +610,10 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::Le
                 if (!t_err)
                 {
                     MUTEX_INSPECTOR;
+                    if(!lc.valid())
+                        logNode("if(!lc.valid()) AA");
+                    if(!lc->heart_beat.valid())
+                        logNode("if(!lc->heart_beat.valid()) AA");
                     execute_transaction(tt->getHash(), t, senderAddress, tj, by, lc->heart_beat->new_epoch);
                     u->incNonce();
                     u->setDirty(lc->heart_beat->new_epoch);
@@ -934,6 +976,142 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
     }
 
     return true;
+}
+
+void Node::Service::execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, const std::string &tx_cmds, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch)
+{
+    MUTEX_INSPECTOR;
+    yyjson::Document doc(tx_cmds);
+    yyjson::Value root = doc.root();
+
+    if(root.isArray())
+    {
+        MUTEX_INSPECTOR;
+        for (int ii=0; ii < root.size(); ii++)
+        {
+            MUTEX_INSPECTOR;
+            bool err=false;
+            yyjson::Value item = root[ii];
+            auto contract = item/"contract";
+            auto method = item/"method";
+            auto params= item/"params";
+            if(!contract.isString() || !method.isString() || !params.isObject())
+            {
+                MUTEX_INSPECTOR;
+                t.emit_command(tx_id, ii, "error", 
+                    R"({"code":-32602,"error":"contract, method, params fields required"})");
+                err=true;
+            }
+            // throw CommonError("if(!contract.isString() || !method.isString() || !params.isObject())");
+            if (!err && contract == "root")
+            {
+                MUTEX_INSPECTOR;
+                std::optional<std::string> err;
+                auto meth=method.toString();
+                // logErr2("method %s",meth.c_str());
+                if (meth == "mint")
+                    err = TR::execute_mint(params, t, senderAddress, by, tx_id, ii, epoch);
+                else if (meth == "transfer")
+                    err = TR::execute_transfer(params, t, senderAddress, by, tx_id, ii,epoch);
+                else if (meth == "node_create")
+                    err = TR::execute_node_create(params, t, senderAddress, by, tx_id, ii, epoch);
+                else if (meth == "node_update")
+                    err = TR::execute_node_update(params, t, senderAddress, by, tx_id, ii, epoch);
+                else if (meth == "node_stake")
+                    err = TR::execute_node_stake(params, t, senderAddress, by, tx_id, ii, epoch);
+                else if (meth == "node_unstake")
+                    err = TR::execute_unstake_node(params, t, senderAddress, by, tx_id, ii,epoch);
+                else if (meth == "node_enable")
+                    err = TR::execute_node_enable(params, t, senderAddress, by, tx_id, ii,epoch);
+                else if (meth == "contract_deploy")
+                    err = TR::execute_contract_deploy(params, t, senderAddress, by, tx_id, ii,epoch);
+                else if (meth == "contract_update")
+                    err = TR::execute_contract_update(params, t, senderAddress, by, tx_id, ii,epoch);
+                else
+                {
+                    MUTEX_INSPECTOR;
+                    t.emit_command(tx_id, ii, "error", 
+                        R"({"error":"unhandled method %s for root contract"})", 
+                        method.toString().c_str());
+                }
+                if (err)
+                {
+                    MUTEX_INSPECTOR;
+                    t.emit_command(tx_id, ii, "error", 
+                        R"({"error":"%s"})", 
+                        err->c_str());                
+                }
+
+            }
+            else if(!err)
+            {
+                MUTEX_INSPECTOR;
+                CONTRACT_id c;
+                c.container=contract.toString();
+                auto m=method.toString();
+                execute_contract(c,m,params);
+                /// exec js contract
+                
+            }
+
+        }
+    }
+    else
+    {
+        t.emit_block("error", R"({"code":-32602,"error":"tx body must be array"})");
+        // t.att_data->block_report= {1,"tx body must be array"};
+    }
+}
+#include "xyjson_to_quickjs.hpp"
+std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, const yyjson::Value& params)
+{
+    auto it=contracts.find(ct);
+    if(it==contracts.end())
+    {
+        auto err=load_contract(ct);
+        if(err)
+            return err;
+        it==contracts.find(ct);
+        if(it==contracts.end())
+            throw CommonError("if(it--contracts.end())");
+    }
+    JSScope<10, 10> scope(it->second->ctx);
+    XYJsonToQuickJS converter(it->second->ctx);
+    JSValue jspars=converter.convert(params);
+    scope.addValue(jspars);
+    auto mi=it->second->methods.find(method);
+    if(mi==it->second->methods.end())
+        return "method not found";
+
+    return std::nullopt;
+}
+#include "jsscope.h"
+#include "js_tools.h"
+std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contract)
+{
+    auto c=root->getContract(contract);
+    REF_getter<contract_rt> ct=new contract_rt();
+    contracts.insert_or_assign(contract,ct);
+    ct->ctx=JS_NewContext(contract_runtime);
+    {
+        M_LOCK(c->parent->mx);
+        ct->src=c->src;
+        ct->owner=c->owner;
+    }
+    
+    JSScope<10, 10> scope(ct->ctx);
+    JSValue module1 = JS_Eval(ct->ctx, ct->src.data(), ct->src.size(), "<module>", JS_EVAL_TYPE_MODULE | JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
+
+    std::string err;
+    if (qjs::CheckAndGetException(ct->ctx, module1, "loadModule",err))
+        return err;
+
+    JSValue ret = JS_EvalFunction(ct->ctx, module1);
+    scope.addValue(ret);
+    if (qjs::CheckAndGetException(ct->ctx, ret, "loadModule",err))
+        return err;
+
+    return std::nullopt;
 }
 
 void Node::Service::logNode(const char *fmt, ...)

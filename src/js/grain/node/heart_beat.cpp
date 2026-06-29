@@ -86,7 +86,6 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route)
 {
         stage_is_working=true;
-        resetTimer();
         REF_getter<MsgData::HeartBeatRSP> hbr = new MsgData::HeartBeatRSP();
         // msg::heart_beat_rsp hba;
         hbr->payload_heart_beat = h;
@@ -239,7 +238,6 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
         return true;
     }
 
-    resetTimer();
 
     bool need_replace = false;
 
@@ -347,7 +345,6 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 void Node::Service::do_heart_beat()
 {
     blocks_leader.clear();
-    // sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_START_HEART_BEAT, NULL, NULL, HEART_BEAT_INTERVAL_SEC, this));
     {
         EPOCH_id e=root->getEpoch()->epoch;
         e.container+=1;

@@ -471,8 +471,9 @@ std::optional<std::string> TR::execute_contract_deploy(const yyjson::Value &para
             return "allowed only lowercase symbols";
         }
     }
-
-    auto nn = t.root->getContract(name);
+    CONTRACT_id cn;
+    cn.container=name;
+    auto nn = t.root->getContract(cn);
     if (nn.valid())
         return "Contract already registered with name";
 
@@ -487,7 +488,7 @@ std::optional<std::string> TR::execute_contract_deploy(const yyjson::Value &para
     }
 
 
-    auto n = t.root->addContract(name, by,epoch);
+    auto n = t.root->addContract(cn, by,epoch);
 
     auto src=params / "src";
     if(!src.isString())
@@ -521,8 +522,9 @@ std::optional<std::string> TR::execute_contract_update(const yyjson::Value &para
         return "no string param name";
     }
     name = _name.toString();
-
-    auto n = t.root->getContract(name);
+    CONTRACT_id cn;
+    cn.container=name;
+    auto n = t.root->getContract(cn);
     if (!n.valid())
         return "contract not exists";
 

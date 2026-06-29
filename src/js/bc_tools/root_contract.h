@@ -359,13 +359,13 @@ struct root_data: public Cellable
     void getDiff(cdiff& out, const EPOCH_id &epoch);
     void apply_diff(const cdiff& out);
 
-    std::vector<std::string> getContractPath(const std::string &name);
-    std::vector<std::string> getNodePath(const std::string &name);
+    std::vector<std::string> getContractPath(const CONTRACT_id &name);
+    std::vector<std::string> getNodePath(const NODE_id &name);
     std::vector<std::string> getUserPath(const ADDRESS_id &addr);
     std::vector<std::string> getUserStatePath(const ADDRESS_id &addr);
 
-    REF_getter<bc_contract> getContract(const std::string &name);
-    REF_getter<bc_contract> addContract(const std::string &name, const REF_getter<fee_calcer>& bca, const EPOCH_id& epoch);
+    REF_getter<bc_contract> getContract(const CONTRACT_id &name);
+    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const REF_getter<fee_calcer>& bca, const EPOCH_id& epoch);
 
     REF_getter<bc_values> getValues();
     REF_getter<bc_values> checkValues();

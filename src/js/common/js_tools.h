@@ -229,4 +229,24 @@ namespace qjs
         printf("msg: %s\n",msg.c_str());
         return true;
     }
+    inline bool CheckAndGetException(JSContext* ctx, JSValue value, const char* where, std::string& out)
+    {
+        JSScope <10,10> scope(ctx);
+        
+        if(!JS_IsException(value)) return false;
+        JSValue exc = JS_GetException(ctx);
+        scope.addValue(exc);
+        JSValue stack_val = JS_GetPropertyStr(ctx, exc, "stack");  // Получаем свойство stack
+        scope.addValue(stack_val);
+        if(!JS_IsUndefined(stack_val))
+        {
+            std::string stack(scope.toStdStringView(stack_val));
+            out+="stack: "+stack+"\n";
+            printf("stack: %s\n",stack.c_str());
+        }
+        std::string msg(scope.toStdStringView(exc));
+        printf("msg: %s\n",msg.c_str());
+        out+="msg: "+msg+"\n";
+        return true;
+    }
 }

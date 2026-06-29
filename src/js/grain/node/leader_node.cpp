@@ -127,12 +127,15 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         std::vector<blst_cpp::PublicKey> agg_pk;
         auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
         // ba->leader_certificateZ = hbs.leader_info.leader_cert_2;
+        std::set<std::string> nnn;
+
         for (auto &z : bt.responses[h])
         {
             auto n = root->getNode(z->node_validator);
             agg_pk.push_back(n->get_bls_pk());
             ba->agg_sig.add(z->sig);
             ba->node_validators.push_back(z->node_validator);
+            nnn.insert(z->node_validator.container);
         }
         if (ba->agg_sig.verify(agg_pk, blake2b_hash(ba->blockInfo->getBuffer()).container))
         {
@@ -145,9 +148,12 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         }
         broadcast_MsgEvent(ba.get());
 
+        logNode("validators %s",iUtils->join(" ",nnn).c_str());
+
         bt.block_accepted_sent = true;
 
         //// slash missed nodes;
+        
         for(auto& z: bt.responses)
         {
             if(z.first!=h)

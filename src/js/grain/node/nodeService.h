@@ -41,9 +41,10 @@
 #include "dbHistory.h"
 #include "t_params.h"
 #include "cached_state.h"
+#include "contract_rt.h"
+#include <mysql/mysql.h>
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
-// #define HEART_BEAT_TIMEDOUT_SEC 5
-#define HEART_BEAT_INTERVAL_SEC 5
+// #define HEART_BEAT_INTERVAL_SEC 5
 
 enum State
 {
@@ -136,9 +137,6 @@ namespace Node
 
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
         bool PutTransactionREQ(const bcEvent::PutTransactionREQ* e);
-
-        void resetTimer();
-
 
         void do_heart_beat();
 
@@ -248,6 +246,10 @@ namespace Node
     
         bool verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate>& lc);
 
+        void execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress,
+                         const std::string &tx_cmds, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch);
+
+
         REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;
         // REF_getter<IDatabase> db_history=nullptr;
@@ -277,8 +279,16 @@ namespace Node
 
         MsgFactory msgFactory;
 
+        std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
+        std::optional<std::string> load_contract(const CONTRACT_id& contract);
+        std::optional<std::string> execute_contract(const CONTRACT_id& ct, const std::string & method, const yyjson::Value& params);
 
+        JSRuntime *contract_runtime=NULL;
 
+        MYSQL* mysql=nullptr;
+        std::string db_user;
+        std::string db_password;
+        std::string db_socket;
 
     };
 

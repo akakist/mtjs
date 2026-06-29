@@ -99,36 +99,36 @@ void root_data::apply_diff(const cdiff& out)
 
 // }
 
-std::vector<std::string> root_data::getContractPath(const std::string &name)
+std::vector<std::string> root_data::getContractPath(const CONTRACT_id &name)
 {
     std::vector<std::string> p;
     p.push_back("c");
-    auto h=ghash(name.c_str());
+    auto h=ghash(name.container.c_str());
     char buf[2];
     buf[0] = "0123456789abcdef"[h % 16];
     buf[1] = "0123456789abcdef"[(h >> 8) % 16];
     p.push_back({buf,1});
     p.push_back({buf+1,1});
-    p.push_back(name);
+    p.push_back(name.container);
     return p;
 }
 
-std::vector<std::string> root_data::getNodePath(const std::string &name)
+std::vector<std::string> root_data::getNodePath(const NODE_id &name)
 {
     std::vector<std::string> p;
     p.push_back("n");
-    auto h=ghash(name.c_str());
+    auto h=ghash(name.container.c_str());
     char buf[2];
     buf[0] = "0123456789abcdef"[h % 16];
     buf[1] = "0123456789abcdef"[(h >> 8) % 16];
     p.push_back({buf,1});
     p.push_back({buf+1,1});
-    p.push_back(name);
+    p.push_back(name.container);
 
     return p;
 }
 
-REF_getter<bc_contract> root_data::getContract(const std::string &name)
+REF_getter<bc_contract> root_data::getContract(const CONTRACT_id &name)
 {
     MUTEX_INSPECTOR;
     auto v = getContractPath(name);
@@ -140,7 +140,7 @@ REF_getter<bc_contract> root_data::getContract(const std::string &name)
     return dynamic_cast<bc_contract *>(cc->data.get());
 }
 
-REF_getter<bc_contract> root_data::addContract(const std::string &name, const REF_getter<fee_calcer> &bca, const EPOCH_id& epoch)
+REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const REF_getter<fee_calcer> &bca, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
     auto v = getContractPath(name);
@@ -371,7 +371,7 @@ REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee
 {
     MUTEX_INSPECTOR;
 
-    std::vector<std::string> v = getNodePath(name.container);
+    std::vector<std::string> v = getNodePath(name);
     // v.push_back("n");
     // v.push_back(name.container);
     auto cc = getByPathOrCreate(this, v, db.get());
@@ -390,7 +390,7 @@ REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee
 REF_getter<bc_node> root_data::getNode(const NODE_id &name)
 {
     MUTEX_INSPECTOR;
-    std::vector<std::string> v = getNodePath(name.container);
+    std::vector<std::string> v = getNodePath(name);
     // v.push_back("n");
     // v.push_back(name.container);
 
