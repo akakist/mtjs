@@ -34,7 +34,7 @@ struct CDatabase: public IDatabase
     {
         rocksdb::Status s;
         rocksdb::WriteOptions w;
-        w.sync=true;
+        // w.sync=true;
         s = db->Put(w, k, v);
         if (!s.ok()) std::cerr << "Put failed: " << s.ToString() << "\n";
         // db->Flush(rocksdb::FlushOptions());
@@ -149,6 +149,7 @@ struct CDatabase: public IDatabase
 // Создание снапшота
     bool create_snapshot(const EPOCH_id &epoch) 
     {
+        // return true;
     // Создаем умный указатель для Checkpoint. Он сам вызовет delete.
     rocksdb::Checkpoint* checkpoint=NULL;
     

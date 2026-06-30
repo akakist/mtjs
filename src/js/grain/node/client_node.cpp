@@ -275,11 +275,11 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 #ifdef MEMLEAK_CHECK
     logNode("!!!!!!!!!!!!!! global REF count %d", get_global_refcount());
     std::vector<std::string> v;
-    root->print_calcers(v);
-    for (auto &z : v)
-    {
-        printf("calcer %s\n", z.c_str());
-    }
+    // root->print_calcers(v);
+    // for (auto &z : v)
+    // {
+    //     printf("calcer %s\n", z.c_str());
+    // }
 #endif
     return true;
 }

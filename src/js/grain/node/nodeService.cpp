@@ -1122,7 +1122,7 @@ void Node::Service::logNode(const char *fmt, ...)
         fprintf(stdout, "\n");
         va_end(ap);
     }
-    if(0){
+    if(1){
         va_list ap;
         va_start(ap, fmt);
         std::string pn=this_node_name.container+".log";
