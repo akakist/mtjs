@@ -69,36 +69,28 @@ namespace Node
             // clear();
 
         }
-        bool TIMER_VALIDATE_BLOCK_DELAY_set=false;
-        bool request_for_transactions_sent=false;
-        bool confirm_leader_sent=false;
+        int64_t TIMER_VALIDATE_BLOCK_DELAY_set=0;
+        int64_t request_for_transactions_sent=0;
+        int64_t confirm_leader_sent=0;
         REF_getter< MsgData::LeaderCertificate> leader_cert_2;
         std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > HeartBeatRSP_m;
         std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > ConfirmLeaderRSP_m;
         std::set<NODE_id> transaction_responders;
         uint64_t request_for_transactions_time=0;
 
-        void clear__1()
-        {
-            request_for_transactions_sent=false;
-            leader_cert_2=nullptr;
-            HeartBeatRSP_m.clear();
-            transaction_responders.clear();
-        }
+        // void clear__1()
+        // {
+        //     request_for_transactions_sent=false;
+        //     leader_cert_2=nullptr;
+        //     HeartBeatRSP_m.clear();
+        //     transaction_responders.clear();
+        // }
 
 
     };
     struct heart_beat_info
     {
-        // NODE_id node_leader;
         heart_beat_node_info leader_info;
-        heart_beat_info()
-        {
-
-        }
-        void clear()
-        {
-        }
     };
     class Service:
         public UnknownBase,

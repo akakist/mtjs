@@ -41,7 +41,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     }
 
     BigInt hb_staked = 0;
-    if (!li.confirm_leader_sent)
+    if (iUtils->getNow() > li.confirm_leader_sent + _1sec)
     {
         blst_cpp::AggregateSignature sig_agg;
         std::vector<blst_cpp::PublicKey> pk_agg;
@@ -71,9 +71,9 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     // logNode()
     auto pers = (hb_staked.toDouble()) / total_staked.toDouble();
 
-    if (pers > QUORUM && !li.confirm_leader_sent)
+    if (pers > QUORUM && (iUtils->getNow() > li.confirm_leader_sent+ _1sec))
     {
-        li.confirm_leader_sent = true;
+        li.confirm_leader_sent = iUtils->getNow();
         {
 
             REF_getter<MsgData::ConfirmLeaderREQ> rt = new MsgData::ConfirmLeaderREQ();

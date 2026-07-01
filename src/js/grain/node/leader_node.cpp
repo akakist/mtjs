@@ -26,7 +26,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     }
     auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
-    if(li.TIMER_VALIDATE_BLOCK_DELAY_set)
+    if(iUtils->getNow()-li.TIMER_VALIDATE_BLOCK_DELAY_set < _1sec)
     {
         // logNode("TIMER_VALIDATE_BLOCK_DELAY_set is true, so do not reset timer");
         return true;
@@ -50,7 +50,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         auto diff_mks=curtime-li.request_for_transactions_time;
         logNode("diff_mks %ld, stake %s, total_staked %s", diff_mks, stake.toString().c_str(), total_staked.toString().c_str());
         sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_VALIDATE_BLOCK_DELAY,NULL,NULL,double(diff_mks)/1000000., this));
-        li.TIMER_VALIDATE_BLOCK_DELAY_set=true;
+        li.TIMER_VALIDATE_BLOCK_DELAY_set=iUtils->getNow();
 
     }
     XPASS;
