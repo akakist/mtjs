@@ -94,7 +94,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     auto &bt = blocks_leader[prev_root_hash_Z];
     auto h=r->blockInfo->getHash();
     bt.responses[h].push_back(r);
-    if (bt.block_accepted_sent)
+    if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
         return true;
     // auto & bh=bt[bl.root_hash];
     // bt.responses.push_back(r);
@@ -150,7 +150,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 
         logNode("validators %s",iUtils->join(" ",nnn).c_str());
 
-        bt.block_accepted_sent = true;
+        bt.block_accepted_sent = iUtils->getNow();
 
         //// slash missed nodes;
         

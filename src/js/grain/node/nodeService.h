@@ -169,28 +169,15 @@ namespace Node
 
         void do_InvalidateRoot();
 
-        struct Round
-        {
-
-        };
 
         struct block
         {
             std::map<THASH_id /*blockinfo hash*/,REF_getter<MsgData::BlockInfo> > blockInfo;
             std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >responses;
-
-
-
-            bool block_accepted_sent=false;
-            bool heart_bit_sent_on_block_accepted_rsp=false;
-
-            std::set<NODE_id > acceptors;
-
+            int64_t block_accepted_sent=0;
             heart_beat_info    heart_beat_store;
-
         };
         _db_to_save db_to_save_Z;
-        // REF_getter<MsgData::BlockDBStore> prepareBlockDBStore(const t_params& t);
 
 
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
@@ -207,7 +194,7 @@ namespace Node
         struct client_leader_info
         {
             NODE_id node_leader;
-            bool heart_beat_sent=false;
+            int64_t heart_beat_sent=0;
         };
 
         std::map<BLOCK_id, client_leader_info> cli_leader_info;
@@ -243,8 +230,7 @@ namespace Node
 
         REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;
-        // REF_getter<IDatabase> db_history=nullptr;
-        REF_getter<DB_history> db_history;
+        REF_getter<DB_history> db_history=nullptr;
 
 
         uint64_t last_activity_time=0;
@@ -276,9 +262,6 @@ namespace Node
 
         JSRuntime *contract_runtime=NULL;
 
-        // std::string db_user;
-        // std::string db_password;
-        // std::string db_socket;
 
     };
 

@@ -213,9 +213,9 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
                     /// главное - нет затыкания протокола
                     logNode("if(prev_root_hash_Z!=h->prev_root_hash)    prev_root_hash_Z %s h->prev_root_hash %s from node %s", prev_root_hash_Z.str().c_str(), h->prev_root_hash_1.str().c_str(),src_node.container.c_str());
                     auto& ci=cli_leader_info[prev_root_hash_Z];
-                    if(!ci.heart_beat_sent)
+                    if(iUtils->getNow() >  ci.heart_beat_sent+_1sec)
                     {
-                        ci.heart_beat_sent=true;
+                        ci.heart_beat_sent=iUtils->getNow();
                         do_heart_beat();
                     }
                     return true;
@@ -236,15 +236,14 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
                 else
                 {
     
-                    if(!ci.heart_beat_sent)
+                    if(iUtils->getNow() > ci.heart_beat_sent +_1sec)
                     {
     
-                        ci.heart_beat_sent=true;
+                        ci.heart_beat_sent=iUtils->getNow();
                         do_heart_beat();
                     }
                     else 
                     {
-                        // logNode("!if(!ci.heart_beat_sent)");
 
                     }
                 }
