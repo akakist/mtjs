@@ -254,7 +254,7 @@ std::vector<std::string> root_data::getBalancePath(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTORS("getBalancePath");
     if (addr.addr.size() != 32)
-        throw CommonError("    if(pk_bin.size()!=32) %d %s", addr.addr.size(), _DMI().c_str());
+        throw CommonError("  Z1  if(pk_bin.size()!=32) %d %s", addr.addr.size(), _DMI().c_str());
     std::vector<std::string> p;
     p.push_back("u");
     std::string addr_hex = base16::encode(addr.addr);
@@ -266,7 +266,7 @@ std::vector<std::string> root_data::getAddressStatePath(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTORS("getAddressStatePath");
     if (addr.addr.size() != 32)
-        throw CommonError("    if(pk_bin.size()!=32) %d %s", addr.addr.size(), _DMI().c_str());
+        throw CommonError("   Z2 if(pk_bin.size()!=32) %d %s", addr.addr.size(), _DMI().c_str());
     std::vector<std::string> p;
     p.reserve(10);
     p.push_back("s");
@@ -457,20 +457,16 @@ REF_getter<bc_node> root_data::addNode(const NODE_id &name, const EPOCH_id& epoc
     MUTEX_INSPECTOR;
 
     std::vector<std::string> v = getNodePath(name);
-    // v.push_back("n");
-    // v.push_back(name.container);
     auto cc = getByPathOrCreate(this, v, db.get());
-
+    MutexLockerDeferred l(cc->mx);
+    l.lock();
     if (cc->data.valid())
         throw CommonError("if(cc->data.valid())");
-    // if(cc->payload_.size())
-    //     throw CommonError("if(cc->payload.size())");
     cc->payload_ctor_idx = hsh::bc_node;
-    {
-        REF_getter<bc_node> n = new bc_node(cc.get());
-        cc->data_copy = n.get();
-        // cc->data->setDirty(epoch);
-    }
+    // {
+    //     REF_getter<bc_node> n = new bc_node(cc.get());
+    //     cc->data_copy = n.get();
+    // }
     REF_getter<bc_node> n = new bc_node(cc.get());
     cc->data = n.get();
     cc->data->setDirty(epoch);

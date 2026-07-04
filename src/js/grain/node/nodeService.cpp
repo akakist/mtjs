@@ -587,8 +587,9 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::Le
         // REF_getter<fee_calcer> by = t.feeCalcers.get(senderAddress);
         if (!tt->verify())
         {
+            // t.emit_block("error", R"({"error":"verify failed @12"})");
             t_err = "verify failed @12";
-            logNode("verify failed @12");
+            // logNode("verify failed @12");
         }
         if (!t_err)
         {
@@ -596,21 +597,12 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::Le
             auto u = root->getAddressState(senderAddress);
             if (!u.valid())
             {
+                // t.emit_block("error", R"({"error":"sender invalid"})");
                 t_err = "sender invalid";
-                logNode("sender invalid");
+                // logNode("sender invalid");
             }
             if (!t_err)
             {
-                // if(!tt->doc)
-                //     return "if(!tt->doc)";
-                // auto jr=yyjson_doc_get_root(tt->doc);
-                // auto _nonce=yyjson_obj_get(jr,"nonce");
-                // yyjson_is_num(_nonce)
-
-                // if(!nonce)
-                //     return "if(!nonce)";
-                // auto nonce_= jr->/ "nonce";
-                // auto nonce=atoll(nonce_.toString().c_str());
                 uint64_t nonce;
                 t_err=tt->getNonce(nonce);
                 if (!t_err && u->getNonce() != nonce)
@@ -626,7 +618,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::Le
                         logNode("if(!lc.valid()) AA");
                     if(!lc->heart_beat.valid())
                         logNode("if(!lc->heart_beat.valid()) AA");
-                    execute_transaction(tt, t, senderAddress,  lc->heart_beat->new_epoch);
+                    t_err=execute_transaction(tt, t, senderAddress,  lc->heart_beat->new_epoch);
                     u->incNonce();
                     u->setDirty(lc->heart_beat->new_epoch);
 
@@ -635,8 +627,8 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::Le
         }
         if (!t_err)
             t.emit_tx(tx_hash, "result", R"({"success":true})");
-        else
-            t.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());    
+        // else
+        //     t.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());    
     }
 
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
@@ -652,91 +644,74 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::Le
 void Node::Service::calc_fee_rewards_nodes(t_params &t, const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     MUTEX_INSPECTOR;
-    // std::map<Cellable*, std::set<REF_getter<fee_calcer>>> cc;
-    // for(auto & z:t.calcers)
-    // {
-    //     auto cell=z.first->parent;
-    //     while(cell)
-    //     {
-    //         for(auto &x: z.second)
-    //             cc[cell].insert(x);
-
-    //         cell=cell->parent;
-    //     }
-    // }
-    // for(auto& z: cc)
-    // {
-    //     size_t size=z.first->last_size;
-    //     size_t portion=size/z.second.size();
-    //     for(auto &x: z.second)
-    //     {
-    //         x->add(portion);
-    //     }
-    // }
-
-    // auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
     BigInt total_staked=0;
-    auto nn=root->getAllNodes();
+    // std::set<NODE_id> ns;
+    // for(auto& z:lc->nodes)
+    // {
+    //     ns.insert(z);
+    // }
+
+    // auto nn=root->getAllNodes();
+    std::map<NODE_id, REF_getter<bc_node>> nn;
+    for(auto& nm:lc->nodes)
+    {
+        auto n=root->getNode(nm);
+        nn.insert_or_assign(nm,n);
+        // if(!n.valid())
+        //     throw CommonError("if(!n.valid()) 112233");
+        // total_staked+=n->get_full_stake();
+    }
+    for(auto &n:nn)
+    {
+        if(!n.second.valid())
+            throw CommonError("if(!n.valid()) 112233");
+        total_staked+=n.second->get_full_stake();
+    }
     for(auto& n:nn)
     {
-        total_staked+=n->get_full_stake();
+        auto owner=n.second->get_owner();
+        if(owner.addr.size()!=32)
+            throw CommonError("if(owner.addr.size()!=32) 112233 size %d",owner.addr.size());
+        auto u=root->getAddressState(owner);
+        if(!u.valid())
+            throw CommonError("if(!u.valid()) 112233");
+        auto stake=n.second->get_full_stake();
+        auto reward=(t.node_rewards*stake)/total_staked;
+        {
+            M_LOCK(u->parent->mx);
+            u->balance+=reward;
+        }
+        t.emit_block("node_reward",R"({"node":"%s","amount":"%s"})",n.first.container.c_str(), reward.toString().c_str());
+
     }
 
-
-    BigInt total_gas;
-    // for (auto &z : t.feeCalcers.calcers)
+    // t.emit_block("total_fee",R"({"fee":"%s"})",total_gas.toString().c_str());
+    // // iUtils->getNow
+    // BigInt total_rewards = (total_gas * 9) / 10;
+    // for (auto &n : lc->nodes)
     // {
-    //     auto u = root->getAddressState(z.first);
+    //     auto node = root->getNode(n);
+    //     if (!node.valid())
+    //         throw CommonError("if(!node.valid()) 556677");
+    //     auto owner = node->get_owner();
+    //     auto u = root->getAddressState(owner);
     //     if (!u.valid())
-    //         throw CommonError("if(!u.valid()) 334455");
     //     {
-    //         M_LOCK(u->parent->mx);
-    //         u->balance-=z.second->get_fee();
-    //         // if (u->balance < z.second->get_fee())
-    //         // {
-    //         //     u->setBalance(0);
-    //         //     u->setDirty(lc->heart_beat->new_epoch);
-    //         // }
-    //         // else
-    //         // {
-    //         //     // logNode("balance deduct %s fee %s", u->getBalance().toString().c_str(), z.second->get_fee().toString().c_str());
-    //         //     u->subBalance(z.second->get_fee());
-    //         //     
-    //         // }
+    //         throw CommonError("if(!u.valid()) 778899");
+    //         // u=root->addUser(upk,NULL);
     //     }
+    //     BigInt amt = (total_rewards * node->get_full_stake()) / total_staked;
+    //     {
+    //         M_LOCK (u->parent->mx);
+    //         u->balance+=amt;
+    //     }
+    //     // u->addBalance(amt);
     //     u->setDirty(lc->heart_beat->new_epoch);
-    //     total_gas += z.second->get_fee();
-    //     t.att_data->gas[z.first] = z.second->get_fee();
-    //     t.emit_block("fee",R"({"address":"%s","fee":"%s"})",base16::encode(z.first.addr).c_str(),z.second->get_fee().toString().c_str());
-    //     z.second->reset();
+    //     // if (n == this_node_name && amt > 0)
+    //     //     logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
+    //     t.att_data->rewards[n] = amt;
+    //     t.emit_block("reward",R"({"node":"%s","amount":"%s"})",n.container.c_str(), amt.toString().c_str());
     // }
-    t.emit_block("total_fee",R"({"fee":"%s"})",total_gas.toString().c_str());
-    // iUtils->getNow
-    BigInt total_rewards = (total_gas * 9) / 10;
-    for (auto &n : lc->nodes)
-    {
-        auto node = root->getNode(n);
-        if (!node.valid())
-            throw CommonError("if(!node.valid()) 556677");
-        auto owner = node->get_owner();
-        auto u = root->getAddressState(owner);
-        if (!u.valid())
-        {
-            throw CommonError("if(!u.valid()) 778899");
-            // u=root->addUser(upk,NULL);
-        }
-        BigInt amt = (total_rewards * node->get_full_stake()) / total_staked;
-        {
-            M_LOCK (u->parent->mx);
-            u->balance+=amt;
-        }
-        // u->addBalance(amt);
-        u->setDirty(lc->heart_beat->new_epoch);
-        // if (n == this_node_name && amt > 0)
-        //     logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
-        t.att_data->rewards[n] = amt;
-        t.emit_block("reward",R"({"node":"%s","amount":"%s"})",n.container.c_str(), amt.toString().c_str());
-    }
     std::set<NODE_id> ns;
     for(auto& z:lc->nodes)
     {
@@ -993,79 +968,10 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     return true;
 }
-std::optional<std::string> Node::Service::execute_transaction2(yyjson_val *txarr, t_params &t, const ADDRESS_id &senderAddress, const EPOCH_id& epoch)
+std::optional<std::string> Node::Service::execute_transaction2(const THASH_id& tx_id, yyjson_val *txarr, t_params &t, const ADDRESS_id &senderAddress, const EPOCH_id& epoch)
 {
-
-    return std::nullopt;
-}
-
-void Node::Service::execute_transaction(const REF_getter<MsgData::TX> &tx, t_params &t, const ADDRESS_id &senderAddress, const EPOCH_id& epoch)
-{
-    MUTEX_INSPECTOR;
-    auto tx_id=tx->getHash();
-    auto s=t.root->getAddressState(senderAddress);
-    if(!s.valid())
-        throw CommonError("if(!s.valid()) 334455"); 
-
-    BigInt gasLimit=0;
-    BigInt gasPrice=0;    
-    BigInt value=0;
-    auto err=tx->getGasLimit(gasLimit);
-    if(err)
-    {
-        t.emit_tx(tx_id, "error", 
-            R"({"error":"%s"})", err->c_str());
-        return;
-
-    }
-    err=tx->getGasPrice(gasPrice);
-    if(err)
-    {
-        t.emit_tx(tx_id, "error", 
-            R"({"error":"%s"})", err->c_str());
-        return;
-
-    }
-    err=tx->getValue(value);
-    if(err)
-    {
-        t.emit_tx(tx_id, "error", 
-            R"({"error":"%s"})", err->c_str());
-        return;
-
-    }
-    yyjson_val* root = yyjson_doc_get_root(tx->doc);
-    yyjson_val* j_tx=yyjson_obj_get(root,"tx");
-
-    if(!yyjson_is_arr(j_tx))
-    {
-        t.emit_tx(tx_id, "error", 
-            R"({"error":"tx body must be array"})");
-        return;
-    }
-
-    BigInt totalGasPrice=gasLimit;
-    totalGasPrice*=gasPrice;
-    {
-        M_LOCK(s->parent->mx);
-        if(s->balance<totalGasPrice+value)
-        {
-            t.emit_tx(tx_id, "error", 
-                R"({"error":"not enough funds","balance":"%s","totalGasPrice":"%s","value":"%s"})",
-                s->balance.toString().c_str(),
-                totalGasPrice.toString().c_str(),
-                value.toString().c_str());
-            return;
-
-        }
-        s->balance-=totalGasPrice+value;    
-        
-    }
-    t.gas_remains=gasLimit;
-    t.value=value;
-
     yyjson_arr_iter iter;
-    yyjson_arr_iter_init(j_tx, &iter);
+    yyjson_arr_iter_init(txarr, &iter);
 
     // Индекс текущего элемента
     uint32_t index = 0;
@@ -1124,6 +1030,7 @@ void Node::Service::execute_transaction(const REF_getter<MsgData::TX> &tx, t_par
                 t.emit_command(tx_id,index,"error", 
                     R"({"error":"%s"})", 
                     err->c_str());
+                return err;
             }
         }
         else
@@ -1132,14 +1039,157 @@ void Node::Service::execute_transaction(const REF_getter<MsgData::TX> &tx, t_par
             c.container=contract_str;
             execute_contract(c,method_str,params);  
         }
+        index++;
+    }
+
+
+    return std::nullopt;
+}
+
+std::optional<std::string> Node::Service::execute_transaction(const REF_getter<MsgData::TX> &tx, t_params &t, const ADDRESS_id &senderAddress, const EPOCH_id& epoch)
+{
+    MUTEX_INSPECTOR;
+    auto tx_id=tx->getHash();
+    auto s=t.root->getAddressState(senderAddress);
+    if(!s.valid())
+        throw CommonError("if(!s.valid()) 334455"); 
+
+    BigInt gasLimit=0;
+    BigInt gasPrice=0;    
+    BigInt value=0;
+    auto err=tx->getGasLimit(gasLimit);
+    if(err)
+    {
+        t.emit_tx(tx_id, "error", 
+            R"({"error":"%s"})", err->c_str());
+        return err;
 
     }
+    err=tx->getGasPrice(gasPrice);
+    if(err)
+    {
+        t.emit_tx(tx_id, "error", 
+            R"({"error":"%s"})", err->c_str());
+        return err;
+
+    }
+    err=tx->getValue(value);
+    if(err)
+    {
+        t.emit_tx(tx_id, "error", 
+            R"({"error":"%s"})", err->c_str());
+        return err;
+
+    }
+    yyjson_val* yyroot = yyjson_doc_get_root(tx->doc);
+    yyjson_val* j_tx=yyjson_obj_get(yyroot,"tx");
+
+    if(!yyjson_is_arr(j_tx))
+    {
+        t.emit_tx(tx_id, "error", 
+            R"({"error":"tx body must be array"})");
+        err="tx body must be array";
+        return err;
+    }
+
+    BigInt totalGasPrice=gasLimit;
+    totalGasPrice*=gasPrice;
+    {
+        M_LOCK(s->parent->mx);
+        if(s->balance<totalGasPrice+value)
+        {
+            t.emit_tx(tx_id, "error", 
+                R"({"error":"not enough funds","balance":"%s","totalGasPrice":"%s","value":"%s"})",
+                s->balance.toString().c_str(),
+                totalGasPrice.toString().c_str(),
+                value.toString().c_str());
+            err="not enough funds";
+            return err;
+
+        }
+        s->balance-=totalGasPrice+value;    
+        
+    }
+    
+    t.gas_remains=gasLimit;
+    t.value=value;
+
+    try{
+        err=execute_transaction2(tx_id,j_tx,t,senderAddress,epoch);
+    }
+    catch(std::exception& e)
+    {
+        err=e.what();
+    }
+
+    if(err)
+    {
+        t.emit_tx(tx_id, "rollback", 
+            R"({"error":"%s"})", err->c_str());
+        t.root->rollback();
+        {
+            M_LOCK(s->parent->mx);
+            s->balance+=t.gas_remains*gasPrice+value;
+        }
+        
+    }
+    else
+    {
+        _db_to_save db_dump;
+        root->calc_tree_hash(db_dump);
+        uint64_t data_size=0;
+        for(auto& z: db_dump.cells)
+        {
+            data_size+=z.first.size();
+            data_size+=z.second.size();
+        }
+        if(t.gas_remains<data_size)
+        {
+            t.emit_tx(tx_id, "rollback", 
+                R"({"error":"not enough gas to save data","gas_remains":"%s","data_size":"%lld"})",
+                t.gas_remains.toString().c_str(),
+                data_size);
+            t.root->rollback();
+            {
+                M_LOCK(s->parent->mx);
+                s->balance+=t.gas_remains*gasPrice+value;
+            }
+            err="not enough gas to save data";
+            return err;
+        }
+        else
+        {
+            t.gas_remains-=data_size;
+            t.emit_tx(tx_id, "commit", 
+                R"({"success":true,"gas_remains":"%s","data_size":"%lld"})",
+                t.gas_remains.toString().c_str(),
+                data_size);
+                {
+                    M_LOCK(s->parent->mx);
+                    s->balance+=t.gas_remains*gasPrice+t.value;
+                }
+
+                root->calc_tree_hash(db_dump);
+                root->clear_dirty();
+
+                t.node_rewards+=(gasLimit-t.gas_remains)* gasPrice;
+
+                for(auto& z:db_dump.cells)
+                {
+                    db_to_save_Z.add(z.first,z.second);
+                }
+        }
+
+    }
+
+    
     BigInt gasReturn=t.gas_remains;
     gasReturn*=gasPrice;
     {
         M_LOCK(s->parent->mx);
-        s->balance+=gasReturn;
+        s->balance+=gasReturn+t.value;
     }
+    return err;
 }
 std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params)
 {

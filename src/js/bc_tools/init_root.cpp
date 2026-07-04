@@ -68,6 +68,7 @@ void init_root(const REF_getter<root_data> &r)
         nn->init(name, u_root_address, bls_pk, base16::decode(getenv2(keys[i].second)), "127.0.0.1:"+std::to_string(2300+i));
         nn->add_stake(u_root_address, 100*i);
         nn->setDirty(e);
+        logErr2("nn->owner_address %s",base16::encode(nn->get_owner().addr).c_str());
         // r->;
 
     }

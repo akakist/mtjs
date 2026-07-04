@@ -26,7 +26,7 @@ std::optional<std::string> yy_get_bn(yyjson_val *params, const char *key, BigInt
     if(!_name)
         return "param '"+(std::string)key+"' must be specified";
     
-        return "'"+(std::string)key+"' must be string";
+        // return "'"+(std::string)key+"' must be string";
     if(yyjson_is_str(_name))
         out.from_string(yyjson_get_str(_name));
     else if(yyjson_is_num(_name))
@@ -261,6 +261,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, t_params &
     {
         return "node not found";
     }
+    logErr2("n owner %s sender %s", base16::encode(n->get_owner().addr).c_str(), base16::encode(senderAddress.addr).c_str());
 
     {
     }

@@ -224,9 +224,9 @@ namespace Node
     
         bool verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate>& lc);
 
-        void execute_transaction(const REF_getter<MsgData::TX> &tx, t_params &t, const ADDRESS_id &senderAddress,
+        std::optional<std::string> execute_transaction(const REF_getter<MsgData::TX> &tx, t_params &t, const ADDRESS_id &senderAddress,
                          const EPOCH_id& epoch);
-        std::optional<std::string> execute_transaction2(yyjson_val *txarr, t_params &t, const ADDRESS_id &senderAddress, const EPOCH_id& epoch);
+        std::optional<std::string> execute_transaction2(const THASH_id& tx_id,yyjson_val *txarr, t_params &t, const ADDRESS_id &senderAddress, const EPOCH_id& epoch);
 
 
         REF_getter<root_data> root=nullptr;

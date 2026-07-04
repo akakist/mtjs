@@ -227,6 +227,12 @@ public:
     void calc_tree_hash(_db_to_save &db_dump);
     // void _getDiff(std::map<std::deque<std::string>,std::string>& out, const EPOCH_id &epoch, IDatabase* db);
     void _getDiff(cdiff& out, const EPOCH_id &epoch, IDatabase* db);
+
+    void rollback();
+    void clear_data_copy();
+    void clear_dirty();
+
+    _db_to_save commit();
 };
 // static const char* base16_TABLE[62] = {
 //     "0","1","2","3","4","5","6","7","8","9",

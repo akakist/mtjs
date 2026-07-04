@@ -187,7 +187,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
             lk.unlock();
         }
     }
-    is_dirty = false;
+    // is_dirty = false;
 }
 void data_base::setDirty(const EPOCH_id& epoch)
 {
@@ -205,3 +205,87 @@ void data_base::setDirty(const EPOCH_id& epoch)
 
     
 // }
+void Cellable::rollback()
+{
+    MutexLockerDeferred l(mx);
+    l.lock();
+    if(!is_dirty)
+        return;
+
+    is_dirty=false;
+    if(data_copy.valid())
+    {
+        data=data_copy;
+        data_copy=nullptr;
+    }
+    std::vector<REF_getter<Cellable>> ptrs;
+    ptrs.reserve(children_ptrs_mx.size());
+    for(auto& z:children_ptrs_mx)
+    {
+        ptrs.push_back(z.second);
+    }
+    l.unlock();
+    for(auto& z:ptrs)
+    {
+        z->rollback();
+    }
+}
+void Cellable::clear_data_copy()
+{
+    MutexLockerDeferred l(mx);
+    l.lock();
+    if(!is_dirty)
+        return;
+    {
+        // is_dirty=false;
+        if(data_copy.valid())
+        {
+            data_copy=nullptr;
+        }
+    }
+    std::vector<REF_getter<Cellable>> ptrs;
+    ptrs.reserve(children_ptrs_mx.size());
+    for(auto& z:children_ptrs_mx)
+    {
+        ptrs.push_back(z.second);
+    }
+    l.unlock();
+    for(auto& z:ptrs)
+    {
+        z->clear_data_copy();
+    }
+}
+void Cellable::clear_dirty()
+{
+    MutexLockerDeferred l(mx);
+    l.lock();
+    if(!is_dirty)
+        return;
+    std::vector<REF_getter<Cellable>> ptrs;
+    ptrs.reserve(children_ptrs_mx.size());
+    for(auto& z:children_ptrs_mx)
+    {
+        ptrs.push_back(z.second);
+    }
+    l.unlock();
+    for(auto& z:ptrs)
+    {
+        z->clear_dirty();
+    }
+    l.lock();
+    is_dirty=false;
+}
+
+_db_to_save Cellable::commit()
+{
+    // commit_recursive();
+    _db_to_save db_dump;
+    calc_tree_hash(db_dump);
+
+    auto root_buf = getBuffer();
+    auto root_hash = blake2b_hash(root_buf);
+    db_dump.add("#root#", root_buf);
+    db_dump.add("#root_hash#", root_hash.container);
+    return db_dump;
+
+}
