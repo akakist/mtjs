@@ -9,7 +9,7 @@ import { StreamModule } from "./stream";
 
 //     // | { type: CreateUser; name: string; email: string }
 //     // | { type: RequestType.DeleteUser; id: string }
-//     // | { type: RequestType.GetUser; id: string }
+//     // | { type: RequestType.getBalance; id: string }
 //     | { type: "register_user"; nick: string; pk: string  };
 
 
@@ -44,7 +44,7 @@ declare global
         get_user_nonce(nodeaddr:string, nick:string, timeout: number): Promise<userInfo>;
         // mint(nodeaddr:string, sk:string, params:object): Promise<object>;
         // tx_sign(tx:Objectstring, sk:string): string;
-        tx_submit(nodeaddr:string,  timeout:number, msg:string,sk:string, nonce:string, callback:(params:object) => void ): Promise<object>;
+        tx_submit(nodeaddr:string,  timeout:number, sk:string, req: Object , callback:(params:object) => void ): Promise<object>;
         tx_subscribe(nodeaddr:string, callback: (params:tx_report) => void): void;
         addr_from_pk(pk:string): string;
         pipe: Pipe;

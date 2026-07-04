@@ -9,7 +9,7 @@ JSValue js_rpc_response_new(JSContext *ctx, const REF_getter<mtjsEvent::mtjsRpcR
 bool MTJS::Service::mtjsRpcREQ(const mtjsEvent::mtjsRpcREQ *e, const REF_getter<epoll_socket_info> &esi)
 {
     XTRY;
-
+    MUTEX_INSPECTOR;
     JSScope<10, 10> scope(js_ctx);
     auto it = opaque.rpc_on_srv_callbacks.find(e->method);
     if (it == opaque.rpc_on_srv_callbacks.end())
@@ -29,6 +29,7 @@ bool MTJS::Service::mtjsRpcREQ(const mtjsEvent::mtjsRpcREQ *e, const REF_getter<
 }
 bool MTJS::Service::mtjsRpcRSP(const mtjsEvent::mtjsRpcRSP *e, const REF_getter<epoll_socket_info> &esi)
 {
+    MUTEX_INSPECTOR;
     XTRY;
     JSScope<10, 10> scope(js_ctx);
     if (e->route.size())

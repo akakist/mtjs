@@ -26,7 +26,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     }
     auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
-    if(iUtils->getNow()-li.TIMER_VALIDATE_BLOCK_DELAY_set < _1sec)
+    if(iUtils->getNow()-li.TIMER_VALIDATE_BLOCK_DELAY_set < VALIDATE_BLOCK_DELAY_set_TIMEFRAME *_1sec)
     {
         // logNode("TIMER_VALIDATE_BLOCK_DELAY_set is true, so do not reset timer");
         return true;
@@ -94,7 +94,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     auto &bt = blocks_leader[prev_root_hash_Z];
     auto h=r->blockInfo->getHash();
     bt.responses[h].push_back(r);
-    if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
+    if ( iUtils->getNow() < bt.block_accepted_sent + BLOCK_ACCEPTED_SENT_TIMEFRAME * _1sec)
         return true;
     // auto & bh=bt[bl.root_hash];
     // bt.responses.push_back(r);

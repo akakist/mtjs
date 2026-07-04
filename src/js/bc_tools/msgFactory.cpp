@@ -36,8 +36,8 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::ConfirmLeaderREQ, MsgData::ConfirmLeaderREQ::construct);
     registerMsg(msgid::ConfirmLeaderRSP, MsgData::ConfirmLeaderRSP::construct);
     registerMsg(msgid::TX, MsgData::TX::construct);
-    registerMsg(msgid::GetUserNonceREQ, MsgData::GetUserNonceREQ::construct);
-    registerMsg(msgid::GetUserNonceRSP, MsgData::GetUserNonceRSP::construct);
+    registerMsg(msgid::getAddressStateREQ, MsgData::getAddressStateREQ::construct);
+    registerMsg(msgid::getAddressStateRSP, MsgData::getAddressStateRSP::construct);
     registerMsg(msgid::LcEnvelopeREQ, MsgData::LcEnvelopeREQ::construct);
     registerMsg(msgid::LcREQ, MsgData::LcREQ::construct);
     registerMsg(msgid::LcRSP, MsgData::LcRSP::construct);

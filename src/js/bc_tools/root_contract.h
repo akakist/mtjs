@@ -9,7 +9,7 @@
 #include "NODE_id.h"
 #include "hsh.h"
 #include "md/md_LeaderCertificate.h"
-#include <xyjson.h>
+#include <yyjson.h>
 #include <sstream>
 #include "fee_calcer.h"
 #include "nodeElement.h"
@@ -24,6 +24,11 @@ struct bc_contract:  public data_base
     std::string name_;
     ADDRESS_id  owner;
     std::string src;
+    data_base * create(Cellable* _parent) final
+    {
+        return new bc_contract(_parent);
+    }
+
     void pack(outBuffer&b) const final
     {
         data_base::pack(b);
@@ -38,78 +43,33 @@ struct bc_contract:  public data_base
         b>>name_>>owner>>src;
 
     }
+    void copy_from(data_base* s) final
+    {
+        data_base::copy_from(s);
+        auto *ss=dynamic_cast<bc_contract*> (s);
+        if(!ss)
+            throw CommonError("dynamic cast error");
+        name_=ss->name_;
+        owner=ss->owner;
+        src=ss->src;
+    }
+
     std::string dump() final;
 };
-struct bc_user: public data_base
+struct bc_address_state: public data_base
 {
 
-    bc_user(Cellable* p): data_base(hsh::bc_user,p, 0,-1) {
-    }
-    // ADDRESS_id address;
-    // std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
-    // std::set<NODE_id> nodes;
-    // std::set<std::string> contracts;
-    BigInt balance;
-    std::map<CONTRACT_id, BigInt> contract_deposits;
-
-
-    void pack(outBuffer& o) const final
-    {
-        data_base::pack(o);
-        o<<1;
-        o<<balance<<contract_deposits;
-    }
-    void unpack(inBuffer& o) final
-    {
-        data_base::unpack(o);
-        auto v=o.get_PN();
-        o>>balance>>contract_deposits;
-    }
-    std::string dump() final
-    {
-        std::ostringstream o;
-        // o<<"ADDRESS: "  << base16::encode(address.addr) << std::endl;
-        o<< std::endl;
-
-
-        // o<< std::endl;
-
-
-        return o.str();
-    }
-
-};
-struct bc_user_state: public data_base
-{
-
-    bc_user_state(Cellable* p): data_base(hsh::bc_user_state,p, 0,-1) {
+    bc_address_state(Cellable* p): data_base(hsh::bc_address_state,p, 0,-1) {
         nonce=0;
-        // balance=0;
     }
-    private:
-    // BigInt balance;
+    // private:
     uint64_t nonce;
+    BigInt balance;
     public:
-    // BigInt getBalance()
-    // {
-    //     M_LOCK(parent->mx);
-    //     // return balance;
-    // }
-    // void addBalance(const BigInt &n)
-    // {
-    //     M_LOCK(parent->mx);
-    //     balance+=n;
-    // }
-    // void setBalance(const BigInt &n)
-    // {
-    //     M_LOCK(parent->mx);
-    //     balance=n;
-    // }
-    // void subBalance(const BigInt &n)
-    // {
-    //     M_LOCK(parent->mx);
-    //     balance-=n;
-    // }
+    data_base * create(Cellable* _parent) final
+    {
+        return new bc_address_state(_parent);
+    }
     uint64_t getNonce()
     {
         M_LOCK(parent->mx);
@@ -125,17 +85,29 @@ struct bc_user_state: public data_base
         data_base::pack(o);
         o<<1;
         o<<nonce;
+        o<<balance;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
         o>>nonce;
+        o>>balance;
+    }
+    void copy_from(data_base* s) final
+    {
+        data_base::copy_from(s);
+        auto *ss=dynamic_cast<bc_address_state*> (s);
+        if(!ss)
+            throw CommonError("dynamic cast error");
+
+        nonce=ss->nonce;
+        balance=ss->balance;
     }
     std::string dump() final;
 
 };
-
+// #endif
 struct bc_node: public data_base
 {
 
@@ -151,6 +123,26 @@ struct bc_node: public data_base
     std::map<ADDRESS_id /*user*/, BigInt> stakes;
     int missed_rounds = 0;
     public:
+    data_base * create(Cellable* _parent) final
+    {
+        return new bc_node(_parent);
+    }
+    void copy_from(data_base* s) final
+    {
+        data_base::copy_from(s);
+
+        auto *ss=dynamic_cast<bc_node*> (s);
+                if(!ss)
+            throw CommonError("dynamic cast error");
+
+        name_=ss->name_;
+        owner_address=ss->owner_address;
+        bls_pk=ss->bls_pk;
+        ed_pk=ss->ed_pk;
+        ip=ss->ip;
+        stakes=ss->stakes;
+        missed_rounds=ss->missed_rounds;
+    }
     NodeElement getElement()
     {
         NodeElement n;
@@ -279,38 +271,54 @@ struct bc_values: public data_base
 
 
 bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
-        fees["contract_deploy"]=BigInt(5000);
-        fees["contract_transfer"]=BigInt(1000);
-        fees["node_create"]=BigInt(20000);
-        fees["node_update"]=BigInt(10000);
-        fees["node_enable"]=BigInt(5000);
-        fees["node_unstake"]=BigInt(2000);
-        fees["node_stake"]=BigInt(2000);
-        fees["mint"]=BigInt(95);
-        fees["transfer"]=BigInt(1000);
+        gas["contract_deploy"]=BigInt(5000);
+        gas["contract_transfer"]=BigInt(1000);
+        gas["node_create"]=BigInt(20000);
+        gas["node_update"]=BigInt(10000);
+        gas["node_enable"]=BigInt(5000);
+        gas["node_unstake"]=BigInt(2000);
+        gas["node_stake"]=BigInt(2000);
+        gas["mint"]=BigInt(95);
+        gas["transfer"]=BigInt(1000);
     }
-    std::map<std::string,BigInt> fees;
+    std::map<std::string,BigInt> gas;
     std::set<ADDRESS_id> emitters_bin;
-    BigInt getFee(const std::string &fee_type) const
+    data_base * create(Cellable* _parent) final
     {
-        auto it=fees.find(fee_type);
-        if(it!=fees.end())
+        return new bc_values(_parent);
+    }
+    void copy_from(data_base* s) final
+    {
+        data_base::copy_from(s);
+
+        auto *ss=dynamic_cast<bc_values*> (s);
+                if(!ss)
+            throw CommonError("dynamic cast error");
+
+        gas=ss->gas;
+        emitters_bin=ss->emitters_bin;
+    }
+
+    BigInt getGas(const std::string &gas_type) const
+    {
+        auto it=gas.find(gas_type);
+        if(it!=gas.end())
             return it->second;
-        throw CommonError("fee '%s' not found", fee_type.c_str());
+        throw CommonError("gas '%s' not found", gas_type.c_str());
         return BigInt(0);
     }
     void pack(outBuffer& o) const final
     {
         // cost.pack(o);
         o<<1;
-        o<<fees<<emitters_bin;
+        o<<gas<<emitters_bin;
     }
     void unpack(inBuffer& o) final
     {
         // cost.unpack(o);
         auto v=o.get_PN();
 
-        o>>fees>>emitters_bin;
+        o>>gas>>emitters_bin;
     }
     std::string dump() final;
 
@@ -324,6 +332,21 @@ struct bc_epoch: public data_base
     }
     EPOCH_id epoch;
     std::string prev_lc;
+    data_base * create(Cellable* _parent) final
+    {
+        return new bc_epoch(_parent);
+    }
+    void copy_from(data_base* s) final
+    {
+        data_base::copy_from(s);
+
+        auto *ss=dynamic_cast<bc_epoch*> (s);
+        if(!ss)
+            throw CommonError("dynamic cast error");
+
+        epoch=ss->epoch;
+        prev_lc=ss->prev_lc;
+    }
     void pack(outBuffer& o) const final
     {
         // cost.pack(o);
@@ -356,16 +379,16 @@ struct root_data: public Cellable
     {
     }
     Mutex state_mutex;
-    void getDiff(cdiff& out, const EPOCH_id &epoch);
-    void apply_diff(const cdiff& out);
+    // void getDiff(cdiff& out, const EPOCH_id &epoch);
+    // void apply_diff(const cdiff& out);
 
     std::vector<std::string> getContractPath(const CONTRACT_id &name);
     std::vector<std::string> getNodePath(const NODE_id &name);
-    std::vector<std::string> getUserPath(const ADDRESS_id &addr);
-    std::vector<std::string> getUserStatePath(const ADDRESS_id &addr);
+    std::vector<std::string> getBalancePath(const ADDRESS_id &addr);
+    std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
 
     REF_getter<bc_contract> getContract(const CONTRACT_id &name);
-    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const REF_getter<fee_calcer>& bca, const EPOCH_id& epoch);
+    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const EPOCH_id& epoch);
 
     REF_getter<bc_values> getValues();
     REF_getter<bc_values> checkValues();
@@ -374,10 +397,14 @@ struct root_data: public Cellable
 
 
 
-    REF_getter<bc_user> getUser(const ADDRESS_id &pk);
+    // REF_getter<bc_balance> getBalance(const ADDRESS_id &pk);
+    // REF_getter<bc_balance> getBalanceClone(const ADDRESS_id &addr);
 
-    REF_getter<bc_user_state> getUserState(const ADDRESS_id &pk);
-    REF_getter<bc_user_state>   checkUserState(const ADDRESS_id &pk);
+
+    REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk);
+    // REF_getter<bc_address_state> getAddressStateClone(const ADDRESS_id &addr);
+
+    REF_getter<bc_address_state>   checkAddressState(const ADDRESS_id &pk);
 
 
     // std::vector<NODE_id> getNodesNames();
@@ -385,7 +412,7 @@ struct root_data: public Cellable
 
 
     REF_getter<bc_node> getNode(const NODE_id &name);
-    REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const EPOCH_id& epoch);
+    REF_getter<bc_node> addNode(const NODE_id &name, const EPOCH_id& epoch);
 
 
 

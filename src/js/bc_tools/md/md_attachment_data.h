@@ -42,7 +42,7 @@ namespace MsgData
 
         }
         EmitNode blockRoot;
-        std::map<ADDRESS_id,BigInt> fees;
+        std::map<ADDRESS_id,BigInt> gas;
         std::map<NODE_id,BigInt> rewards;
         // std::vector<std::string> emitted_events;
 
@@ -50,19 +50,19 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<fees<<rewards<<blockRoot;
+            b<<gas<<rewards<<blockRoot;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>fees>>rewards>>blockRoot;
+            b>>gas>>rewards>>blockRoot;
         }
 
         void update(Blake2bHasher &h) const
         {
             blockRoot.update(h);
-            for(auto &z: fees)
+            for(auto &z: gas)
             {
                 h.update(z.first.addr);
                 h.update(z.second.toString());

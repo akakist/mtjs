@@ -1,4 +1,4 @@
-#include "xyjson_to_quickjs.hpp"
+#include "yyjson_to_quickjs.h"
 #include <cstring>
 #include <cmath>
 
@@ -8,10 +8,10 @@
  * @param val Значение xyjson для конвертации
  * @return JSValue - результат конвертации
  */
-JSValue XYJsonToQuickJS::convert(const yyjson::Value& val) {
+JSValue YYJsonToQuickJS::convert( yyjson_val* val) {
     // Получаем сырой указатель на структуру yyjson
     // xyjson::Value хранит внутри себя yyjson_val*
-    yyjson_val* raw_val = val.get();
+     yyjson_val* raw_val = val;
 
     // Проверяем, что указатель валидный
     if (!raw_val) {
@@ -57,7 +57,7 @@ JSValue XYJsonToQuickJS::convert(const yyjson::Value& val) {
  * @param val Указатель на yyjson_val (должен быть типа YYJSON_TYPE_OBJ)
  * @return JSValue - объект JavaScript
  */
-JSValue XYJsonToQuickJS::convertObject(yyjson_val* val) {
+JSValue YYJsonToQuickJS::convertObject(yyjson_val* val) {
     // Проверяем, что передан именно объект
     if (!val || yyjson_get_type(val) != YYJSON_TYPE_OBJ) {
         addError("Ошибка: ожидался JSON объект");
@@ -95,7 +95,7 @@ JSValue XYJsonToQuickJS::convertObject(yyjson_val* val) {
 
         // Рекурсивно конвертируем значение
         // Для этого создаем временный объект xyjson::Value из сырого указателя
-        JSValue js_value = convert(yyjson::Value(value));
+        JSValue js_value = convert(value);
 
         // Проверяем, не произошла ли ошибка при конвертации
         if (JS_IsException(js_value)) {
@@ -124,7 +124,7 @@ JSValue XYJsonToQuickJS::convertObject(yyjson_val* val) {
  * @param val Указатель на yyjson_val (должен быть типа YYJSON_TYPE_ARR)
  * @return JSValue - массив JavaScript
  */
-JSValue XYJsonToQuickJS::convertArray(yyjson_val* val) {
+JSValue YYJsonToQuickJS::convertArray(yyjson_val* val) {
     // Проверяем, что передан именно массив
     if (!val || yyjson_get_type(val) != YYJSON_TYPE_ARR) {
         addError("Ошибка: ожидался JSON массив");
@@ -149,7 +149,7 @@ JSValue XYJsonToQuickJS::convertArray(yyjson_val* val) {
     // Обходим все элементы массива
     while ((item = yyjson_arr_iter_next(&iter))) {
         // Рекурсивно конвертируем элемент
-        JSValue js_item = convert(yyjson::Value(item));
+        JSValue js_item = convert(item);
 
         // Проверяем, не произошла ли ошибка
         if (JS_IsException(js_item)) {
@@ -174,7 +174,7 @@ JSValue XYJsonToQuickJS::convertArray(yyjson_val* val) {
  * @param val Указатель на yyjson_val (должен быть типа YYJSON_TYPE_STR)
  * @return JSValue - строка JavaScript
  */
-JSValue XYJsonToQuickJS::convertString(yyjson_val* val) {
+JSValue YYJsonToQuickJS::convertString(yyjson_val* val) {
     // Проверяем, что передан именно строка
     if (!val || yyjson_get_type(val) != YYJSON_TYPE_STR) {
         addError("Ошибка: ожидалась JSON строка");
@@ -204,7 +204,7 @@ JSValue XYJsonToQuickJS::convertString(yyjson_val* val) {
  * @param val Указатель на yyjson_val (должен быть типа YYJSON_TYPE_NUM)
  * @return JSValue - число JavaScript
  */
-JSValue XYJsonToQuickJS::convertNumber(yyjson_val* val) {
+JSValue YYJsonToQuickJS::convertNumber(yyjson_val* val) {
     // Проверяем, что передан именно число
     if (!val || yyjson_get_type(val) != YYJSON_TYPE_NUM) {
         addError("Ошибка: ожидалось JSON число");
@@ -250,7 +250,7 @@ JSValue XYJsonToQuickJS::convertNumber(yyjson_val* val) {
  * @param val Указатель на yyjson_val (должен быть типа YYJSON_TYPE_BOOL)
  * @return JSValue - булево JavaScript
  */
-JSValue XYJsonToQuickJS::convertBoolean(yyjson_val* val) {
+JSValue YYJsonToQuickJS::convertBoolean(yyjson_val* val) {
     // Проверяем, что передан именно булево
     if (!val || yyjson_get_type(val) != YYJSON_TYPE_BOOL) {
         addError("Ошибка: ожидалось JSON булево значение");

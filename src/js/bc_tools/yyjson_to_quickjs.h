@@ -2,7 +2,7 @@
 #define XYJSON_TO_QUICKJS_HPP
 
 #include <quickjs/quickjs.h>
-#include <xyjson.h>
+#include <yyjson.h>
 #include <string>
 #include <vector>
 
@@ -12,7 +12,7 @@
  * Этот класс обеспечивает рекурсивную конвертацию JSON данных из формата xyjson
  * в объекты JavaScript, понятные для движка QuickJS.
  */
-class XYJsonToQuickJS {
+class YYJsonToQuickJS {
 private:
     JSContext* ctx;                    // Контекст QuickJS
     std::vector<std::string> errors;   // Хранилище ошибок конвертации
@@ -22,7 +22,7 @@ public:
      * @brief Конструктор
      * @param context Контекст QuickJS
      */
-    XYJsonToQuickJS(JSContext* context) : ctx(context) {}
+    YYJsonToQuickJS(JSContext* context) : ctx(context) {}
 
     /**
      * @brief Получить список ошибок
@@ -44,7 +44,7 @@ public:
      * @param val Значение xyjson для конвертации
      * @return JSValue - объект JavaScript или JS_EXCEPTION при ошибке
      */
-    JSValue convert(const yyjson::Value& val);
+    JSValue convert(yyjson_val* val);
 
 private:
     /**

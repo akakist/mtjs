@@ -9,14 +9,15 @@ struct t_params
     REF_getter<root_data> root;
     REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
     REF_getter<MsgData::attachment_data> att_data;
-    _feeCalcers feeCalcers;
-    std::map<REF_getter<data_base>, std::set<REF_getter<fee_calcer>> > calcers;
-    std::map<ADDRESS_id, BigInt> fee;
-
-    void addCalcer(const REF_getter<data_base>& d,const REF_getter<fee_calcer>& c)
-    {
-        calcers[d].insert(c);
-    }
+    // _feeCalcers feeCalcers;
+    // std::map<REF_getter<data_base>, std::set<REF_getter<fee_calcer>> > calcers;
+    // std::map<ADDRESS_id, BigInt> fee;
+    BigInt gas_remains;
+    BigInt value;
+    // void addCalcer(const REF_getter<data_base>& d,const REF_getter<fee_calcer>& c)
+    // {
+    //     calcers[d].insert(c);
+    // }
 
 
     void emit_command(const THASH_id& txId, int seqId, const std::string& command, const char* fmt, ...)
@@ -31,6 +32,7 @@ struct t_params
         }
         va_end(ap);
         att_data->blockRoot.children[base16::encode(txId.container)].children[std::to_string(seqId)].emits.push_back({command,overflow?"\"overflow\"":str});
+        logErr2("emit_command %s %s %d %s", command.c_str(), base16::encode(txId.container).c_str(), seqId, str);
     }
     void emit_tx(const THASH_id& txId, const std::string& command, const char* fmt, ...)
     {
@@ -44,6 +46,7 @@ struct t_params
         }
         va_end(ap);
         att_data->blockRoot.children[base16::encode(txId.container)].emits.push_back({command,overflow?"\"overflow\"":str});
+        logErr2("emit_tx %s %s %s", command.c_str(), base16::encode(txId.container).c_str(), str);
     }
     void emit_block(const std::string& command,const char* fmt, ...)
     {
@@ -57,6 +60,7 @@ struct t_params
         }
         va_end(ap);
         att_data->blockRoot.emits.push_back({command,overflow?"\"overflow\"":str});
+        logErr2("emit_block %s %s", command.c_str(), str);
     }
     // void logError(const THASH_id& txId, int seqId, const char* fmt, ...)
     // {

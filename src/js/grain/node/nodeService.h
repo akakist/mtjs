@@ -42,7 +42,7 @@
 #include "t_params.h"
 #include "cached_state.h"
 #include "contract_rt.h"
-#define BROADCAST_ACK_TIMEDOUT_SEC 0.2
+#include <yyjson.h>
 // #define HEART_BEAT_INTERVAL_SEC 5
 
 enum State
@@ -224,8 +224,9 @@ namespace Node
     
         bool verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate>& lc);
 
-        void execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress,
-                         const std::string &tx_cmds, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch);
+        void execute_transaction(const REF_getter<MsgData::TX> &tx, t_params &t, const ADDRESS_id &senderAddress,
+                         const EPOCH_id& epoch);
+        std::optional<std::string> execute_transaction2(yyjson_val *txarr, t_params &t, const ADDRESS_id &senderAddress, const EPOCH_id& epoch);
 
 
         REF_getter<root_data> root=nullptr;
@@ -258,7 +259,7 @@ namespace Node
 
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::optional<std::string> load_contract(const CONTRACT_id& contract);
-        std::optional<std::string> execute_contract(const CONTRACT_id& ct, const std::string & method, const yyjson::Value& params);
+        std::optional<std::string> execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params);
 
         JSRuntime *contract_runtime=NULL;
 

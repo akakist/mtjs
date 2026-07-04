@@ -53,8 +53,8 @@ tree.h
 TypedStr.h
 md/md_LcEnvelopeREQ.h
 get_tariff.h
-xyjson_to_quickjs.cpp
-xyjson_to_quickjs.hpp
+yyjson_to_quickjs.cpp
+yyjson_to_quickjs.h
 )
 
 

@@ -23,7 +23,7 @@
 
 #include "sv.h"
 #include "md/md_GetUserNonceRSP.h"
-#include "xyjson.h"
+#include "yyjson.h"
 #include <nlohmann/json.hpp>
 #include "js_tools.h"
 extern "C"
@@ -132,50 +132,91 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base> &e)
     switch (ID)
     {
     case systemEventEnum::startService:
+        XTRY;
         return on_startService((const systemEvent::startService *)e.get());
+        XPASS;
     case timerEventEnum::TickTimer:
+        XTRY;
         return TickTimer((const timerEvent::TickTimer *)e.get());
+        XPASS;
     case httpEventEnum::RequestIncoming:
+        XTRY;
         return RequestIncoming((const httpEvent::RequestIncoming *)e.get());
+        XPASS;
     case httpEventEnum::RequestStartChunking:
+        XTRY;
         return RequestStartChunking((const httpEvent::RequestStartChunking *)e.get());
+        XPASS;
     case httpEventEnum::RequestChunkReceived:
+        XTRY;
         return RequestChunkReceived((const httpEvent::RequestChunkReceived *)e.get());
+        XPASS;
     case httpEventEnum::RequestChunkingCompleted:
+        XTRY;
         return RequestChunkingCompleted((const httpEvent::RequestChunkingCompleted *)e.get());
+        XPASS;
     case httpEventEnum::WSDisaccepted:
+        XTRY;
         return WSDisaccepted((const httpEvent::WSDisaccepted *)e.get());
+        XPASS;
     case httpEventEnum::WSDisconnected:
+        XTRY;
         return WSDisconnected((const httpEvent::WSDisconnected *)e.get());
+        XPASS;
     case httpEventEnum::WSTextMessage:
+        XTRY;
         return WSTextMessage((const httpEvent::WSTextMessage *)e.get());
+        XPASS;
     case socketEventEnum::Connected:
+        XTRY;
         return Connected((const socketEvent::Connected *)e.get());
+        XPASS;
     case socketEventEnum::Disconnected:
+        XTRY;
         return Disconnected((const socketEvent::Disconnected *)e.get());
+        XPASS;
     case socketEventEnum::StreamRead:
+        XTRY;
         return StreamRead((const socketEvent::StreamRead *)e.get());
+        XPASS;
     case socketEventEnum::NotifyOutBufferEmpty:
+        XTRY;
         return NotifyOutBufferEmpty((const socketEvent::NotifyOutBufferEmpty *)e.get());
+        XPASS;
     case timerEventEnum::TickAlarm:
+        XTRY;
         return TickAlarm((const timerEvent::TickAlarm *)e.get());
+        XPASS;
     case mtjsEventEnum::AsyncExecuted:
+        XTRY;
         return AsyncExecuted((const mtjsEvent::AsyncExecuted *)e.get());
-
+        XPASS;
     case mtjsEventEnum::Eval:
+        XTRY;
         return Eval((const mtjsEvent::Eval *)e.get());
+        XPASS;
     case mtjsEventEnum::EmitterData:
+        XTRY;
         return EmitterData((const mtjsEvent::EmitterData *)e.get());
+        XPASS;
     case telnetEventEnum::CommandEntered:
+        XTRY;
         return CommandEntered((const telnetEvent::CommandEntered *)e.get());
+        XPASS;
     case bcEventEnum::ClientMsgReply:
+        XTRY;
         return ClientMsgReply((const bcEvent::ClientMsgReply *)e.get());
+        XPASS;
 
     case bcEventEnum::ClientTxSubscribeRSP:
+        XTRY;
         return ClientTxSubscribeRSP((const bcEvent::ClientTxSubscribeRSP *)e.get());
+        XPASS;
 
     case bcEventEnum::AddTxRSP:
+        XTRY;
         return AddTxRSP((const bcEvent::AddTxRSP *)e.get());
+        XPASS;
 
 #ifdef WEBDUMP
     case webHandlerEventEnum::RequestIncoming:
@@ -190,15 +231,25 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base> &e)
         switch (IDC)
         {
         case bcEventEnum::AddTxRSP:
+            XTRY;
             return AddTxRSP((const bcEvent::AddTxRSP *)E->e.get());
+            XPASS;
         case mtjsEventEnum::mtjsRpcREQ:
+            XTRY;
             return mtjsRpcREQ((mtjsEvent::mtjsRpcREQ *)E->e.get(), E->esi);
+            XPASS;
         case mtjsEventEnum::mtjsRpcRSP:
+            XTRY;
             return mtjsRpcRSP((mtjsEvent::mtjsRpcRSP *)E->e.get(), E->esi);
+            XPASS;
         case bcEventEnum::ClientMsgReply:
+            XTRY;
             return ClientMsgReply((const bcEvent::ClientMsgReply *)E->e.get());
+            XPASS;
         case bcEventEnum::ClientTxSubscribeRSP:
+            XTRY;
             return ClientTxSubscribeRSP((const bcEvent::ClientTxSubscribeRSP *)E->e.get());
+            XPASS;
 
         default:
             logErr2("unhandled event %s %s %d", iUtils->genum_name(E->e->id), __func__, __LINE__);
@@ -215,15 +266,25 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base> &e)
         switch (IDA)
         {
         case bcEventEnum::AddTxRSP:
+            XTRY;
             return AddTxRSP((const bcEvent::AddTxRSP *)E->e.get());
+            XPASS;
         case mtjsEventEnum::mtjsRpcREQ:
+            XTRY;
             return mtjsRpcREQ((mtjsEvent::mtjsRpcREQ *)E->e.get(), E->esi);
+            XPASS;
         case mtjsEventEnum::mtjsRpcRSP:
+            XTRY;
             return mtjsRpcRSP((mtjsEvent::mtjsRpcRSP *)E->e.get(), E->esi);
+            XPASS;
         case bcEventEnum::ClientMsgReply:
+            XTRY;
             return ClientMsgReply((const bcEvent::ClientMsgReply *)E->e.get());
+            XPASS;
         case bcEventEnum::ClientTxSubscribeRSP:
+            XTRY;
             return ClientTxSubscribeRSP((const bcEvent::ClientTxSubscribeRSP *)E->e.get());
+            XPASS;
         default:
             logErr2("unhandled event %s %s %d", iUtils->genum_name(E->e->id), __func__, __LINE__);
             break;
@@ -242,6 +303,7 @@ bool MTJS::Service::handleEvent(const REF_getter<Event::Base> &e)
 
 void MTJS::Service::checkForExit()
 {
+    XTRY;
     executePending();
     if (getPendingCount())
         return;
@@ -267,6 +329,7 @@ void MTJS::Service::checkForExit()
         return;
     stop();
     exit(0);
+    XPASS;
 }
 
 JSValue makeError(JSContext *ctx, int errid, const char *errstr)
@@ -327,6 +390,7 @@ bool MTJS::Service::TickAlarm(const timerEvent::TickAlarm *e)
 }
 void MTJS::Service::executePending()
 {
+    XTRY;
     for (;;)
     {
         int r = JS_ExecutePendingJob(js_rt, NULL);
@@ -338,13 +402,16 @@ void MTJS::Service::executePending()
         if (r == 0)
             break;
     }
+    XPASS;
 }
 bool MTJS::Service::TickTimer(const timerEvent::TickTimer *e)
 {
+    XTRY;
     MUTEX_INSPECTOR;
     JSScope<10, 10> scope(js_ctx);
     if (e->tid == Timers::TIMER_INTERVAL)
     {
+        XTRY;
         MUTEX_INSPECTOR;
         TimerTask *t = (TimerTask *)e->cookie.get();
         // logErr2("TickTimer: %lld", std::stoll(e->data->container));
@@ -360,16 +427,19 @@ bool MTJS::Service::TickTimer(const timerEvent::TickTimer *e)
         scope.addValue(func_result);
         qjs::checkForException(js_ctx, func_result, "TickTimer: JS_Call");
         return true;
+        XPASS;
     }
     else if (e->tid == Timers::TIMER_POLL)
     {
+        XTRY;
         MUTEX_INSPECTOR;
         executePending();
         checkForExit();
-
+        XPASS;
         return true;
     }
     return false;
+    XPASS;
 }
 
 JSValue loadModule(JSContext *ctx, const std::string &moduleCode)
@@ -479,7 +549,7 @@ bool MTJS::Service::CommandEntered(const telnetEvent::CommandEntered *e)
 bool MTJS::Service::AddTxRSP(const bcEvent::AddTxRSP* e)
 {
 
-
+MUTEX_INSPECTOR;
 
     auto it = opaque.node_req_promises.find(e->tx_hash.container);
     if (it == opaque.node_req_promises.end())
@@ -524,9 +594,9 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
     b->unpack(in);
     switch(p)
     {
-    case msgid::GetUserNonceRSP:
+    case msgid::getAddressStateRSP:
     {
-        auto *rs=(MsgData::GetUserNonceRSP*) b.get();
+        auto *rs=(MsgData::getAddressStateRSP*) b.get();
         auto *ctx = it->second.ctx;
         JSScope<20, 20> scope(it->second.ctx);
         auto obj = JS_NewObject(ctx);
@@ -617,9 +687,6 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     MUTEX_INSPECTOR;
     XTRY;
 
-    // inBuffer in(e->msg);
-    // REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore();
-    // pb->unpack2(in);
     for (size_t ti = 0; ti < e->blockStore->validateBlockREQ->transaction_bodies.size(); ti++)
     {
         XTRY;
@@ -638,11 +705,12 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
                 if(tx_it==e->att_data->blockRoot.children.end())
                     throw CommonError("if(tx_it==e->att_data->blockRoot.children.end())");
                 JSValue obj2=emit_node_to_js(js_ctx, tx_it->second);
+                scope.addValue(obj2);
                 JSValue argv1[1];
                 argv1[0] = obj2;
                 JSValue func_result = JS_Call(js_ctx, it->second.get(), global_obj, 1, argv1);
                 scope.addValue(func_result);
-                qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
+                qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP1: JS_Call");
                 opaque.node_tx_cb.erase(it);
 
             }
@@ -657,7 +725,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
             argv[0] = obj;
             JSValue func_result = JS_Call(js_ctx, opaque.tx_subscription_cb->get(), global_obj, 1, argv);
             scope.addValue(func_result);
-            qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
+            qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP2: JS_Call");
             XPASS;
         }
         XPASS;

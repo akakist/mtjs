@@ -28,16 +28,16 @@ void init_root(const REF_getter<root_data> &r)
         v->setDirty(e);
     }
     // u_root pk
-    if(!r->checkUserState(u_root_address).valid())
+    if(!r->checkAddressState(u_root_address).valid())
     {
-        auto u=r->getUser(u_root_address);
+        auto u=r->getAddressState(u_root_address);
         if(!u.valid())
         {
             throw CommonError("cannot find root user state");
         }
         {
             M_LOCK(u->parent->mx);
-            u->balance+=1000000;
+            u->balance+=100000000;
         }
         u->setDirty(e);
 
@@ -62,7 +62,7 @@ void init_root(const REF_getter<root_data> &r)
         auto n=r->getNode(name);
         if(n.valid()) continue;
 
-        REF_getter<bc_node> nn=r->addNode(name,NULL,e);
+        REF_getter<bc_node> nn=r->addNode(name,e);
         blst_cpp::PublicKey bls_pk;
         bls_pk.deserializeHexStr(getenv2(keys[i].first));
         nn->init(name, u_root_address, bls_pk, base16::decode(getenv2(keys[i].second)), "127.0.0.1:"+std::to_string(2300+i));

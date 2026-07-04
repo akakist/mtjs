@@ -41,7 +41,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     }
 
     BigInt hb_staked = 0;
-    if (iUtils->getNow() > li.confirm_leader_sent + _1sec)
+    if (iUtils->getNow() > li.confirm_leader_sent + CONFIRM_LEADER_SENT_TIMEFRAME *_1sec)
     {
         blst_cpp::AggregateSignature sig_agg;
         std::vector<blst_cpp::PublicKey> pk_agg;
@@ -71,7 +71,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     // logNode()
     auto pers = (hb_staked.toDouble()) / total_staked.toDouble();
 
-    if (pers > QUORUM && (iUtils->getNow() > li.confirm_leader_sent+ _1sec))
+    if (pers > QUORUM && (iUtils->getNow() > li.confirm_leader_sent + CONFIRM_LEADER_SENT_TIMEFRAME * _1sec))
     {
         li.confirm_leader_sent = iUtils->getNow();
         {
@@ -213,7 +213,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
                     /// главное - нет затыкания протокола
                     logNode("if(prev_root_hash_Z!=h->prev_root_hash)    prev_root_hash_Z %s h->prev_root_hash %s from node %s", prev_root_hash_Z.str().c_str(), h->prev_root_hash_1.str().c_str(),src_node.container.c_str());
                     auto& ci=cli_leader_info[prev_root_hash_Z];
-                    if(iUtils->getNow() >  ci.heart_beat_sent+_1sec)
+                    if(iUtils->getNow() >  ci.heart_beat_sent+ HEART_BEAT_SENT_TIMEFRAME * _1sec)
                     {
                         ci.heart_beat_sent=iUtils->getNow();
                         do_heart_beat();
@@ -236,7 +236,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
                 else
                 {
     
-                    if(iUtils->getNow() > ci.heart_beat_sent +_1sec)
+                    if(iUtils->getNow() > ci.heart_beat_sent + HEART_BEAT_SENT_TIMEFRAME* _1sec)
                     {
     
                         ci.heart_beat_sent=iUtils->getNow();

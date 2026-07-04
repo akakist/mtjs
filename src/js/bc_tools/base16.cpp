@@ -36,13 +36,17 @@ std::string base16::decode(const std::vector<uint8_t>& data)
 {
     return decode((const uint8_t*)data.data(), data.size());
 }
-
+void throw_hex()
+{
+    printf("aaa");
+}
 std::string base16::decode(const uint8_t* data, size_t length)
 {
-
+    
     if (length % 2 != 0) {
+        throw_hex();
         throw std::invalid_argument("Hex string length must be even "
-            +std::string((char*)data, length));
+            +std::string((char*)data, length) +_DMI());
     }
 
     std::string result;

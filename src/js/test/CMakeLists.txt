@@ -3,12 +3,10 @@
 #add_executable(blscc4
 # blscc4.cpp
 #)
- add_executable(keygen
-  keygen.cpp
-    ../bc_tools/base16.cpp
-#  base16.cpp
-#  mcrypto.cpp
- )
+# add_executable(keygen
+#  keygen.cpp
+#    ../bc_tools/base16.cpp
+# )
  add_executable(keygen2
   keygen2.cpp
 #  base16.cpp
@@ -19,7 +17,7 @@
 #  base16.cpp
 #  mcrypto.cpp
  )
-target_link_libraries(keygen blst crypto sodium)
+#target_link_libraries(keygen blst crypto sodium)
 target_link_libraries(keygen2 blst crypto sodium)
 target_link_libraries(test_qjs quickjs)
 # add_executable(client

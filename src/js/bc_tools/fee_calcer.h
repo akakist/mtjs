@@ -3,7 +3,7 @@
 #include "REF.h"
 #include "bigint.h"
 #include "ADDRESS_id.h"
-
+#ifdef KALL
 struct fee_calcer: public Refcountable
 {
 private:
@@ -47,3 +47,4 @@ struct _feeCalcers
         calcers.clear();
     }
 };
+#endif

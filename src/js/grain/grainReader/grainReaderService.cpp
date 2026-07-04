@@ -148,14 +148,14 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
 
     switch(p)
     {
-    case msgid::GetUserNonceREQ:
+    case msgid::getAddressStateREQ:
     {
         ADDRESS_id addr;
-        auto pp=(MsgData::GetUserNonceREQ*) b.get();
+        auto pp=(MsgData::getAddressStateREQ*) b.get();
         // addr.container=blake2b_hash(pp->user_pk_bin_ed).container;
-        auto u = root->getUserState(pp->user_address);
+        auto u = root->getAddressState(pp->user_address);
 
-        REF_getter<MsgData::GetUserNonceRSP> rsp=new MsgData::GetUserNonceRSP;
+        REF_getter<MsgData::getAddressStateRSP> rsp=new MsgData::getAddressStateRSP;
         // rsp->balance=u->getBalance();
         rsp->nonce=u->getNonce();
         passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
