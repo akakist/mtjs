@@ -49,7 +49,7 @@
 #include "md/md_LcREQ.h"
 #include "md/md_LcRSP.h"
 #include "tr_exec.h"
-#include "xyjson_to_quickjs.hpp"
+#include "yyjson_to_quickjs.h"
 #include "js_tools.h"
 bool Node::Service::on_startService(const systemEvent::startService *)
 {
@@ -135,7 +135,10 @@ void Node::Service::collectTransactions()
     for (auto &z : transaction_pool_of_leader)
     {
         std::string &pk = z.second->pk_ed_bin;
-        auto &nonce=z.second->nonce;
+        uint64_t nonce;
+        auto err=z.second->getNonce(nonce);
+        if(err)
+            throw CommonError(err->c_str());
         ordered[pk][nonce].push_back(z.second);
     }
     transaction_pool_of_leader.clear();
@@ -589,9 +592,12 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::Le
             }
             if (!t_err)
             {
-                if (u->getNonce() != tt->nonce)
+                uint64_t nonce;
+                auto err=tt->getNonce(nonce);
+                if(err) throw CommonError(*err);
+                if (u->getNonce() != nonce)
                 {
-                    logNode("invalid nonce, expected %lld got %lld", u->getNonce(), tt->nonce);
+                    logNode("invalid nonce, expected %lld got %lld", u->getNonce(), nonce);
                     t_err = "invalid nonce";
 
                 }
@@ -602,7 +608,7 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::Le
                         logNode("if(!lc.valid()) AA");
                     if(!lc->heart_beat.valid())
                         logNode("if(!lc->heart_beat.valid()) AA");
-                    execute_transaction(tt->getHash(), t, senderAddress, tj, by, lc->heart_beat->new_epoch);
+                    execute_transaction(tt->getHash(), t, senderAddress, tt, by, lc->heart_beat->new_epoch);
                     u->incNonce();
                     u->setDirty(lc->heart_beat->new_epoch);
 
@@ -970,66 +976,94 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
     return true;
 }
 
-void Node::Service::execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, const std::string &tx_cmds, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch)
+void Node::Service::execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, 
+    const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
-    yyjson::Document doc(tx_cmds);
-    yyjson::Value root = doc.root();
+    // yyjson::Document doc(tx_cmds);
+    yyjson_val *jroot=yyjson_doc_get_root(tx->doc);
 
-    if(root.isArray())
+    yyjson_val * j_tx = yyjson_obj_get(jroot,"tx");
+
+    if(!yyjson_is_arr(j_tx))
+        throw CommonError("if(!yyjson_is_arr(root))");
+    yyjson_arr_iter iter;
+    yyjson_arr_iter_init(j_tx, &iter);    
+    // if(root.isArray())
+    uint32_t index = 0;
+    yyjson_val* item;
     {
         MUTEX_INSPECTOR;
-        for (int ii=0; ii < root.size(); ii++)
+        while ((item = yyjson_arr_iter_next(&iter)))
         {
             MUTEX_INSPECTOR;
             bool err=false;
-            yyjson::Value item = root[ii];
-            auto contract = item/"contract";
-            auto method = item/"method";
-            auto params= item/"params";
-            if(!contract.isString() || !method.isString() || !params.isObject())
+            // yyjson::Value item = root[ii];
+            // auto contract = item/"contract";
+            // auto method = item/"method";
+            // auto params= item/"params";
+                   yyjson_val* contract = yyjson_obj_get(item, "contract");
+            yyjson_val* method = yyjson_obj_get(item, "method");
+            yyjson_val* params = yyjson_obj_get(item, "params");
+            if(contract==NULL || method==NULL || params==NULL)
             {
-                MUTEX_INSPECTOR;
-                t.emit_command(tx_id, ii, "error", 
+                t.emit_command(tx_id, index, "error",
                     R"({"code":-32602,"error":"contract, method, params fields required"})");
-                err=true;
+                index++;
+                continue;
             }
+            if(!yyjson_is_str(contract) || !yyjson_is_str(method) || !yyjson_is_obj(params))
+            {
+                t.emit_command(tx_id, index, "error",
+                    R"({"code":-32602,"error":"contract, method, params fields required"})");
+                index++;
+                continue;
+            }
+            std::string contract_str=yyjson_get_str(contract);
+            std::string method_str=yyjson_get_str(method);
+            // if(!contract.isString() || !method.isString() || !params.isObject())
+            // {
+            //     MUTEX_INSPECTOR;
+            //     t.emit_command(tx_id, ii, "error", 
+            //         R"({"code":-32602,"error":"contract, method, params fields required"})");
+            //     err=true;
+            // }
             // throw CommonError("if(!contract.isString() || !method.isString() || !params.isObject())");
-            if (!err && contract == "root")
+            if (!err && contract_str == "root")
             {
                 MUTEX_INSPECTOR;
                 std::optional<std::string> err;
-                auto meth=method.toString();
+                auto meth=method_str;
                 // logErr2("method %s",meth.c_str());
                 if (meth == "mint")
-                    err = TR::execute_mint(params, t, senderAddress, by, tx_id, ii, epoch);
+                    err = TR::execute_mint(params, t, senderAddress, by, tx_id, index, epoch);
                 else if (meth == "transfer")
-                    err = TR::execute_transfer(params, t, senderAddress, by, tx_id, ii,epoch);
+                    err = TR::execute_transfer(params, t, senderAddress, by, tx_id, index,epoch);
                 else if (meth == "node_create")
-                    err = TR::execute_node_create(params, t, senderAddress, by, tx_id, ii, epoch);
+                    err = TR::execute_node_create(params, t, senderAddress, by, tx_id, index, epoch);
                 else if (meth == "node_update")
-                    err = TR::execute_node_update(params, t, senderAddress, by, tx_id, ii, epoch);
+                    err = TR::execute_node_update(params, t, senderAddress, by, tx_id, index, epoch);
                 else if (meth == "node_stake")
-                    err = TR::execute_node_stake(params, t, senderAddress, by, tx_id, ii, epoch);
+                    err = TR::execute_node_stake(params, t, senderAddress, by, tx_id, index, epoch);
                 else if (meth == "node_unstake")
-                    err = TR::execute_unstake_node(params, t, senderAddress, by, tx_id, ii,epoch);
+                    err = TR::execute_unstake_node(params, t, senderAddress, by, tx_id, index,epoch);
                 else if (meth == "node_enable")
-                    err = TR::execute_node_enable(params, t, senderAddress, by, tx_id, ii,epoch);
+                    err = TR::execute_node_enable(params, t, senderAddress, by, tx_id, index,epoch);
                 else if (meth == "contract_deploy")
-                    err = TR::execute_contract_deploy(params, t, senderAddress, by, tx_id, ii,epoch);
+                    err = TR::execute_contract_deploy(params, t, senderAddress, by, tx_id, index,epoch);
                 else if (meth == "contract_update")
-                    err = TR::execute_contract_update(params, t, senderAddress, by, tx_id, ii,epoch);
+                    err = TR::execute_contract_update(params, t, senderAddress, by, tx_id, index,epoch);
                 else
                 {
                     MUTEX_INSPECTOR;
-                    t.emit_command(tx_id, ii, "error", 
+                    t.emit_command(tx_id, index, "error", 
                         R"({"error":"unhandled method %s for root contract"})", 
-                        method.toString().c_str());
+                        method_str.c_str());
                 }
                 if (err)
                 {
                     MUTEX_INSPECTOR;
-                    t.emit_command(tx_id, ii, "error", 
+                    t.emit_command(tx_id, index, "error", 
                         R"({"error":"%s"})", 
                         err->c_str());                
                 }
@@ -1039,23 +1073,22 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, t_params &t, cons
             {
                 MUTEX_INSPECTOR;
                 CONTRACT_id c;
-                c.container=contract.toString();
-                auto m=method.toString();
-                execute_contract(c,m,params);
+                c.container=contract_str;
+                auto m=method;
+                // execute_contract(c,m,params);
                 /// exec js contract
                 
             }
 
         }
     }
-    else
-    {
-        t.emit_block("error", R"({"code":-32602,"error":"tx body must be array"})");
-        // t.att_data->block_report= {1,"tx body must be array"};
-    }
+    // else
+    // {
+    //     t.emit_block("error", R"({"code":-32602,"error":"tx body must be array"})");
+    //     // t.att_data->block_report= {1,"tx body must be array"};
+    // }
 }
-#include "xyjson_to_quickjs.hpp"
-std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, const yyjson::Value& params)
+std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params)
 {
     auto it=contracts.find(ct);
     if(it==contracts.end())
@@ -1068,7 +1101,7 @@ std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct
             throw CommonError("if(it--contracts.end())");
     }
     JSScope<10, 10> scope(it->second->ctx);
-    XYJsonToQuickJS converter(it->second->ctx);
+    YYJsonToQuickJS converter(it->second->ctx);
     JSValue jspars=converter.convert(params);
     scope.addValue(jspars);
     auto mi=it->second->methods.find(method);

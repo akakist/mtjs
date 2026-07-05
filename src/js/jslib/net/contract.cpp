@@ -204,7 +204,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     REF_getter<MsgData::TX> t = new MsgData::TX;
     t->tx_body = msg;
     t->pk_ed_bin = pk;
-    t->nonce = nonce;
+    // t->nonce = nonce;
     auto hash = t->getHash();
     t->sig_ed_bin = sign_ed(sk, hash.container);
     // auto hash = blake2b_hash(t->tx_body+t->nonce.toString());

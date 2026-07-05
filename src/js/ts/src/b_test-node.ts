@@ -67,7 +67,8 @@ async function exec() {
             // const m=mtjs.tx_sign(tx, sk!);
             // console.log("signed tx:", m);
             i++;
-            const rsp=await mtjs.tx_submit(node,1, JSON.stringify(tx), sk!, nonce,
+            let req={tx:tx, nonce: nonce};
+            const rsp=await mtjs.tx_submit(node,1, JSON.stringify(req), sk!, nonce,
             (obj)=>{
                 console.log("TX REPORT "+JSON.stringify(obj));
             });

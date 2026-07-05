@@ -9,7 +9,7 @@
 #include "NODE_id.h"
 #include "hsh.h"
 #include "md/md_LeaderCertificate.h"
-#include <xyjson.h>
+#include <yyjson.h>
 #include <sstream>
 #include "fee_calcer.h"
 #include "nodeElement.h"
