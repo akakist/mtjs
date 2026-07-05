@@ -131,7 +131,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             throw CommonError("on_get_blocks_rsp: !ba.agg_sig.verify");
         }
         logNode("on_get_blocks_rsp: block verified OK");
-        t_params t(root);
+        b_params t(root);
         t.validateBlockREQ = z->validateBlockREQ;
         auto rh = execute_block(t, z->validateBlockREQ->leader_cert);
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);

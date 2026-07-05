@@ -560,22 +560,22 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
 }
 
 // #include "sql"
-BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::LeaderCertificate> &lc)
+BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     MUTEX_INSPECTOR;
     M_LOCK(root->state_mutex);
     // outBuffer o;
-    for (int ti = 0; ti < t.validateBlockREQ->transaction_bodies.size(); ti++)
+    for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
     {
         MUTEX_INSPECTOR;
         std::optional<std::string> t_err;
-        auto tt=t.validateBlockREQ->transaction_bodies[ti];
+        auto tt=b.validateBlockREQ->transaction_bodies[ti];
         auto tx_hash=tt->getHash();
         auto &pk_bin=tt->pk_ed_bin;
         ADDRESS_id senderAddress;
         senderAddress.addr=blake2b_hash(pk_bin).container;
         auto &tj = tt->tx_body;
-        REF_getter<fee_calcer> by = t.feeCalcers.get(senderAddress);
+        REF_getter<fee_calcer> by = b.feeCalcers.get(senderAddress);
         if (!tt->verify())
         {
             t_err = "verify failed @12";
@@ -608,7 +608,9 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::Le
                         logNode("if(!lc.valid()) AA");
                     if(!lc->heart_beat.valid())
                         logNode("if(!lc->heart_beat.valid()) AA");
-                    execute_transaction(tt->getHash(), t, senderAddress, tt, by, lc->heart_beat->new_epoch);
+                    // t_params t;
+                    // t.senderAddress=senderAddress;
+                    execute_transaction(tt->getHash(),  b, senderAddress, tt, by, lc->heart_beat->new_epoch);
                     u->incNonce();
                     u->setDirty(lc->heart_beat->new_epoch);
 
@@ -616,26 +618,26 @@ BLOCK_id Node::Service::execute_block(t_params &t,  const REF_getter<MsgData::Le
             }
         }
         if (!t_err)
-            t.emit_tx(tx_hash, "result", R"({"success":true})");
+            b.emit_tx(tx_hash, "result", R"({"success":true})");
         else
-            t.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());    
+            b.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());    
     }
 
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
-    calc_fee_rewards_nodes(t, lc);
+    calc_fee_rewards_nodes(b, lc);
     auto newEpoch = root->getEpoch();
     newEpoch->epoch.container += 1;
-    newEpoch->prev_lc = t.validateBlockREQ->leader_cert->getBuffer();
+    newEpoch->prev_lc = b.validateBlockREQ->leader_cert->getBuffer();
     newEpoch->setDirty(lc->heart_beat->new_epoch);
 
     rh=proceed_merkle_on_transaction_pool_hashers(root);
     return rh;
 }
-void Node::Service::calc_fee_rewards_nodes(t_params &t, const REF_getter<MsgData::LeaderCertificate> &lc)
+void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     MUTEX_INSPECTOR;
     std::map<Cellable*, std::set<REF_getter<fee_calcer>>> cc;
-    for(auto & z:t.calcers)
+    for(auto & z:b.calcers)
     {
         auto cell=z.first->parent;
         while(cell)
@@ -666,7 +668,7 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const REF_getter<MsgData
 
 
     BigInt total_fees;
-    for (auto &z : t.feeCalcers.calcers)
+    for (auto &z : b.feeCalcers.calcers)
     {
         auto u = root->getUser(z.first);
         if (!u.valid())
@@ -688,11 +690,11 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const REF_getter<MsgData
         }
         u->setDirty(lc->heart_beat->new_epoch);
         total_fees += z.second->get_fee();
-        t.att_data->fees[z.first] = z.second->get_fee();
-        t.emit_block("fee",R"({"address":"%s","fee":"%s"})",base16::encode(z.first.addr).c_str(),z.second->get_fee().toString().c_str());
+        b.att_data->fees[z.first] = z.second->get_fee();
+        b.emit_block("fee",R"({"address":"%s","fee":"%s"})",base16::encode(z.first.addr).c_str(),z.second->get_fee().toString().c_str());
         z.second->reset();
     }
-    t.emit_block("total_fee",R"({"fee":"%s"})",total_fees.toString().c_str());
+    b.emit_block("total_fee",R"({"fee":"%s"})",total_fees.toString().c_str());
     // iUtils->getNow
     BigInt total_rewards = (total_fees * 9) / 10;
     for (auto &n : lc->nodes)
@@ -716,15 +718,15 @@ void Node::Service::calc_fee_rewards_nodes(t_params &t, const REF_getter<MsgData
         u->setDirty(lc->heart_beat->new_epoch);
         // if (n == this_node_name && amt > 0)
         //     logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
-        t.att_data->rewards[n] = amt;
-        t.emit_block("reward",R"({"node":"%s","amount":"%s"})",n.container.c_str(), amt.toString().c_str());
+        b.att_data->rewards[n] = amt;
+        b.emit_block("reward",R"({"node":"%s","amount":"%s"})",n.container.c_str(), amt.toString().c_str());
     }
     std::set<NODE_id> ns;
     for(auto& z:lc->nodes)
     {
         ns.insert(z);
     }
-    auto nodes=t.root->getAllNodes();
+    auto nodes=b.root->getAllNodes();
     for(auto &n: nodes)
     {
         if(ns.count(n->getName()))
@@ -975,7 +977,7 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     return true;
 }
-std::optional<std::string> Node::Service::execute_tx_commands(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, 
+std::optional<std::string> Node::Service::execute_tx_commands(const THASH_id &tx_id, b_params &b, t_params& t, const ADDRESS_id &senderAddress, 
     const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch,yyjson_val * j_tx)
 {
     if(!yyjson_is_arr(j_tx))
@@ -1000,14 +1002,14 @@ std::optional<std::string> Node::Service::execute_tx_commands(const THASH_id &tx
             yyjson_val* params = yyjson_obj_get(item, "params");
             if(contract==NULL || method==NULL || params==NULL)
             {
-                t.emit_command(tx_id, index, "error",
+                b.emit_command(tx_id, index, "error",
                     R"({"code":-32602,"error":"contract, method, params fields required"})");
                 index++;
                 continue;
             }
             if(!yyjson_is_str(contract) || !yyjson_is_str(method) || !yyjson_is_obj(params))
             {
-                t.emit_command(tx_id, index, "error",
+                b.emit_command(tx_id, index, "error",
                     R"({"code":-32602,"error":"contract, method, params fields required"})");
                 index++;
                 continue;
@@ -1029,34 +1031,34 @@ std::optional<std::string> Node::Service::execute_tx_commands(const THASH_id &tx
                 auto meth=method_str;
                 // logErr2("method %s",meth.c_str());
                 if (meth == "mint")
-                    err = TR::execute_mint(params, t, senderAddress, by, tx_id, index, epoch);
+                    err = TR::execute_mint(params, b, t, senderAddress, by, tx_id, index, epoch);
                 else if (meth == "transfer")
-                    err = TR::execute_transfer(params, t, senderAddress, by, tx_id, index,epoch);
+                    err = TR::execute_transfer(params, b,t, senderAddress, by, tx_id, index,epoch);
                 else if (meth == "node_create")
-                    err = TR::execute_node_create(params, t, senderAddress, by, tx_id, index, epoch);
+                    err = TR::execute_node_create(params,b, t, senderAddress, by, tx_id, index, epoch);
                 else if (meth == "node_update")
-                    err = TR::execute_node_update(params, t, senderAddress, by, tx_id, index, epoch);
+                    err = TR::execute_node_update(params, b,t, senderAddress, by, tx_id, index, epoch);
                 else if (meth == "node_stake")
-                    err = TR::execute_node_stake(params, t, senderAddress, by, tx_id, index, epoch);
+                    err = TR::execute_node_stake(params, b,t, senderAddress, by, tx_id, index, epoch);
                 else if (meth == "node_unstake")
-                    err = TR::execute_unstake_node(params, t, senderAddress, by, tx_id, index,epoch);
+                    err = TR::execute_unstake_node(params, b,t, senderAddress, by, tx_id, index,epoch);
                 else if (meth == "node_enable")
-                    err = TR::execute_node_enable(params, t, senderAddress, by, tx_id, index,epoch);
+                    err = TR::execute_node_enable(params, b,t, senderAddress, by, tx_id, index,epoch);
                 else if (meth == "contract_deploy")
-                    err = TR::execute_contract_deploy(params, t, senderAddress, by, tx_id, index,epoch);
+                    err = TR::execute_contract_deploy(params,b, t, senderAddress, by, tx_id, index,epoch);
                 else if (meth == "contract_update")
-                    err = TR::execute_contract_update(params, t, senderAddress, by, tx_id, index,epoch);
+                    err = TR::execute_contract_update(params, b,t, senderAddress, by, tx_id, index,epoch);
                 else
                 {
                     MUTEX_INSPECTOR;
-                    t.emit_command(tx_id, index, "error", 
+                    b.emit_command(tx_id, index, "error", 
                         R"({"error":"unhandled method %s for root contract"})", 
                         method_str.c_str());
                 }
                 if (err)
                 {
                     MUTEX_INSPECTOR;
-                    t.emit_command(tx_id, index, "error", 
+                    b.emit_command(tx_id, index, "error", 
                         R"({"error":"%s"})", 
                         err->c_str());                
                 }
@@ -1078,7 +1080,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(const THASH_id &tx
     return std::nullopt;
 }
 
-void Node::Service::execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, 
+void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress, 
     const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
@@ -1089,7 +1091,12 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, t_params &t, cons
     if(!j_tx)
         throw CommonError("if(!j_tx)");
 
-    execute_tx_commands(tx_id,t,senderAddress,tx,by,epoch,j_tx);
+    t_params t(root);
+    t.senderAddress=senderAddress;
+    t.tx=tx;
+    t.epoch=epoch;
+
+    execute_tx_commands(tx_id,b,t,senderAddress,tx,by,epoch,j_tx);
 
 
 }

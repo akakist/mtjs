@@ -212,22 +212,22 @@ namespace Node
         std::map<EPOCH_id, std::map<NODE_id, REF_getter<MsgData::LeaderCertificate> > >lc_responses;
 
         void collectTransactions();
-        BLOCK_id execute_block(t_params &t,  const REF_getter<MsgData::LeaderCertificate> &lc);
+        BLOCK_id execute_block(b_params &b,  const REF_getter<MsgData::LeaderCertificate> &lc);
 
         void do_sync(const NODE_id &src_node);
 
         // bool CheckState(const MsgData::HeartBeatREQ *r, const NODE_id & src_node);
 
-        void calc_fee_rewards_nodes(t_params& t, const REF_getter<MsgData::LeaderCertificate> &lc);
+        void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::LeaderCertificate> &lc);
 
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
     
         bool verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate>& lc);
 
-        void execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress,
+        void execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
                          const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch);
 
-        std::optional<std::string> execute_tx_commands(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, 
+        std::optional<std::string> execute_tx_commands(const THASH_id &tx_id, b_params &b, t_params& t,const ADDRESS_id &senderAddress, 
             const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch,yyjson_val * j_tx);
 
         REF_getter<root_data> root=nullptr;

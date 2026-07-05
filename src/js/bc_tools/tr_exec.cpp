@@ -36,7 +36,7 @@ std::optional<std::string> yy_get_bn(yyjson_val *params, const char *key, BigInt
 
 }
 
-std::optional<std::string> TR::execute_mint(yyjson_val *params, t_params &t, 
+std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_params &t,
         const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
@@ -62,17 +62,17 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, t_params &t,
     }
     // u->addBalance(amount);
     u->setDirty(epoch);
-    t.addCalcer(u.get(),by);
+    b.addCalcer(u.get(),by);
 
-    t.fee[senderAddress] += v->getFee("mint");
+    b.fee[senderAddress] += v->getFee("mint");
 
-    t.emit_command(txid, seqId,"mint",R"({"to":"%s","amount":"%s"})",
+    b.emit_command(txid, seqId,"mint",R"({"to":"%s","amount":"%s"})",
         base16::encode(senderAddress.addr).c_str(),
         amount.toString().c_str());
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_transfer(yyjson_val *params, t_params &t, 
+std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b, t_params &t,
     const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
@@ -128,13 +128,13 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, t_params &t,
     // to->addBalance(amount);
     u->setDirty(epoch);
     to->setDirty(epoch);
-    t.addCalcer(u.get(),by);
-    t.addCalcer(to.get(),by);
+    b.addCalcer(u.get(),by);
+    b.addCalcer(to.get(),by);
 
 
-    t.fee[senderAddress] += fee;
+    b.fee[senderAddress] += fee;
 
-    t.emit_command(txid, seqId, "transfer", R"({"from":"%s","to":"%s","amount":"%s"})", 
+    b.emit_command(txid, seqId, "transfer", R"({"from":"%s","to":"%s","amount":"%s"})", 
         base16::encode(senderAddress.addr).c_str(), 
         base16::encode(to_addr.addr).c_str(), 
         amount.toString().c_str()
@@ -142,7 +142,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, t_params &t,
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_node_update(yyjson_val *params, t_params &t, 
+std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params &b, t_params &t,
     const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     // if(senderAddress!=)
@@ -177,25 +177,25 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, t_params 
     {
         nn->set_ip(ip);
         // t.logMsg(txid, seqId, "ip changed");
-        t.emit_command(txid, seqId, "node_change_ip",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
+        b.emit_command(txid, seqId, "node_change_ip",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
         
     }
 
 
     nn->setDirty(epoch);
     us->setDirty(epoch);
-    t.addCalcer(nn.get(),by);
-    t.addCalcer(us.get(),by);
+    b.addCalcer(nn.get(),by);
+    b.addCalcer(us.get(),by);
 
 
-    t.fee[senderAddress] += fee;
+    b.fee[senderAddress] += fee;
 
     // t.logMsg(txid, seqId, "node %s updated", name.container.c_str());
 
     return std::nullopt;
 }
 
-std::optional<std::string> TR::execute_node_create(yyjson_val *params, t_params &t, 
+std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params &b, t_params &t,
     const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
@@ -262,19 +262,19 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, t_params 
     n->setDirty(epoch);
     // u->setDirty();
     us->setDirty(epoch);
-    t.addCalcer(n.get(),by);
-    t.addCalcer(us.get(),by);
+    b.addCalcer(n.get(),by);
+    b.addCalcer(us.get(),by);
 
 
 
-    t.fee[senderAddress] += fee;
+    b.fee[senderAddress] += fee;
 
     // t.logMsg(txid, seqId, "node %s registered", name.container.c_str());
-    t.emit_command(txid, seqId, "node_create",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
+    b.emit_command(txid, seqId, "node_create",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_node_stake(yyjson_val *params, t_params & t,
+std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params & b,t_params &t,
     const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
@@ -319,22 +319,22 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, t_params &
     // n->total_stake += amount;
     // v->total_staked += amount;
 
-    t.fee[senderAddress] += fee;
+    b.fee[senderAddress] += fee;
 
     // t.logMsg(txid, seqId, "node %s staked on amount %s", node.container.c_str(), amount.toString().c_str());
-    t.emit_command(txid, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
+    b.emit_command(txid, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
         node.container.c_str(),
         amount.toString().c_str(),
         base16::encode(senderAddress.addr).c_str()
     );
     n->setDirty(epoch);
     us->setDirty(epoch);
-    t.addCalcer(n.get(),by);
-    t.addCalcer(us.get(),by);
+    b.addCalcer(n.get(),by);
+    b.addCalcer(us.get(),by);
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, t_params & t,
+std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params & b,t_params &t,
     const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
@@ -390,14 +390,14 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, t_params
     v->setDirty(epoch);
     n->setDirty(epoch);
     u->setDirty(epoch);
-    t.addCalcer(v.get(),by);
-    t.addCalcer(n.get(),by);
-    t.addCalcer(u.get(),by);
+    b.addCalcer(v.get(),by);
+    b.addCalcer(n.get(),by);
+    b.addCalcer(u.get(),by);
 
-    t.fee[senderAddress] += fee;
+    b.fee[senderAddress] += fee;
 
     // t.logMsg(txid, seqId, "node %s unstaked on amount %s", node.container.c_str(), amount.toString().c_str());
-    t.emit_command(txid, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
+    b.emit_command(txid, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
         node.container.c_str(),
         base16::encode(senderAddress.addr).c_str(),
         amount.toString().c_str()
@@ -406,7 +406,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, t_params
     return std::nullopt;
 }
 
-std::optional<std::string> TR::execute_node_enable(yyjson_val *params, t_params & t,
+std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params & b,t_params &t,
     const ADDRESS_id& senderAddress, const REF_getter<fee_calcer>& by, const THASH_id& txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
@@ -437,10 +437,10 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, t_params 
     n->reset_missed_rounds();
     n->setDirty(epoch);
 
-    t.fee[senderAddress] += fee;
+    b.fee[senderAddress] += fee;
 
     // t.logMsg(txid, seqId, "node %s enabled", node.container.c_str());
-    t.emit_command(txid, seqId, "node_enable",R"({"node":"%s"})", node.container.c_str());
+    b.emit_command(txid, seqId, "node_enable",R"({"node":"%s"})", node.container.c_str());
 
     return std::nullopt;
 }
@@ -448,7 +448,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, t_params 
 
 
 
-std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, t_params &t, 
+std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_params &b, t_params &t,
     const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
@@ -497,16 +497,16 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, t_par
 
     n->setDirty(epoch);
     us->setDirty(epoch);
-    t.addCalcer(n.get(),by);
-    t.addCalcer(us.get(),by);
+    b.addCalcer(n.get(),by);
+    b.addCalcer(us.get(),by);
 
-    t.fee[senderAddress] += fee;
+    b.fee[senderAddress] += fee;
 
-    t.emit_command(txid, seqId, "contract_deploy",R"({"name":"%s","owner":"%s"})",name.c_str(),base16::encode(senderAddress.addr).c_str());
+    b.emit_command(txid, seqId, "contract_deploy",R"({"name":"%s","owner":"%s"})",name.c_str(),base16::encode(senderAddress.addr).c_str());
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_contract_update(yyjson_val *params, t_params &t, 
+std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_params &b, t_params &t,
     const ADDRESS_id &senderAddress, const REF_getter<fee_calcer> &by, const THASH_id &txid, int seqId, const EPOCH_id& epoch)
 {
     auto v = t.root->getValues();
@@ -547,12 +547,12 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, t_par
 
     n->setDirty(epoch);
     us->setDirty(epoch);
-    t.addCalcer(n.get(),by);
-    t.addCalcer(us.get(),by);
+    b.addCalcer(n.get(),by);
+    b.addCalcer(us.get(),by);
 
-    t.fee[senderAddress] += fee;
+    b.fee[senderAddress] += fee;
 
-    t.emit_command(txid, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",cn.container.c_str(),base16::encode(senderAddress.addr).c_str());
+    b.emit_command(txid, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",cn.container.c_str(),base16::encode(senderAddress.addr).c_str());
 
     return std::nullopt;
 }
