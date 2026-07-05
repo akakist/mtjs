@@ -227,6 +227,8 @@ namespace Node
         void execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress,
                          const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch);
 
+        std::optional<std::string> execute_tx_commands(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, 
+            const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch,yyjson_val * j_tx);
 
         REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;

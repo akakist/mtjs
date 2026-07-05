@@ -975,16 +975,9 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     return true;
 }
-
-void Node::Service::execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, 
-    const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch)
+std::optional<std::string> Node::Service::execute_tx_commands(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, 
+    const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch,yyjson_val * j_tx)
 {
-    MUTEX_INSPECTOR;
-    // yyjson::Document doc(tx_cmds);
-    yyjson_val *jroot=yyjson_doc_get_root(tx->doc);
-
-    yyjson_val * j_tx = yyjson_obj_get(jroot,"tx");
-
     if(!yyjson_is_arr(j_tx))
         throw CommonError("if(!yyjson_is_arr(root))");
     yyjson_arr_iter iter;
@@ -1082,11 +1075,23 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, t_params &t, cons
 
         }
     }
-    // else
-    // {
-    //     t.emit_block("error", R"({"code":-32602,"error":"tx body must be array"})");
-    //     // t.att_data->block_report= {1,"tx body must be array"};
-    // }
+    return std::nullopt;
+}
+
+void Node::Service::execute_transaction(const THASH_id &tx_id, t_params &t, const ADDRESS_id &senderAddress, 
+    const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch)
+{
+    MUTEX_INSPECTOR;
+    // yyjson::Document doc(tx_cmds);
+    yyjson_val *jroot=yyjson_doc_get_root(tx->doc);
+
+    yyjson_val * j_tx = yyjson_obj_get(jroot,"tx");
+    if(!j_tx)
+        throw CommonError("if(!j_tx)");
+
+    execute_tx_commands(tx_id,t,senderAddress,tx,by,epoch,j_tx);
+
+
 }
 std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params)
 {
