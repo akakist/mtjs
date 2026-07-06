@@ -66,6 +66,7 @@ async function exec() {
         });
         console.log(rsp);
         sleep(200);
+
     }
 }
 console.log(std.getenv("PATH"));
