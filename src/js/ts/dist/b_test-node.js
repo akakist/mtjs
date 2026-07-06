@@ -33,7 +33,7 @@ async function exec() {
             {
                 contract: "root",
                 method: "mint",
-                params: { amount: "100000" }
+                params: { amount: "10000000" }
             }
         ];
         for (let i = 0; i < users.length; i++) {
@@ -60,7 +60,7 @@ async function exec() {
         // const m=mtjs.tx_sign(tx, sk!);
         // console.log("signed tx:", m);
         i++;
-        let req = { tx: tx, nonce: nonce, value: 1000000, gasLimit: 100000, gasPrice: 10 };
+        let req = { tx: tx, nonce: nonce, value: 1000000, gasLimit: 100000, gasPrice: 100 };
         const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce, (obj) => {
             console.log("TX REPORT " + JSON.stringify(obj));
         });

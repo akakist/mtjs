@@ -63,5 +63,58 @@ struct t_params
     EPOCH_id epoch;
     THASH_id tx_id;
     BigInt gasUsed=0;
+    BigInt gasLimit=0;
+    BigInt value=0;
     Rollback *roll=NULL;
+    void rollback()
+    {
+        for(auto &z: roll->data)
+        {
+            inBuffer in(z.second);
+            {
+                M_LOCK(z.first->mx);
+                z.first->unpack_mx(in);
+            }
+        }
+    }
+    std::map<NODE_id,REF_getter<bc_node>> nodes;
+    REF_getter<bc_node> getNode(const NODE_id& n)
+    {
+        auto it=nodes.find(n);
+        if(it!=nodes.end())
+            return it->second;
+
+        auto nn=root->getNode(n);
+        if(nn.valid())
+        {
+            nodes[n]=nn;
+            auto p=nn->parent;
+            if(!roll->data.count(p))
+            {
+                M_LOCK(p->mx);
+                roll->data[p]=p->getBuffer_mx();
+            }
+        }
+        return nn;
+    }
+    std::map<ADDRESS_id,REF_getter<bc_address_state>> addrs;
+    REF_getter<bc_address_state> getAddressState(const ADDRESS_id& n)
+    {
+        auto it=addrs.find(n);
+        if(it!=addrs.end())
+            return it->second;
+
+        auto nn=root->getAddressState(n,roll);
+        if(nn.valid())
+        {
+            addrs[n]=nn;
+            auto p=nn->parent;
+            if(!roll->data.count(p))
+            {
+                M_LOCK(p->mx);
+                roll->data[p]=p->getBuffer_mx();
+            }
+        }
+        return nn;
+    }
 };

@@ -27,7 +27,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     if(err) return err;
 
 
-    auto u = t.root->getAddressState(t.senderAddress,t.roll);
+    auto u = t.getAddressState(t.senderAddress);
     if (!u.valid())
     {
         return "mint: sender not found";
@@ -67,7 +67,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     if(to_addr.addr.size()!=t.senderAddress.addr.size())
         return "param to has invalid size";
 
-    auto u = t.root->getAddressState(t.senderAddress,t.roll);
+    auto u = t.getAddressState(t.senderAddress);
     if (!u.valid())
     {
         return "sender userstate invalid";
@@ -81,7 +81,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     {
         return "invalid destination address";
     }
-    auto to = t.root->getAddressState(to_addr,t.roll);
+    auto to = t.getAddressState(to_addr);
     if (!to.valid())
     {
         return "destination user not found";
@@ -128,14 +128,14 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
 
 
 
-    auto nn = t.root->getNode(name);
+    auto nn = t.getNode(name);
     if (!nn.valid())
         return "Node not found";
     if(nn->get_owner()!=t.senderAddress)
     {
         return "only node owner can update node info";
     }
-    auto us = t.root->getAddressState(t.senderAddress,t.roll);
+    auto us = t.getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
 
@@ -182,11 +182,11 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
         }
     }
 
-    auto nn = t.root->getNode(name);
+    auto nn = t.getNode(name);
     if (nn.valid())
         return "Node already registered with name";
 
-    auto us = t.root->getAddressState(t.senderAddress,t.roll);
+    auto us = t.getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
 
@@ -234,11 +234,11 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     if(err) return err;
 
 
-    auto us = t.root->getAddressState(t.senderAddress,t.roll);
+    auto us = t.getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
 
-    auto n=t.root->getNode(node);
+    auto n=t.getNode(node);
     if(!n.valid())
     {
         return "node not found";
@@ -288,7 +288,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     NODE_id node;
     err=yy_get_string(params,"node",node.container);
     if(err) return err;
-    auto n = t.root->getNode(node);
+    auto n = t.getNode(node);
     if (!n.valid())
     {
         return "nodes not registered";
@@ -305,7 +305,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
         return "insufficient stake in node";
     }
 
-    auto u = t.root->getAddressState(t.senderAddress,t.roll);
+    auto u = t.getAddressState(t.senderAddress);
 
     if (!u.valid())
         return "FATAL:  dst addr not found";
@@ -344,7 +344,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     auto err=yy_get_string(params,"node",node.container);
     if(err)return err;
 
-    auto n = t.root->getNode(node);
+    auto n = t.getNode(node);
     if (!n.valid())
     {
         return "node not found";
@@ -353,7 +353,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     {
         return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(t.senderAddress.addr);
     }
-    auto us = t.root->getAddressState(t.senderAddress,t.roll);
+    auto us = t.getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
     n->reset_missed_rounds();
@@ -395,7 +395,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     if (nn.valid())
         return "Contract already registered with name";
 
-    auto us = t.root->getAddressState(t.senderAddress,t.roll);
+    auto us = t.getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
 
@@ -439,7 +439,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     {
         return "sender is not contract owner";
     }
-    auto us = t.root->getAddressState(t.senderAddress,t.roll);
+    auto us = t.getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
     

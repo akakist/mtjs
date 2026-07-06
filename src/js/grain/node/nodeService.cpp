@@ -608,7 +608,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
                         logNode("if(!lc->heart_beat.valid()) AA");
                     // t_params t;
                     // t.senderAddress=senderAddress;
-                    execute_transaction(tt->getHash(),  b, senderAddress, tt, lc->heart_beat->new_epoch);
+                    auto err=execute_transaction(tt->getHash(),  b, senderAddress, tt, lc->heart_beat->new_epoch);
                     u->incNonce();
                     u->setDirty(lc->heart_beat->new_epoch,NULL);
 
@@ -935,6 +935,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
     yyjson_val* item;
     {
         MUTEX_INSPECTOR;
+        if(t.gasUsed>t.gasLimit) return "gas exceeds limit";
         while ((item = yyjson_arr_iter_next(&iter)))
         {
             MUTEX_INSPECTOR;
@@ -1018,7 +1019,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
     return std::nullopt;
 }
 
-void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress, 
+std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress, 
     const REF_getter<MsgData::TX> &tx,  const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
@@ -1043,7 +1044,7 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, cons
     if(err)
     {
         b.emit_tx(tx_id,"error",R"({"error":"%s"})",err->c_str());
-        return;
+        return err;
     }    
     Rollback roll;
     t_params t(root);
@@ -1052,6 +1053,8 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, cons
     t.epoch=epoch;
     t.tx_id=tx_id;
     t.roll=&roll;
+    t.value=value;
+    t.gasLimit=gasLimit;
 
     /// сбрасываем все изменения состояния перед транзакцией
     // _db_to_save db_dump0;
@@ -1062,13 +1065,66 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, cons
     {
         logNode("error:%s",err->c_str());
         b.emit_tx(t.tx_id,"error",R"({"error":"%s"})",err->c_str());
+        t.rollback();
+        auto gu=t.gasUsed;
+        if(gu>gasLimit)
+            gu=gasLimit;
+
+        auto u=root->getAddressState(t.senderAddress,NULL);
+        M_LOCK(u->parent->mx);
+        u->balance-=gu*gasPrice;
+        b.node_rewards+=gu*gasPrice;
+        
+        return err;
+
+    }
+    if(t.value<0)
+    {
+        t.rollback();
+        b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
+        auto u=root->getAddressState(t.senderAddress,NULL);
+        M_LOCK(u->parent->mx);
+        u->balance-=t.gasUsed*gasPrice;
+        b.node_rewards+=t.gasUsed*gasPrice;
+        return "value exceeds limit";
+    }
+    if(t.gasUsed>gasLimit)
+    {
+        t.rollback();
+        b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
+        auto u=root->getAddressState(t.senderAddress,NULL);
+        M_LOCK(u->parent->mx);
+        u->balance-=gasLimit*gasPrice;
+        b.node_rewards+=gasLimit*gasPrice;
+        return "gas exceeds limit";
     }
 
     _db_to_save db_dump;
     root->calc_tree_hash(db_dump);
-    db_to_save_Z.add(db_dump);
     size_t sz=db_dump.size();
+    t.gasUsed+=sz;
+    if(t.gasUsed>gasLimit)
+    {
+        t.rollback();
+        b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
+        auto u=root->getAddressState(t.senderAddress,NULL);
+        M_LOCK(u->parent->mx);
+        u->balance-=gasLimit*gasPrice;
+        b.node_rewards+=gasLimit*gasPrice;
+        return "gas exceeds limit";
+    }
+    // OK
+    auto u=root->getAddressState(t.senderAddress,NULL);
+    {
+        M_LOCK(u->parent->mx);
+        u->balance-=t.gasUsed*gasPrice+value-t.value;
+    }
+
+    root->calc_tree_hash(db_dump);
+    db_to_save_Z.add(db_dump);
+    
     logErr2("user sz %d",sz);
+    return std::nullopt;
 }
 std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params)
 {
