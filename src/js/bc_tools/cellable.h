@@ -50,6 +50,14 @@ struct data_base : public Refcountable
     ~data_base()
     {
     }
+    virtual void copy_from(data_base* d)
+    {
+        type=d->type;
+        create_time=d->create_time;
+        ttl=d->ttl;
+        last_update_epoch=d->last_update_epoch;
+    }
+    REF_getter<data_base> clone();
     void setDirty(const EPOCH_id& epoch);
     virtual void pack(outBuffer& o) const
     {

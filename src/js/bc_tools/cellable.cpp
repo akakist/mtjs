@@ -198,3 +198,10 @@ void data_base::setDirty(const EPOCH_id& epoch)
     last_update_epoch=epoch;
     parent->setDirty__(epoch);
 }
+REF_getter<data_base> data_base::clone()
+{
+    
+    REF_getter<data_base> ret=db_constructors[parent->payload_ctor_idx](parent);
+    ret->copy_from(this);
+    return ret;
+}
