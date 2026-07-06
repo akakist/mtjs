@@ -13,7 +13,7 @@ struct b_params
     _feeCalcers feeCalcers;
     std::map<REF_getter<data_base>, std::set<REF_getter<fee_calcer>> > calcers;
     std::map<ADDRESS_id, BigInt> fee;
-
+    BigInt node_rewards=0;
     void addCalcer(const REF_getter<data_base>& d,const REF_getter<fee_calcer>& c)
     {
         calcers[d].insert(c);

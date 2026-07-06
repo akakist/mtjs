@@ -1152,9 +1152,12 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
     _db_to_save db_dump;
     root->calc_tree_hash(db_dump);
+    
     db_to_save_Z.add(db_dump);
     size_t sz=db_dump.size();
     logErr2("user sz %d",sz);
+    b.node_rewards+=(BigInt)sz * BigInt(gasPrice);
+    logNode("node_rewards %s",b.node_rewards.toString().c_str());
     return std::nullopt;
 }
 std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params)
