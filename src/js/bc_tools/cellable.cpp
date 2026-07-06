@@ -28,10 +28,14 @@ std::string Cellable::dump()
     return str.str();
 }
 
-REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l, Rollback* roll)
+REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l)
 {
     MUTEX_INSPECTOR;
-    l.lock();
+    {
+        MUTEX_INSPECTOR;
+        l.lock();
+
+    }
     auto it = children_hashes_mx.find(id);
     if (it != children_hashes_mx.end())
     {
@@ -39,12 +43,9 @@ REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase 
         l.unlock();
         return getLeafNoCreate(id, db,l);
     }
-    if(roll)
-    {
-        if(!roll->data.count(this))
-            roll->data[this]=getBuffer();
+    // lk.unlock();
 
-    }
+    // l.lock();
     children_hashes_mx[id].container = "";
     auto it2 = children_ptrs_mx.find(id);
     if (it2 != children_ptrs_mx.end())
@@ -121,6 +122,41 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string &id, IDatabase 
     }
     return cc;
 }
+void Cellable::_getDiff(cdiff& out, const EPOCH_id &epoch, IDatabase* db)
+{
+    if(last_update_epoch<epoch)
+        return;
+    std::deque<std::string> path;
+    get_path(path);
+    if(data.valid())
+    {
+        auto e=data->last_update_epoch;
+        out.add(e,path,data->getBuffer(),payload_ctor_idx); 
+    }
+    // out[path]={getBuffer();
+    MutexLockerDeferred lk(mx);
+    lk.lock();
+    auto hashes=children_hashes_mx;
+    lk.unlock();
+    for(auto& z:hashes)
+    {
+        REF_getter<Cellable> child;
+        lk.lock();
+        auto it=children_ptrs_mx.find(z.first);
+        if(it!=children_ptrs_mx.end())
+            child=it->second;
+        else
+        {
+            lk.unlock();
+            child=getLeafNoCreate(z.first,db,lk);
+            if(!child.valid())
+                throw CommonError("if(!child.valid())");
+        }
+        if(!child.valid())
+            throw CommonError("if(!child.valid())");
+        child->_getDiff(out,epoch,db);
+    }
+}
 
 void Cellable::calc_tree_hash(_db_to_save &db_dump)
 {
@@ -157,8 +193,8 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     }
     is_dirty = false;
 }
-void data_base::setDirty(const EPOCH_id& epoch, Rollback* r)
+void data_base::setDirty(const EPOCH_id& epoch)
 {
-    // last_update_epoch=epoch;
-    parent->setDirty__(epoch,r);
+    last_update_epoch=epoch;
+    parent->setDirty__(epoch);
 }

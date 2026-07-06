@@ -1,6 +1,6 @@
 #pragma once
 #include "root_contract.h"
-
+#include "fee_calcer.h"
 #include "md/md_attachment_data.h"
 #include "md/md_ValidateBlockREQ.h"
 
@@ -10,7 +10,14 @@ struct b_params
     REF_getter<root_data> root;
     REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
     REF_getter<MsgData::attachment_data> att_data;
-    BigInt node_rewards=0;
+    _feeCalcers feeCalcers;
+    std::map<REF_getter<data_base>, std::set<REF_getter<fee_calcer>> > calcers;
+    std::map<ADDRESS_id, BigInt> fee;
+
+    void addCalcer(const REF_getter<data_base>& d,const REF_getter<fee_calcer>& c)
+    {
+        calcers[d].insert(c);
+    }
 
 
     void emit_command(const THASH_id& txId, int seqId, const std::string& command, const char* fmt, ...)
@@ -64,17 +71,4 @@ struct t_params
     REF_getter<MsgData::TX> tx;
     EPOCH_id epoch;
     THASH_id tx_id;
-    Rollback *roll;
-
-    BigInt gasUsed=0;
-
-    void rollback()
-    {
-        for(auto& z: roll->data)
-        {
-            inBuffer in(z.second);
-            z.first->unpack(in);
-            // z.first->setDirty__()
-        }
-    }
 };

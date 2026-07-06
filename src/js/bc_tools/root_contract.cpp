@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 #include "root_contract.h"
 #include "QUORUM.h"
-
+#include "fee_calcer.h"
 
 std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
@@ -29,23 +29,23 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
 };
 
 
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string> &v, IDatabase *db, Rollback* roll)
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string> &v, IDatabase *db)
 {
     // M_LOCK(cur->lock);
     for (auto &z : v)
     {
         MutexLockerDeferred l(cur->mx);
-        cur = cur->getLeafOrCreate(z, db,l, roll);
+        cur = cur->getLeafOrCreate(z, db,l);
     }
     return cur;
 }
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db, Rollback* roll)
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db)
 {
     // M_LOCK(cur->lock);
     for (auto &z : v)
     {
         MutexLockerDeferred l(cur->mx);
-        cur = cur->getLeafOrCreate(z, db,l, roll);
+        cur = cur->getLeafOrCreate(z, db,l);
     }
     return cur;
 }
@@ -61,39 +61,39 @@ REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vect
     }
     return cur;
 }
-// void root_data::getDiff(cdiff& out, const EPOCH_id &epoch)
-// {
-//     M_LOCK(state_mutex);
-//     _getDiff(out,epoch,db.get());
-// }
+void root_data::getDiff(cdiff& out, const EPOCH_id &epoch)
+{
+    M_LOCK(state_mutex);
+    _getDiff(out,epoch,db.get());
+}
 
-// void root_data::apply_diff(const cdiff& out)
-// {
-//     M_LOCK(state_mutex);
-//     for(auto &e: out.container)
-//     {
-//         auto &epoch=e.first;
-//         for(auto &z:e.second)
-//         {
-//             auto& path=z.first;
-//             auto& buf=z.second.first;
-//             int ctor=z.second.second;
-//             REF_getter<Cellable> cell=getByPathOrCreate(this,path,db.get(),NULL);
-//             if(cell->payload_ctor_idx && cell->payload_ctor_idx!=ctor)
-//             {
-//                 throw CommonError("if(cell->payload_ctor_idx && cell->payload_ctor_idx!=ctor)");
-//             }
-//             if(cell->payload_ctor_idx!=ctor)
-//                 cell->payload_ctor_idx=ctor;
-//             data=db_constructors[cell->payload_ctor_idx](cell.get());
-//             inBuffer in(buf);
-//             data->unpack(in);
-//             // if(data->last_update_epoch!=epoch)
-//             //     throw CommonError("if(data->last_update_epoch!=epoch)");
-//             // data->setDirty(data->last_update_epoch,NULL);
-//         }
-//     }
-// }
+void root_data::apply_diff(const cdiff& out)
+{
+    M_LOCK(state_mutex);
+    for(auto &e: out.container)
+    {
+        auto &epoch=e.first;
+        for(auto &z:e.second)
+        {
+            auto& path=z.first;
+            auto& buf=z.second.first;
+            int ctor=z.second.second;
+            REF_getter<Cellable> cell=getByPathOrCreate(this,path,db.get());
+            if(cell->payload_ctor_idx && cell->payload_ctor_idx!=ctor)
+            {
+                throw CommonError("if(cell->payload_ctor_idx && cell->payload_ctor_idx!=ctor)");
+            }
+            if(cell->payload_ctor_idx!=ctor)
+                cell->payload_ctor_idx=ctor;
+            data=db_constructors[cell->payload_ctor_idx](cell.get());
+            inBuffer in(buf);
+            data->unpack(in);
+            if(data->last_update_epoch!=epoch)
+                throw CommonError("if(data->last_update_epoch!=epoch)");
+            data->setDirty(data->last_update_epoch);
+        }
+    }
+}
 // void getDiff(std::map<std::string,std::string>& out)
 // {
 
@@ -140,11 +140,11 @@ REF_getter<bc_contract> root_data::getContract(const CONTRACT_id &name)
     return dynamic_cast<bc_contract *>(cc->data.get());
 }
 
-REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const EPOCH_id& epoch, Rollback* roll)
+REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const REF_getter<fee_calcer> &bca, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
     auto v = getContractPath(name);
-    auto cc = getByPathOrCreate(this, v, db.get(), roll);
+    auto cc = getByPathOrCreate(this, v, db.get());
     if (!cc.valid())
         throw CommonError("if(!cc.valid())");
     if (cc->data.valid())
@@ -152,15 +152,15 @@ REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const EP
     REF_getter<bc_contract> bc = new bc_contract(cc.get());
     cc->data = bc.get();
     cc->payload_ctor_idx = hsh::bc_contract;
-    cc->data->setDirty(epoch,roll);
+    cc->data->setDirty(epoch);
     return bc;
 }
-REF_getter<bc_epoch> root_data::getEpoch(Rollback* roll)
+REF_getter<bc_epoch> root_data::getEpoch()
 {
     MUTEX_INSPECTOR;
     auto r = this;
     MutexLockerDeferred lk(r->mx);
-    auto l = r->getLeafOrCreate("ep", db.get(),lk, roll);
+    auto l = r->getLeafOrCreate("ep", db.get(),lk);
     if (!l.valid())
         throw CommonError("if(!l.valid())");
     if (l->data.valid())
@@ -176,12 +176,12 @@ REF_getter<bc_epoch> root_data::getEpoch(Rollback* roll)
     return v;
 }
 
-REF_getter<bc_values> root_data::getValues(Rollback* roll)
+REF_getter<bc_values> root_data::getValues()
 {
     MUTEX_INSPECTOR;
     auto r = this;
     MutexLockerDeferred lk(r->mx);
-    auto l = r->getLeafOrCreate("v", db.get(),lk, roll);
+    auto l = r->getLeafOrCreate("v", db.get(),lk);
     if (!l.valid())
         throw CommonError("if(!l.valid())");
     if (l->data.valid())
@@ -259,11 +259,11 @@ std::vector<std::string> root_data::getAddressStatePath(const ADDRESS_id &addr)
 //     cc->payload_ctor_idx = hsh::bc_user;
 //     return u;
 // }
-REF_getter<bc_address_state> root_data::getAddressState(const ADDRESS_id &addr, Rollback* roll)
+REF_getter<bc_address_state> root_data::getAddressState(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTOR;
     auto v = getAddressStatePath(addr);
-    auto cc = getByPathOrCreate(this, v, db.get(), roll);
+    auto cc = getByPathOrCreate(this, v, db.get());
     if (!cc.valid())
         return NULL;
     if (cc->data.valid())
@@ -367,14 +367,14 @@ std::vector<REF_getter<bc_node>> root_data::getAllNodes()
     // }
     // return v;
 }
-REF_getter<bc_node> root_data::addNode(const NODE_id &name, const EPOCH_id& epoch, Rollback* roll)
+REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer> &bc, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
 
     std::vector<std::string> v = getNodePath(name);
     // v.push_back("n");
     // v.push_back(name.container);
-    auto cc = getByPathOrCreate(this, v, db.get(), roll);
+    auto cc = getByPathOrCreate(this, v, db.get());
 
     if (cc->data.valid())
         throw CommonError("if(cc->data.valid())");
@@ -383,7 +383,7 @@ REF_getter<bc_node> root_data::addNode(const NODE_id &name, const EPOCH_id& epoc
     REF_getter<bc_node> n = new bc_node(cc.get());
     cc->data = n.get();
     cc->payload_ctor_idx = hsh::bc_node;
-    cc->data->setDirty(epoch,NULL);
+    cc->data->setDirty(epoch);
     return n;
 }
 
@@ -498,7 +498,7 @@ std::string bc_values::dump()
         a.addr=blake2b_hash(z.addr).container;
         j["emitters"].push_back(base16::encode(a.addr));
     }
-    for(auto& z: gas)
+    for(auto& z: fees)
     {
         nlohmann::json jj;
         jj["type"]=z.first;

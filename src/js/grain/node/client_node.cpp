@@ -188,7 +188,7 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
 }
 bool Node::Service::LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route)
 {
-    auto lc=root->getEpoch(NULL)->prev_lc;
+    auto lc=root->getEpoch()->prev_lc;
     pass_NodeMsgRSP(new MsgData::LcRSP(lc), route);
     return true;
 }
@@ -233,7 +233,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
     if (!err && r->leader_cert->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
     {
-        if (root->getEpoch(NULL)->epoch.container + 1 != r->leader_cert->heart_beat->new_epoch.container)
+        if (root->getEpoch()->epoch.container + 1 != r->leader_cert->heart_beat->new_epoch.container)
         {
             t.emit_block("error", R"({"code":-32602,"error":"epoch invalid"})");
             err = true;

@@ -32,10 +32,6 @@ inline inBuffer & operator>> (inBuffer& b,  cdiff &s)
     b>>s.container;
     return b;
 }
-struct Rollback
-{
-    std::map<Cellable*, std::string> data;
-};
 
 struct data_base : public Refcountable
 {
@@ -45,29 +41,29 @@ struct data_base : public Refcountable
     time_t create_time=0;
     int ttl=-1;
 
-    // EPOCH_id last_update_epoch;
+    EPOCH_id last_update_epoch;
 
     data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
         type(t), parent(_parent), create_time(_create_time),ttl(_ttl) {
-            // last_update_epoch.container=0;
+            last_update_epoch.container=0;
         }
     ~data_base()
     {
     }
-    void setDirty(const EPOCH_id& epoch, Rollback* r);
+    void setDirty(const EPOCH_id& epoch);
     virtual void pack(outBuffer& o) const
     {
         o<<1;
         o<<type;
         o<<create_time<<ttl;
-        // o<<last_update_epoch;
+        o<<last_update_epoch;
     }
     virtual void unpack(inBuffer& in)
     {
         int ver=in.get_PN();
         in>>type;
         in>>create_time>>ttl;
-        // in>>last_update_epoch;
+        in>>last_update_epoch;
     }
     std::string getBuffer()
     {
@@ -80,6 +76,7 @@ struct data_base : public Refcountable
 };
 
 extern std::vector< data_base* (*)(Cellable*)> db_constructors;
+
 struct Cellable: public Refcountable
 {
 
@@ -114,28 +111,19 @@ public:
     /// @brief выставляется и читается в потоке ноды, мутекс не нужен.
     bool is_dirty=false;
     EPOCH_id last_update_epoch;
-// 
+
     Cellable(Cellable* _parent, const std::string & id):Refcountable("cellable"),  parent(_parent), m_id(id)
     {
     }
-    void setDirty__(const EPOCH_id& epoch, Rollback* r)
+    void setDirty__(const EPOCH_id& epoch)
     {
-        {
-            M_LOCK(mx);
-            if(r)
-            {
-                if(!r->data.count(this))
-                    r->data[this]=getBuffer();
-            }
-            is_dirty=true;
-            last_update_epoch=epoch;
-
-        }
+        is_dirty=true;
+        last_update_epoch=epoch;
         // if(bc.valid())
         //     calcers_Z.insert(bc);
         if(parent)
         {
-            parent->setDirty__(epoch,r);
+            parent->setDirty__(epoch);
         }
     }
     std::string dump();
@@ -218,12 +206,12 @@ public:
     }
 
 
-    REF_getter<Cellable> getLeafOrCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l,Rollback* roll);
+    REF_getter<Cellable> getLeafOrCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
     REF_getter<Cellable> getLeafNoCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
 
     void calc_tree_hash(_db_to_save &db_dump);
     // void _getDiff(std::map<std::deque<std::string>,std::string>& out, const EPOCH_id &epoch, IDatabase* db);
-    // void _getDiff(cdiff& out, const EPOCH_id &epoch, IDatabase* db);
+    void _getDiff(cdiff& out, const EPOCH_id &epoch, IDatabase* db);
 };
 // static const char* base16_TABLE[62] = {
 //     "0","1","2","3","4","5","6","7","8","9",

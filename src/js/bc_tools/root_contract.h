@@ -11,7 +11,7 @@
 #include "md/md_LeaderCertificate.h"
 #include <yyjson.h>
 #include <sstream>
-
+#include "fee_calcer.h"
 #include "nodeElement.h"
 #include "ADDRESS_id.h"
 #include "CONTRACT_id.h"
@@ -24,7 +24,6 @@ struct bc_contract:  public data_base
     std::string name_;
     ADDRESS_id  owner;
     std::string src;
-
     void pack(outBuffer&b) const final
     {
         data_base::pack(b);
@@ -264,38 +263,38 @@ struct bc_values: public data_base
 
 
 bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
-        gas["contract_deploy"]=BigInt(5000);
-        gas["contract_transfer"]=BigInt(1000);
-        gas["node_create"]=BigInt(20000);
-        gas["node_update"]=BigInt(10000);
-        gas["node_enable"]=BigInt(5000);
-        gas["node_unstake"]=BigInt(2000);
-        gas["node_stake"]=BigInt(2000);
-        gas["mint"]=BigInt(95);
-        gas["transfer"]=BigInt(1000);
+        fees["contract_deploy"]=BigInt(5000);
+        fees["contract_transfer"]=BigInt(1000);
+        fees["node_create"]=BigInt(20000);
+        fees["node_update"]=BigInt(10000);
+        fees["node_enable"]=BigInt(5000);
+        fees["node_unstake"]=BigInt(2000);
+        fees["node_stake"]=BigInt(2000);
+        fees["mint"]=BigInt(95);
+        fees["transfer"]=BigInt(1000);
     }
-    std::map<std::string,BigInt> gas;
+    std::map<std::string,BigInt> fees;
     std::set<ADDRESS_id> emitters_bin;
-    
-    BigInt getGas(const std::string &fee_type) const
+    BigInt getFee(const std::string &fee_type) const
     {
-        auto it=gas.find(fee_type);
-        if(it!=gas.end())
+        auto it=fees.find(fee_type);
+        if(it!=fees.end())
             return it->second;
         throw CommonError("fee '%s' not found", fee_type.c_str());
         return BigInt(0);
     }
     void pack(outBuffer& o) const final
     {
-        data_base::pack(o);
+        // cost.pack(o);
         o<<1;
-        o<<gas<<emitters_bin;
+        o<<fees<<emitters_bin;
     }
     void unpack(inBuffer& o) final
     {
-        data_base::unpack(o);
+        // cost.unpack(o);
         auto v=o.get_PN();
-        o>>gas>>emitters_bin;
+
+        o>>fees>>emitters_bin;
     }
     std::string dump() final;
 
@@ -311,14 +310,14 @@ struct bc_epoch: public data_base
     std::string prev_lc;
     void pack(outBuffer& o) const final
     {
-        data_base::pack(o);
+        // cost.pack(o);
         o<<1;
         o<<epoch;
         o<<prev_lc;
     }
     void unpack(inBuffer& o) final
     {
-        data_base::unpack(o);
+        // cost.unpack(o);
         auto v=o.get_PN();
         o>>epoch;
         o>> prev_lc;
@@ -327,8 +326,8 @@ struct bc_epoch: public data_base
 
 };
 
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db, Rollback*);
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db, Rollback*);
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db);
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db);
 
 REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db);
 
@@ -341,8 +340,8 @@ struct root_data: public Cellable
     {
     }
     Mutex state_mutex;
-    // void getDiff(cdiff& out, const EPOCH_id &epoch);
-    // void apply_diff(const cdiff& out);
+    void getDiff(cdiff& out, const EPOCH_id &epoch);
+    void apply_diff(const cdiff& out);
 
     std::vector<std::string> getContractPath(const CONTRACT_id &name);
     std::vector<std::string> getNodePath(const NODE_id &name);
@@ -350,18 +349,18 @@ struct root_data: public Cellable
     std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
 
     REF_getter<bc_contract> getContract(const CONTRACT_id &name);
-    REF_getter<bc_contract> addContract(const CONTRACT_id &name,  const EPOCH_id& epoch, Rollback*);
+    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const REF_getter<fee_calcer>& bca, const EPOCH_id& epoch);
 
-    REF_getter<bc_values> getValues(Rollback* roll);
+    REF_getter<bc_values> getValues();
     REF_getter<bc_values> checkValues();
 
-    REF_getter<bc_epoch> getEpoch(Rollback* roll);
+    REF_getter<bc_epoch> getEpoch();
 
 
 
     // REF_getter<bc_user> getUser(const ADDRESS_id &pk);
 
-    REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk, Rollback*);
+    REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk);
     REF_getter<bc_address_state>   checkUserState(const ADDRESS_id &pk);
 
 
@@ -370,7 +369,7 @@ struct root_data: public Cellable
 
 
     REF_getter<bc_node> getNode(const NODE_id &name);
-    REF_getter<bc_node> addNode(const NODE_id &name, const EPOCH_id& epoch, Rollback*);
+    REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const EPOCH_id& epoch);
 
 
 

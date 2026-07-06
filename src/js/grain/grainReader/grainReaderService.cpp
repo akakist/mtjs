@@ -153,7 +153,7 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
         ADDRESS_id addr;
         auto pp=(MsgData::GetUserNonceREQ*) b.get();
         // addr.container=blake2b_hash(pp->user_pk_bin_ed).container;
-        auto u = root->getAddressState(pp->user_address,NULL);
+        auto u = root->getAddressState(pp->user_address);
 
         REF_getter<MsgData::GetUserNonceRSP> rsp=new MsgData::GetUserNonceRSP;
         // rsp->balance=u->getBalance();

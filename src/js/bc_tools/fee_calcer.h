@@ -1,4 +1,3 @@
-#ifdef KALL
 #pragma once
 
 #include "REF.h"
@@ -48,4 +47,3 @@ struct _feeCalcers
         calcers.clear();
     }
 };
-#endif
