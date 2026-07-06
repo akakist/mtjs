@@ -71,4 +71,5 @@ struct t_params
     REF_getter<MsgData::TX> tx;
     EPOCH_id epoch;
     THASH_id tx_id;
+    Rollback *roll;
 };

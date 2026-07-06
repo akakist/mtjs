@@ -373,8 +373,8 @@ struct bc_epoch: public data_base
 
 };
 
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db);
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db);
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db, Rollback*);
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db, Rollback*);
 
 REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db);
 
@@ -396,18 +396,18 @@ struct root_data: public Cellable
     std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
 
     REF_getter<bc_contract> getContract(const CONTRACT_id &name);
-    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const REF_getter<fee_calcer>& bca, const EPOCH_id& epoch);
+    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const REF_getter<fee_calcer>& bca, const EPOCH_id& epoch, Rollback*);
 
-    REF_getter<bc_values> getValues();
+    REF_getter<bc_values> getValues(Rollback* roll);
     REF_getter<bc_values> checkValues();
 
-    REF_getter<bc_epoch> getEpoch();
+    REF_getter<bc_epoch> getEpoch(Rollback* roll);
 
 
 
     // REF_getter<bc_user> getUser(const ADDRESS_id &pk);
 
-    REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk);
+    REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk, Rollback*);
     REF_getter<bc_address_state>   checkUserState(const ADDRESS_id &pk);
 
 
@@ -416,7 +416,7 @@ struct root_data: public Cellable
 
 
     REF_getter<bc_node> getNode(const NODE_id &name);
-    REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const EPOCH_id& epoch);
+    REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const EPOCH_id& epoch, Rollback*);
 
 
 

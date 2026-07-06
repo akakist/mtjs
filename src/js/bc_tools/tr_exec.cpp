@@ -13,7 +13,7 @@
 std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_params &t,
         const REF_getter<fee_calcer> &by,  int seqId)
 {
-    auto v = t.root->getValues();
+    auto v = t.root->getValues(NULL);
     auto it = v->emitters_bin.find(t.senderAddress);
     if (it == v->emitters_bin.end())
     {
@@ -25,7 +25,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     if(err) return err;
 
 
-    auto u = t.root->getAddressState(t.senderAddress);
+    auto u = t.root->getAddressState(t.senderAddress,t.roll);
     if (!u.valid())
     {
         return "mint: sender not found";
@@ -49,7 +49,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
 std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b, t_params &t,
     const REF_getter<fee_calcer> &by, int seqId)
 {
-    auto v = t.root->getValues();
+    auto v = t.root->getValues(t.roll);
 
     BigInt amount=0;
     auto err=yy_get_bn(params,"amount",amount);
@@ -64,7 +64,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     if(to_addr.addr.size()!=t.senderAddress.addr.size())
         return "param to has invalid size";
 
-    auto u = t.root->getAddressState(t.senderAddress);
+    auto u = t.root->getAddressState(t.senderAddress, t.roll);
     if (!u.valid())
     {
         return "sender userstate invalid";
@@ -78,7 +78,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     {
         return "invalid destination address";
     }
-    auto to = t.root->getAddressState(to_addr);
+    auto to = t.root->getAddressState(to_addr, t.roll);
     if (!to.valid())
     {
         return "destination user not found";
@@ -120,7 +120,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     const REF_getter<fee_calcer> &by,int seqId)
 {
     // if(senderAddress!=)
-    auto v = t.root->getValues();
+    auto v = t.root->getValues(NULL);
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
@@ -134,7 +134,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     {
         return "only node owner can update node info";
     }
-    auto us = t.root->getAddressState(t.senderAddress);
+    auto us = t.root->getAddressState(t.senderAddress,t.roll);
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("node_update");
@@ -172,7 +172,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
 std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params &b, t_params &t,
     const REF_getter<fee_calcer> &by, int seqId)
 {
-    auto v = t.root->getValues();
+    auto v = t.root->getValues(NULL);
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
@@ -192,7 +192,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
     if (nn.valid())
         return "Node already registered with name";
 
-    auto us = t.root->getAddressState(t.senderAddress);
+    auto us = t.root->getAddressState(t.senderAddress,t.roll);
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("node_create");
@@ -203,7 +203,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
     }
 
 
-    auto n = t.root->addNode(name, by,t.epoch);
+    auto n = t.root->addNode(name, by,t.epoch,t.roll);
 
     std::string ip,pk_ed,pk_bls;
     err=yy_get_string(params,"ip",ip);
@@ -251,7 +251,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
 std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params & b,t_params &t,
     const REF_getter<fee_calcer>& by, int seqId)
 {
-    auto v = t.root->getValues();
+    auto v = t.root->getValues(NULL);
 
     BigInt amount=0;
     auto err=yy_get_bn(params,"amount",amount);
@@ -262,7 +262,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     if(err) return err;
 
 
-    auto us = t.root->getAddressState(t.senderAddress);
+    auto us = t.root->getAddressState(t.senderAddress,t.roll);
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("node_stake");
@@ -311,7 +311,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
 std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params & b,t_params &t,
     const REF_getter<fee_calcer>& by, int seqId)
 {
-    auto v = t.root->getValues();
+    auto v = t.root->getValues(NULL);
     BigInt amount=0;
     auto err=yy_get_bn(params,"amount",amount);
     if(err) return err;
@@ -335,7 +335,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
         return "insufficient stake in node";
     }
 
-    auto u = t.root->getAddressState(t.senderAddress);
+    auto u = t.root->getAddressState(t.senderAddress,t.roll);
 
     if (!u.valid())
         return "FATAL:  dst addr not found";
@@ -383,7 +383,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
 std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params & b,t_params &t,
     const REF_getter<fee_calcer>& by, int seqId)
 {
-    auto v = t.root->getValues();
+    auto v = t.root->getValues(NULL);
     NODE_id node;
     auto err=yy_get_string(params,"node",node.container);
     if(err)return err;
@@ -398,7 +398,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
         return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(t.senderAddress.addr);
     }
     auto fee=v->getFee("node_enable");
-    auto us = t.root->getAddressState(t.senderAddress);
+    auto us = t.root->getAddressState(t.senderAddress, t.roll);
     if (!us.valid())
         return "if(!us.valid())";
     {
@@ -425,7 +425,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
 std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_params &b, t_params &t,
     const REF_getter<fee_calcer> &by,int seqId)
 {
-    auto v = t.root->getValues();
+    auto v = t.root->getValues(NULL);
     std::string name;
     auto err=yy_get_string(params,"name",name);
     if(err) return err;
@@ -446,7 +446,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     if (nn.valid())
         return "Contract already registered with name";
 
-    auto us = t.root->getAddressState(t.senderAddress);
+    auto us = t.root->getAddressState(t.senderAddress,t.roll);
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("contract_deploy");
@@ -457,7 +457,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     }
 
 
-    auto n = t.root->addContract(cn, by,t.epoch);
+    auto n = t.root->addContract(cn, by,t.epoch,t.roll);
 
     std::string src;
      err=yy_get_string(params,"src",src);
@@ -483,7 +483,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
 std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_params &b, t_params &t,
     const REF_getter<fee_calcer> &by, int seqId)
 {
-    auto v = t.root->getValues();
+    auto v = t.root->getValues(NULL);
     CONTRACT_id cn;
     auto err=yy_get_string(params,"name",cn.container);
     if(err)
@@ -497,7 +497,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     {
         return "sender is not contract owner";
     }
-    auto us = t.root->getAddressState(t.senderAddress);
+    auto us = t.root->getAddressState(t.senderAddress, t.roll);
     if (!us.valid())
         return "if(!us.valid())";
     auto fee=v->getFee("contract_update");

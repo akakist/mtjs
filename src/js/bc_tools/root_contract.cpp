@@ -29,23 +29,23 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
 };
 
 
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string> &v, IDatabase *db)
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string> &v, IDatabase *db, Rollback* roll)
 {
     // M_LOCK(cur->lock);
     for (auto &z : v)
     {
         MutexLockerDeferred l(cur->mx);
-        cur = cur->getLeafOrCreate(z, db,l);
+        cur = cur->getLeafOrCreate(z, db,l, roll);
     }
     return cur;
 }
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db)
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db, Rollback* roll)
 {
     // M_LOCK(cur->lock);
     for (auto &z : v)
     {
         MutexLockerDeferred l(cur->mx);
-        cur = cur->getLeafOrCreate(z, db,l);
+        cur = cur->getLeafOrCreate(z, db,l, roll);
     }
     return cur;
 }
@@ -78,7 +78,7 @@ void root_data::apply_diff(const cdiff& out)
             auto& path=z.first;
             auto& buf=z.second.first;
             int ctor=z.second.second;
-            REF_getter<Cellable> cell=getByPathOrCreate(this,path,db.get());
+            REF_getter<Cellable> cell=getByPathOrCreate(this,path,db.get(),NULL);
             if(cell->payload_ctor_idx && cell->payload_ctor_idx!=ctor)
             {
                 throw CommonError("if(cell->payload_ctor_idx && cell->payload_ctor_idx!=ctor)");
@@ -140,11 +140,11 @@ REF_getter<bc_contract> root_data::getContract(const CONTRACT_id &name)
     return dynamic_cast<bc_contract *>(cc->data.get());
 }
 
-REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const REF_getter<fee_calcer> &bca, const EPOCH_id& epoch)
+REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const REF_getter<fee_calcer> &bca, const EPOCH_id& epoch, Rollback* roll)
 {
     MUTEX_INSPECTOR;
     auto v = getContractPath(name);
-    auto cc = getByPathOrCreate(this, v, db.get());
+    auto cc = getByPathOrCreate(this, v, db.get(), roll);
     if (!cc.valid())
         throw CommonError("if(!cc.valid())");
     if (cc->data.valid())
@@ -155,12 +155,12 @@ REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const RE
     cc->data->setDirty(epoch);
     return bc;
 }
-REF_getter<bc_epoch> root_data::getEpoch()
+REF_getter<bc_epoch> root_data::getEpoch(Rollback* roll)
 {
     MUTEX_INSPECTOR;
     auto r = this;
     MutexLockerDeferred lk(r->mx);
-    auto l = r->getLeafOrCreate("ep", db.get(),lk);
+    auto l = r->getLeafOrCreate("ep", db.get(),lk, roll);
     if (!l.valid())
         throw CommonError("if(!l.valid())");
     if (l->data.valid())
@@ -176,12 +176,12 @@ REF_getter<bc_epoch> root_data::getEpoch()
     return v;
 }
 
-REF_getter<bc_values> root_data::getValues()
+REF_getter<bc_values> root_data::getValues(Rollback* roll)
 {
     MUTEX_INSPECTOR;
     auto r = this;
     MutexLockerDeferred lk(r->mx);
-    auto l = r->getLeafOrCreate("v", db.get(),lk);
+    auto l = r->getLeafOrCreate("v", db.get(),lk, roll);
     if (!l.valid())
         throw CommonError("if(!l.valid())");
     if (l->data.valid())
@@ -259,11 +259,11 @@ std::vector<std::string> root_data::getAddressStatePath(const ADDRESS_id &addr)
 //     cc->payload_ctor_idx = hsh::bc_user;
 //     return u;
 // }
-REF_getter<bc_address_state> root_data::getAddressState(const ADDRESS_id &addr)
+REF_getter<bc_address_state> root_data::getAddressState(const ADDRESS_id &addr, Rollback* roll)
 {
     MUTEX_INSPECTOR;
     auto v = getAddressStatePath(addr);
-    auto cc = getByPathOrCreate(this, v, db.get());
+    auto cc = getByPathOrCreate(this, v, db.get(), roll);
     if (!cc.valid())
         return NULL;
     if (cc->data.valid())
@@ -367,14 +367,14 @@ std::vector<REF_getter<bc_node>> root_data::getAllNodes()
     // }
     // return v;
 }
-REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer> &bc, const EPOCH_id& epoch)
+REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer> &bc, const EPOCH_id& epoch, Rollback* roll)
 {
     MUTEX_INSPECTOR;
 
     std::vector<std::string> v = getNodePath(name);
     // v.push_back("n");
     // v.push_back(name.container);
-    auto cc = getByPathOrCreate(this, v, db.get());
+    auto cc = getByPathOrCreate(this, v, db.get(), roll);
 
     if (cc->data.valid())
         throw CommonError("if(cc->data.valid())");

@@ -28,14 +28,10 @@ std::string Cellable::dump()
     return str.str();
 }
 
-REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l)
+REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l, Rollback* roll)
 {
     MUTEX_INSPECTOR;
-    {
-        MUTEX_INSPECTOR;
-        l.lock();
-
-    }
+    l.lock();
     auto it = children_hashes_mx.find(id);
     if (it != children_hashes_mx.end())
     {
@@ -43,9 +39,12 @@ REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase 
         l.unlock();
         return getLeafNoCreate(id, db,l);
     }
-    // lk.unlock();
+    if(roll)
+    {
+        if(!roll->data.count(this))
+            roll->data[this]=getBuffer();
 
-    // l.lock();
+    }
     children_hashes_mx[id].container = "";
     auto it2 = children_ptrs_mx.find(id);
     if (it2 != children_ptrs_mx.end())

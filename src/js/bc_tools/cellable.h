@@ -84,7 +84,10 @@ struct data_base : public Refcountable
 };
 
 extern std::vector< data_base* (*)(Cellable*)> db_constructors;
-
+struct Rollback
+{
+    std::map<Cellable*, std::string> data;
+};
 struct Cellable: public Refcountable
 {
 
@@ -214,7 +217,7 @@ public:
     }
 
 
-    REF_getter<Cellable> getLeafOrCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
+    REF_getter<Cellable> getLeafOrCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l,Rollback* roll);
     REF_getter<Cellable> getLeafNoCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
 
     void calc_tree_hash(_db_to_save &db_dump);

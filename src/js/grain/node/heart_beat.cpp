@@ -114,7 +114,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         logNode("block timestamp not valid");
         return true;
     }
-    auto llc=root->getEpoch()->prev_lc;
+    auto llc=root->getEpoch(NULL)->prev_lc;
     
     if(llc.size())
     {
@@ -370,14 +370,14 @@ void Node::Service::do_heart_beat()
     // logNode("@@ %s",__FUNCTION__);
     blocks_leader.clear();
     {
-        EPOCH_id e=root->getEpoch()->epoch;
+        EPOCH_id e=root->getEpoch(NULL)->epoch;
         e.container+=1;
         REF_getter<MsgData::HeartBeatREQ> hb_req =
             new MsgData::HeartBeatREQ(prev_root_hash_Z,
                                       e,
-                                      this_node_name, root->getEpoch()->prev_lc, time(NULL));
+                                      this_node_name, root->getEpoch(NULL)->prev_lc, time(NULL));
 
-        REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),root->getEpoch()->prev_lc);
+        REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),root->getEpoch(NULL)->prev_lc);
         // logNode("broadcast heart beat");
         broadcast_MsgEvent(lce.get());
     }

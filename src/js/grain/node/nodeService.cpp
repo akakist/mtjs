@@ -249,7 +249,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         if(lc_responses.size())
         {
             REF_getter<MsgData::LeaderCertificate> local_lc=NULL;
-            auto &local_lcb=root->getEpoch()->prev_lc;
+            auto &local_lcb=root->getEpoch(NULL)->prev_lc;
             if(local_lcb.size())
             {
                 local_lc=new MsgData::LeaderCertificate;
@@ -584,7 +584,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
         if (!t_err)
         {
             MUTEX_INSPECTOR;
-            auto u = root->getAddressState(senderAddress);
+            auto u = root->getAddressState(senderAddress,NULL);
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -625,7 +625,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
 
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
     calc_fee_rewards_nodes(b, lc);
-    auto newEpoch = root->getEpoch();
+    auto newEpoch = root->getEpoch(NULL);
     newEpoch->epoch.container += 1;
     newEpoch->prev_lc = b.validateBlockREQ->leader_cert->getBuffer();
     newEpoch->setDirty(lc->heart_beat->new_epoch);
@@ -670,7 +670,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     BigInt total_fees;
     for (auto &z : b.feeCalcers.calcers)
     {
-        auto u = root->getAddressState(z.first);
+        auto u = root->getAddressState(z.first,NULL);
         if (!u.valid())
             throw CommonError("if(!u.valid()) 334455");
         {
@@ -703,7 +703,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
         if (!node.valid())
             throw CommonError("if(!node.valid()) 556677");
         auto owner = node->get_owner();
-        auto u = root->getAddressState(owner);
+        auto u = root->getAddressState(owner, NULL);
         if (!u.valid())
         {
             throw CommonError("if(!u.valid()) 778899");
@@ -1112,11 +1112,13 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, cons
     if(!j_tx)
         throw CommonError("if(!j_tx)");
 
+        Rollback roll;
     t_params t(root);
     t.senderAddress=senderAddress;
     t.tx=tx;
     t.epoch=epoch;
     t.tx_id=tx_id;
+    t.roll=&roll;
 
 
     /// сбрасываем все изменения состояния перед транзакцией
@@ -1190,7 +1192,7 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
 void Node::Service::logNode(const char *fmt, ...)
 {
 
-    auto epoch = root->getEpoch();
+    auto epoch = root->getEpoch(NULL);
     {
         va_list ap;
         va_start(ap, fmt);
