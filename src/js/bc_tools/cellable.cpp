@@ -28,14 +28,10 @@ std::string Cellable::dump()
     return str.str();
 }
 
-REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l)
+REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l, Rollback* roll)
 {
     MUTEX_INSPECTOR;
-    {
-        MUTEX_INSPECTOR;
-        l.lock();
-
-    }
+    l.lock();
     auto it = children_hashes_mx.find(id);
     if (it != children_hashes_mx.end())
     {
@@ -44,7 +40,13 @@ REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase 
         return getLeafNoCreate(id, db,l);
     }
     // lk.unlock();
-
+    if(roll)
+    {
+        if(!roll->data.count(this));
+        {
+            roll->data[this]=getBuffer_mx();
+        }
+    }
     // l.lock();
     children_hashes_mx[id].container = "";
     auto it2 = children_ptrs_mx.find(id);
@@ -52,11 +54,8 @@ REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase 
         throw CommonError("if(it!=children_ptrs.end())");
     REF_getter<Cellable> c = new Cellable(this, id);
     children_ptrs_mx.insert({id, c});
-    {
-        MUTEX_INSPECTOR;
-        l.unlock();
+    l.unlock();
 
-    }
     return c;
 }
 
@@ -82,11 +81,7 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string &id, IDatabase 
         l.unlock();
         return NULL;
     }
-    {
-        MUTEX_INSPECTOR;
-        l.unlock();
-
-    }
+    l.unlock();
     REF_getter<Cellable> cc = new Cellable(this, id);
 
 
@@ -103,7 +98,9 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string &id, IDatabase 
         if (it->second == h)
         {
             inBuffer in(result);
-            cc->unpack(in);
+            // l.lock();
+            cc->unpack_mx(in);
+            // /l.unlock();
         }
         else
         {
@@ -121,41 +118,6 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string &id, IDatabase 
 
     }
     return cc;
-}
-void Cellable::_getDiff(cdiff& out, const EPOCH_id &epoch, IDatabase* db)
-{
-    if(last_update_epoch<epoch)
-        return;
-    std::deque<std::string> path;
-    get_path(path);
-    if(data.valid())
-    {
-        auto e=data->last_update_epoch;
-        out.add(e,path,data->getBuffer(),payload_ctor_idx); 
-    }
-    // out[path]={getBuffer();
-    MutexLockerDeferred lk(mx);
-    lk.lock();
-    auto hashes=children_hashes_mx;
-    lk.unlock();
-    for(auto& z:hashes)
-    {
-        REF_getter<Cellable> child;
-        lk.lock();
-        auto it=children_ptrs_mx.find(z.first);
-        if(it!=children_ptrs_mx.end())
-            child=it->second;
-        else
-        {
-            lk.unlock();
-            child=getLeafNoCreate(z.first,db,lk);
-            if(!child.valid())
-                throw CommonError("if(!child.valid())");
-        }
-        if(!child.valid())
-            throw CommonError("if(!child.valid())");
-        child->_getDiff(out,epoch,db);
-    }
 }
 
 void Cellable::calc_tree_hash(_db_to_save &db_dump)
@@ -179,7 +141,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
             // lk.unlock();
             c->calc_tree_hash(db_dump);
             lk.lock();
-            auto child_buf = c->getBuffer();
+            auto child_buf = c->getBuffer_mx();
             auto ch = blake2b_hash(child_buf);
             if (ch != children_hashes_mx[cid])
             {
@@ -193,8 +155,10 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     }
     is_dirty = false;
 }
-void data_base::setDirty(const EPOCH_id& epoch)
+void data_base::setDirty(const EPOCH_id& epoch, Rollback* roll)
 {
+        MUTEX_INSPECTOR;
+
     last_update_epoch=epoch;
-    parent->setDirty__(epoch);
+    parent->setDirty__(epoch,roll);
 }

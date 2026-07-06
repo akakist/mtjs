@@ -248,7 +248,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         if(lc_responses.size())
         {
             REF_getter<MsgData::LeaderCertificate> local_lc=NULL;
-            auto &local_lcb=root->getEpoch()->prev_lc;
+            auto &local_lcb=root->getEpoch(NULL)->prev_lc;
             if(local_lcb.size())
             {
                 local_lc=new MsgData::LeaderCertificate;
@@ -582,7 +582,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
         if (!t_err)
         {
             MUTEX_INSPECTOR;
-            auto u = root->getAddressState(senderAddress);
+            auto u = root->getAddressState(senderAddress,NULL);
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -610,7 +610,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
                     // t.senderAddress=senderAddress;
                     execute_transaction(tt->getHash(),  b, senderAddress, tt, lc->heart_beat->new_epoch);
                     u->incNonce();
-                    u->setDirty(lc->heart_beat->new_epoch);
+                    u->setDirty(lc->heart_beat->new_epoch,NULL);
 
                 }
             }
@@ -623,10 +623,10 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
 
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
     calc_fee_rewards_nodes(b, lc);
-    auto newEpoch = root->getEpoch();
+    auto newEpoch = root->getEpoch(NULL);
     newEpoch->epoch.container += 1;
     newEpoch->prev_lc = b.validateBlockREQ->leader_cert->getBuffer();
-    newEpoch->setDirty(lc->heart_beat->new_epoch);
+    newEpoch->setDirty(lc->heart_beat->new_epoch,NULL);
 
     rh=proceed_merkle_on_transaction_pool_hashers(root);
     return rh;
@@ -649,13 +649,13 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     {
         auto portion=n->get_full_stake()*b.node_rewards/total_staked;
         auto owner=n->get_owner();
-        auto u = root->getAddressState(owner);
+        auto u = root->getAddressState(owner,NULL);
         NODE_id name=n->getName();
         {
             M_LOCK(u->parent->mx);
             u->balance+=portion;
         }
-        u->setDirty(lc->heart_beat->new_epoch);
+        u->setDirty(lc->heart_beat->new_epoch,NULL);
         b.emit_block("reward",R"({"node":"%s","fee":"%s"})",name.container.c_str(),portion.toString().c_str());
     }
     b.emit_block("total_fee",R"({"fee":"%s"})",b.node_rewards.toString().c_str());
@@ -676,7 +676,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
             else
             {
                 n->reset_missed_rounds();
-                n->setDirty(lc->heart_beat->new_epoch);
+                n->setDirty(lc->heart_beat->new_epoch,NULL);
             }
         }
         else
@@ -688,7 +688,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
             else    
             {
                 n->inc_missed_rounds();
-                n->setDirty(lc->heart_beat->new_epoch);
+                n->setDirty(lc->heart_beat->new_epoch,NULL);
             }
         }
     }
@@ -700,7 +700,11 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
     r->calc_tree_hash(db_to_save_Z);
     // r->calcers_Z.clear();
 
-    auto root_buf = r->getBuffer();
+    std::string root_buf;
+    {
+        M_LOCK(r->mx);
+        root_buf = r->getBuffer_mx();
+    }
     auto root_hash = blake2b_hash(root_buf);
     db_to_save_Z.add("#root#", root_buf);
     db_to_save_Z.add("#root_hash#", root_hash.container);
@@ -920,6 +924,7 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_params& t, 
       yyjson_val * j_tx)
 {
+    MUTEX_INSPECTOR;
     if(!yyjson_is_arr(j_tx))
         return "command list must be json array";
         // throw CommonError("if(!yyjson_is_arr(root))");
@@ -953,32 +958,8 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 return "'method' must be string type";
             if(!yyjson_is_obj(params))
                 return "'params' must be object type";
-            // if(contract==NULL || method==NULL || params==NULL)
-            // {
-            //     return "contract, method, params fields required";
-            //     // b.emit_command(t.tx_id, index, "error",
-            //     //     R"({"code":-32602,"error":"contract, method, params fields required"})");
-            //     // index++;
-            //     // continue;
-            // }
-            // if(!yyjson_is_str(contract) || !yyjson_is_str(method) || !yyjson_is_obj(params))
-            // {
-            //     return "contract:string, method:string, params:object fields required";
-            //     // b.emit_command(t.tx_id, index, "error",
-            //     //     R"({"code":-32602,"error":"contract, method, params fields required"})");
-            //     // index++;
-            //     // continue;
-            // }
             std::string contract_str=yyjson_get_str(contract);
             std::string method_str=yyjson_get_str(method);
-            // if(!contract.isString() || !method.isString() || !params.isObject())
-            // {
-            //     MUTEX_INSPECTOR;
-            //     t.emit_command(tx_id, ii, "error", 
-            //         R"({"code":-32602,"error":"contract, method, params fields required"})");
-            //     err=true;
-            // }
-            // throw CommonError("if(!contract.isString() || !method.isString() || !params.isObject())");
             if (!err && contract_str == "root")
             {
                 MUTEX_INSPECTOR;
@@ -1051,19 +1032,32 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, cons
     yyjson_val * j_tx = yyjson_obj_get(jroot,"tx");
     if(!j_tx)
         throw CommonError("if(!j_tx)");
-
+    // BigInt gasLimit=0;
+    // BigInt gasPrice=0;
+    // BigInt value=0;
+    auto err=yy_get_bn(jroot,"value",value);
+    if(!err)
+        err=yy_get_bn(jroot,"gasLimit",gasLimit);
+    if(!err)
+        err=yy_get_bn(jroot,"gasPrice",gasPrice);
+    if(err)
+    {
+        b.emit_tx(tx_id,"error",R"({"error":"%s"})",err->c_str());
+        return;
+    }    
+    Rollback roll;
     t_params t(root);
     t.senderAddress=senderAddress;
     t.tx=tx;
     t.epoch=epoch;
     t.tx_id=tx_id;
-
+    t.roll=&roll;
 
     /// сбрасываем все изменения состояния перед транзакцией
     // _db_to_save db_dump0;
     root->calc_tree_hash(db_to_save_Z);
 
-    auto err=execute_tx_commands(b,t,j_tx);
+    err=execute_tx_commands(b,t,j_tx);
     if(err)
     {
         logNode("error:%s",err->c_str());
@@ -1130,7 +1124,7 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
 void Node::Service::logNode(const char *fmt, ...)
 {
 
-    auto epoch = root->getEpoch();
+    auto epoch = root->getEpoch(NULL);
     {
         va_list ap;
         va_start(ap, fmt);

@@ -60,13 +60,12 @@ async function exec() {
         // const m=mtjs.tx_sign(tx, sk!);
         // console.log("signed tx:", m);
         i++;
-        let req = { tx: tx, nonce: nonce };
+        let req = { tx: tx, nonce: nonce, value: 1000000, gasLimit: 100000, gasPrice: 10 };
         const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce, (obj) => {
             console.log("TX REPORT " + JSON.stringify(obj));
         });
         console.log(rsp);
         sleep(200);
-
     }
 }
 console.log(std.getenv("PATH"));

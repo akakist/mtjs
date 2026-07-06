@@ -63,4 +63,5 @@ struct t_params
     EPOCH_id epoch;
     THASH_id tx_id;
     BigInt gasUsed=0;
+    Rollback *roll=NULL;
 };

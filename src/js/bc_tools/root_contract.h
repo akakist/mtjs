@@ -39,47 +39,6 @@ struct bc_contract:  public data_base
     }
     std::string dump() final;
 };
-#ifdef KALL
-struct bc_user: public data_base
-{
-
-    bc_user(Cellable* p): data_base(hsh::bc_user,p, 0,-1) {
-    }
-    // ADDRESS_id address;
-    // std::map<NODE_id /*nodeName*/, BigInt /*stake*/> my_stakes;
-    // std::set<NODE_id> nodes;
-    // std::set<std::string> contracts;
-    BigInt balance;
-    std::map<CONTRACT_id, BigInt> contract_deposits;
-
-
-    void pack(outBuffer& o) const final
-    {
-        data_base::pack(o);
-        o<<1;
-        o<<balance<<contract_deposits;
-    }
-    void unpack(inBuffer& o) final
-    {
-        data_base::unpack(o);
-        auto v=o.get_PN();
-        o>>balance>>contract_deposits;
-    }
-    std::string dump() final
-    {
-        std::ostringstream o;
-        // o<<"ADDRESS: "  << base16::encode(address.addr) << std::endl;
-        o<< std::endl;
-
-
-        // o<< std::endl;
-
-
-        return o.str();
-    }
-
-};
-#endif
 struct bc_address_state: public data_base
 {
 
@@ -284,13 +243,13 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
     }
     void pack(outBuffer& o) const final
     {
-        // cost.pack(o);
+        data_base::pack(o);
         o<<1;
         o<<fees<<emitters_bin;
     }
     void unpack(inBuffer& o) final
     {
-        // cost.unpack(o);
+        data_base::unpack(o);
         auto v=o.get_PN();
 
         o>>fees>>emitters_bin;
@@ -309,14 +268,14 @@ struct bc_epoch: public data_base
     std::string prev_lc;
     void pack(outBuffer& o) const final
     {
-        // cost.pack(o);
+        data_base::pack(o);
         o<<1;
         o<<epoch;
         o<<prev_lc;
     }
     void unpack(inBuffer& o) final
     {
-        // cost.unpack(o);
+        data_base::unpack(o);
         auto v=o.get_PN();
         o>>epoch;
         o>> prev_lc;
@@ -325,8 +284,8 @@ struct bc_epoch: public data_base
 
 };
 
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db);
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db);
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db, Rollback* roll);
+REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db,Rollback*);
 
 REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db);
 
@@ -339,8 +298,6 @@ struct root_data: public Cellable
     {
     }
     Mutex state_mutex;
-    void getDiff(cdiff& out, const EPOCH_id &epoch);
-    void apply_diff(const cdiff& out);
 
     std::vector<std::string> getContractPath(const CONTRACT_id &name);
     std::vector<std::string> getNodePath(const NODE_id &name);
@@ -348,18 +305,18 @@ struct root_data: public Cellable
     std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
 
     REF_getter<bc_contract> getContract(const CONTRACT_id &name);
-    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const EPOCH_id& epoch);
+    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const EPOCH_id& epoch,Rollback*);
 
-    REF_getter<bc_values> getValues();
+    REF_getter<bc_values> getValues(Rollback*);
     REF_getter<bc_values> checkValues();
 
-    REF_getter<bc_epoch> getEpoch();
+    REF_getter<bc_epoch> getEpoch(Rollback* roll);
 
 
 
     // REF_getter<bc_user> getUser(const ADDRESS_id &pk);
 
-    REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk);
+    REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk,Rollback*);
     REF_getter<bc_address_state>   checkUserState(const ADDRESS_id &pk);
 
 
@@ -368,7 +325,7 @@ struct root_data: public Cellable
 
 
     REF_getter<bc_node> getNode(const NODE_id &name);
-    REF_getter<bc_node> addNode(const NODE_id &name,  const EPOCH_id& epoch);
+    REF_getter<bc_node> addNode(const NODE_id &name,  const EPOCH_id& epoch, Rollback*);
 
 
 

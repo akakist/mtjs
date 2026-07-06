@@ -12,27 +12,10 @@
 
 struct Cellable;
 
-struct cdiff
+struct Rollback
 {
-    std::map<EPOCH_id, std::map<std::deque<std::string>,std::pair<std::string,int>>>container;
-    void add(const EPOCH_id& ep, const std::deque<std::string>& path, const std::string& body, int ctor_idx)
-    {
-        container[ep][path]={body,ctor_idx};
-    }
+    std::map<Cellable*, std::string> data;
 };
-inline outBuffer & operator<< (outBuffer& b,const cdiff &s)
-{
-    b<<1;
-    b<<s.container;
-    return b;
-}
-inline inBuffer & operator>> (inBuffer& b,  cdiff &s)
-{
-    auto ver=b.get_PN();
-    b>>s.container;
-    return b;
-}
-
 struct data_base : public Refcountable
 {
     int type;
@@ -50,7 +33,8 @@ struct data_base : public Refcountable
     ~data_base()
     {
     }
-    void setDirty(const EPOCH_id& epoch);
+    void setDirty(const EPOCH_id& epoch, Rollback* roll);
+;
     virtual void pack(outBuffer& o) const
     {
         o<<1;
@@ -115,18 +99,32 @@ public:
     Cellable(Cellable* _parent, const std::string & id):Refcountable("cellable"),  parent(_parent), m_id(id)
     {
     }
-    void setDirty__(const EPOCH_id& epoch)
+    void setDirty__(const EPOCH_id& epoch, Rollback* r)
     {
-        is_dirty=true;
-        last_update_epoch=epoch;
+    MUTEX_INSPECTOR;
+        {
+    MUTEX_INSPECTOR;
+            M_LOCK(mx);
+            if(r)
+            {
+    MUTEX_INSPECTOR;
+                if(!r->data.count(this))
+                    r->data[this]=getBuffer_mx();
+            }
+            is_dirty=true;
+            last_update_epoch=epoch;
+
+        }
         // if(bc.valid())
         //     calcers_Z.insert(bc);
         if(parent)
         {
-            parent->setDirty__(epoch);
+            parent->setDirty__(epoch,r);
         }
     }
     std::string dump();
+
+    REF_getter<Cellable> getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l, Rollback *roll);
 
     std::string getDbId() const;
 
@@ -146,14 +144,14 @@ public:
         }
         s.push_back(this->m_id);
     }
-    virtual void pack(outBuffer& o)
+    virtual void pack_mx(outBuffer& o)
     {
         o<<1;
         // o<<m_id;
         o<<payload_ctor_idx;
         o<<last_update_epoch;
         {
-            MutexLocker lk(mx);
+            // MutexLocker lk(mx);
             o<<children_hashes_mx;
             bool valid=data.valid();
             o<<valid;
@@ -162,14 +160,14 @@ public:
 
         }
     }
-    virtual void unpack(inBuffer& in)
+    virtual void unpack_mx(inBuffer& in)
     {
         int v=in.get_PN();
         // in>>m_id;
         in>>payload_ctor_idx;
         in>>last_update_epoch;
         {
-            MutexLocker lk(mx);
+            // MutexLocker lk(mx);
             in>>children_hashes_mx;
             bool valid;
             in>>valid;
@@ -189,10 +187,10 @@ public:
 
         }
     }
-    std::string getBuffer()
+    std::string getBuffer_mx()
     {
         outBuffer o;
-        pack(o);
+        pack_mx(o);
         return o.asString()->container;
     }
     const Cellable * get_root()
@@ -206,12 +204,10 @@ public:
     }
 
 
-    REF_getter<Cellable> getLeafOrCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
+    // REF_getter<Cellable> getLeafOrCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
     REF_getter<Cellable> getLeafNoCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
 
     void calc_tree_hash(_db_to_save &db_dump);
-    // void _getDiff(std::map<std::deque<std::string>,std::string>& out, const EPOCH_id &epoch, IDatabase* db);
-    void _getDiff(cdiff& out, const EPOCH_id &epoch, IDatabase* db);
 };
 // static const char* base16_TABLE[62] = {
 //     "0","1","2","3","4","5","6","7","8","9",
