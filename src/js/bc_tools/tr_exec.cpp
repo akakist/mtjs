@@ -37,7 +37,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     // u->addBalance(amount);
     u->setDirty(t.epoch);
 
-    t.gasUsed+=v->getFee("mint");
+    t.gasUsed+=v->getGas("mint");
 
     b.emit_command(t.tx_id, seqId,"mint",R"({"to":"%s","amount":"%s"})",
         base16::encode(t.senderAddress.addr).c_str(),
@@ -82,7 +82,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     {
         return "destination user not found";
     }
-    auto fee=v->getFee("transfer");
+    auto fee=v->getGas("transfer");
     {
         M_LOCK(u->parent->mx);
         if(u->balance < fee + amount)
@@ -134,7 +134,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     auto us = t.root->getAddressState(t.senderAddress,t.roll);
     if (!us.valid())
         return "if(!us.valid())";
-    auto fee=v->getFee("node_update");
+    auto fee=v->getGas("node_update");
     {
         M_LOCK(us->parent->mx);
         if(us->balance < fee)
@@ -189,7 +189,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
     auto us = t.root->getAddressState(t.senderAddress,t.roll);
     if (!us.valid())
         return "if(!us.valid())";
-    auto fee=v->getFee("node_create");
+    auto fee=v->getGas("node_create");
     {
         M_LOCK(us->parent->mx);
         if (us->balance < fee)
@@ -256,7 +256,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     auto us = t.root->getAddressState(t.senderAddress,t.roll);
     if (!us.valid())
         return "if(!us.valid())";
-    auto fee=v->getFee("node_stake");
+    auto fee=v->getGas("node_stake");
 
     auto n=t.root->getNode(node);
     if(!n.valid())
@@ -327,7 +327,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
 
     if (!u.valid())
         return "FATAL:  dst addr not found";
-    auto fee=v->getFee("node_unstake");
+    auto fee=v->getGas("node_unstake");
     {
         M_LOCK(u->parent->mx);
         if(u->balance < fee)
@@ -378,7 +378,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     {
         return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(t.senderAddress.addr);
     }
-    auto fee=v->getFee("node_enable");
+    auto fee=v->getGas("node_enable");
     auto us = t.root->getAddressState(t.senderAddress, t.roll);
     if (!us.valid())
         return "if(!us.valid())";
@@ -430,7 +430,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     auto us = t.root->getAddressState(t.senderAddress,t.roll);
     if (!us.valid())
         return "if(!us.valid())";
-    auto fee=v->getFee("contract_deploy");
+    auto fee=v->getGas("contract_deploy");
     {
         M_LOCK(us->parent->mx);
         if (us->balance < fee)
@@ -479,7 +479,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     auto us = t.root->getAddressState(t.senderAddress, t.roll);
     if (!us.valid())
         return "if(!us.valid())";
-    auto fee=v->getFee("contract_update");
+    auto fee=v->getGas("contract_update");
     {
         M_LOCK(us->parent->mx);
         if (us->balance < fee)

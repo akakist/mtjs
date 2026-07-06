@@ -293,31 +293,31 @@ struct bc_values: public data_base
 
 
 bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
-        fees["contract_deploy"]=BigInt(5000);
-        fees["contract_transfer"]=BigInt(1000);
-        fees["node_create"]=BigInt(20000);
-        fees["node_update"]=BigInt(10000);
-        fees["node_enable"]=BigInt(5000);
-        fees["node_unstake"]=BigInt(2000);
-        fees["node_stake"]=BigInt(2000);
-        fees["mint"]=BigInt(95);
-        fees["transfer"]=BigInt(1000);
+        gas["contract_deploy"]=BigInt(5000);
+        gas["contract_transfer"]=BigInt(1000);
+        gas["node_create"]=BigInt(20000);
+        gas["node_update"]=BigInt(10000);
+        gas["node_enable"]=BigInt(5000);
+        gas["node_unstake"]=BigInt(2000);
+        gas["node_stake"]=BigInt(2000);
+        gas["mint"]=BigInt(95);
+        gas["transfer"]=BigInt(1000);
     }
-    std::map<std::string,BigInt> fees;
+    std::map<std::string,BigInt> gas;
     std::set<ADDRESS_id> emitters_bin;
     void copy_from(data_base* d) final
     {
         data_base::copy_from(d);
         auto *dd=dynamic_cast<bc_values*>(d);
         if(!dd) throw CommonError("if(!dd)");
-        fees=dd->fees;
+        gas=dd->gas;
         emitters_bin=dd->emitters_bin;
     }
     
-    BigInt getFee(const std::string &fee_type) const
+    BigInt getGas(const std::string &fee_type) const
     {
-        auto it=fees.find(fee_type);
-        if(it!=fees.end())
+        auto it=gas.find(fee_type);
+        if(it!=gas.end())
             return it->second;
         throw CommonError("fee '%s' not found", fee_type.c_str());
         return BigInt(0);
@@ -326,14 +326,14 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
     {
         // cost.pack(o);
         o<<1;
-        o<<fees<<emitters_bin;
+        o<<gas<<emitters_bin;
     }
     void unpack(inBuffer& o) final
     {
         // cost.unpack(o);
         auto v=o.get_PN();
 
-        o>>fees>>emitters_bin;
+        o>>gas>>emitters_bin;
     }
     std::string dump() final;
 

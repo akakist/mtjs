@@ -498,7 +498,7 @@ std::string bc_values::dump()
         a.addr=blake2b_hash(z.addr).container;
         j["emitters"].push_back(base16::encode(a.addr));
     }
-    for(auto& z: fees)
+    for(auto& z: gas)
     {
         nlohmann::json jj;
         jj["type"]=z.first;
