@@ -1,3 +1,0 @@
-[submodule "src/megatron"]
-	path = src/megatron
-	url = git@github.com:akakist/megatron.git
