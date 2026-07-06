@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CLISH_MODULE xmlns="/XMLSchema" 
+          xmlns:xsi="/XMLSchema-instance" 
+ xsi:schemaLocation="/XMLSchema
+                     /XMLSchema/clish.xsd">
+ 	<!--=======================================================-->
+    <VIEW name="config-if-gb-view"
+        prompt="${HOSTNAME}(config-if)# ">
+        <!--===================================================-->
+	<NAMESPACE ref="root-view"
+            prefix="do"
+            help="true"
+            completion="true"/>
+                                    
+	<COMMAND name="do" help="Import global commands"/>
+                                	
+        <COMMAND name="no"
+                 help="Negate a command or set its defaults">
+        </COMMAND>
+        <!--===================================================-->
+
+        <COMMAND name="description"
+                 help="Interface specific description">
+                 <PARAM name="if_description"
+                   help="Enter description"
+                   ptype="STRING_ALL_10"/>
+            <ACTION>
+        	/scp/swprog -sw_descr ${if_description}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no description"
+                 help="Interface specific description">
+            <ACTION>
+        	/scp/swprog -sw_descr
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="duplex"
+                 help="Configure duplex operation.">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no duplex"
+                 help="Configure duplex operation.">
+            <ACTION>
+        	/scp/swprog -duplex auto
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="duplex auto"
+                 help="Enable AUTO duplex configuration">
+            <ACTION>
+        	/scp/swprog -duplex auto
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="duplex full"
+                 help="Force full duplex operation">
+            <ACTION>
+        	/scp/swprog -duplex full
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="duplex half"
+                 help="Force half-duplex operation">
+            <ACTION>
+                /scp/swprog -duplex half
+            </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+
+        <COMMAND name="speed"
+                 help="Set speed for interface">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no speed"
+                 help="Set speed for interface">
+            <ACTION>
+        	/scp/swprog -speed auto
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->         
+        <COMMAND name="speed 10"
+                 help="Set speed 10 Mbps for interface">
+            <ACTION>
+        	/scp/swprog -speed 10
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="speed 100"
+                 help="Set speed 100 Mbps for interface">
+            <ACTION>
+        	/scp/swprog -speed 100
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="speed 1000"
+                 help="Set speed 1000 Mbps for interface">
+            <ACTION>
+        	/scp/swprog -speed 1000
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="speed auto"
+                 help="Set speed auto define">
+            <ACTION>
+        	/scp/swprog -speed auto
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="speed nonegotiate"
+                 help="Force set speed to 1000 Mbps for interface">
+            <ACTION>
+        	/scp/swprog -speed nonegotiate
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->        
+
+        <COMMAND name="switchport"
+                 help="Set switching mode characteristics">
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="switchport access"
+                 help="Set access mode characteristics of the interface">
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="switchport access vlan"
+                 help="VLAN keyword">
+				<PARAM name="vlan_id"
+                   help="enter vlan id"
+                   ptype="VLAN_ID"/>
+                 <ACTION>
+                    /scp/swprog -sw_acc_vlan ${vlan_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+
+        <COMMAND name="switchport mode"
+                 help="Set trunking mode of the interface">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport mode access"
+                 help="Set trunking mode to ACCESS unconditionally">
+            <ACTION>
+        	/scp/swprog -sw_mode access
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport mode trunk"
+                 help="Set trunking mode to TRUNK unconditionally">
+            <ACTION>
+        	/scp/swprog -sw_mode trunk
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+
+        <COMMAND name="switchport trunk"
+                 help="Set trunking characteristics of the interface">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport trunk allowed"
+                 help="Set allowed VLAN characteristics when interface is in trunking mode">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport trunk allowed vlan"
+                 help="Set allowed VLANs when interface is in trunking mode">
+                 <PARAM name="vlan_id_list"
+                   help="vlan id list"
+                   ptype="VL_STRING"/>                 
+            <ACTION>
+        	/scp/swprog -sw_tr_allow_vl ${vlan_id_list}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport trunk allowed vlan add"
+                 help="add VLANs to the current list">
+			<PARAM name="vlan_id_list"
+                   help="vlan id list"
+                   ptype="VL_STRING"/>
+            <ACTION>
+        	/scp/swprog -sw_tr_allow_vl_add ${vlan_id_list}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport trunk allowed vlan remove"
+                 help="remove VLANs from the current list">
+				<PARAM name="vlan_id_list"
+                   help="vlan id list"
+                   ptype="VL_STRING"/>
+            <ACTION>
+        	/scp/swprog -sw_tr_allow_vl_rm ${vlan_id_list}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+
+        <COMMAND name="switchport port-security"
+                 help="Enable SA, filtering for MAC">
+            <ACTION>
+        	/scp/swprog -sw_port_sec
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport port-security violation"
+                 help="Security violation mode">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport port-security violation accept"
+                 help="accept SA MAC">
+            <ACTION>
+        	/scp/swprog -sw_port_sec_viol accept
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport port-security violation reject"
+                 help="reject SA MAC">
+            <ACTION>
+        	/scp/swprog -sw_port_sec_viol reject
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport port-security maximum"
+                 help="Quantity of accepted SA MAC">
+                  <PARAM name="max"
+                         help="number of accepted SA MAC"
+                        ptype="UINT"/>
+                <ACTION>
+                	/scp/swprog -sw_port_sec_max ${max}
+    	        </ACTION>
+        </COMMAND>
+         <!--===================================================-->
+         <COMMAND name="switchport port-security sticky"
+                  help="Enable Sticky MAC learning engine">
+                  <ACTION>
+                        /scp/swprog -sw_port_sec_mac_stk
+                </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport port-security mac-address"
+                 help="Secure mac address">
+				<PARAM name="mac_address"
+                   help="H.H.H  48 bit mac address"
+                   ptype="MAC_ADDR"/>
+                 <ACTION>
+                    /scp/swprog -sw_port_sec_mac ${mac_address}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="switchport port-security mac-address sticky"
+                 help="Secure mac address">
+		<PARAM name="mac_address"
+                       help="H.H.H  48 bit mac address"
+                       ptype="MAC_ADDR"/>
+                <ACTION>
+                    /scp/swprog -sw_port_sec_mac_stk_addr ${mac_address}
+                </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport"
+                 help="Set switching mode characteristics">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport access"
+                 help="Set access mode characteristics of the interface">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport access vlan"
+                 help="VLAN keyword">
+				<PARAM name="vlan_id"
+                   help="enter vlan id"
+                   ptype="VLAN_ID"/>
+                 <ACTION>
+                    /scp/swprog -no_sw_acc_vlan ${vlan_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+
+        <COMMAND name="no switchport mode"
+                 help="Set trunking mode of the interface">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport mode access"
+                 help="Set trunking mode to ACCESS unconditionally">
+             <ACTION>
+                /scp/swprog -no_sw_mode access
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport mode trunk"
+                 help="Set trunking mode to TRUNK unconditionally">
+             <ACTION>
+                /scp/swprog -no_sw_mode trunk
+            </ACTION>
+        </COMMAND>
+	<!--===================================================-->
+        <COMMAND name="no switchport trunk"
+                 help="Set trunking characteristics of the interface">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport trunk allowed"
+                 help="Set allowed VLAN characteristics when interface is in trunking mode">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport trunk allowed vlan"
+                 help="Set allowed VLANs when interface is in trunking mode">
+                 <PARAM name="vlan_id_list"
+                   help="vlan id list"
+                   ptype="VL_STRING"/>                 
+            <ACTION>
+        	/scp/swprog -no_sw_tr_allow_vl ${vlan_id_list}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport port-security"
+                 help="Disable SA, filtering for MAC">
+            <ACTION>
+        	/scp/swprog -no_sw_port_sec
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport port-security violation"
+                 help="Security violation mode">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport port-security violation accept"
+                 help="accept SA MAC">
+            <ACTION>
+        	/scp/swprog -no_sw_port_sec_viol accept
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport port-security violation reject"
+                 help="reject SA MAC">
+            <ACTION>
+        	/scp/swprog -no_sw_port_sec_viol reject
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport port-security maximum"
+                 help="Quantity of accepted SA MAC">
+                 <ACTION>
+                    /scp/swprog -no_sw_port_sec_max
+                </ACTION>
+	</COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport port-security sticky"
+                 help="Disable Sticky MAC learning engine">
+    	         <ACTION>
+        	    /scp/swprog -no_sw_port_sec_mac_stk
+                </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport port-security mac-address"
+                 help="Secure mac address">
+				<PARAM name="mac_address"
+                   help="H.H.H  48 bit mac address"
+                   ptype="MAC_ADDR"/>
+                 <ACTION>
+                    /scp/swprog -no_sw_port_sec_mac ${mac_address}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no switchport port-security mac-address sticky"
+                 help="Secure mac address">
+				<PARAM name="mac_address"
+                   help="H.H.H  48 bit mac address"
+                   ptype="MAC_ADDR"/>
+                 <ACTION>
+                    /scp/swprog -no_sw_port_sec_mac_stk_addr ${mac_address}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="shutdown"
+                 help="Shutdown the selected interface">
+            <ACTION>
+        	/scp/swprog -shutdown
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no shutdown"
+                 help="Shutdown the selected interface">
+            <ACTION>
+        	/scp/swprog -no_shutdown
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->         
+        <COMMAND name="exit"
+                 help="Exit from config-if mode"
+                 view="config-view">
+            <ACTION>echo "Leaving config-if mode..."</ACTION>
+        </COMMAND>
+        <!--===================================================-->
+    </VIEW>
+ 	<!--=======================================================-->    
+</CLISH_MODULE>

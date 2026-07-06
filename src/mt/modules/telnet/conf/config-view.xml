@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CLISH_MODULE xmlns="http://clish.sourceforge.net/XMLSchema" 
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+ xsi:schemaLocation="http://clish.sourceforge.net/XMLSchema
+                     http://clish.sourceforge.net/XMLSchema/clish.xsd">
+
+     <!--===================================================--> 
+    <VIEW name="config-view" prompt="${HOSTNAME}(config)# ">
+    
+        <NAMESPACE ref="root-view"
+            prefix="do"
+            help="true"
+            completion="true"/>
+
+	<COMMAND name="do" help="Import global commands"/>
+	
+	<!--===================================================-->
+        <COMMAND name="clock"
+                 help="Configure time-of-day clock">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="clock timezone"
+                 help="Configure time zone">
+                 <PARAM name="zone"
+                   help="name of time zone"
+                   ptype="CLK_NAME"/>
+                 <PARAM name="offset"
+                   help="Hours offset from UTC"
+                   ptype="CLK_OFF"/>
+                   
+            <ACTION>
+        	/scp/swprog -ntp_timezone ${zone} ${offset}
+            </ACTION> 
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no"
+                 help="Negate a command or set its defaults">
+        </COMMAND>
+	<!--===================================================-->
+        <COMMAND name="no clock"
+                 help="Configure time-of-day clock">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no clock timezone"
+                 help="Configure time zone">
+                 
+            <ACTION>
+        	/scp/swprog -no_ntp_timezone
+            </ACTION> 
+        </COMMAND>        
+        <!--===================================================-->
+        <COMMAND name="default"
+                 help="Set default values for IP gateway or interface">
+        </COMMAND>
+        
+        <!--===================================================-->
+        <COMMAND name="no default"
+                 help="Remove values for IP gateway or reset an interface">
+        </COMMAND>
+        
+        <!--===================================================-->
+        <COMMAND name="default gateway"
+                 help="Set default gateway">
+                 <PARAM name="ip"
+                   help="enter ip address"
+                   ptype="IP_ADDR"/>
+                   <PARAM name="vlan"
+			    help="enter vlan"
+                	    value="vlan"
+                	    ptype="STRING"
+                	    mode="subcommand">
+                            <PARAM name="vlan_id"
+                	    	help="enter VID"
+                	    	ptype="VLAN_ID"/>        
+                   </PARAM>
+            <ACTION>
+        	/scp/swprog -def_route ${ip} ${vlan_id}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="default interface"
+                 help="Set an interface to default state">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="default interface FastEthernet"
+                 help="Default state of FastEthernet IEEE 802.3">
+		<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="IF_ID"/>                 
+            <ACTION>
+        	/scp/swprog -def_iface 0 ${if_id}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="default interface GigabitEthernet"
+                 help="Default state of GigabitEthernet IEEE 802.3z">
+		<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="GB_IF_ID"/>                 
+            <ACTION>
+    		/scp/swprog -def_iface 1 ${if_id}
+            </ACTION>
+        </COMMAND>                
+        <!--===================================================-->
+        <COMMAND name="no default gateway"
+                 help="Remove default gateway">
+            <ACTION>
+        	/scp/swprog -no_def_route
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="hostname"
+                 help="Set system's network name">
+				<PARAM name="hostname"
+                   help="Enter hostname"
+                   ptype="STRING"/>
+            <ACTION>
+        	/scp/swprog -hostname ${hostname}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no hostname"
+                 help="Set system's network name">
+            <ACTION>
+        	/scp/swprog -hostname Switch
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="interface"
+                 help="Select an interface to configure">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no interface"
+                 help="Select an interface to configure">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="interface FastEthernet"
+                 help="FastEthernet IEEE 802.3"
+                 view="config-if-fa-view">
+		<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="IF_ID"/>                 
+            <ACTION>
+        	/scp/swprog -write_iface_id 0 ${if_id}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="interface GigabitEthernet"
+                 help="GigabitEthernet IEEE 802.3z"
+                 view="config-if-gb-view">
+		<PARAM name="if_id"
+                   help="enter interface id"
+                   ptype="GB_IF_ID"/>                 
+            <ACTION>
+    		/scp/swprog -write_iface_id 1 ${if_id}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="interface Vlan"
+                 help="SVI Vlans"
+                 view="config-if-vlan-view">
+			<PARAM name="vlan_id"
+                   help="enter vlan id"
+                   ptype="VLAN_ID"/>
+                 <ACTION>
+                   /scp/swprog -write_iface_id 2 ${vlan_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no interface Vlan"
+                 help="SVI Vlans">
+			<PARAM name="vlan_id"
+                   help="enter vlan id"
+                   ptype="VLAN_ID"/>
+                 <ACTION>
+                   /scp/swprog -write_iface_id 3 ${vlan_id}
+                 </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="mac-address-table"
+                 help="Configure the MAC address table">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="mac-address-table aging-time"
+                 help="Set MAC address table entry maximum age">
+		   <PARAM name="ag_time"
+                   help="enter aging-time"
+                   ptype="AG_TIME"/>                 
+            <ACTION>
+        	/scp/swprog -mat_ag ${ag_time}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="no mac-address-table"
+                 help="Configure the MAC address table">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no mac-address-table aging-time"
+                 help="Set MAC address table entry maximum age">
+            <ACTION>
+        	/scp/swprog -mat_ag 300
+            </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="ntp"
+                 help="Configure NTP">
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="no ntp"
+                 help="Configure NTP">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="ntp disable"
+                 help="Disable NTP Client">
+            <ACTION>
+        	/scp/swprog -ntp_disable 1
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no ntp disable"
+                 help="Enable NTP Client">
+            <ACTION>
+        	/scp/swprog -ntp_disable 0
+            </ACTION>
+        </COMMAND>
+	<!--===================================================-->
+        <COMMAND name="ntp peer"
+                 help="Configure NTP peer">
+                 <PARAM name="ip"
+                   help="enter ip address"
+                   ptype="IP_ADDR"/>                 
+
+            <ACTION>
+        	/scp/swprog -ntp_peer ${ip}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no ntp peer"
+                 help="Configure NTP peer">
+                 <PARAM name="ip"
+                   help="enter ip address"
+                   ptype="IP_ADDR"/>                 
+
+            <ACTION>                 
+        	/scp/swprog -no_ntp_peer ${ip}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================--> 
+        <COMMAND name="snmp-server"
+                 help="Enable SNMP Traps or Informs">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="snmp-server enable"
+                 help="Enable SNMP Traps or Informs">
+            <ACTION>
+        	/scp/swprog -snmp_srv_enable
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="snmp-server community"
+                 help="Set community string and access privs">
+				<PARAM name="community_string"
+                   help="enter community string"
+                   ptype="STRING"/>                 
+                   <PARAM name="community_type"
+                   help="enter community type"
+                   ptype="COMM_TYPE"/>
+            <ACTION>
+        	/scp/swprog -snmp_srv_community ${community_string} ${community_type}
+    	    </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no snmp-server"
+                 help="Enable SNMP Traps or Informs">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no snmp-server enable"
+                 help="Disable SNMP Traps or Informs">
+            <ACTION>
+        	/scp/swprog -no_snmp_srv_enable
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no snmp-server community"
+                 help="Delete community string and access privs">
+				<PARAM name="community_string"
+                   help="enter community string"
+                   ptype="STRING"/>                 
+            <ACTION>
+        	/scp/swprog -no_snmp_srv_community ${community_string}
+    	    </ACTION>
+        </COMMAND>
+        <!--===================================================-->        
+       <COMMAND name="username"
+                 help="Establish User Name Authentication">
+			<PARAM name="username_string"
+	                       help="enter username"
+        		       ptype="STRING"/>        
+        		<PARAM name="password"
+        			value="password"
+	                       help="enter password"
+        		       ptype="STRING"
+        		       mode="subcommand">
+        		       <PARAM name="passwd_string"
+        		    	help="enter password"
+        		        ptype="STRING"
+        		       />        
+        		</PARAM>
+            <ACTION> 
+		/scp/swprog -username ${username_string} ${passwd_string}
+	    </ACTION>
+        </COMMAND>
+ 
+        <!--===================================================-->
+        <COMMAND name="no username"
+                 help="Delete User Name Authentication">
+				<PARAM name="username_string"
+                   help="enter username and password"
+                   ptype="STRING"/>                 
+            <ACTION>
+        	/scp/swprog -no_username ${username_string}
+	    </ACTION>
+        </COMMAND>
+        <!--===================================================-->        
+	<COMMAND name="vlan"
+                 help="Add or modify values associated with a single VLAN">
+        	<PARAM name="vlan_id"
+                       help="enter vlan id"
+                       ptype="VLAN_ID"/>             
+    		<PARAM name="name"
+		       help="enter vlan name"
+		       value="name"
+		       ptype="STRING"
+		       mode="subcommand"
+		       optional="true">
+        	       <PARAM name="vlan_name"
+        	    	help="enter Vlan name"
+        	        ptype="STRING"
+        	       />        
+                </PARAM>
+              <ACTION>/scp/swprog -vlan ${vlan_id} ${vlan_name}</ACTION>
+	</COMMAND>
+	<!--===================================================-->        
+        <COMMAND name="no vlan"
+	          help="delete values associated with a single VLAN">
+        	<PARAM name="vlan_id"
+                       help="enter vlan id"
+                      ptype="VLAN_ID"/>             
+          <ACTION>/scp/swprog -no_vlan ${vlan_id}</ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="exit"
+                 help="Exit from configure mode"
+                 view="root-view">
+            <ACTION>echo "Leaving cinfiguration mode..."</ACTION>
+        </COMMAND>
+    </VIEW>
+
+</CLISH_MODULE>

@@ -1,0 +1,17 @@
+#ifndef ___megatron_config_h_in
+#define ___megatron_config_h_in
+
+#define PLUGIN_TARGET_DIR "@PLUGIN_TARGET_DIR@"
+
+#define DATA_TARGET_DIR "@DATA_TARGET_DIR@"
+#define CONFIG_TARGET_DIR "@CONFIG_TARGET_DIR@"
+#define CACHE_TARGET_DIR "@CACHE_TARGET_DIR@"
+
+#define LOG_TARGET_DIR "@LOG_TARGET_DIR@"
+#define CAPS_ADDRESS "@CAPS_IP@:@PORT@"
+#define CAPS_PORT "@PORT@"
+#define CAPS_IP "@CAPS_IP@"
+
+#define APP_NAME "@APP_NAME@"
+
+#endif

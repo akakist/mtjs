@@ -1,0 +1,3 @@
+https://github.com/google/googletest
+
+cmake -DBUILD_SHARED_LIBS=ON 

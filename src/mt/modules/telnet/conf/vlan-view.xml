@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CLISH_MODULE xmlns="/XMLSchema" 
+          xmlns:xsi="/XMLSchema-instance" 
+ xsi:schemaLocation="/XMLSchema
+                     /XMLSchema/clish.xsd">
+ 	<!--=======================================================-->
+    <VIEW name="vlan-view"
+        prompt="${HOSTNAME}(vlan)# ">
+        <!--===================================================-->
+      
+        <COMMAND name="vlan"
+                 help="Add or modify values associated with a single VLAN">
+				<PARAM name="vlan_id"
+                   help="enter vlan id"
+                   ptype="VLAN_ID"/>             
+				<PARAM name="vlan_name"
+                   help="enter vlan name"
+                   ptype="STRING"/>
+            <ACTION>/scp/swprog -vlan ${vlan_id} ${vlan_name}</ACTION>
+        </COMMAND>
+        <!--===================================================-->
+
+        <!--===================================================-->        
+        <COMMAND name="no"
+                 help="Negate a command or set its defaults">
+        </COMMAND>
+        <!--===================================================-->        
+        <COMMAND name="no vlan"
+                 help="delete values associated with a single VLAN">
+				<PARAM name="vlan_id"
+                   help="enter vlan id"
+                   ptype="VLAN_ID"/>             
+            <ACTION>/scp/swprog -no_vlan ${vlan_id}</ACTION>
+        </COMMAND>
+        <!--===================================================-->
+                
+        <!--===================================================-->        
+        <COMMAND name="exit"
+                 help="Exit from vlan mode"
+                 view="root-view">
+            <ACTION>echo "Leaving vlan mode..."</ACTION>
+        </COMMAND>
+        <!--===================================================-->
+    </VIEW>
+ 	<!--=======================================================-->    
+</CLISH_MODULE>

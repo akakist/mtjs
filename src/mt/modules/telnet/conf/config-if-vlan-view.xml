@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CLISH_MODULE xmlns="/XMLSchema" 
+          xmlns:xsi="/XMLSchema-instance" 
+ xsi:schemaLocation="/XMLSchema
+                     /XMLSchema/clish.xsd">
+ 	<!--=======================================================-->
+    <VIEW name="config-if-vlan-view"
+        prompt="${HOSTNAME}(config-if)# ">
+        <!--===================================================-->
+	<NAMESPACE ref="root-view"
+            prefix="do"
+            help="true"
+            completion="true"/>
+                                    
+	<COMMAND name="do" help="Import global commands"/>
+                                	
+        <COMMAND name="no"
+                 help="Negate a command or set its defaults">
+        </COMMAND>
+        <!--===================================================-->
+
+        <COMMAND name="description"
+                 help="Interface specific description">
+				<PARAM name="if_description"
+                   help="Enter description"
+                   ptype="STRING_ALL_10"/>
+            <ACTION>
+        	/scp/swprog -sw_descr ${if_description}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no description"
+                 help="Interface specific description">
+            <ACTION>
+        	/scp/swprog -sw_descr
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+
+        <COMMAND name="ip"
+                 help="Interface Internet Protocol config commands">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no ip"
+                 help="Interface Internet Protocol config commands">
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="ip address"
+                 help="Set the IP address of an interface">
+				<PARAM name="ip"
+                   help="enter ip address"
+                   ptype="IP_ADDR"/>
+				<PARAM name="netmask"
+                   help="enter netmask"
+                   ptype="NETMASK"/>
+            <ACTION>
+        	/scp/swprog -ip_address ${ip} ${netmask}
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no ip address"
+                 help="Unset the IP address of an interface">
+            <ACTION>
+        	/scp/swprog -no_ip_address
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+
+        <COMMAND name="shutdown"
+                 help="Shutdown the selected interface">
+            <ACTION>
+        	/scp/swprog -shutdown
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->
+        <COMMAND name="no shutdown"
+                 help="Shutdown the selected interface">
+            <ACTION>
+        	/scp/swprog -no_shutdown
+            </ACTION>
+        </COMMAND>
+        <!--===================================================-->        
+        
+
+        <!--===================================================-->        
+        <COMMAND name="exit"
+                 help="Exit from config-if mode"
+                 view="config-view">
+            <ACTION>echo "Leaving config-if mode..."</ACTION>
+        </COMMAND>
+        <!--===================================================-->
+    </VIEW>
+ 	<!--=======================================================-->    
+</CLISH_MODULE>

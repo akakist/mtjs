@@ -1,0 +1,24 @@
+
+project (dfsCoreModules)
+
+
+
+ADD_SUBDIRECTORY(errorDispatcher)
+ADD_SUBDIRECTORY(logger)
+ADD_SUBDIRECTORY(http)
+#    ADD_SUBDIRECTORY(mysql)
+ADD_SUBDIRECTORY(objectProxy)
+ADD_SUBDIRECTORY(oscar)
+ADD_SUBDIRECTORY(rpc)
+ADD_SUBDIRECTORY(socket)
+ADD_SUBDIRECTORY(ssl)
+ADD_SUBDIRECTORY(telnet)
+ADD_SUBDIRECTORY(timer)
+ADD_SUBDIRECTORY(webHandler)
+
+
+
+
+ADD_SUBDIRECTORY(webSocketClient)
+
+ADD_SUBDIRECTORY(zsingle)
