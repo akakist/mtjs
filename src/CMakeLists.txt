@@ -118,11 +118,11 @@ endif()
 
 include_directories(.)
 
-include_directories(megatron megatron/main megatron/corelib)
+include_directories(megatron mt/main mt/corelib)
 
 OPTION(MT_CORE_SERVICES_SINGLE_PLUGING "Build apps/core-plugins - all core plugins in one file" ON)
 
-include_directories( megatron/local  megatron . megatron/corelib  megatron/lib/SQLiteCpp  megatron/lib  megatron/main
+include_directories( mt/local  mt . mt/corelib  mt/lib/SQLiteCpp  mt/lib  mt/main
 
 /usr/local/include
 lib/cpp-jwt/include
@@ -153,12 +153,12 @@ link_directories(
 endif()
 
 include_directories(	src/mtjs
-			megatron/corelib 
-			megatron/main 
-			megatron/local  
-			megatron/lib/jpeg-9d
+			mt/corelib 
+			mt/main 
+			mt/local  
+			mt/lib/jpeg-9d
 
-			megatron  .  svs megatron/lib megatron/lib/sqlite3
+			mt  .  svs mt/lib mt/lib/sqlite3
 
 			)
 
