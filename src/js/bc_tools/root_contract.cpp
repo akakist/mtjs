@@ -17,7 +17,7 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
     { return new bc_contract(p); },
     // +[](Cellable *p) -> data_base *
-    // { return new bc_balance(p); },
+    // { return new bc_user(p); },
     +[](Cellable *p) -> data_base *
     { return new bc_address_state(p); },
     +[](Cellable *p) -> data_base *
@@ -61,14 +61,12 @@ REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vect
     }
     return cur;
 }
-#ifdef KALL
 void root_data::getDiff(cdiff& out, const EPOCH_id &epoch)
 {
     M_LOCK(state_mutex);
     _getDiff(out,epoch,db.get());
 }
-#endif
-#ifdef KALL
+
 void root_data::apply_diff(const cdiff& out)
 {
     M_LOCK(state_mutex);
@@ -96,7 +94,6 @@ void root_data::apply_diff(const cdiff& out)
         }
     }
 }
-#endif
 // void getDiff(std::map<std::string,std::string>& out)
 // {
 
@@ -138,38 +135,24 @@ REF_getter<bc_contract> root_data::getContract(const CONTRACT_id &name)
     auto cc = getByPathNoCreate(this, v, db.get());
     if (!cc.valid())
         return NULL;
-    MutexLockerDeferred l(cc->mx);
-    l.lock();
     if (!cc->data.valid())
         throw CommonError("if(!cc->data.valid())");
-    if(!cc->data_copy.valid())
-    {
-        cc->data_copy=cc->data->clone_mx();
-    }
     return dynamic_cast<bc_contract *>(cc->data.get());
 }
 
-REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const EPOCH_id& epoch)
+REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const REF_getter<fee_calcer> &bca, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
     auto v = getContractPath(name);
     auto cc = getByPathOrCreate(this, v, db.get());
-    MutexLockerDeferred l(cc->mx);
     if (!cc.valid())
         throw CommonError("if(!cc.valid())");
-    l.lock();
     if (cc->data.valid())
         throw CommonError("if(cc->data.valid())");
-    cc->payload_ctor_idx = hsh::bc_contract;
-    
-    // {
-    //     REF_getter<bc_contract> bc_c = new bc_contract(cc.get());
-    //     cc->data_copy = bc_c.get();
-    // }
-    // cc->data->setDirty(epoch);
     REF_getter<bc_contract> bc = new bc_contract(cc.get());
     cc->data = bc.get();
-    cc->data_copy=bc->clone_mx();
+    cc->payload_ctor_idx = hsh::bc_contract;
+    cc->data->setDirty(epoch);
     return bc;
 }
 REF_getter<bc_epoch> root_data::getEpoch()
@@ -180,20 +163,14 @@ REF_getter<bc_epoch> root_data::getEpoch()
     auto l = r->getLeafOrCreate("ep", db.get(),lk);
     if (!l.valid())
         throw CommonError("if(!l.valid())");
-    lk.lock();
     if (l->data.valid())
     {
-        if(!l->data_copy.valid())
-        {
-            l->data_copy=l->data->clone_mx();
-        }
         return dynamic_cast<bc_epoch *>(l->data.get());
     }
 
     REF_getter<bc_epoch> v = new bc_epoch(l.get());
     lk.lock();
     l->data = v.get();
-    l->data_copy=v->clone_mx();
     l->payload_ctor_idx = hsh::bc_epoch;
     lk.unlock();
     return v;
@@ -205,25 +182,18 @@ REF_getter<bc_values> root_data::getValues()
     auto r = this;
     MutexLockerDeferred lk(r->mx);
     auto l = r->getLeafOrCreate("v", db.get(),lk);
-    lk.unlock();
     if (!l.valid())
         throw CommonError("if(!l.valid())");
-    MutexLockerDeferred ll(l->mx);
-    ll.lock();
     if (l->data.valid())
     {
-        if(!l->data_copy.valid())
-        {
-            l->data_copy=l->data->clone_mx();
-        }
         return dynamic_cast<bc_values *>(l->data.get());
     }
 
     REF_getter<bc_values> v = new bc_values(l.get());
-    ll.lock();
+    lk.lock();
     l->data = v.get();
     l->payload_ctor_idx = hsh::bc_values;
-    ll.unlock();
+    lk.unlock();
     return v;
 }
 REF_getter<bc_values> root_data::checkValues()
@@ -232,29 +202,23 @@ REF_getter<bc_values> root_data::checkValues()
     auto r = this;
     MutexLockerDeferred lk(r->mx);
     auto l = r->getLeafNoCreate("v", db.get(),lk);
-    lk.unlock();
     if (!l.valid())
         return NULL;
-    MutexLockerDeferred ll(l->mx);
-    ll.lock();
-    // l->data;
-    // lk.unlock();
-    if (l->data.valid())
-    {  
-        if(!l->data_copy.valid())
-        {
-            l->data_copy=l->data->clone_mx();
-        }
-        return dynamic_cast<bc_values *>(l->data.get());
+    lk.lock();
+    auto data=l->data;
+    lk.unlock();
+    if (data.valid())
+    {
+        return dynamic_cast<bc_values *>(data.get());
     }
     return NULL;
 }
 
-std::vector<std::string> root_data::getBalancePath(const ADDRESS_id &addr)
+std::vector<std::string> root_data::getUserPath(const ADDRESS_id &addr)
 {
-    MUTEX_INSPECTORS("getBalancePath");
+    MUTEX_INSPECTORS("getUserPath");
     if (addr.addr.size() != 32)
-        throw CommonError("  Z1  if(pk_bin.size()!=32) %d %s", addr.addr.size(), _DMI().c_str());
+        throw CommonError("    if(pk_bin.size()!=32) %d %s", addr.addr.size(), _DMI().c_str());
     std::vector<std::string> p;
     p.push_back("u");
     std::string addr_hex = base16::encode(addr.addr);
@@ -266,7 +230,7 @@ std::vector<std::string> root_data::getAddressStatePath(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTORS("getAddressStatePath");
     if (addr.addr.size() != 32)
-        throw CommonError("   Z2 if(pk_bin.size()!=32) %d %s", addr.addr.size(), _DMI().c_str());
+        throw CommonError("    if(pk_bin.size()!=32) %d %s", addr.addr.size(), _DMI().c_str());
     std::vector<std::string> p;
     p.reserve(10);
     p.push_back("s");
@@ -276,45 +240,23 @@ std::vector<std::string> root_data::getAddressStatePath(const ADDRESS_id &addr)
     return p;
 }
 
-// REF_getter<bc_balance> root_data::getBalance(const ADDRESS_id &addr)
+// REF_getter<bc_user> root_data::getUser(const ADDRESS_id &addr)
 // {
 //     MUTEX_INSPECTOR;
-//     auto v = getBalancePath(addr);
+//     auto v = getUserPath(addr);
 //     auto cc = getByPathOrCreate(this, v, db.get());
 //     if (!cc.valid())
 //         return NULL;
 //     if (cc->data.valid())
 //     {
-//         return dynamic_cast<bc_balance *>(cc->data.get());
+//         return dynamic_cast<bc_user *>(cc->data.get());
 //     }
-//     REF_getter<bc_balance> u = new bc_balance(cc.get());
+//     // if(cc->payload_.size())
+//     // throw CommonError("if(cc->payload_.size())");
+//     // else throw CommonError("if(cc->data.valid())");
+//     REF_getter<bc_user> u = new bc_user(cc.get());
 //     cc->data = u.get();
-//     cc->payload_ctor_idx = hsh::bc_balance;
-//     return u;
-// }
-// REF_getter<bc_balance> root_data::getBalanceClone(const ADDRESS_id &addr)
-// {
-//     MUTEX_INSPECTOR;
-//     auto v = getBalancePath(addr);
-//     auto cc = getByPathOrCreate(this, v, db.get());
-//     if (!cc.valid())
-//         return NULL;
-//     if (cc->data.valid())
-//     {
-//         M_LOCK(parent->mx);
-//         if(cc->data_clone.valid())
-//         {
-//             return dynamic_cast<bc_balance *>(cc->data_clone.get());
-
-//         }
-//         else{
-//             cc->data_clone=cc->data->clone();            
-//             return dynamic_cast<bc_balance *>(cc->data_clone.get());
-//         }
-//     }
-//     REF_getter<bc_balance> u = new bc_balance(cc.get());
-//     cc->data_clone = u.get();
-//     cc->payload_ctor_idx = hsh::bc_balance;
+//     cc->payload_ctor_idx = hsh::bc_user;
 //     return u;
 // }
 REF_getter<bc_address_state> root_data::getAddressState(const ADDRESS_id &addr)
@@ -324,54 +266,27 @@ REF_getter<bc_address_state> root_data::getAddressState(const ADDRESS_id &addr)
     auto cc = getByPathOrCreate(this, v, db.get());
     if (!cc.valid())
         return NULL;
-    MutexLockerDeferred l(cc->mx);
-    l.lock();
     if (cc->data.valid())
     {
         return dynamic_cast<bc_address_state *>(cc->data.get());
     }
+    // else throw CommonError("if(cc->data.valid())");
+    // if(cc->payload_.size())
+    //     throw CommonError("if(cc->payload_.size())");
 
     REF_getter<bc_address_state> u = new bc_address_state(cc.get());
     cc->data = u.get();
-    cc->data_copy=u->clone_mx();
     cc->payload_ctor_idx = hsh::bc_address_state;
     return u;
 }
-// REF_getter<bc_address_state> root_data::getAddressStateClone(const ADDRESS_id &addr)
-// {
-//     MUTEX_INSPECTOR;
-//     auto v = getAddressStatePath(addr);
-//     auto cc = getByPathOrCreate(this, v, db.get());
-//     if (!cc.valid())
-//         return NULL;
-//     if (cc->data.valid())
-//     {
-//         if (cc->data_clone.valid())
-//             return dynamic_cast<bc_address_state *>(cc->data_clone.get());
-//         cc->data_clone=cc->data->clone();
-//             return dynamic_cast<bc_address_state *>(cc->data_clone.get());
-//     }
-
-//     REF_getter<bc_address_state> u = new bc_address_state(cc.get());
-//     cc->data_clone = u.get();
-//     cc->payload_ctor_idx = hsh::bc_address_state;
-//     return u;
-// }
-REF_getter<bc_address_state> root_data::checkAddressState(const ADDRESS_id &addr)
+REF_getter<bc_address_state> root_data::checkUserState(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTOR;
     auto v = getAddressStatePath(addr);
     auto cc = getByPathNoCreate(this, v, db.get());
     if (!cc.valid())
         return NULL;
-    MutexLockerDeferred l(cc->mx);
-    l.lock();
-    if(!cc->data.valid())
-        throw CommonError("if(!cc->data.valid())");
-    if(!cc->data_copy.valid())
-    {
-        cc->data_copy=cc->data->clone_mx();
-    }
+
     return dynamic_cast<bc_address_state *>(cc->data.get());
 }
 
@@ -452,23 +367,22 @@ std::vector<REF_getter<bc_node>> root_data::getAllNodes()
     // }
     // return v;
 }
-REF_getter<bc_node> root_data::addNode(const NODE_id &name, const EPOCH_id& epoch)
+REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer> &bc, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
 
     std::vector<std::string> v = getNodePath(name);
+    // v.push_back("n");
+    // v.push_back(name.container);
     auto cc = getByPathOrCreate(this, v, db.get());
-    MutexLockerDeferred l(cc->mx);
-    l.lock();
+
     if (cc->data.valid())
         throw CommonError("if(cc->data.valid())");
-    cc->payload_ctor_idx = hsh::bc_node;
-    // {
-    //     REF_getter<bc_node> n = new bc_node(cc.get());
-    //     cc->data_copy = n.get();
-    // }
+    // if(cc->payload_.size())
+    //     throw CommonError("if(cc->payload.size())");
     REF_getter<bc_node> n = new bc_node(cc.get());
     cc->data = n.get();
+    cc->payload_ctor_idx = hsh::bc_node;
     cc->data->setDirty(epoch);
     return n;
 }
@@ -574,7 +488,7 @@ std::string bc_node::dump()
 std::string bc_values::dump()
 {
     /*
-        std::map<std::string,BigInt> gas;
+        std::map<std::string,BigInt> fees;
     std::set<std::string> emitters_bin;
 */
     nlohmann::json j;
@@ -584,12 +498,12 @@ std::string bc_values::dump()
         a.addr=blake2b_hash(z.addr).container;
         j["emitters"].push_back(base16::encode(a.addr));
     }
-    for(auto& z: gas)
+    for(auto& z: fees)
     {
         nlohmann::json jj;
         jj["type"]=z.first;
         jj["value"]=z.second.toString();
-        j["gas"].push_back(jj);
+        j["fees"].push_back(jj);
     }
     return j.dump(2);
 }

@@ -42,7 +42,7 @@
 #include "t_params.h"
 #include "cached_state.h"
 #include "contract_rt.h"
-#include <yyjson.h>
+#define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 // #define HEART_BEAT_INTERVAL_SEC 5
 
 enum State
@@ -212,22 +212,23 @@ namespace Node
         std::map<EPOCH_id, std::map<NODE_id, REF_getter<MsgData::LeaderCertificate> > >lc_responses;
 
         void collectTransactions();
-        BLOCK_id execute_block(t_params &t,  const REF_getter<MsgData::LeaderCertificate> &lc);
+        BLOCK_id execute_block(b_params &b,  const REF_getter<MsgData::LeaderCertificate> &lc);
 
         void do_sync(const NODE_id &src_node);
 
         // bool CheckState(const MsgData::HeartBeatREQ *r, const NODE_id & src_node);
 
-        void calc_fee_rewards_nodes(t_params& t, const REF_getter<MsgData::LeaderCertificate> &lc);
+        void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::LeaderCertificate> &lc);
 
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
     
         bool verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate>& lc);
 
-        std::optional<std::string> execute_transaction(const REF_getter<MsgData::TX> &tx, t_params &t, const ADDRESS_id &senderAddress,
-                         const EPOCH_id& epoch);
-        std::optional<std::string> execute_transaction2(const THASH_id& tx_id,yyjson_val *txarr, t_params &t, const ADDRESS_id &senderAddress, const EPOCH_id& epoch);
+        void execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
+                         const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch);
 
+        std::optional<std::string> execute_tx_commands(b_params &b, t_params& t, 
+            const REF_getter<fee_calcer> &by, yyjson_val * j_tx);
 
         REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;

@@ -167,8 +167,8 @@ include_directories(system /usr/local/include quickjs)
 include_directories(${CMAKE_BINARY_DIR} common)
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fPIC -O0 -march=native -g  -DNDEBUG")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O0 -march=native -g  -DNDEBUG")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fPIC -O3 -march=native  -DNDEBUG")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O3 -march=native  -DNDEBUG")
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fPIC -O0 -g -fsanitize=address -fno-omit-frame-pointer")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O0 -g -fsanitize=address -fno-omit-frame-pointer")
@@ -212,9 +212,9 @@ CONFIGURE_FILE( "${PROJECT_SOURCE_DIR}/version.h.in"
 
 SET(CAPS_IP "x.testquant.com")
 SET(PORT 10100)
-add_definitions(  -DDEBUG  -DMUTEX_INSPECTOR_DEBUG )
+add_definitions(   )
 #-DMEMLEAK_CHECK 
-# 
+#-DDEBUG  -DMUTEX_INSPECTOR_DEBUG 
 #-DDEBUG  -DMUTEX_INSPECTOR_DEBUG -DWEBDUMP -DDEBUG  -DMUTEX_INSPECTOR_DEBUG
 
     add_definitions(  -DCURL_POLL_ADD=5)

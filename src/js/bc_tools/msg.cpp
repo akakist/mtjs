@@ -80,10 +80,10 @@ const char *msgName(int id)
         return "TX";
     case msgid::attachment_data:
         return "attachment_data";
-    case msgid::getAddressStateRSP:
-        return "getAddressStateRSP";
-    case msgid::getAddressStateREQ:
-        return "getAddressStateREQ";
+    case msgid::GetUserNonceRSP:
+        return "GetUserNonceRSP";
+    case msgid::GetUserNonceREQ:
+        return "GetUserNonceREQ";
     case msgid::LcEnvelopeREQ:
         return "LcEnvelopeREQ";
     case msgid::LcREQ:

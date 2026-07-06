@@ -5,7 +5,7 @@ namespace hsh
     enum hashers
     {
         bc_contract,
-        // bc_balance,
+        // bc_user,
         bc_address_state,
         bc_node,
         bc_values,

@@ -130,23 +130,22 @@ JSValue js_tx_subscribe(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     logErr2("js_tx_submit");
-    JSScope<20, 20> scope(ctx);
+    JSScope<10, 10> scope(ctx);
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    if (argc != 5)
-        return JS_ThrowInternalError(ctx, "number of argument must be 5");
-    logErr2("argc %d",argc);
+    if (argc != 6)
+        return JS_ThrowInternalError(ctx, "number of argument must be 6");
+
     if (!JS_IsString(argv[0]))
         return JS_ThrowInternalError(ctx, "node addr not specified, must be string");
-
     if (!JS_IsNumber(argv[1]))
         return JS_ThrowInternalError(ctx, "timeout not specified, must be number (float)");
-
     if (!JS_IsString(argv[2]))
+        return JS_ThrowInternalError(ctx, "msg not specified, must be string");
+    if (!JS_IsString(argv[3]))
         return JS_ThrowInternalError(ctx, "sk not specified, must be string");
-
-    if (!JS_IsObject(argv[3]))
-        return JS_ThrowInternalError(ctx, "txbody not specified, must be object");
-    if (!JS_IsFunction(ctx, argv[4]))
+    if (!JS_IsString(argv[4]))
+        return JS_ThrowInternalError(ctx, "nonce not specified, must be string");
+    if (!JS_IsFunction(ctx, argv[5]))
         return JS_ThrowInternalError(ctx, "callback not specified, must be function");
 
     auto node_addr = scope.toStdString(argv[0]);
@@ -156,45 +155,19 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     {
         return JS_ThrowInternalError(ctx, "error parsing timeout");
     }
-    std::string msg;
-    qjs::convert_js_value_to_json(ctx,argv[3],msg);
-    // logErr2("msg %s",msg.c_str());
-
-    // JSValue nonce_val = JS_GetPropertyStr(ctx, argv[3], "nonce");
-    // scope.addValue(nonce_val);
-    // JSValue gasLimit_val = JS_GetPropertyStr(ctx, argv[3], "gasLimit");
-    // scope.addValue(gasLimit_val);
-    // JSValue gasLimit_val = JS_GetPropertyStr(ctx, argv[3], "gasLimit");
-    // scope.addValue(gasLimit_val);
-        // return JS_ThrowInternalError(ctx, "callback not specified, must be function");
-
-    // auto node_addr = scope.toStdString(argv[0]);
-    // logErr2("node_addr %s", node_addr.c_str());
-    // double timeout;
-    // if (JS_ToFloat64(ctx, &timeout, argv[1]))
-    // {
-    //     return JS_ThrowInternalError(ctx, "error parsing timeout");
-    // }
-    // auto msg = scope.toStdString(argv[2]);
-    auto sk = base16::decode(scope.toStdString(argv[2]));
+    auto msg = scope.toStdString(argv[2]);
+    auto sk = base16::decode(scope.toStdString(argv[3]));
     auto pk = extract_public_ed(sk);
-    // auto nonce_str = scope.toStdString(argv[4]);
-    // // JSValueGuard g_func(ctx,JS_DupValue(ctx,argv[5]));
-    // uint64_t nonce=0;
-    // try
-    // {        nonce=std::atoll(nonce_str.c_str());
-    // }    
-    // catch (std::exception &e)
-    // {
-    //             return JS_ThrowInternalError(ctx, "error parsing nonce: %s", e.what());
-    // }
-
-    // auto gaslimit_v=JS_ToString(ctx,argv[5]);
-    // auto value_v=JS_ToString(ctx,argv[6]);
-    // scope.addValue(gaslimit_v);
-    // scope.addValue(value_v);
-    // auto gaslimit_s=scope.toStdString(gaslimit_v);
-    // auto value_s=scope.toStdString(value_v);
+    auto nonce_str = scope.toStdString(argv[4]);
+    // JSValueGuard g_func(ctx,JS_DupValue(ctx,argv[5]));
+    uint64_t nonce=0;
+    try
+    {        nonce=std::atoll(nonce_str.c_str());
+    }    
+    catch (std::exception &e)
+    {
+                return JS_ThrowInternalError(ctx, "error parsing nonce: %s", e.what());
+    }
 
     // auto hash=blake2b_hash(msg);
 
@@ -202,8 +175,6 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     t->tx_body = msg;
     t->pk_ed_bin = pk;
     // t->nonce = nonce;
-    // t->gasLimit.from_string(gaslimit_s);
-    // t->value.from_string(value_s);
     auto hash = t->getHash();
     t->sig_ed_bin = sign_ed(sk, hash.container);
     // auto hash = blake2b_hash(t->tx_body+t->nonce.toString());
@@ -212,7 +183,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, timeout, op->listener_));
 
-    op->node_tx_cb.emplace(hash.container,JSValueGuard(ctx,JS_DupValue(ctx,argv[4])));
+    op->node_tx_cb.emplace(hash.container,JSValueGuard(ctx,JS_DupValue(ctx,argv[5])));
     auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
     JSValue prom[2];
@@ -269,7 +240,7 @@ JSValue js_get_user_nonce(JSContext *ctx, JSValueConst this_val, int argc, JSVal
     if (JS_ToFloat64(ctx, &to, argv[2]))
         return JS_ThrowInternalError(ctx, "timeout parse error");
 
-    REF_getter<MsgData::getAddressStateREQ> rq = new MsgData::getAddressStateREQ();
+    REF_getter<MsgData::GetUserNonceREQ> rq = new MsgData::GetUserNonceREQ();
     rq->user_address = address;
     rq->rnd.resize(10);
     RAND_bytes((unsigned char *)rq->rnd.data(), rq->rnd.size());

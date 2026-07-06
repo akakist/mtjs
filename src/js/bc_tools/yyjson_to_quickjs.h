@@ -5,6 +5,8 @@
 #include <yyjson.h>
 #include <string>
 #include <vector>
+#include <optional>
+#include "bigint.h"
 
 /**
  * @brief Класс для конвертации xyjson::Value в JSValue для QuickJS
@@ -90,5 +92,32 @@ private:
         errors.push_back(message);
     }
 };
+inline std::optional<std::string> yy_get_string(yyjson_val *params, const char *key, std::string& out)
+{
+    auto _name=yyjson_obj_get(params,key);
+    if(!_name)
+        return "param '"+(std::string)key+"' must be specified";
+
+    if(!yyjson_is_str(_name))
+        return "'"+(std::string)key+"' must be string";
+    out= yyjson_get_str(_name);
+    return std::nullopt;
+
+}
+inline std::optional<std::string> yy_get_bn(yyjson_val *params, const char *key, BigInt& out)
+{
+    auto _name=yyjson_obj_get(params,key);
+    if(!_name)
+        return "param '"+(std::string)key+"' must be specified";
+
+    if(yyjson_is_str(_name))
+        out.from_string(yyjson_get_str(_name));
+    else if(yyjson_is_num(_name))
+        out=yyjson_get_uint(_name);
+    else return "'"+(std::string)key+"' must be string or num";
+
+    return std::nullopt;
+
+}
 
 #endif // XYJSON_TO_QUICKJS_HPP

@@ -3,17 +3,17 @@
 #include "md_LeaderCertificate.h"
 namespace MsgData
 {
-    struct getAddressStateRSP: public Base
+    struct GetUserNonceRSP: public Base
     {
 
-        getAddressStateRSP():Base(msgid::getAddressStateRSP)
+        GetUserNonceRSP():Base(msgid::GetUserNonceRSP)
         {
         }
-        // BigInt balance;
+        BigInt balance;
         uint64_t nonce;
         void update(Blake2bHasher& h) const
         {
-            // h.update(balance.toString());
+            h.update(balance.toString());
             h.update(std::to_string(nonce));
         }
 
@@ -23,7 +23,7 @@ namespace MsgData
 
             Base::pack(b);
             b
-            // <<balance
+            <<balance
             <<nonce;
         }
         void unpack(inBuffer& b) final
@@ -31,28 +31,28 @@ namespace MsgData
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b
-            // >>balance
+            >>balance
             >>nonce;
         }
 
         static Base* construct()
         {
-            return new getAddressStateRSP();
+            return new GetUserNonceRSP();
         }
     };
 
 }
-inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::getAddressStateRSP> &s)
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetUserNonceRSP> &s)
 {
     b<<1;
     s->pack(b);
     return b;
 }
-inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::getAddressStateRSP> &s)
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetUserNonceRSP> &s)
 {
     auto ver=b.get_PN();
     if(!s.valid())
-        s=new MsgData::getAddressStateRSP();
+        s=new MsgData::GetUserNonceRSP();
     s->unpack2(b);
     return b;
 }

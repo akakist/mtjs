@@ -18,12 +18,12 @@ async function exec() {
             params: { node: "n9" }
         }
     ];
-    // const rsp=await mtjs.tx_submit(node,1, JSON.stringify(tx), sk!, nonce, "1000","1000", (obj)=>{
-    //     console.log(JSON.stringify(obj,null,2) );
-    //     const elapsed = performance.now() - start;
-    //     console.log("elapsed "+elapsed);
-    // });
-    // console.log(rsp);
+    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(tx), sk, nonce, (obj) => {
+        console.log(JSON.stringify(obj, null, 2));
+        const elapsed = performance.now() - start;
+        console.log("elapsed " + elapsed);
+    });
+    console.log(rsp);
 }
 console.log(std.getenv("PATH"));
 try {

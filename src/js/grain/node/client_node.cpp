@@ -203,7 +203,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         return true;
     }
 
-    t_params t(root);
+    b_params t(root);
     bool err = false;
     if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
     {

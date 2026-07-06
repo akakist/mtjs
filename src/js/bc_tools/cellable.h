@@ -41,43 +41,29 @@ struct data_base : public Refcountable
     time_t create_time=0;
     int ttl=-1;
 
-    // EPOCH_id last_update_epoch;
+    EPOCH_id last_update_epoch;
 
     data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
         type(t), parent(_parent), create_time(_create_time),ttl(_ttl) {
-            // last_update_epoch.container=0;
+            last_update_epoch.container=0;
         }
     ~data_base()
     {
     }
-    data_base * clone_mx()
-    {
-        data_base *d=create(parent);
-        d->copy_from(this);
-        return d;
-    }
-    virtual data_base * create(Cellable* _parent) = 0;
     void setDirty(const EPOCH_id& epoch);
     virtual void pack(outBuffer& o) const
     {
         o<<1;
         o<<type;
         o<<create_time<<ttl;
-        // o<<last_update_epoch;
+        o<<last_update_epoch;
     }
     virtual void unpack(inBuffer& in)
     {
         int ver=in.get_PN();
         in>>type;
         in>>create_time>>ttl;
-        // in>>last_update_epoch;
-    }
-    virtual void copy_from(data_base* s)
-    {
-        type=s->type;
-        create_time=s->create_time;
-        ttl=s->ttl;
-        // last_update_epoch=s->last_update_epoch;
+        in>>last_update_epoch;
     }
     std::string getBuffer()
     {
@@ -121,7 +107,6 @@ struct Cellable: public Refcountable
 
     /// @brief выставляется в конструкторе, мутекс не нужен
     REF_getter<data_base> data=nullptr;
-    REF_getter<data_base> data_copy=nullptr;
 public:
     /// @brief выставляется и читается в потоке ноды, мутекс не нужен.
     bool is_dirty=false;
@@ -227,12 +212,6 @@ public:
     void calc_tree_hash(_db_to_save &db_dump);
     // void _getDiff(std::map<std::deque<std::string>,std::string>& out, const EPOCH_id &epoch, IDatabase* db);
     void _getDiff(cdiff& out, const EPOCH_id &epoch, IDatabase* db);
-
-    void rollback();
-    void clear_data_copy();
-    void clear_dirty();
-
-    _db_to_save commit();
 };
 // static const char* base16_TABLE[62] = {
 //     "0","1","2","3","4","5","6","7","8","9",
