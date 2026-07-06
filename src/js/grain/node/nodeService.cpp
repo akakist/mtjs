@@ -580,6 +580,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
         {
             t_err = "verify failed @12";
             logNode("verify failed @12");
+            // return;
         }
         if (!t_err)
         {
@@ -589,6 +590,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
             {
                 t_err = "sender invalid";
                 logNode("sender invalid");
+                // return;
             }
             if (!t_err)
             {
@@ -610,8 +612,11 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
                         logNode("if(!lc->heart_beat.valid()) AA");
                     // t_params t;
                     // t.senderAddress=senderAddress;
-                    execute_transaction(tt->getHash(),  b, senderAddress, tt, by, lc->heart_beat->new_epoch);
-                    u->incNonce();
+                    t_err=execute_transaction(tt->getHash(),  b, senderAddress, tt, by, lc->heart_beat->new_epoch);
+                    // if(t_err)
+                    //     return t_err;
+                    if(!t_err)
+                        u->incNonce();
                     u->setDirty(lc->heart_beat->new_epoch);
 
                 }
@@ -622,7 +627,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
         else
             b.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());    
     }
-
+    // if()
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
     calc_fee_rewards_nodes(b, lc);
     auto newEpoch = root->getEpoch(NULL);
@@ -1097,7 +1102,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
     return std::nullopt;
 }
 
-void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress, 
+std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress, 
     const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
@@ -1112,7 +1117,18 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, cons
     if(!j_tx)
         throw CommonError("if(!j_tx)");
 
-        Rollback roll;
+    // BigInt value, gasLimit, gasPrice;
+    auto err=yy_get_bn(jroot,"value",value);
+    if(!err)
+        err=yy_get_bn(jroot,"gasLimit",gasLimit);
+    if(!err)
+        err=yy_get_bn(jroot,"gasPrice",gasPrice);
+    if(err)
+    {
+        b.emit_tx(tx_id,"error",R"({"error":"%s"})",err->c_str());
+        return err;
+    }
+    Rollback roll;
     t_params t(root);
     t.senderAddress=senderAddress;
     t.tx=tx;
@@ -1125,11 +1141,13 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, cons
     // _db_to_save db_dump0;
     root->calc_tree_hash(db_to_save_Z);
 
-    auto err=execute_tx_commands(b,t,by,j_tx);
+    err=execute_tx_commands(b,t,by,j_tx);
     if(err)
     {
         logNode("error:%s",err->c_str());
         b.emit_tx(t.tx_id,"error",R"({"error":"%s"})",err->c_str());
+        t.rollback();
+        return err;
     }
 
     _db_to_save db_dump;
@@ -1137,6 +1155,7 @@ void Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, cons
     db_to_save_Z.add(db_dump);
     size_t sz=db_dump.size();
     logErr2("user sz %d",sz);
+    return std::nullopt;
 }
 std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params)
 {

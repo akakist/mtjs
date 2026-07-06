@@ -72,4 +72,14 @@ struct t_params
     EPOCH_id epoch;
     THASH_id tx_id;
     Rollback *roll;
+
+    void rollback()
+    {
+        for(auto& z: roll->data)
+        {
+            inBuffer in(z.second);
+            z.first->unpack(in);
+            // z.first->setDirty__()
+        }
+    }
 };
