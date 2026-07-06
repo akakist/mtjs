@@ -11,7 +11,6 @@
 #include <sys/stat.h>
 #include "root_contract.h"
 #include "QUORUM.h"
-#include "fee_calcer.h"
 
 std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
@@ -140,7 +139,7 @@ REF_getter<bc_contract> root_data::getContract(const CONTRACT_id &name)
     return dynamic_cast<bc_contract *>(cc->data.get());
 }
 
-REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const REF_getter<fee_calcer> &bca, const EPOCH_id& epoch)
+REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
     auto v = getContractPath(name);
@@ -367,7 +366,7 @@ std::vector<REF_getter<bc_node>> root_data::getAllNodes()
     // }
     // return v;
 }
-REF_getter<bc_node> root_data::addNode(const NODE_id &name, const REF_getter<fee_calcer> &bc, const EPOCH_id& epoch)
+REF_getter<bc_node> root_data::addNode(const NODE_id &name, const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
 

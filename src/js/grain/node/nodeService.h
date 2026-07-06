@@ -225,10 +225,10 @@ namespace Node
         bool verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate>& lc);
 
         void execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
-                         const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch);
+                         const REF_getter<MsgData::TX> &tx,  const EPOCH_id& epoch);
 
         std::optional<std::string> execute_tx_commands(b_params &b, t_params& t, 
-            const REF_getter<fee_calcer> &by, yyjson_val * j_tx);
+             yyjson_val * j_tx);
 
         REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;

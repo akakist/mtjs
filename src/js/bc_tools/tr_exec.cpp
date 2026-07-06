@@ -11,7 +11,7 @@
 #include "yyjson_to_quickjs.h"
 
 std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_params &t,
-        const REF_getter<fee_calcer> &by,  int seqId)
+          int seqId)
 {
     auto v = t.root->getValues();
     auto it = v->emitters_bin.find(t.senderAddress);
@@ -36,9 +36,9 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     }
     // u->addBalance(amount);
     u->setDirty(t.epoch);
-    b.addCalcer(u.get(),by);
+    // b.addCalcer(u.get(),by);
 
-    b.fee[t.senderAddress] += v->getFee("mint");
+    t.gasUsed+=v->getFee("mint");
 
     b.emit_command(t.tx_id, seqId,"mint",R"({"to":"%s","amount":"%s"})",
         base16::encode(t.senderAddress.addr).c_str(),
@@ -47,7 +47,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b, t_params &t,
-    const REF_getter<fee_calcer> &by, int seqId)
+     int seqId)
 {
     auto v = t.root->getValues();
 
@@ -83,10 +83,9 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     {
         return "destination user not found";
     }
-    auto fee=v->getFee("transfer");
     {
         M_LOCK(u->parent->mx);
-        if(u->balance < fee + amount)
+        if(u->balance < amount)
             return "Not enough funds";
         u->balance-=amount;
     }
@@ -102,11 +101,9 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     // to->addBalance(amount);
     u->setDirty(t.epoch);
     to->setDirty(t.epoch);
-    b.addCalcer(u.get(),by);
-    b.addCalcer(to.get(),by);
+    t.gasUsed+=v->getFee("transfer");
 
 
-    b.fee[t.senderAddress] += fee;
 
     b.emit_command(t.tx_id, seqId, "transfer", R"({"from":"%s","to":"%s","amount":"%s"})", 
         base16::encode(t.senderAddress.addr).c_str(), 
@@ -117,7 +114,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params &b, t_params &t,
-    const REF_getter<fee_calcer> &by,int seqId)
+    int seqId)
 {
     // if(senderAddress!=)
     auto v = t.root->getValues();
@@ -137,12 +134,6 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     auto us = t.root->getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    auto fee=v->getFee("node_update");
-    {
-        M_LOCK(us->parent->mx);
-        if(us->balance < fee)
-        return "Not enough funds";
-    }
 
     std::string ip;
     err=yy_get_string(params,"ip",ip);
@@ -158,11 +149,9 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
 
     nn->setDirty(t.epoch);
     us->setDirty(t.epoch);
-    b.addCalcer(nn.get(),by);
-    b.addCalcer(us.get(),by);
 
 
-    b.fee[t.senderAddress] += fee;
+    t.gasUsed+=v->getFee("node_update");
 
     // t.logMsg(txid, seqId, "node %s updated", name.container.c_str());
 
@@ -170,7 +159,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
 }
 
 std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params &b, t_params &t,
-    const REF_getter<fee_calcer> &by, int seqId)
+     int seqId)
 {
     auto v = t.root->getValues();
     NODE_id name;
@@ -195,15 +184,9 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
     auto us = t.root->getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    auto fee=v->getFee("node_create");
-    {
-        M_LOCK(us->parent->mx);
-        if (us->balance < fee)
-            return "Not enough funds";
-    }
 
 
-    auto n = t.root->addNode(name, by,t.epoch);
+    auto n = t.root->addNode(name, t.epoch);
 
     std::string ip,pk_ed,pk_bls;
     err=yy_get_string(params,"ip",ip);
@@ -212,15 +195,6 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
     if(err) return err;
     err=yy_get_string(params,"pk_bls",pk_bls);
     if(err) return err;
-    // auto ip=params / "ip";
-    // auto pk_ed=params / "pk_ed";
-    // auto pk_bls=params / "pk_bls";
-    // if(!ip.isString())
-    //     return "string param ip required";
-    // if(!pk_ed.isString())
-    //     return "string param pk_ed required";
-    // if(!pk_bls.isString())
-    //     return "string param pk_bls required";
 
         blst_cpp::PublicKey bls;
         bls.deserializeHexStr(pk_bls);
@@ -228,20 +202,12 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
         t.senderAddress, 
         bls, 
         base16::decode(pk_ed), ip);
-    // n->name_ = name;
-    // n->ip = ip.toString();
-    // n->ed_pk = base16::decode(pk_ed.toString());
-    // n->bls_pk.deserialize(base16::decode(pk_bls.toString()));
-    // n->owner_ed_pk = senderAddress;
     n->setDirty(t.epoch);
-    // u->setDirty();
     us->setDirty(t.epoch);
-    b.addCalcer(n.get(),by);
-    b.addCalcer(us.get(),by);
 
 
 
-    b.fee[t.senderAddress] += fee;
+    t.gasUsed+=v->getFee("node_create");
 
     // t.logMsg(txid, seqId, "node %s registered", name.container.c_str());
     b.emit_command(t.tx_id, seqId, "node_create",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
@@ -249,7 +215,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params & b,t_params &t,
-    const REF_getter<fee_calcer>& by, int seqId)
+     int seqId)
 {
     auto v = t.root->getValues();
 
@@ -265,7 +231,6 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     auto us = t.root->getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    auto fee=v->getFee("node_stake");
 
     auto n=t.root->getNode(node);
     if(!n.valid())
@@ -275,7 +240,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     // BigInt &nodeStake = n->get_stastakes[senderAddress];
     {
         M_LOCK(us->parent->mx);
-        if (us->balance < amount + fee)
+        if (us->balance < amount )
         {
             return "Insufficient funds";
         }
@@ -293,7 +258,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     // n->total_stake += amount;
     // v->total_staked += amount;
 
-    b.fee[t.senderAddress] += fee;
+    t.gasUsed += v->getFee("node_stake");
 
     // t.logMsg(txid, seqId, "node %s staked on amount %s", node.container.c_str(), amount.toString().c_str());
     b.emit_command(t.tx_id, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
@@ -303,13 +268,11 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     );
     n->setDirty(t.epoch);
     us->setDirty(t.epoch);
-    b.addCalcer(n.get(),by);
-    b.addCalcer(us.get(),by);
 
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params & b,t_params &t,
-    const REF_getter<fee_calcer>& by, int seqId)
+     int seqId)
 {
     auto v = t.root->getValues();
     BigInt amount=0;
@@ -339,36 +302,21 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
 
     if (!u.valid())
         return "FATAL:  dst addr not found";
-    auto fee=v->getFee("node_unstake");
     {
 
     }
     {
         M_LOCK(u->parent->mx);
-        if(u->balance < fee)
-        {
-            return "Insufficient funds to unstake";
-        }
         u->balance+=amount;
-
     }
 
     n->sub_stake(t.senderAddress, amount);
-    // nodeStake -= amount;
-
-    // n->total_stake -= amount;
-
-
-    // v->total_staked -= amount;
 
     v->setDirty(t.epoch);
     n->setDirty(t.epoch);
     u->setDirty(t.epoch);
-    b.addCalcer(v.get(),by);
-    b.addCalcer(n.get(),by);
-    b.addCalcer(u.get(),by);
 
-    b.fee[t.senderAddress] += fee;
+    t.gasUsed+=v->getFee("node_unstake");
 
     // t.logMsg(txid, seqId, "node %s unstaked on amount %s", node.container.c_str(), amount.toString().c_str());
     b.emit_command(t.tx_id, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
@@ -381,7 +329,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
 }
 
 std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params & b,t_params &t,
-    const REF_getter<fee_calcer>& by, int seqId)
+     int seqId)
 {
     auto v = t.root->getValues();
     NODE_id node;
@@ -397,21 +345,13 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     {
         return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(t.senderAddress.addr);
     }
-    auto fee=v->getFee("node_enable");
     auto us = t.root->getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    {
-        M_LOCK(us->parent->mx);     
-        if (us->balance < fee)
-        {
-            return "Insufficient funds";
-        }
-    }
     n->reset_missed_rounds();
     n->setDirty(t.epoch);
 
-    b.fee[t.senderAddress] += fee;
+    t.gasUsed+=v->getFee("node_enable");
 
     // t.logMsg(txid, seqId, "node %s enabled", node.container.c_str());
     b.emit_command(t.tx_id, seqId, "node_enable",R"({"node":"%s"})", node.container.c_str());
@@ -423,7 +363,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
 
 
 std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_params &b, t_params &t,
-    const REF_getter<fee_calcer> &by,int seqId)
+    int seqId)
 {
     auto v = t.root->getValues();
     std::string name;
@@ -449,15 +389,9 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     auto us = t.root->getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    auto fee=v->getFee("contract_deploy");
-    {
-        M_LOCK(us->parent->mx);
-        if (us->balance < fee)
-            return "Not enough funds";
-    }
 
 
-    auto n = t.root->addContract(cn, by,t.epoch);
+    auto n = t.root->addContract(cn, t.epoch);
 
     std::string src;
      err=yy_get_string(params,"src",src);
@@ -471,17 +405,15 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
 
     n->setDirty(t.epoch);
     us->setDirty(t.epoch);
-    b.addCalcer(n.get(),by);
-    b.addCalcer(us.get(),by);
 
-    b.fee[t.senderAddress] += fee;
+    t.gasUsed+=v->getFee("contract_deploy");
 
     b.emit_command(t.tx_id, seqId, "contract_deploy",R"({"name":"%s","owner":"%s"})",name.c_str(),base16::encode(t.senderAddress.addr).c_str());
 
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_params &b, t_params &t,
-    const REF_getter<fee_calcer> &by, int seqId)
+     int seqId)
 {
     auto v = t.root->getValues();
     CONTRACT_id cn;
@@ -500,12 +432,6 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     auto us = t.root->getAddressState(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    auto fee=v->getFee("contract_update");
-    {
-        M_LOCK(us->parent->mx);
-        if (us->balance < fee)
-            return "Not enough funds";
-    }
     
 
 
@@ -521,10 +447,8 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
 
     n->setDirty(t.epoch);
     us->setDirty(t.epoch);
-    b.addCalcer(n.get(),by);
-    b.addCalcer(us.get(),by);
 
-    b.fee[t.senderAddress] += fee;
+    t.gasUsed+=v->getFee("contract_update");
 
     b.emit_command(t.tx_id, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",cn.container.c_str(),base16::encode(t.senderAddress.addr).c_str());
 
