@@ -31,7 +31,7 @@
 #include "events_nodeService.hpp"
 #include "getenv2.h"
 #include "httpConnection.h"
-#include "fee_calcer.h"
+
 #include "execute_transaction.h"
 #include "root_contract.h"
 #include "listenerBase.h"
@@ -575,7 +575,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
         ADDRESS_id senderAddress;
         senderAddress.addr=blake2b_hash(pk_bin).container;
         auto &tj = tt->tx_body;
-        REF_getter<fee_calcer> by = b.feeCalcers.get(senderAddress);
+        // REF_getter<fee_calcer> by = b.feeCalcers.get(senderAddress);
         if (!tt->verify())
         {
             t_err = "verify failed @12";
@@ -612,7 +612,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
                         logNode("if(!lc->heart_beat.valid()) AA");
                     // t_params t;
                     // t.senderAddress=senderAddress;
-                    t_err=execute_transaction(tt->getHash(),  b, senderAddress, tt, by, lc->heart_beat->new_epoch);
+                    t_err=execute_transaction(tt->getHash(),  b, senderAddress, tt,  lc->heart_beat->new_epoch);
                     // if(t_err)
                     //     return t_err;
                     if(!t_err)
@@ -641,97 +641,67 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
 void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     MUTEX_INSPECTOR;
-    std::map<Cellable*, std::set<REF_getter<fee_calcer>>> cc;
-    for(auto & z:b.calcers)
-    {
-        auto cell=z.first->parent;
-        while(cell)
-        {
-            for(auto &x: z.second)
-                cc[cell].insert(x);
-
-            cell=cell->parent;
-        }
-    }
-    for(auto& z: cc)
-    {
-        size_t size=z.first->last_size;
-        size_t portion=size/z.second.size();
-        for(auto &x: z.second)
-        {
-            x->add(portion);
-        }
-    }
 
     // auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
     BigInt total_staked=0;
-    auto nn=root->getAllNodes();
-    for(auto& n:nn)
+    auto nodes=root->getAllNodes();
+    for(auto& n:nodes)
     {
         total_staked+=n->get_full_stake();
     }
 
 
-    BigInt total_fees;
-    for (auto &z : b.feeCalcers.calcers)
+    // BigInt total_fees;
+    for (auto &z : nodes)
     {
-        auto u = root->getAddressState(z.first,NULL);
+        auto staked=z->get_full_stake();
+        auto owner=z->get_owner();
+        auto portion=staked*b.node_rewards/total_staked;
+
+        auto u = root->getAddressState(owner,NULL);
         if (!u.valid())
             throw CommonError("if(!u.valid()) 334455");
         {
             M_LOCK(u->parent->mx);
-            u->balance-=z.second->get_fee();
-            // if (u->balance < z.second->get_fee())
-            // {
-            //     u->setBalance(0);
-            //     u->setDirty(lc->heart_beat->new_epoch);
-            // }
-            // else
-            // {
-            //     // logNode("balance deduct %s fee %s", u->getBalance().toString().c_str(), z.second->get_fee().toString().c_str());
-            //     u->subBalance(z.second->get_fee());
-            //     
-            // }
+            u->balance+=portion;
         }
         u->setDirty(lc->heart_beat->new_epoch);
-        total_fees += z.second->get_fee();
-        b.att_data->fees[z.first] = z.second->get_fee();
-        b.emit_block("fee",R"({"address":"%s","fee":"%s"})",base16::encode(z.first.addr).c_str(),z.second->get_fee().toString().c_str());
-        z.second->reset();
+        b.emit_block("node_rewards",R"({"node":"%s","fee":"%s"})",z->getName().container.c_str(),portion.toString().c_str());
+        // z.second->reset();
     }
-    b.emit_block("total_fee",R"({"fee":"%s"})",total_fees.toString().c_str());
+    b.emit_block("total_rewards",R"({"fee":"%s"})",b.node_rewards.toString().c_str());
     // iUtils->getNow
-    BigInt total_rewards = (total_fees * 9) / 10;
-    for (auto &n : lc->nodes)
-    {
-        auto node = root->getNode(n);
-        if (!node.valid())
-            throw CommonError("if(!node.valid()) 556677");
-        auto owner = node->get_owner();
-        auto u = root->getAddressState(owner, NULL);
-        if (!u.valid())
-        {
-            throw CommonError("if(!u.valid()) 778899");
-            // u=root->addUser(upk,NULL);
-        }
-        BigInt amt = (total_rewards * node->get_full_stake()) / total_staked;
-        {
-            M_LOCK (u->parent->mx);
-            u->balance+=amt;
-        }
-        // u->addBalance(amt);
-        u->setDirty(lc->heart_beat->new_epoch);
-        // if (n == this_node_name && amt > 0)
-        //     logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
-        b.att_data->rewards[n] = amt;
-        b.emit_block("reward",R"({"node":"%s","amount":"%s"})",n.container.c_str(), amt.toString().c_str());
-    }
+    // BigInt total_rewards = (total_fees * 9) / 10;
+    // for (auto &n : lc->nodes)
+    // {
+    //     auto node = root->getNode(n);
+    //     if (!node.valid())
+    //         throw CommonError("if(!node.valid()) 556677");
+    //     auto owner = node->get_owner();
+    //     auto u = root->getAddressState(owner, NULL);
+    //     if (!u.valid())
+    //     {
+    //         throw CommonError("if(!u.valid()) 778899");
+    //         // u=root->addUser(upk,NULL);
+    //     }
+    //     BigInt amt = (total_rewards * node->get_full_stake()) / total_staked;
+    //     {
+    //         M_LOCK (u->parent->mx);
+    //         u->balance+=amt;
+    //     }
+    //     // u->addBalance(amt);
+    //     u->setDirty(lc->heart_beat->new_epoch);
+    //     // if (n == this_node_name && amt > 0)
+    //     //     logNode("node %s rewarded %s grans", n.container.c_str(), amt.toString().c_str());
+    //     b.att_data->rewards[n] = amt;
+    //     b.emit_block("reward",R"({"node":"%s","amount":"%s"})",n.container.c_str(), amt.toString().c_str());
+    // }
     std::set<NODE_id> ns;
     for(auto& z:lc->nodes)
     {
         ns.insert(z);
     }
-    auto nodes=b.root->getAllNodes();
+    // auto nodes=b.root->getAllNodes();
     for(auto &n: nodes)
     {
         if(ns.count(n->getName()))
@@ -983,7 +953,7 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
     return true;
 }
 std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_params& t, 
-     const REF_getter<fee_calcer> &by, yyjson_val * j_tx)
+      yyjson_val * j_tx)
 {
     if(!yyjson_is_arr(j_tx))
         return "command list must be json array";
@@ -1051,23 +1021,23 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 auto meth=method_str;
                 // logErr2("method %s",meth.c_str());
                 if (meth == "mint")
-                    err = TR::execute_mint(params, b, t, by, index);
+                    err = TR::execute_mint(params, b, t,  index);
                 else if (meth == "transfer")
-                    err = TR::execute_transfer(params, b,t, by, index);
+                    err = TR::execute_transfer(params, b,t,  index);
                 else if (meth == "node_create")
-                    err = TR::execute_node_create(params,b, t, by, index);
+                    err = TR::execute_node_create(params,b, t,  index);
                 else if (meth == "node_update")
-                    err = TR::execute_node_update(params, b,t, by, index);
+                    err = TR::execute_node_update(params, b,t,  index);
                 else if (meth == "node_stake")
-                    err = TR::execute_node_stake(params, b,t, by, index);
+                    err = TR::execute_node_stake(params, b,t,  index);
                 else if (meth == "node_unstake")
-                    err = TR::execute_unstake_node(params, b,t, by, index);
+                    err = TR::execute_unstake_node(params, b,t, index);
                 else if (meth == "node_enable")
-                    err = TR::execute_node_enable(params, b,t, by, index);
+                    err = TR::execute_node_enable(params, b,t,  index);
                 else if (meth == "contract_deploy")
-                    err = TR::execute_contract_deploy(params,b, t, by, index);
+                    err = TR::execute_contract_deploy(params,b, t,  index);
                 else if (meth == "contract_update")
-                    err = TR::execute_contract_update(params, b,t, by, index);
+                    err = TR::execute_contract_update(params, b,t,  index);
                 else
                 {
                     MUTEX_INSPECTOR;
@@ -1103,7 +1073,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 }
 
 std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress, 
-    const REF_getter<MsgData::TX> &tx, const REF_getter<fee_calcer> &by, const EPOCH_id& epoch)
+    const REF_getter<MsgData::TX> &tx,  const EPOCH_id& epoch)
 {
     MUTEX_INSPECTOR;
     // yyjson::Document doc(tx_cmds);
@@ -1141,7 +1111,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     // _db_to_save db_dump0;
     root->calc_tree_hash(db_to_save_Z);
 
-    err=execute_tx_commands(b,t,by,j_tx);
+    err=execute_tx_commands(b,t,j_tx);
     if(err)
     {
         logNode("error:%s",err->c_str());

@@ -11,7 +11,7 @@
 #include "md/md_LeaderCertificate.h"
 #include <yyjson.h>
 #include <sstream>
-#include "fee_calcer.h"
+
 #include "nodeElement.h"
 #include "ADDRESS_id.h"
 #include "CONTRACT_id.h"
@@ -396,7 +396,7 @@ struct root_data: public Cellable
     std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
 
     REF_getter<bc_contract> getContract(const CONTRACT_id &name);
-    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const REF_getter<fee_calcer>& bca, const EPOCH_id& epoch, Rollback*);
+    REF_getter<bc_contract> addContract(const CONTRACT_id &name,  const EPOCH_id& epoch, Rollback*);
 
     REF_getter<bc_values> getValues(Rollback* roll);
     REF_getter<bc_values> checkValues();
@@ -416,7 +416,7 @@ struct root_data: public Cellable
 
 
     REF_getter<bc_node> getNode(const NODE_id &name);
-    REF_getter<bc_node> addNode(const NODE_id &name, const REF_getter<fee_calcer>& bc, const EPOCH_id& epoch, Rollback*);
+    REF_getter<bc_node> addNode(const NODE_id &name, const EPOCH_id& epoch, Rollback*);
 
 
 
