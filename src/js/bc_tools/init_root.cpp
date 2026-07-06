@@ -25,7 +25,7 @@ void init_root(const REF_getter<root_data> &r)
             total+=z;
         }
         // v->total_staked=total;
-        v->setDirty(e);
+        v->setDirty(e,NULL);
     }
     // u_root pk
     if(!r->checkUserState(u_root_address).valid())
@@ -39,7 +39,7 @@ void init_root(const REF_getter<root_data> &r)
             M_LOCK(u->parent->mx);
             u->balance+=1000000;
         }
-        u->setDirty(e);
+        u->setDirty(e,NULL);
 
     }
 
@@ -67,7 +67,7 @@ void init_root(const REF_getter<root_data> &r)
         bls_pk.deserializeHexStr(getenv2(keys[i].first));
         nn->init(name, u_root_address, bls_pk, base16::decode(getenv2(keys[i].second)), "127.0.0.1:"+std::to_string(2300+i));
         nn->add_stake(u_root_address, 100*i);
-        nn->setDirty(e);
+        nn->setDirty(e,NULL);
         // r->;
 
     }

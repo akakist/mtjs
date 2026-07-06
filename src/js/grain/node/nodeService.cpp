@@ -617,7 +617,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
                     //     return t_err;
                     if(!t_err)
                         u->incNonce();
-                    u->setDirty(lc->heart_beat->new_epoch);
+                    u->setDirty(lc->heart_beat->new_epoch,NULL);
 
                 }
             }
@@ -633,7 +633,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
     auto newEpoch = root->getEpoch(NULL);
     newEpoch->epoch.container += 1;
     newEpoch->prev_lc = b.validateBlockREQ->leader_cert->getBuffer();
-    newEpoch->setDirty(lc->heart_beat->new_epoch);
+    newEpoch->setDirty(lc->heart_beat->new_epoch,NULL);
 
     rh=proceed_merkle_on_transaction_pool_hashers(root);
     return rh;
@@ -665,7 +665,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
             M_LOCK(u->parent->mx);
             u->balance+=portion;
         }
-        u->setDirty(lc->heart_beat->new_epoch);
+        u->setDirty(lc->heart_beat->new_epoch,NULL);
         b.emit_block("node_rewards",R"({"node":"%s","fee":"%s"})",z->getName().container.c_str(),portion.toString().c_str());
         // z.second->reset();
     }
@@ -711,7 +711,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
             else
             {
                 n->reset_missed_rounds();
-                n->setDirty(lc->heart_beat->new_epoch);
+                n->setDirty(lc->heart_beat->new_epoch,NULL);
             }
         }
         else
@@ -723,7 +723,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
             else    
             {
                 n->inc_missed_rounds();
-                n->setDirty(lc->heart_beat->new_epoch);
+                n->setDirty(lc->heart_beat->new_epoch,NULL);
             }
         }
     }

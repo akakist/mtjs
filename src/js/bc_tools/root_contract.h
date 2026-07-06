@@ -24,15 +24,6 @@ struct bc_contract:  public data_base
     std::string name_;
     ADDRESS_id  owner;
     std::string src;
-    void copy_from(data_base* d) final
-    {
-        data_base::copy_from(d);
-        auto *dd=dynamic_cast<bc_contract*>(d);
-        if(!dd) throw CommonError("if(!dd)");
-        name_=dd->name_;
-        owner=dd->owner;
-        src=dd->src;
-    }
 
     void pack(outBuffer&b) const final
     {
@@ -102,14 +93,6 @@ struct bc_address_state: public data_base
     uint64_t nonce;
     private:
     public:
-    void copy_from(data_base* d) final
-    {
-        data_base::copy_from(d);
-        auto *dd=dynamic_cast<bc_address_state*>(d);
-        if(!dd) throw CommonError("if(!dd)");
-        balance=dd->balance;
-        nonce=dd->nonce;
-    }
     uint64_t getNonce()
     {
         M_LOCK(parent->mx);
@@ -153,18 +136,6 @@ struct bc_node: public data_base
     std::map<ADDRESS_id /*user*/, BigInt> stakes;
     int missed_rounds = 0;
     public:
-    void copy_from(data_base* d) final
-    {
-        data_base::copy_from(d);
-        auto *dd=dynamic_cast<bc_node*>(d);
-        if(!dd) throw CommonError("if(!dd)");
-        name_=dd->name_;
-        owner_address=dd->owner_address;
-        bls_pk=dd->bls_pk;
-        ed_pk=dd->ed_pk;
-        ip=dd->ip;
-        stakes=dd->stakes;
-    }
     NodeElement getElement()
     {
         NodeElement n;
@@ -305,14 +276,6 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
     }
     std::map<std::string,BigInt> gas;
     std::set<ADDRESS_id> emitters_bin;
-    void copy_from(data_base* d) final
-    {
-        data_base::copy_from(d);
-        auto *dd=dynamic_cast<bc_values*>(d);
-        if(!dd) throw CommonError("if(!dd)");
-        gas=dd->gas;
-        emitters_bin=dd->emitters_bin;
-    }
     
     BigInt getGas(const std::string &fee_type) const
     {
@@ -324,15 +287,14 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
     }
     void pack(outBuffer& o) const final
     {
-        // cost.pack(o);
+        data_base::pack(o);
         o<<1;
         o<<gas<<emitters_bin;
     }
     void unpack(inBuffer& o) final
     {
-        // cost.unpack(o);
+        data_base::unpack(o);
         auto v=o.get_PN();
-
         o>>gas>>emitters_bin;
     }
     std::string dump() final;
@@ -347,24 +309,16 @@ struct bc_epoch: public data_base
     }
     EPOCH_id epoch;
     std::string prev_lc;
-    void copy_from(data_base* d) final
-    {
-        data_base::copy_from(d);
-        auto *dd=dynamic_cast<bc_epoch*>(d);
-        if(!dd) throw CommonError("if(!dd)");
-        epoch=dd->epoch;
-        prev_lc=dd->prev_lc;
-    }
     void pack(outBuffer& o) const final
     {
-        // cost.pack(o);
+        data_base::pack(o);
         o<<1;
         o<<epoch;
         o<<prev_lc;
     }
     void unpack(inBuffer& o) final
     {
-        // cost.unpack(o);
+        data_base::unpack(o);
         auto v=o.get_PN();
         o>>epoch;
         o>> prev_lc;
@@ -387,8 +341,8 @@ struct root_data: public Cellable
     {
     }
     Mutex state_mutex;
-    void getDiff(cdiff& out, const EPOCH_id &epoch);
-    void apply_diff(const cdiff& out);
+    // void getDiff(cdiff& out, const EPOCH_id &epoch);
+    // void apply_diff(const cdiff& out);
 
     std::vector<std::string> getContractPath(const CONTRACT_id &name);
     std::vector<std::string> getNodePath(const NODE_id &name);
