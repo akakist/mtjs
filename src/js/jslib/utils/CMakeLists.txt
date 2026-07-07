@@ -12,5 +12,7 @@ utils.cpp
 telnet_js.cpp
 telnet_request.cpp
 asyncFSio.cpp
+granularMap.cpp
+granularMap.h
            )
 
