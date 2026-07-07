@@ -1055,7 +1055,14 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.roll=&roll;
     t.value=value;
     t.gasLimit=gasLimit;
-
+    auto uu=root->getAddressState(senderAddress,NULL);
+    if(!uu.valid())
+    throw CommonError("if(!uu.valid())");
+    {
+        M_LOCK(uu->parent->mx);
+        if(uu->balance < gasLimit*gasPrice+value)
+            return "not enough funds to reserve gasLimit*gasPrice+value";
+    }
     /// сбрасываем все изменения состояния перед транзакцией
     // _db_to_save db_dump0;
     root->calc_tree_hash(db_to_save_Z);
@@ -1065,6 +1072,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {
         logNode("error:%s",err->c_str());
         b.emit_tx(t.tx_id,"error",R"({"error":"%s"})",err->c_str());
+        t.gasUsed+=t.roll->size();
         t.rollback();
         auto gu=t.gasUsed;
         if(gu>gasLimit)
@@ -1080,6 +1088,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     }
     if(t.value<0)
     {
+        t.gasUsed+=t.roll->size();
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
         auto u=root->getAddressState(t.senderAddress,NULL);
@@ -1105,6 +1114,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.gasUsed+=sz;
     if(t.gasUsed>gasLimit)
     {
+
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
         auto u=root->getAddressState(t.senderAddress,NULL);
