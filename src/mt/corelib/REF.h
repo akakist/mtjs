@@ -125,20 +125,22 @@ public:
     }
     inline  T* operator -> () const
     {
-        // #ifdef DEBUG
+        #ifdef DEBUG
         if(!___ptr)
         {
             throw_deref_nullptr();
         }
-        // #endif
+        #endif
         return ___ptr;
     };
     inline  T* get() const
     {
+        #ifdef DEBUG
         if(!___ptr)
         {
             throw_deref_nullptr();
         }
+#endif
         return ___ptr;
     };
 };
