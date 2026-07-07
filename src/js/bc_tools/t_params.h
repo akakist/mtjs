@@ -85,15 +85,11 @@ struct t_params
             return it->second;
 
         auto nn=root->getNode(n);
+
         if(nn.valid())
         {
             nodes[n]=nn;
-            auto p=nn->parent;
-            if(!roll->data.count(p))
-            {
-                M_LOCK(p->mx);
-                roll->data[p]=p->getBuffer_mx();
-            }
+            nn->setDirty(epoch, roll);
         }
         return nn;
     }
@@ -108,12 +104,7 @@ struct t_params
         if(nn.valid())
         {
             addrs[n]=nn;
-            auto p=nn->parent;
-            if(!roll->data.count(p))
-            {
-                M_LOCK(p->mx);
-                roll->data[p]=p->getBuffer_mx();
-            }
+            nn->setDirty(epoch,roll);
         }
         return nn;
     }

@@ -233,7 +233,7 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
     }
     std::map<std::string,BigInt> fees;
     std::set<ADDRESS_id> emitters_bin;
-    BigInt getFee(const std::string &fee_type) const
+    BigInt getGas(const std::string &fee_type) const
     {
         auto it=fees.find(fee_type);
         if(it!=fees.end())

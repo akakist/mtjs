@@ -40,7 +40,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     u->setDirty(t.epoch,t.roll);
     // b.addCalcer(u.get(),by);
 
-    t.gasUsed+=v->getFee("mint");
+    t.gasUsed+=v->getGas("mint");
 
     b.emit_command(t.tx_id, seqId,"mint",R"({"to":"%s","amount":"%s"})",
         base16::encode(t.senderAddress.addr).c_str(),
@@ -86,12 +86,10 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     {
         return "destination user not found";
     }
-    {
-        M_LOCK(u->parent->mx);
-        if(u->balance < amount)
-            return "Not enough funds";
-        u->balance-=amount;
-    }
+    if(amount>t.value)
+    return "amount>t.value";
+
+    t.value-=amount;
     // if (u->getBalance() < fee + amount)
     // {
     //     return "Not enough funds";
@@ -104,7 +102,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     // to->addBalance(amount);
     u->setDirty(t.epoch,t.roll);
     to->setDirty(t.epoch,t.roll);
-    t.gasUsed+=v->getFee("transfer");
+    t.gasUsed+=v->getGas("transfer");
 
 
 
@@ -155,9 +153,8 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     us->setDirty(t.epoch,t.roll);
 
 
-    t.gasUsed+=v->getFee("node_update");
+    t.gasUsed+=v->getGas("node_update");
 
-    // t.logMsg(txid, seqId, "node %s updated", name.container.c_str());
 
     return std::nullopt;
 }
@@ -212,7 +209,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
 
 
 
-    t.gasUsed+=v->getFee("node_create");
+    t.gasUsed+=v->getGas("node_create");
 
     // t.logMsg(txid, seqId, "node %s registered", name.container.c_str());
     b.emit_command(t.tx_id, seqId, "node_create",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
@@ -244,29 +241,15 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
         return "node not found";
     }
     // BigInt &nodeStake = n->get_stastakes[senderAddress];
+    if(t.value<amount)
     {
-        M_LOCK(us->parent->mx);
-        if (us->balance < amount )
-        {
-            return "Insufficient funds";
-        }
-
-    // }
-
-    // {
-    //     M_LOCK(us->parent->mx);
-        us->balance-=amount;
+        return "Insufficient funds";
     }
-    // us->subBalance(amount);
+    t.value-=amount;
     n->add_stake(t.senderAddress, amount);
-    //  auto nodeStake = n->getStake(senderAddress);
-    // nodeStake += amount;
-    // n->total_stake += amount;
-    // v->total_staked += amount;
 
-    t.gasUsed += v->getFee("node_stake");
+    t.gasUsed += v->getGas("node_stake");
 
-    // t.logMsg(txid, seqId, "node %s staked on amount %s", node.container.c_str(), amount.toString().c_str());
     b.emit_command(t.tx_id, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
         node.container.c_str(),
         amount.toString().c_str(),
@@ -306,16 +289,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     }
 
     auto u = t.getAddressState(t.senderAddress);
-
-    if (!u.valid())
-        return "FATAL:  dst addr not found";
-    {
-
-    }
-    {
-        M_LOCK(u->parent->mx);
-        u->balance+=amount;
-    }
+    t.value+=amount;
 
     n->sub_stake(t.senderAddress, amount);
 
@@ -323,9 +297,8 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     n->setDirty(t.epoch,t.roll);
     u->setDirty(t.epoch,t.roll);
 
-    t.gasUsed+=v->getFee("node_unstake");
+    t.gasUsed+=v->getGas("node_unstake");
 
-    // t.logMsg(txid, seqId, "node %s unstaked on amount %s", node.container.c_str(), amount.toString().c_str());
     b.emit_command(t.tx_id, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
         node.container.c_str(),
         base16::encode(t.senderAddress.addr).c_str(),
@@ -353,13 +326,13 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     {
         return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(t.senderAddress.addr);
     }
-    auto us = t.getAddressState(t.senderAddress);
-    if (!us.valid())
-        return "if(!us.valid())";
+    // auto us = t.getAddressState(t.senderAddress);
+    // if (!us.valid())
+    //     return "if(!us.valid())";
     n->reset_missed_rounds();
     n->setDirty(t.epoch,t.roll);
 
-    t.gasUsed+=v->getFee("node_enable");
+    t.gasUsed+=v->getGas("node_enable");
 
     // t.logMsg(txid, seqId, "node %s enabled", node.container.c_str());
     b.emit_command(t.tx_id, seqId, "node_enable",R"({"node":"%s"})", node.container.c_str());
@@ -415,7 +388,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     n->setDirty(t.epoch,t.roll);
     us->setDirty(t.epoch,t.roll);
 
-    t.gasUsed+=v->getFee("contract_deploy");
+    t.gasUsed+=v->getGas("contract_deploy");
 
     b.emit_command(t.tx_id, seqId, "contract_deploy",R"({"name":"%s","owner":"%s"})",name.c_str(),base16::encode(t.senderAddress.addr).c_str());
 
@@ -458,7 +431,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     n->setDirty(t.epoch,t.roll);
     us->setDirty(t.epoch,t.roll);
 
-    t.gasUsed+=v->getFee("contract_update");
+    t.gasUsed+=v->getGas("contract_update");
 
     b.emit_command(t.tx_id, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",cn.container.c_str(),base16::encode(t.senderAddress.addr).c_str());
 
