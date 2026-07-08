@@ -37,7 +37,7 @@ void init_root(const REF_getter<root_data> &r)
         }
         {
             M_LOCK(u->parent->mx);
-            u->balance+=1000000;
+            u->balance+=100000000;
         }
         u->setDirty(e,NULL);
 

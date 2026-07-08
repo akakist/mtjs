@@ -608,8 +608,11 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
                         logNode("if(!lc->heart_beat.valid()) AA");
                     // t_params t;
                     // t.senderAddress=senderAddress;
-                    auto err=execute_transaction(tt->getHash(),  b, senderAddress, tt, lc->heart_beat->new_epoch);
-                    u->incNonce();
+                    t_err=execute_transaction(tt->getHash(),  b, senderAddress, tt, lc->heart_beat->new_epoch);
+                    if(!t_err)
+                    {
+                        u->incNonce();
+                    }
                     u->setDirty(lc->heart_beat->new_epoch,NULL);
 
                 }
