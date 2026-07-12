@@ -4,6 +4,9 @@
 #include <map>
 #include <string>
 #include "REF.h"
+#include "ADDRESS_id.h"
+#include "CONTRACT_id.h"
+#include "root_contract.h"
 struct contract_rt: public Refcountable
 {
     contract_rt():Refcountable("contract_rt"){}
@@ -12,5 +15,7 @@ struct contract_rt: public Refcountable
     std::map<std::string,JSValueGuard> methods;
     std::string src;
     ADDRESS_id owner;
+    CONTRACT_id name;
+    REF_getter<root_data> root;
 
 };

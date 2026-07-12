@@ -24,7 +24,10 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
     { return new bc_values(p); },
     +[](Cellable *p) -> data_base *
-    { return new bc_epoch(p); }
+    { return new bc_epoch(p); },
+    +[](Cellable *p) -> data_base *
+    { return new bc_contract_data(p); },
+
 };
 
 
@@ -75,6 +78,26 @@ std::vector<std::string> root_data::getContractPath(const CONTRACT_id &name)
     p.push_back(name.container);
     return p;
 }
+std::vector<std::string> root_data::getContractDataPath(const CONTRACT_DATA_id &name)
+{
+    std::vector<std::string> p;
+    p.push_back("d");
+    auto h=ghash(name.container.c_str());
+    // char buf[8];
+    char s[8];
+    for(int i=0;i<8;i++)
+    {
+        s[i] = "0123456789abcdef"[h % 16];
+        h>>=4;
+    }
+    for(int i=0;i<8;i++)
+    {
+        p.push_back({s+i,1});    
+    }
+        // p.push_back({buf,1});
+    p.push_back(name.container);
+    return p;
+}
 
 std::vector<std::string> root_data::getNodePath(const NODE_id &name)
 {
@@ -102,6 +125,17 @@ REF_getter<bc_contract> root_data::getContract(const CONTRACT_id &name)
         throw CommonError("if(!cc->data.valid())");
     return dynamic_cast<bc_contract *>(cc->data.get());
 }
+REF_getter<bc_contract_data> root_data::getContractData(const CONTRACT_DATA_id &name)
+{
+    MUTEX_INSPECTOR;
+    auto v = getContractDataPath(name);
+    auto cc = getByPathNoCreate(this, v, db.get());
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        throw CommonError("if(!cc->data.valid())");
+    return dynamic_cast<bc_contract_data *>(cc->data.get());
+}
 
 REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const EPOCH_id& epoch,Rollback* roll)
 {
@@ -115,6 +149,21 @@ REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const EP
     REF_getter<bc_contract> bc = new bc_contract(cc.get());
     cc->data = bc.get();
     cc->payload_ctor_idx = hsh::bc_contract;
+    cc->data->setDirty(epoch,roll);
+    return bc;
+}
+REF_getter<bc_contract_data> root_data::addContractData(const CONTRACT_DATA_id &name, const EPOCH_id& epoch,Rollback* roll)
+{
+    MUTEX_INSPECTOR;
+    auto v = getContractDataPath(name);
+    auto cc = getByPathOrCreate(this, v, db.get(),roll);
+    if (!cc.valid())
+        throw CommonError("if(!cc.valid())");
+    if (cc->data.valid())
+        throw CommonError("if(cc->data.valid())");
+    REF_getter<bc_contract_data> bc = new bc_contract_data(cc.get());
+    cc->data = bc.get();
+    cc->payload_ctor_idx = hsh::bc_contract_data;
     cc->data->setDirty(epoch,roll);
     return bc;
 }
@@ -411,6 +460,11 @@ std::string bc_contract::dump()
     // o<< "Src: " << src << std::endl;
 
     return j.dump(2);
+}
+std::string bc_contract_data::dump()
+{
+    return "";
+
 }
 std::string bc_address_state::dump()
 {

@@ -14,6 +14,7 @@
 #include "nodeElement.h"
 #include "ADDRESS_id.h"
 #include "CONTRACT_id.h"
+#include "CONTRACT_DATA_id.h"
 // #include <ostringstream>
 
 struct bc_contract:  public data_base
@@ -35,6 +36,27 @@ struct bc_contract:  public data_base
         data_base::unpack(b);
         auto v=b.get_PN();
         b>>name_>>owner>>src;
+
+    }
+    std::string dump() final;
+};
+struct bc_contract_data:  public data_base
+{
+
+    bc_contract_data(Cellable *p):data_base(hsh::bc_contract_data,p, 0,-1) {}
+    std::string container;
+    void pack(outBuffer&b) const final
+    {
+        data_base::pack(b);
+        b<<1;
+        b<<container;
+
+    }
+    void unpack(inBuffer&b) final
+    {
+        data_base::unpack(b);
+        auto v=b.get_PN();
+        b>>container;
 
     }
     std::string dump() final;
@@ -300,12 +322,16 @@ struct root_data: public Cellable
     Mutex state_mutex;
 
     std::vector<std::string> getContractPath(const CONTRACT_id &name);
+    std::vector<std::string> getContractDataPath(const CONTRACT_DATA_id &name);
     std::vector<std::string> getNodePath(const NODE_id &name);
     std::vector<std::string> getUserPath(const ADDRESS_id &addr);
     std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
 
     REF_getter<bc_contract> getContract(const CONTRACT_id &name);
     REF_getter<bc_contract> addContract(const CONTRACT_id &name, const EPOCH_id& epoch,Rollback*);
+
+    REF_getter<bc_contract_data> getContractData(const CONTRACT_DATA_id &name);
+    REF_getter<bc_contract_data> addContractData(const CONTRACT_DATA_id &name, const EPOCH_id& epoch,Rollback*);
 
     REF_getter<bc_values> getValues(Rollback*);
     REF_getter<bc_values> checkValues();
