@@ -18,7 +18,7 @@ void Node::Service::do_sync(const NODE_id &src_node)
 {
     MUTEX_INSPECTOR;
     logNode("void Node::Service::do_sync(const NODE_id &src_node) ");
-    auto n = root->getNode(src_node);
+    auto n = root->getNode(src_node,db_state.get());
     if (!n.valid())
         throw CommonError("if(!n.valid())");
     REF_getter<MsgData::GetSavedBlocksREQ> gbr = new MsgData::GetSavedBlocksREQ();
@@ -47,7 +47,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const
         {
 
             std::string res;
-            if (db_history->get(prev.container, &res))
+            if (db_state->getBlock(prev, res))
             {
                 logNode("cannot find block %s", r->prev_root_hash.str().c_str());
                 break;
@@ -100,7 +100,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
     for (auto &z : r->blocks_ZZ)
     {
         logNode("iter block epoch %ld", z->validateBlockREQ->leader_cert->heart_beat->new_epoch);
-        logNode("cur epoch %ld", root->getEpoch(NULL)->epoch);
+        logNode("cur epoch %ld", root->getEpoch(NULL,db_state.get())->epoch);
 
         logNode("iter prev_root_hash in validateBlockREQ %s", z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.str().c_str());
         logNode("iter prev_root_hash in blockAcceptedREQ %s", z->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str());
@@ -123,7 +123,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         std::vector<blst_cpp::PublicKey> agg_pk;
         for (auto &k : z->blockAcceptedREQ->node_validators)
         {
-            auto n = root->getNode(k);
+            auto n = root->getNode(k,db_state.get());
             agg_pk.push_back(n->get_bls_pk());
         }
         if (!z->blockAcceptedREQ->agg_sig.verify(agg_pk, blake2b_hash(z->blockAcceptedREQ->blockInfo->getBuffer()).container))
@@ -131,7 +131,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             throw CommonError("on_get_blocks_rsp: !ba.agg_sig.verify");
         }
         logNode("on_get_blocks_rsp: block verified OK");
-        b_params t(root);
+        b_params t(root,db_state.get());
         t.validateBlockREQ = z->validateBlockREQ;
         auto rh = execute_block(t, z->validateBlockREQ->leader_cert);
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
@@ -141,14 +141,14 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             logNode("on_get_blocks_rsp: block executed OK on epoch %ld", z->validateBlockREQ->leader_cert->heart_beat->new_epoch);
 
             logNode("before write batch");
-            db_state->write_batch(db_to_save_Z);
+            db_state->write_granules_batch(db_to_save_Z);
             logNode("after write batch");
             // sendEvent(ServiceEnum::GrainWriter,
             //     new bcEvent::WriteGranules(db_to_save_Z,
             //         t.validateBlockREQ->leader_cert->heart_beat->new_epoch,
             //         db_state,this));
 
-            logNode("db->write_batch(db_to_save_Z); done %d granules", db_to_save_Z.cells.size());
+            logNode("db->write_granules_batch(db_to_save_Z); done %d granules", db_to_save_Z.cells.size());
             db_to_save_Z.clear();
             prev_root_hash_Z = new_root_hash;
         }
@@ -169,7 +169,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         }
         outBuffer o;
         o<<z;
-        if(db_history->writeBlock(z->validateBlockREQ->leader_cert->heart_beat->new_epoch, 
+        if(db_state->writeBlock(z->validateBlockREQ->leader_cert->heart_beat->new_epoch, 
             z->validateBlockREQ->leader_cert->heart_beat->block_timestamp,
             z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.container,
                                   o.asString()->container
@@ -203,7 +203,7 @@ bool Node::Service::DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const
 {
     logErr2("@@ %s",__PRETTY_FUNCTION__);
     std::string res;
-    if (db_history->get(m->prev_root_hash.container, &res))
+    if (db_state->getBlock(m->prev_root_hash, res))
     {
         logNode("cannot find block %s", m->prev_root_hash.str().c_str());
         return true;

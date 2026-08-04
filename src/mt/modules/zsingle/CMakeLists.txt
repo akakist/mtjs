@@ -20,7 +20,7 @@ add_library(zsingle STATIC
 
 ../webSocketClient/webSocketClientService.cpp
 
-
+../mysql/mysqlService.cpp
 
 )
 

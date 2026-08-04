@@ -11,6 +11,7 @@
 #include "Event/bcEvent.h"
 #include "root_contract.h"
 #include "NODE_id.h"
+#include "DBH.h"
 
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 
@@ -38,7 +39,8 @@ namespace BroadcasterTree
     class Service:
         public UnknownBase,
         public ListenerBuffered1Thread,
-        public Broadcaster
+        public Broadcaster,
+        public DBH_feature
     {
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP*);
         bool on_startService(const systemEvent::startService*);
@@ -80,6 +82,7 @@ namespace BroadcasterTree
         REF_getter<root_data> root=NULL;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
+        REF_getter<IDatabase> db_state_4;
 
 
     };

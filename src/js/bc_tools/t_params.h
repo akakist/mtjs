@@ -5,8 +5,9 @@
 
 struct b_params
 {
-    b_params(const REF_getter<root_data>& r): root(r),att_data(new MsgData::attachment_data()) {}
+    b_params(const REF_getter<root_data>& r, IDatabase* _db): root(r),att_data(new MsgData::attachment_data()),db(_db) {}
     REF_getter<root_data> root;
+    IDatabase* db;
     REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
     REF_getter<MsgData::attachment_data> att_data;
     BigInt node_rewards;
@@ -78,13 +79,13 @@ struct t_params
         }
     }
     std::map<NODE_id,REF_getter<bc_node>> nodes;
-    REF_getter<bc_node> getNode(const NODE_id& n)
+    REF_getter<bc_node> getNode(const NODE_id& n,IDatabase* db)
     {
         auto it=nodes.find(n);
         if(it!=nodes.end())
             return it->second;
 
-        auto nn=root->getNode(n);
+        auto nn=root->getNode(n,db);
 
         if(nn.valid())
         {
@@ -94,13 +95,13 @@ struct t_params
         return nn;
     }
     std::map<ADDRESS_id,REF_getter<bc_address_state>> addrs;
-    REF_getter<bc_address_state> getAddressState(const ADDRESS_id& n)
+    REF_getter<bc_address_state> getAddressState(const ADDRESS_id& n,IDatabase* db)
     {
         auto it=addrs.find(n);
         if(it!=addrs.end())
             return it->second;
 
-        auto nn=root->getAddressState(n,roll);
+        auto nn=root->getAddressState(n,roll,db);
         if(nn.valid())
         {
             addrs[n]=nn;

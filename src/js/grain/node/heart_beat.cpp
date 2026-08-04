@@ -23,7 +23,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         return false;
     }
 
-    auto n = root->getNode(m->node_signer);
+    auto n = root->getNode(m->node_signer,db_state.get());
     if (!n.valid())
     {
         logNode("if(!n.valid())");
@@ -52,7 +52,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         {
             for (auto &z : li.HeartBeatRSP_m)
             {
-                auto nn = root->getNode(z.second->node_signer);
+                auto nn = root->getNode(z.second->node_signer,db_state.get());
                 hb_staked += nn->get_full_stake();
                 // logNode("nn->get_full_stake() %s",nn->get_full_stake().toString().c_str());
                 pk_agg.push_back(nn->get_bls_pk());
@@ -62,7 +62,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     }
     BigInt total_staked=0;
     
-    auto nn=root->getAllNodes();
+    auto nn=root->getAllNodes(db_state.get());
     for(auto& z: nn)
     {
         total_staked+=z->get_full_stake();
@@ -114,7 +114,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         logNode("block timestamp not valid");
         return true;
     }
-    auto llc=root->getEpoch(NULL)->prev_lc;
+    auto llc=root->getEpoch(NULL,db_state.get())->prev_lc;
     
     if(llc.size())
     {
@@ -310,7 +310,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         return false;
     }
 
-    auto n = root->getNode(m->node_signer);
+    auto n = root->getNode(m->node_signer,db_state.get());
     if (!n.valid())
     {
         logNode("if(!n.valid())");
@@ -337,13 +337,13 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         for (auto &z : li.ConfirmLeaderRSP_m)
         {
             sig_agg.add(z.second->sig);
-            auto nn = root->getNode(z.second->node_signer);
+            auto nn = root->getNode(z.second->node_signer,db_state.get());
             pk_agg.push_back(nn->get_bls_pk());
             hb_staked += nn->get_full_stake();
         }
     }
     BigInt total_staked;
-    auto nn=root->getAllNodes();
+    auto nn=root->getAllNodes(db_state.get());
     for(auto &n:nn)
     {
         total_staked+=n->get_full_stake();
@@ -370,14 +370,14 @@ void Node::Service::do_heart_beat()
     // logNode("@@ %s",__FUNCTION__);
     blocks_leader.clear();
     {
-        EPOCH_id e=root->getEpoch(NULL)->epoch;
+        EPOCH_id e=root->getEpoch(NULL,db_state.get())->epoch;
         e.container+=1;
         REF_getter<MsgData::HeartBeatREQ> hb_req =
             new MsgData::HeartBeatREQ(prev_root_hash_Z,
                                       e,
-                                      this_node_name, root->getEpoch(NULL)->prev_lc, time(NULL));
+                                      this_node_name, root->getEpoch(NULL,db_state.get())->prev_lc, time(NULL));
 
-        REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),root->getEpoch(NULL)->prev_lc);
+        REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),root->getEpoch(NULL,db_state.get())->prev_lc);
         // logNode("broadcast heart beat");
         broadcast_MsgEvent(lce.get());
     }
@@ -398,7 +398,7 @@ void Node::Service::make_leader_certificate()
     for (auto &r : li.ConfirmLeaderRSP_m)
     {
         lc->agg_sig.add(r.second->sig);
-        auto nn = root->getNode(r.second->node_signer);
+        auto nn = root->getNode(r.second->node_signer,db_state.get());
         lc->nodes.push_back(r.second->node_signer);
     }
 

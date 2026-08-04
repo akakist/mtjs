@@ -1,6 +1,6 @@
 #include "init_root.h"
 #include "getenv2.h"
-void init_root(const REF_getter<root_data> &r)
+void init_root(const REF_getter<root_data> &r, IDatabase* db)
 {
     MUTEX_INSPECTOR;
         EPOCH_id e;
@@ -13,9 +13,9 @@ void init_root(const REF_getter<root_data> &r)
     std::string u_root_pk=base16::decode(getenv2("k_root_ed_pk"));
     ADDRESS_id u_root_address;
     u_root_address.addr=blake2b_hash(u_root_pk).container;
-    if(!r->checkValues().valid())
+    if(!r->checkValues(db).valid())
     {
-        auto v=r->getValues(NULL);
+        auto v=r->getValues(NULL,db);
         if(!v->emitters_bin.count(u_root_address))
             v->emitters_bin.insert(u_root_address);
 
@@ -28,9 +28,9 @@ void init_root(const REF_getter<root_data> &r)
         v->setDirty(e,NULL);
     }
     // u_root pk
-    if(!r->checkUserState(u_root_address).valid())
+    if(!r->checkUserState(u_root_address,db).valid())
     {
-        auto u=r->getAddressState(u_root_address,NULL);
+        auto u=r->getAddressState(u_root_address,NULL,db);
         if(!u.valid())
         {
             throw CommonError("cannot find root user state");
@@ -59,10 +59,10 @@ void init_root(const REF_getter<root_data> &r)
     {
         NODE_id name;
         name.container="n"+std::to_string(i);
-        auto n=r->getNode(name);
+        auto n=r->getNode(name,db);
         if(n.valid()) continue;
 
-        REF_getter<bc_node> nn=r->addNode(name,e,NULL);
+        REF_getter<bc_node> nn=r->addNode(name,e,NULL,db);
         blst_cpp::PublicKey bls_pk;
         bls_pk.deserializeHexStr(getenv2(keys[i].first));
         nn->init(name, u_root_address, bls_pk, base16::decode(getenv2(keys[i].second)), "127.0.0.1:"+std::to_string(2300+i));

@@ -92,7 +92,7 @@ struct DB_history : public Refcountable
     {
         {
             auto pn=base_path+".db";
-
+            
             try {
                 SQLite::Database dbs(pn,  SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
 

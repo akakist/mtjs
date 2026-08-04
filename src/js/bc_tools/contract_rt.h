@@ -7,6 +7,7 @@
 #include "ADDRESS_id.h"
 #include "CONTRACT_id.h"
 #include "root_contract.h"
+#include "IDatabase.h"
 struct contract_rt: public Refcountable
 {
     contract_rt():Refcountable("contract_rt"){}
@@ -17,5 +18,7 @@ struct contract_rt: public Refcountable
     ADDRESS_id owner;
     CONTRACT_id name;
     REF_getter<root_data> root;
+    REF_getter<IDatabase> db;
+    
 
 };

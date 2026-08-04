@@ -68,7 +68,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     for (auto &z : r->node_validators)
     {
         XTRY;
-        agg_pk.push_back(root->getNode(z)->get_bls_pk());
+        agg_pk.push_back(root->getNode(z,db_state.get())->get_bls_pk());
         XPASS;
     }
 
@@ -93,7 +93,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         {
             sz+=z.second.size();
         }
-        logNode("db_state->write_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
+        logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
     auto &hb=c.blockDBStore->validateBlockREQ->leader_cert->heart_beat;
     {
@@ -101,26 +101,26 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XTRY;
         outBuffer o;
         o<<c.blockDBStore;
-        db_history->writeBlock(hb->new_epoch, 
+        db_state->writeBlock(hb->new_epoch, 
                                 hb->block_timestamp,
                                 hb->prev_root_hash_1.container,
                                 o.asString()->container
                               );
         XPASS;
     }
-    db_state->write_batch(db_to_save_Z);
+    db_state->write_granules_batch(db_to_save_Z);
     logErr2("written %d granules",db_to_save_Z.cells.size());
     db_to_save_Z.clear();
-    if(hb->new_epoch.container%SNAPSHOT_BLOCKS==0)
-    {
-        db_state->create_snapshot(hb->new_epoch);
-    }
+    // if(hb->new_epoch.container%SNAPSHOT_BLOCKS==0)
+    // {
+    //     db_state->create_snapshot(hb->new_epoch);
+    // }
 
     // sendEvent(ServiceEnum::GrainWriter,
     //     new bcEvent::WriteGranules(db_to_save_Z,
     //         r->blockInfo->heart_beat->new_epoch,
     //         db_state,this));
-    // db_state->write_batch(db_to_save_Z);
+    // db_state->write_granules_batch(db_to_save_Z);
     // db_to_save_Z.clear();
 
 
@@ -188,7 +188,7 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
 }
 bool Node::Service::LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route)
 {
-    auto lc=root->getEpoch(NULL)->prev_lc;
+    auto lc=root->getEpoch(NULL,db_state.get())->prev_lc;
     pass_NodeMsgRSP(new MsgData::LcRSP(lc), route);
     return true;
 }
@@ -203,7 +203,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         return true;
     }
 
-    b_params t(root);
+    b_params t(root,db_state.get());
     bool err = false;
     if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
     {
@@ -233,7 +233,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
     if (!err && r->leader_cert->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
     {
-        if (root->getEpoch(NULL)->epoch.container + 1 != r->leader_cert->heart_beat->new_epoch.container)
+        if (root->getEpoch(NULL,db_state.get())->epoch.container + 1 != r->leader_cert->heart_beat->new_epoch.container)
         {
             t.emit_block("error", R"({"code":-32602,"error":"epoch invalid"})");
             err = true;

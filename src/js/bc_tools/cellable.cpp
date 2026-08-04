@@ -87,9 +87,9 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string &id, IDatabase 
 
     std::string result;
 
-    int r = db->get_cell(cc->getDbId(), &result);
+    int r = db->getGranule(cc->getDbId(), &result);
     if (r)
-        logErr2("db->get_cell err %s", cc->getDbId().c_str());
+        logErr2("db->getGranule err %s", cc->getDbId().c_str());
 
     if (result.size())
     {
@@ -104,7 +104,7 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string &id, IDatabase 
         }
         else
         {
-            throw CommonError("get_cell: cell hash not matched %s %s", base16::encode(it->second.container).c_str(), base16::encode(h.container).c_str());
+            throw CommonError("getGranule: cell hash not matched %s %s", base16::encode(it->second.container).c_str(), base16::encode(h.container).c_str());
         }
     }
     {

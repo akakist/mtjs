@@ -25,6 +25,7 @@
 #include "events_broadcasterTreeService.hpp"
 #include "unknown.h"
 #include "init_root.h"
+#include "CDatabase.h"
 bool BroadcasterTree::Service::on_startService(const systemEvent::startService *)
 {
     MUTEX_INSPECTOR;
@@ -148,18 +149,16 @@ BroadcasterTree::Service::~Service()
 BroadcasterTree::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *ins)
     : UnknownBase(nm),
       ListenerBuffered1Thread(nm, id),
-      Broadcaster(ins)
+      Broadcaster(ins),
+      DBH_feature(ins)
 {
 }
 
 bool BroadcasterTree::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     conf = e;
-    // if (!root.valid())
-    //     root = getRoot(conf->db.get());
-
-    // init_root(root);
     root=e->root;
+    db_state_4=new CDatabase(getDB(),conf->db_name2);
     return true;
 }
 bool BroadcasterTree::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
@@ -174,7 +173,7 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
     MUTEX_INSPECTOR;
     std::map<NODE_id, NodeElement> nodes;
 // logErr2("BroadcastMessage from %s", e->node_signer.container.c_str());
-    auto ks = root->getAllNodes();
+    auto ks = root->getAllNodes(db_state_4.get());
     for (auto &nd : ks)
     {
         // auto nn = root->getNode(nd);

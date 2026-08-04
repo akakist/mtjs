@@ -15,7 +15,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
 {
         MUTEX_INSPECTOR;
 
-    auto v = t.root->getValues(t.roll);
+    auto v = t.root->getValues(t.roll,b.db);
     auto it = v->emitters_bin.find(t.senderAddress);
     if (it == v->emitters_bin.end())
     {
@@ -27,7 +27,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     if(err) return err;
 
 
-    auto u = t.getAddressState(t.senderAddress);
+    auto u = t.getAddressState(t.senderAddress,b.db);
     if (!u.valid())
     {
         return "mint: sender not found";
@@ -52,7 +52,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll);
+    auto v = t.root->getValues(t.roll,b.db);
 
     BigInt amount=0;
     auto err=yy_get_bn(params,"amount",amount);
@@ -67,7 +67,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     if(to_addr.addr.size()!=t.senderAddress.addr.size())
         return "param to has invalid size";
 
-    auto u = t.getAddressState(t.senderAddress);
+    auto u = t.getAddressState(t.senderAddress,b.db);
     if (!u.valid())
     {
         return "sender userstate invalid";
@@ -81,7 +81,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     {
         return "invalid destination address";
     }
-    auto to = t.getAddressState(to_addr);
+    auto to = t.getAddressState(to_addr,b.db);
     if (!to.valid())
     {
         return "destination user not found";
@@ -119,21 +119,21 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
 {
     MUTEX_INSPECTOR;
     // if(senderAddress!=)
-    auto v = t.root->getValues(t.roll);
+    auto v = t.root->getValues(t.roll,b.db);
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
 
 
 
-    auto nn = t.getNode(name);
+    auto nn = t.getNode(name,b.db);
     if (!nn.valid())
         return "Node not found";
     if(nn->get_owner()!=t.senderAddress)
     {
         return "only node owner can update node info";
     }
-    auto us = t.getAddressState(t.senderAddress);
+    auto us = t.getAddressState(t.senderAddress,b.db);
     if (!us.valid())
         return "if(!us.valid())";
 
@@ -163,7 +163,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll);
+    auto v = t.root->getValues(t.roll,b.db);
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
@@ -179,16 +179,16 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
         }
     }
 
-    auto nn = t.getNode(name);
+    auto nn = t.getNode(name,b.db);
     if (nn.valid())
         return "Node already registered with name";
 
-    auto us = t.getAddressState(t.senderAddress);
+    auto us = t.getAddressState(t.senderAddress,b.db);
     if (!us.valid())
         return "if(!us.valid())";
 
 
-    auto n = t.root->addNode(name, t.epoch,t.roll);
+    auto n = t.root->addNode(name, t.epoch,t.roll,b.db);
 
     std::string ip,pk_ed,pk_bls;
     err=yy_get_string(params,"ip",ip);
@@ -220,7 +220,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll);
+    auto v = t.root->getValues(t.roll,b.db);
 
     BigInt amount=0;
     auto err=yy_get_bn(params,"amount",amount);
@@ -231,11 +231,11 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     if(err) return err;
 
 
-    auto us = t.getAddressState(t.senderAddress);
+    auto us = t.getAddressState(t.senderAddress,b.db);
     if (!us.valid())
         return "if(!us.valid())";
 
-    auto n=t.getNode(node);
+    auto n=t.getNode(node,b.db);
     if(!n.valid())
     {
         return "node not found";
@@ -264,14 +264,14 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll);
+    auto v = t.root->getValues(t.roll,b.db);
     BigInt amount=0;
     auto err=yy_get_bn(params,"amount",amount);
     if(err) return err;
     NODE_id node;
     err=yy_get_string(params,"node",node.container);
     if(err) return err;
-    auto n = t.getNode(node);
+    auto n = t.getNode(node,b.db);
     if (!n.valid())
     {
         return "nodes not registered";
@@ -288,7 +288,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
         return "insufficient stake in node";
     }
 
-    auto u = t.getAddressState(t.senderAddress);
+    auto u = t.getAddressState(t.senderAddress,b.db);
     t.value+=amount;
 
     n->sub_stake(t.senderAddress, amount);
@@ -312,12 +312,12 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll);
+    auto v = t.root->getValues(t.roll,b.db);
     NODE_id node;
     auto err=yy_get_string(params,"node",node.container);
     if(err)return err;
 
-    auto n = t.getNode(node);
+    auto n = t.getNode(node,b.db);
     if (!n.valid())
     {
         return "node not found";
@@ -347,7 +347,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll);
+    auto v = t.root->getValues(t.roll,b.db);
     std::string name;
     auto err=yy_get_string(params,"name",name);
     if(err) return err;
@@ -364,16 +364,16 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     }
     CONTRACT_id cn;
     cn.container=name;
-    auto nn = t.root->getContract(cn);
+    auto nn = t.root->getContract(cn,b.db);
     if (nn.valid())
         return "Contract already registered with name";
 
-    auto us = t.getAddressState(t.senderAddress);
+    auto us = t.getAddressState(t.senderAddress,b.db);
     if (!us.valid())
         return "if(!us.valid())";
 
 
-    auto n = t.root->addContract(cn, t.epoch,t.roll);
+    auto n = t.root->addContract(cn, t.epoch,t.roll,b.db);
 
     std::string src;
      err=yy_get_string(params,"src",src);
@@ -398,13 +398,13 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll);
+    auto v = t.root->getValues(t.roll,b.db);
     CONTRACT_id cn;
     auto err=yy_get_string(params,"name",cn.container);
     if(err)
         return err;
 
-    auto n = t.root->getContract(cn);
+    auto n = t.root->getContract(cn,b.db);
     if (!n.valid())
         return "contract not exists";
 
@@ -412,7 +412,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     {
         return "sender is not contract owner";
     }
-    auto us = t.getAddressState(t.senderAddress);
+    auto us = t.getAddressState(t.senderAddress,b.db);
     if (!us.valid())
         return "if(!us.valid())";
     

@@ -42,7 +42,7 @@ bool GrainWriter::Service::on_timer(const timerEvent::TickTimer *e)
     {
         if(db_to_save.cells.size())
         {
-            db_state->write_batch(db_to_save);
+            db_state->write_granules_batch(db_to_save);
             logErr2("written %d granules",db_to_save.cells.size());
             db_to_save.clear();
         }

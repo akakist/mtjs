@@ -4,128 +4,133 @@
 #include <rocksdb/utilities/checkpoint.h>
 #include <iostream>
 #include <ctime>
-
+#include "DBH.h"
 
 struct CDatabase: public IDatabase
 {
-
-    rocksdb::DB *db;
-    std::string path_;
-    void close()
+    bool getBlock(const BLOCK_id &h,std::string& block)
     {
-        db->Close();
+        auto res=dbh->exec((QUERY)"select block_blob from ?.blocks where prev_state_root_hash = UNHEX('?')"<<db_name<<base16::encode(h.container));
+        if(res->size()!=1)
+            return 1;
+        if(res->operator[](0).size()!=1)
+            return 1;
+        block=res->operator[](0)[0];
+        return 0;
     }
-    bool compactRange()
+    bool writeBlock(const EPOCH_id& epoch, uint64_t block_timestamp,  const std::string& prev_root_hash, const std::string& data)
     {
-        rocksdb::CompactRangeOptions compact_opts;
-        // 1. Задаем поведение на нижнем (bottommost) уровне. Чтобы наверняка утрамбовать все данные и удалить старые версии, используем `kForce` [citation:9].
-        compact_opts.bottommost_level_compaction = rocksdb::BottommostLevelCompaction::kForce;
+        /*       CREATE TABLE IF NOT EXISTS ?.blocks (
+                height BIGINT UNSIGNED NOT NULL,
+                prev_state_root_hash BINARY(32) NOT NULL,
+                state_root_hash BINARY(32) NOT NULL,
+                block_blob BLOB NOT NULL,
+                block_timestamp BIGINT UNSIGNED NOT NULL,
+                PRIMARY KEY (height),
+                INDEX idx_prev_state_root (prev_state_root_hash),
+                INDEX idx_height (height),
+                INDEX idx_block_timestamp (block_timestamp)
+                
+     */
+    logErr2("write block");
+        dbh->execSimple((QUERY)R"( REPLACE INTO ?.blocks (height,prev_state_root_hash, block_blob,block_timestamp) VALUES 
+            (?,UNHEX('?'),UNHEX('?'),?)
+        )"
 
-// 2. Разрешаем временно увеличить нагрузку на диск, чтобы ускорить процесс.
-        compact_opts.allow_write_stall = true;
-
-// 3. Увеличиваем количество подкомпактов для параллельной работы (опционально, если есть свободные ядра).
-        compact_opts.max_subcompactions = 4;
-
-        rocksdb::Status s = db->CompactRange(compact_opts, nullptr, nullptr);
-        return !s.ok();
-    }
-    int put_cell(const std::string& k, const std::string& v)
-    {
-        rocksdb::Status s;
-        rocksdb::WriteOptions w;
-        // w.sync=true;
-        s = db->Put(w, k, v);
-        if (!s.ok()) std::cerr << "Put failed: " << s.ToString() << "\n";
-        // db->Flush(rocksdb::FlushOptions());
-        return !s.ok();
-    }
-    int write_batch(const _db_to_save &v)
-    {
-        rocksdb::WriteBatch batch;
-        for(auto& z:v.cells)
-        {
-            batch.Put(z.first, z.second);
-        }
-        rocksdb::Status s=db->Write(rocksdb::WriteOptions(), &batch);
-        if (!s.ok())
-        {
-            throw CommonError("Write failed: %s",s.ToString().c_str());
-        }
-
-        db->Flush(rocksdb::FlushOptions());
-
+        <<db_name
+        <<epoch.container
+        <<base16::encode(prev_root_hash)
+        <<base16::encode(data)
+        << block_timestamp
+        );
         return 0;
     }
 
-    int get_cell(const std::string& k, std::string* v)
+
+    CDatabase(const REF_getter<DBH>& dbh, const std::string& _db_name):dbh(dbh),db_name(_db_name)
     {
-        rocksdb::ReadOptions ro;
-        ro.verify_checksums = true; // проверять контрольные суммы
-        ro.fill_cache = false;      // не засорять блок-кэш при сканах
-        auto status=db->Get(ro,k,v);
-        if(!status.ok())
-        {
-            logErr2("get failed %s",base16::encode(k).c_str());
-            // throw std::runtime_error("db corrupted");
-        }
-        return !status.ok();
+        dbh->execSimple((QUERY) R"(
+                CREATE DATABASE IF NOT EXISTS ?
+                CHARACTER SET utf8mb4
+                COLLATE utf8mb4_unicode_ci;
+          )"<< db_name);
+        
+        dbh->execSimple((QUERY)R"(
+            CREATE TABLE IF NOT EXISTS ?.granule_storage (
+                path_hash BINARY(32) NOT NULL,
+                granule_data BLOB NOT NULL,
+                PRIMARY KEY (path_hash)
+            ) ENGINE=InnoDB
+            DEFAULT CHARSET=utf8mb4
+            ROW_FORMAT=DYNAMIC;
+          )" << db_name);
+
+        dbh->execSimple((QUERY)R"(
+            CREATE TABLE IF NOT EXISTS ?.granule_cache (
+                granule_hash BINARY(32) NOT NULL,
+                granule_data BLOB NOT NULL,
+                block_height BIGINT UNSIGNED NOT NULL,
+                PRIMARY KEY (granule_hash),
+                INDEX idx_block_height (block_height)
+            ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC;
+           )" << db_name);
+        dbh->execSimple((QUERY)R"(
+            CREATE TABLE IF NOT EXISTS ?.blocks (
+                height BIGINT UNSIGNED NOT NULL,
+                prev_state_root_hash BINARY(32) NOT NULL,
+                block_blob BLOB NOT NULL,
+                block_timestamp BIGINT UNSIGNED NOT NULL,
+                PRIMARY KEY (height),
+                INDEX idx_prev_state_root (prev_state_root_hash),
+                INDEX idx_height (height),
+                INDEX idx_block_timestamp (block_timestamp)
+                
+            ) ENGINE=InnoDB
+            DEFAULT CHARSET=utf8mb4
+            ROW_FORMAT=DYNAMIC;
+           )" << db_name);
     }
-    CDatabase(const std::string& path):path_(path)
+    REF_getter<DBH> dbh;
+    std::string db_name;
+
+
+    // int put_cell(const std::string& k, const std::string& v)
+    // {
+    //     rocksdb::Status s;
+    //     rocksdb::WriteOptions w;
+    //     // w.sync=true;
+    //     s = db->Put(w, k, v);
+    //     if (!s.ok()) std::cerr << "Put failed: " << s.ToString() << "\n";
+    //     // db->Flush(rocksdb::FlushOptions());
+    //     return !s.ok();
+    // }
+    int write_granules_batch(const _db_to_save &v)
     {
-        db = nullptr;
-        rocksdb::Options options;
-        options.create_if_missing = true;
-        options.atomic_flush = true;
-
-        // ========== Фоновые потоки ==========
-        options.max_background_jobs = 8;        // хорошо
-        options.max_background_compactions = 6; // явно выделяем под компакцию
-
-        // ========== Memtable ==========
-        options.write_buffer_size = 128 * 1024 * 1024;  // 128MB (было 64)
-        options.max_write_buffer_number = 4;              // максимум 4 мемтаблицы
-        options.min_write_buffer_number_to_merge = 2;
-
-        // ========== L0 компакция (критично!) ==========
-        options.level0_file_num_compaction_trigger = 2;   // было 4 → старт при 2 файлах
-        options.level0_slowdown_writes_trigger = 8;       // замедление при 8
-        options.level0_stop_writes_trigger = 12;          // останов при 12 (не должно достигаться)
-
-        // ========== Размеры файлов и уровней ==========
-        options.target_file_size_base = 64 * 1024 * 1024; // 64MB (ок)
-        options.target_file_size_multiplier = 1;
-        options.max_bytes_for_level_base = 512 * 1024 * 1024; // 512MB для L1
-        options.level_compaction_dynamic_level_bytes = true; // хорошо
-
-        // ========== Логи ==========
-        options.keep_log_file_num = 3;
-        options.max_log_file_size = 10 * 1024 * 1024;
-
-// ========== Блочный кэш (важно для чтения) ==========
-// rocksdb::BlockBasedTableOptions table_options;
-// table_options.block_cache = rocksdb::NewLRUCache(512 * 1024 * 1024); // 512 MB cache
-// options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
-
-
-// std::shared_ptr<rocksdb::Cache> cache = rocksdb::NewLRUCache(512 * 1024 * 1024); // 512MB
-// options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(
-//     rocksdb::BlockBasedTableOptions{cache}
-// ));        
-//        options.max_open_files=800;
-        // options.compaction_on_commit = true;
-//        options.level0_file_num_compaction_trigger = 2;
-        rocksdb::Status s = rocksdb::DB::Open(options, path, &db);
-        if (!s.ok()) {
-            std::cerr << "Open failed: " << s.ToString() << "\n";
-            throw CommonError("rocksdb: open filed %s",path.c_str());
+        st_TRANSACTION tr(dbh);
+        for (const auto& [key, value] : v.cells) {
+            auto hash = blake2b_hash(key);
+            tr.dbh->execSimple((QUERY) R"(
+                REPLACE INTO ?.granule_storage (path_hash, granule_data)
+                VALUES (UNHEX('?'), UNHEX('?'));
+            )" << db_name << base16::encode(hash.container) << base16::encode(value));
         }
+        tr.commit();
+        return 0;
+    }
 
-
+    int getGranule(const std::string& k, std::string* v)
+    {
+        auto h=blake2b_hash(k);
+        auto res=dbh->exec((QUERY)"select granule_data from ?.granule_storage where path_hash = UNHEX('?')"<<db_name<<base16::encode(h.container));
+        if(res->size()!=1)
+            return 1;
+        if(res->operator[](0).size()!=1)
+            return 1;
+        *v=res->operator[](0)[0];
+        return 0;
     }
     ~CDatabase()
     {
-        delete db;
     }
     std::string timestr()
     {
@@ -140,40 +145,4 @@ struct CDatabase: public IDatabase
         return bn;
 
     }
-//     #include <memory>
-// #include <rocksdb/db.h>
-// #include <rocksdb/utilities/checkpoint.h>
-
-// rocksdb::DB* db; // уже открытая БД
-
-// Создание снапшота
-    bool create_snapshot(const EPOCH_id &epoch) 
-    {
-        // return true;
-    // Создаем умный указатель для Checkpoint. Он сам вызовет delete.
-    rocksdb::Checkpoint* checkpoint=NULL;
-    
-    // Создаем объект Checkpoint
-    rocksdb::Status s = rocksdb::Checkpoint::Create(db, &checkpoint);
-    if (!s.ok()) {
-        std::cerr << "Checkpoint creation failed: " << s.ToString() << std::endl;
-        delete checkpoint;
-        return false;
-    }
-    char pn[100];
-    snprintf(pn, sizeof(pn),"%s-snapshot-%09lx",path_.c_str(), epoch.container/SNAPSHOT_BLOCKS);
-    // std::string snapshot_path=path_+"-snapshot-"+timestr();
-    // Создаем снапшот
-    // 0 означает, что RocksDB сама решит, делать ли flush
-    s = checkpoint->CreateCheckpoint(pn, 0);
-    
-    if (!s.ok()) {
-        std::cerr << "Checkpoint creation failed: " << s.ToString() << std::endl;
-        delete checkpoint;
-        return false;
-    }
-    
-    delete checkpoint;
-    return true;
-}
 };

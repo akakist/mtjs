@@ -35,10 +35,10 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     BigInt stake = 0;
     for (auto &z : li.transaction_responders)
     {
-        auto n = root->getNode(z);
+        auto n = root->getNode(z,db_state.get());
         stake += n->get_full_stake();
     }
-    auto nn=root->getAllNodes();
+    auto nn=root->getAllNodes(db_state.get());
     BigInt total_staked=0;
     for(auto &n:nn)
     {
@@ -85,7 +85,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
         return true;
     }
-    if (!r->verify(root->getNode(r->node_validator)->get_bls_pk()))
+    if (!r->verify(root->getNode(r->node_validator,db_state.get())->get_bls_pk()))
     {
         logNode("block response not validated");
         return true;
@@ -101,10 +101,10 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     BigInt stakeVal = 0;
     for (auto &z : bt.responses[h])
     {
-        stakeVal += root->getNode(z->node_validator)->get_full_stake();
+        stakeVal += root->getNode(z->node_validator,db_state.get())->get_full_stake();
     }
     BigInt total_staked=0;
-    auto nn=root->getAllNodes();
+    auto nn=root->getAllNodes(db_state.get());
     for(auto& n:nn)
     {
         total_staked+=n->get_full_stake();
@@ -131,7 +131,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 
         for (auto &z : bt.responses[h])
         {
-            auto n = root->getNode(z->node_validator);
+            auto n = root->getNode(z->node_validator,db_state.get());
             agg_pk.push_back(n->get_bls_pk());
             ba->agg_sig.add(z->sig);
             ba->node_validators.push_back(z->node_validator);

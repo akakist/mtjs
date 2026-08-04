@@ -63,34 +63,22 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     for (auto &z : web_addr)
         sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
 
-    db_state = new CDatabase(rocksdb_path+"_state");
-    auto db_state2=db_state;
-    iUtils->add_shutdown_cb([db_state2]() {
-
-        // logNode("close db handler");
-        db_state2->close();
-    });
+    auto db=getDB();
+    db_state = new CDatabase(db, db_name);
 
     if (!root.valid())
         root = getRoot(db_state.get());
 
-    db_history = new DB_history(rocksdb_path+"_history");
-    auto db_h_copy=db_history;
-    iUtils->add_shutdown_cb([db_h_copy]() {
+    init_root(root,db_state.get());
 
-        // logNode("close db handler");
-        db_h_copy->close();
-    });
-    init_root(root);
-    // initDB();
     my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
 
     my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
     logNode("ServiceInit nodename %s", this_node_name.container.c_str());
-    sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, root, this));
-    sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, root, this));
-    sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, root, this));
-    sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, root, this));
+    sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
+    sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
+    sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
+    sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
     for (auto &z : rpc_addr)
     {
         SECURE sec;
@@ -100,7 +88,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 1., this));
 
     std::string res;
-    int err = db_state->get_cell("#root_hash#", &res);
+    int err = db_state->getGranule("#root_hash#", &res);
     if (!err)
     {
         // logNode("prev_root_hash_Z.container = res;");
@@ -248,7 +236,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         if(lc_responses.size())
         {
             REF_getter<MsgData::LeaderCertificate> local_lc=NULL;
-            auto &local_lcb=root->getEpoch(NULL)->prev_lc;
+            auto &local_lcb=root->getEpoch(NULL,db_state.get())->prev_lc;
             if(local_lcb.size())
             {
                 local_lc=new MsgData::LeaderCertificate;
@@ -487,10 +475,11 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
     : UnknownBase(nm),
       ListenerBuffered1Thread(nm, id),
       Broadcaster(ins),
-      iInstance(ins)
+      iInstance(ins),
+      DBH_feature(ins)
 {
-    rocksdb_path = ins->getConfig()->get_string("rockdb_path", "/db/r1", "Path to access to rocksdb");
-    sqlite_pn = ins->getConfig()->get_string("sqlite_pn", "/db/1", "Pathname to access to sqlite");
+    // rocksdb_path = ins->getConfig()->get_string("rockdb_path", "/db/r1", "Path to access to rocksdb");
+    // sqlite_pn = ins->getConfig()->get_string("sqlite_pn", "/db/1", "Pathname to access to sqlite");
     rpc_addr = ins->getConfig()->get_tcpaddr("rpc_addr", "127.0.0.1:2345", "rpc address(es) of node ex: ip:port,ip2:port2");
     web_addr = ins->getConfig()->get_tcpaddr("web_addr", "127.0.0.1:2347", "web address(es) of node ex: ip:port,ip2:port2");
     my_sk_bls_env_key = ins->getConfig()->get_string("my_sk_bls_env_key", "sk_bls_env_key", "env key of bls key");
@@ -499,7 +488,8 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
 
     // db_user=ins->getConfig()->get_string2("db_user", "root", "mariadb db user");
     // db_password=ins->getConfig()->get_string2("db_password", "123", "mariadb db password");
-    // db_socket=ins->getConfig()->get_string2("db_socket", "", "mariadb db password");
+    // db_socket=ins->getConfig()->get_string2("db_socket", "", "mariadb db socket");
+    db_name=ins->getConfig()->get_string2("db_name", "grain", "db name");
     contract_runtime=JS_NewRuntime();
 }
 
@@ -582,7 +572,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
         if (!t_err)
         {
             MUTEX_INSPECTOR;
-            auto u = root->getAddressState(senderAddress,NULL);
+            auto u = root->getAddressState(senderAddress,NULL,db_state.get());
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -626,7 +616,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::Le
 
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
     calc_fee_rewards_nodes(b, lc);
-    auto newEpoch = root->getEpoch(NULL);
+    auto newEpoch = root->getEpoch(NULL,db_state.get());
     newEpoch->epoch.container += 1;
     newEpoch->prev_lc = b.validateBlockREQ->leader_cert->getBuffer();
     newEpoch->setDirty(lc->heart_beat->new_epoch,NULL);
@@ -640,7 +630,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
 
     // auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
     BigInt total_staked=0;
-    auto nn=root->getAllNodes();
+    auto nn=root->getAllNodes(db_state.get());
     for(auto& n:nn)
     {
         total_staked+=n->get_full_stake();
@@ -652,7 +642,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     {
         auto portion=n->get_full_stake()*b.node_rewards/total_staked;
         auto owner=n->get_owner();
-        auto u = root->getAddressState(owner,NULL);
+        auto u = root->getAddressState(owner,NULL,db_state.get());
         NODE_id name=n->getName();
         {
             M_LOCK(u->parent->mx);
@@ -669,7 +659,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     {
         ns.insert(z);
     }
-    auto nodes=b.root->getAllNodes();
+    auto nodes=b.root->getAllNodes(db_state.get());
     for(auto &n: nodes)
     {
         if(ns.count(n->getName()))
@@ -718,7 +708,7 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 #include <stdlib.h>
 int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 {
-    auto nv = root->getAllNodes();
+    auto nv = root->getAllNodes(db_state.get());
     int crc = __crc32(0, prev_root_hash_Z.container.data(), prev_root_hash_Z.container.size());
     int idx = crc % nv.size();
     int npoz = -1;
@@ -733,7 +723,7 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 {
     if (nodeLeft == nodeRight)
         return true;
-    auto nv = root->getAllNodes();
+    auto nv = root->getAllNodes(db_state.get());
     {
         int crc = __crc32(0, prev_root_hash_Z.container.data(), prev_root_hash_Z.container.size());
         int idx = crc % nv.size();
@@ -760,7 +750,7 @@ bool Node::Service::verify_leader_certificate(const REF_getter<MsgData::LeaderCe
         BigInt stake;
         for (auto &z : lc->nodes)
         {
-            auto n = root->getNode(z);
+            auto n = root->getNode(z,db_state.get());
             if (!n.valid())
             {
                 logErr2("            if (!n.valid()) %s",z.container.c_str());
@@ -770,7 +760,7 @@ bool Node::Service::verify_leader_certificate(const REF_getter<MsgData::LeaderCe
             agg_pk.push_back(n->get_bls_pk());
             stake += n->get_full_stake();
         }
-        auto nn=root->getAllNodes();
+        auto nn=root->getAllNodes(db_state.get());
         BigInt ts = 0;
         for(auto &z: nn)
         {
@@ -842,7 +832,7 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
 
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 {
-    auto n = root->getNode(m->node_signer);
+    auto n = root->getNode(m->node_signer,db_state.get());
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {
         logNode("verify failed 11");
@@ -889,7 +879,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
 bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 {
-    auto n = root->getNode(m->node_signer);
+    auto n = root->getNode(m->node_signer,db_state.get());
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {
         logNode("verify failed @4");
@@ -1058,7 +1048,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.roll=&roll;
     t.value=value;
     t.gasLimit=gasLimit;
-    auto uu=root->getAddressState(senderAddress,NULL);
+    auto uu=root->getAddressState(senderAddress,NULL,db_state.get());
     if(!uu.valid())
     throw CommonError("if(!uu.valid())");
     {
@@ -1081,7 +1071,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         if(gu>gasLimit)
             gu=gasLimit;
 
-        auto u=root->getAddressState(t.senderAddress,NULL);
+        auto u=root->getAddressState(t.senderAddress,NULL,db_state.get());
         M_LOCK(u->parent->mx);
         u->balance-=gu*gasPrice;
         b.node_rewards+=gu*gasPrice;
@@ -1094,7 +1084,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         t.gasUsed+=t.roll->size();
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
-        auto u=root->getAddressState(t.senderAddress,NULL);
+        auto u=root->getAddressState(t.senderAddress,NULL,db_state.get());
         M_LOCK(u->parent->mx);
         u->balance-=t.gasUsed*gasPrice;
         b.node_rewards+=t.gasUsed*gasPrice;
@@ -1104,7 +1094,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        auto u=root->getAddressState(t.senderAddress,NULL);
+        auto u=root->getAddressState(t.senderAddress,NULL,db_state.get());
         M_LOCK(u->parent->mx);
         u->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
@@ -1120,14 +1110,14 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        auto u=root->getAddressState(t.senderAddress,NULL);
+        auto u=root->getAddressState(t.senderAddress,NULL,db_state.get());
         M_LOCK(u->parent->mx);
         u->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
         return "gas exceeds limit";
     }
     // OK
-    auto u=root->getAddressState(t.senderAddress,NULL);
+    auto u=root->getAddressState(t.senderAddress,NULL,db_state.get());
     {
         M_LOCK(u->parent->mx);
         u->balance-=t.gasUsed*gasPrice+value-t.value;
@@ -1165,7 +1155,7 @@ std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct
 #include "js_tools.h"
 std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contract)
 {
-    auto c=root->getContract(contract);
+    auto c=root->getContract(contract,db_state.get());
     REF_getter<contract_rt> ct=new contract_rt();
     contracts.insert_or_assign(contract,ct);
     ct->ctx=JS_NewContext(contract_runtime);
@@ -1193,7 +1183,7 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
 void Node::Service::logNode(const char *fmt, ...)
 {
 
-    auto epoch = root->getEpoch(NULL);
+    auto epoch = root->getEpoch(NULL,db_state.get());
     {
         va_list ap;
         va_start(ap, fmt);

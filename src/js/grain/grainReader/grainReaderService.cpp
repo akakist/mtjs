@@ -25,6 +25,7 @@
 #include "md/md_GetUserNonceREQ.h"
 #include "md/md_GetUserNonceRSP.h"
 #include "init_root.h"
+#include "CDatabase.h"
 
 bool GrainReader::Service::on_startService(const systemEvent::startService *)
 {
@@ -115,24 +116,20 @@ GrainReader::Service::~Service()
 GrainReader::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *ins)
     : UnknownBase(nm),
       ListenerBuffered1Thread(nm, id),
-      Broadcaster(ins)
+      Broadcaster(ins),
+      DBH_feature(ins)
 {
 }
 bool GrainReader::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     conf = e;
     root=e->root;
-    // if (!root.valid())
-    //     root = getRoot(conf->db.get());
-
-    // init_root(root);
+    db_state_3=new CDatabase(getDB(),conf->db_name2);
     return true;
 }
 bool GrainReader::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 {
     root=e->root;
-    // root = getRoot(conf->db.get());
-    // init_root(root);
     return true;
 }
 bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
@@ -152,12 +149,9 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
     {
         ADDRESS_id addr;
         auto pp=(MsgData::GetUserNonceREQ*) b.get();
-        // addr.container=blake2b_hash(pp->user_pk_bin_ed).container;
-        auto u = root->getAddressState(pp->user_address,NULL);
+        auto u = root->getAddressState(pp->user_address,NULL,db_state_3.get());
 
         REF_getter<MsgData::GetUserNonceRSP> rsp=new MsgData::GetUserNonceRSP;
-        // rsp->balance=u->getBalance();
-        // rsp->nonce=u->getNonce();
         {
             M_LOCK(u->parent->mx);
             rsp->nonce=u->nonce;

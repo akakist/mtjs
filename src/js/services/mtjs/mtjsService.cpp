@@ -639,9 +639,10 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
                 if(tx_it==e->att_data->blockRoot.children.end())
                     throw CommonError("if(tx_it==e->att_data->blockRoot.children.end())");
                 JSValue obj2=emit_node_to_js(js_ctx, tx_it->second);
-                JSValue argv1[1];
-                argv1[0] = obj2;
-                JSValue func_result = JS_Call(js_ctx, it->second.get(), global_obj, 1, argv1);
+                scope.addValue(obj2);
+                // JSValue argv1[1];
+                // argv1[0] = obj2;
+                JSValue func_result = JS_Call(js_ctx, it->second.get(), global_obj, 1, & obj2);
                 scope.addValue(func_result);
                 qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
                 opaque.node_tx_cb.erase(it);
@@ -654,9 +655,9 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
             }
             JSValue obj=emit_node_to_js(js_ctx, e->att_data->blockRoot);
             scope.addValue(obj);
-            JSValue argv[1];
-            argv[0] = obj;
-            JSValue func_result = JS_Call(js_ctx, opaque.tx_subscription_cb->get(), global_obj, 1, argv);
+            // JSValue argv[1];
+            // argv[0] = obj;
+            JSValue func_result = JS_Call(js_ctx, opaque.tx_subscription_cb->get(), global_obj, 1, &obj);
             scope.addValue(func_result);
             qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
             XPASS;

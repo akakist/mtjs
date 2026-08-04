@@ -42,6 +42,7 @@
 #include "t_params.h"
 #include "cached_state.h"
 #include "contract_rt.h"
+#include "DBH.h"
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 // #define HEART_BEAT_INTERVAL_SEC 5
 
@@ -95,7 +96,8 @@ namespace Node
     class Service:
         public UnknownBase,
         public ListenerBuffered1Thread,
-        public Broadcaster
+        public Broadcaster,
+        public DBH_feature
     {
         bool on_startService(const systemEvent::startService*);
         bool on_timer(const timerEvent::TickTimer*);
@@ -232,12 +234,12 @@ namespace Node
 
         REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;
-        REF_getter<DB_history> db_history=nullptr;
+        // REF_getter<DB_history> db_history=nullptr;
 
 
         uint64_t last_activity_time=0;
-        std::string sqlite_pn;
-        std::string rocksdb_path;
+        // std::string sqlite_pn;
+        // std::string rocksdb_path;
         std::set<msockaddr_in> rpc_addr;
         void logNode(const char* fmt, ...);
         IInstance *iInstance=NULL;
@@ -255,6 +257,10 @@ namespace Node
 
         std::string my_sk_bls_env_key;
         std::string my_sk_ed_env_key;
+    // std::string db_user;
+    // std::string db_password;
+    // std::string db_socket;
+        std::string db_name;
 
         MsgFactory msgFactory;
 

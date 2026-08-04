@@ -315,8 +315,7 @@ REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vect
 struct root_data: public Cellable
 {
 
-    REF_getter<IDatabase> db;
-    root_data(IDatabase *db_): Cellable(nullptr,"r"),db(db_)
+    root_data(): Cellable(nullptr,"r")
     {
     }
     Mutex state_mutex;
@@ -327,31 +326,31 @@ struct root_data: public Cellable
     std::vector<std::string> getUserPath(const ADDRESS_id &addr);
     std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
 
-    REF_getter<bc_contract> getContract(const CONTRACT_id &name);
-    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const EPOCH_id& epoch,Rollback*);
+    REF_getter<bc_contract> getContract(const CONTRACT_id &name,IDatabase* db);
+    REF_getter<bc_contract> addContract(const CONTRACT_id &name, const EPOCH_id& epoch,Rollback*,IDatabase* db);
 
-    REF_getter<bc_contract_data> getContractData(const CONTRACT_DATA_id &name);
-    REF_getter<bc_contract_data> addContractData(const CONTRACT_DATA_id &name, const EPOCH_id& epoch,Rollback*);
+    REF_getter<bc_contract_data> getContractData(const CONTRACT_DATA_id &name,IDatabase* db);
+    REF_getter<bc_contract_data> addContractData(const CONTRACT_DATA_id &name, const EPOCH_id& epoch,Rollback*,IDatabase* db);
 
-    REF_getter<bc_values> getValues(Rollback*);
-    REF_getter<bc_values> checkValues();
+    REF_getter<bc_values> getValues(Rollback*,IDatabase* db);
+    REF_getter<bc_values> checkValues(IDatabase* db);
 
-    REF_getter<bc_epoch> getEpoch(Rollback* roll);
+    REF_getter<bc_epoch> getEpoch(Rollback* roll,IDatabase* db);
 
 
 
     // REF_getter<bc_user> getUser(const ADDRESS_id &pk);
 
-    REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk,Rollback*);
-    REF_getter<bc_address_state>   checkUserState(const ADDRESS_id &pk);
+    REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk,Rollback*,IDatabase* db);
+    REF_getter<bc_address_state>   checkUserState(const ADDRESS_id &pk,IDatabase* db);
 
 
     // std::vector<NODE_id> getNodesNames();
-    std::vector<REF_getter<bc_node>> getAllNodes();
+    std::vector<REF_getter<bc_node>> getAllNodes(IDatabase* db);
 
 
-    REF_getter<bc_node> getNode(const NODE_id &name);
-    REF_getter<bc_node> addNode(const NODE_id &name,  const EPOCH_id& epoch, Rollback*);
+    REF_getter<bc_node> getNode(const NODE_id &name,IDatabase* db);
+    REF_getter<bc_node> addNode(const NODE_id &name,  const EPOCH_id& epoch, Rollback*,IDatabase* db);
 
 
 

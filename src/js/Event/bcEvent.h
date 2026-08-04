@@ -241,21 +241,21 @@ namespace bcEvent
             return NULL;
         }
         ServiceInit(blst_cpp::SecretKey my_sk_bls_,
-                    std::string my_sk_ed_, const NODE_id &this_node_name_, const REF_getter<IDatabase> &db_,
+                    std::string my_sk_ed_, const NODE_id &this_node_name_, const std::string& db_name_ ,
                     const REF_getter<root_data>& _root,
                     const route_t &r)
             : NoPacked(bcEventEnum::ServiceInit, r), 
                 my_sk_bls(my_sk_bls_), 
                 my_sk_ed(my_sk_ed_), 
                 this_node_name(this_node_name_), 
-                db(db_),
+                db_name2(db_name_),
                 root(_root) {}
 
         blst_cpp::SecretKey my_sk_bls;
         std::string my_sk_ed;
 
         NODE_id this_node_name;
-        REF_getter<IDatabase> db;
+        std::string db_name2;
         REF_getter<root_data> root;
     };
 

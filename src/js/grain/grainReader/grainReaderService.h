@@ -9,7 +9,7 @@
 #include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
 #include "root_contract.h"
-
+#include "DBH.h"
 
 
 namespace GrainReader
@@ -20,7 +20,8 @@ namespace GrainReader
     class Service:
         public UnknownBase,
         public ListenerBuffered1Thread,
-        public Broadcaster
+        public Broadcaster,
+        public DBH_feature
     {
         bool on_startService(const systemEvent::startService*);
         bool on_timer(const timerEvent::TickTimer*);
@@ -56,6 +57,7 @@ namespace GrainReader
         REF_getter<root_data> root=NULL;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
+        REF_getter<IDatabase> db_state_3;
 
 
 

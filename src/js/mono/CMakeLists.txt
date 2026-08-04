@@ -9,7 +9,7 @@ set_target_properties(mtjs PROPERTIES LINK_SEARCH_START_STATIC ON)
 set_target_properties(mtjs PROPERTIES LINK_SEARCH_END_STATIC ON)
 
 
-link_libraries("-static")
+#link_libraries("-static")
 link_directories(/usr/local/lib)
 
 
@@ -32,7 +32,7 @@ ${OPENSSL_LIBRARIES}
 
 else()
 target_link_libraries(mtjs 
--static  
+#-static  
 -Wl,--start-group node2-serviceS node-serviceS node3-serviceS node4-serviceS node5-serviceS node6-serviceS nodeW-serviceS 
      mtjsmoduleS mtjscommon     mtjsnet  mtjsutils bctools quickjs megatron-main   zsingle megatron-core sodium   rocksdb SQLiteCpp sqlite3  crypto  blst
       ${linuxlib} yyjson zstd lz4 bz2 snappy
