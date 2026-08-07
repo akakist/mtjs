@@ -43,6 +43,11 @@ struct CDatabase: public IDatabase
         <<base16::encode(data)
         << block_timestamp
         );
+        
+        if(epoch.container>10000)
+            dbh->execSimple((QUERY)"delete from ?.blocks where height<?"
+            <<db_name
+            <<epoch.container-10000);
         return 0;
     }
 
