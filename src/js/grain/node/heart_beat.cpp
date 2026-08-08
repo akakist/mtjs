@@ -179,6 +179,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch)
         {
             logNode("if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch) return");
+            do_heart_beat();
             return true;
         }
         else if(remote_prev_lc->heart_beat->new_epoch > local_lc->heart_beat->new_epoch)
@@ -216,13 +217,17 @@ remote_prev_lc->heart_beat->prev_root_hash %s local_lc->heart_beat->prev_root_ha
                     /// главное - нет затыкания протокола
                     logNode(R"(
 if(prev_root_hash_Z!=h->prev_root_hash)
-prev_root_hash_Z %s 
-h->prev_root_hash %s
-local_lc->heart_beat->prev_root_hash_1 %s
-from node %s )", 
+        prev_root_hash_Z %s 
+        h->prev_root_hash %s
+        local_lc->heart_beat->prev_root_hash_1 %s
+        remote_prev_lc->heart_beat->new_epoch.container %ld
+        local_lc->heart_beat->new_epoch.container %ld
+        from node %s )", 
 prev_root_hash_Z.str().c_str(), 
 h->prev_root_hash_1.str().c_str(),
 local_lc->heart_beat->prev_root_hash_1.str().c_str(),
+remote_prev_lc->heart_beat->new_epoch.container,
+local_lc->heart_beat->new_epoch.container,
 src_node.container.c_str());
                     auto& ci=cli_leader_info[prev_root_hash_Z];
                     if(iUtils->getNow() >  ci.heart_beat_sent+_1sec)

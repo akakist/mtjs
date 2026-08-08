@@ -97,21 +97,12 @@ try {
                 Node_this_node_name=n${i}
                 Node_sqlite_pn=db/s${i}
                 db_name=db${i}
-#                db_user=root
-#                db_password=gaga123
-#                db_socket=/run/mysqld/mysqld.sock
                 mysql_max_connections=20
-#
                  mysql_host=NULL
-#
                  mysql_user=root
-#
                  mysql_passwd=gaga123
-#
                  mysql_database=md
-#
                  mysql_port=0
-#
                  mysql_sock=/run/mysqld/mysqld.sock
         `);
     }
