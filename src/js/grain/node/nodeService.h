@@ -183,7 +183,6 @@ namespace Node
 
 
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
-        std::map<BLOCK_id,block> blocks_leader;
         
 
         struct client_block_info
@@ -191,27 +190,36 @@ namespace Node
             REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
             REF_getter<MsgData::attachment_data> att_data= nullptr;
 
+            int64_t block_validated=0;
         };
-        std::map<BLOCK_id, client_block_info> c_blocks;
         struct client_leader_info
         {
             NODE_id node_leader;
             int64_t heart_beat_sent=0;
         };
 
-        std::map<BLOCK_id, client_leader_info> cli_leader_info;
-
         struct _sync
         {
             bool do_you_have_sent=false;
             std::set<NODE_id> havers;
         };
+        std::map<BLOCK_id, client_block_info> c_blocks;
+        std::map<BLOCK_id,block> blocks_leader;
+        std::map<BLOCK_id, client_leader_info> cli_leader_info;
+        std::map<EPOCH_id, std::map<NODE_id, REF_getter<MsgData::LeaderCertificate> > >lc_responses;
+        void clear()
+        {
+            c_blocks.clear();
+            blocks_leader.clear();
+            cli_leader_info.clear();
+            lc_responses.clear();
+        }
+
         std::map<BLOCK_id,_sync> syncs;
 
         BLOCK_id prev_root_hash_Z;
         void do_start_block();
 
-        std::map<EPOCH_id, std::map<NODE_id, REF_getter<MsgData::LeaderCertificate> > >lc_responses;
 
         void collectTransactions();
         BLOCK_id execute_block(b_params &b,  const REF_getter<MsgData::LeaderCertificate> &lc);
@@ -257,9 +265,6 @@ namespace Node
 
         std::string my_sk_bls_env_key;
         std::string my_sk_ed_env_key;
-    // std::string db_user;
-    // std::string db_password;
-    // std::string db_socket;
         std::string db_name;
 
         MsgFactory msgFactory;

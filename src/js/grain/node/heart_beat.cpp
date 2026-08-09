@@ -178,7 +178,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
     
         if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch)
         {
-            logNode("if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch) return");
+            logNode("if(remote_prev_lc->heart_beat->new_epoch (%s) < local_lc->heart_beat->new_epoch) return",src_node.container.c_str());
             do_heart_beat();
             return true;
         }
@@ -386,6 +386,8 @@ void Node::Service::do_heart_beat()
 {
     // logNode("@@ %s",__FUNCTION__);
     blocks_leader.clear();
+    c_blocks.clear();
+    // clear();
     {
         EPOCH_id e=root->getEpoch(NULL,db_state.get())->epoch;
         e.container+=1;
