@@ -20,6 +20,7 @@
 #include "md/md_DoYouHaveBlockRSP.h"
 #include "md/md_LcREQ.h"
 #include "md/md_LcRSP.h"
+#include "md/md_DelayNotificationREQ.h"
 
 
 MsgFactory::MsgFactory()
@@ -43,5 +44,6 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::LcRSP, MsgData::LcRSP::construct);
     registerMsg(msgid::DoYouHaveBlockREQ, MsgData::DoYouHaveBlockREQ::construct);
     registerMsg(msgid::DoYouHaveBlockRSP, MsgData::DoYouHaveBlockRSP::construct);
+    registerMsg(msgid::DelayNotificationREQ, MsgData::DelayNotificationREQ::construct);
 
 }

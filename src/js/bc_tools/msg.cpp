@@ -94,6 +94,8 @@ const char *msgName(int id)
         return "DoYouHaveBlockREQ";
     case msgid::DoYouHaveBlockRSP:
         return "DoYouHaveBlockRSP";
+    case msgid::DelayNotificationREQ:
+        return "DelayNotificationREQ";
         
 
     default:

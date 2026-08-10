@@ -5,6 +5,7 @@
 #include "REF.h"
 #include "mutexInspector.h"
 #include "nodeService.h"
+#include "md/md_DelayNotificationREQ.h"
 #include "QUORUM.h"
 #include "blst_cp.h"
 #include "NODE_id.h"
@@ -179,7 +180,15 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
         if(remote_prev_lc->heart_beat->new_epoch < local_lc->heart_beat->new_epoch)
         {
             logNode("if(remote_prev_lc->heart_beat->new_epoch (%s) < local_lc->heart_beat->new_epoch) return",src_node.container.c_str());
-            do_heart_beat();
+            REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
+            d->lc=local_lc;
+            auto buffer = d->getBuffer();
+            auto n=root->getNode(src_node,db_state.get());
+            sendEvent(n->get_ip(), ServiceEnum::Node,
+                    new bcEvent::NodeMsgREQ(this_node_name, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
+
+
+            // do_heart_beat();
             return true;
         }
         else if(remote_prev_lc->heart_beat->new_epoch > local_lc->heart_beat->new_epoch)

@@ -38,6 +38,7 @@
 #include "md/md_DoYouHaveBlockRSP.h"
 #include "md/md_LcREQ.h"
 #include "md/md_LcRSP.h"
+#include "md/md_DelayNotificationREQ.h"
 #include "dbHistory.h"
 #include "t_params.h"
 #include "cached_state.h"
@@ -153,6 +154,8 @@ namespace Node
         bool DoYouHaveBlockRSP(const MsgData::DoYouHaveBlockRSP* m, const NODE_id & src_node, const route_t& route);
         bool LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route);
         bool LcRSP(const MsgData::LcRSP* m, const NODE_id & src_node, const route_t& route);
+
+        bool DelayNotificationREQ(const MsgData::DelayNotificationREQ* m, const NODE_id & src_node, const route_t& route);
 
         bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);

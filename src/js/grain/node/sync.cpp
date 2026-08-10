@@ -29,6 +29,28 @@ void Node::Service::do_sync(const NODE_id &src_node)
     sendEvent(n->get_ip(), ServiceEnum::Node,
               new bcEvent::NodeMsgREQ(this_node_name, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 }
+bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r, const NODE_id &src_node, const route_t &route)
+{
+    bool remote_verified=verify_leader_certificate(r->lc);
+    if(!remote_verified)
+        return true;
+    auto llc=root->getEpoch(NULL,db_state.get())->prev_lc;
+    REF_getter<MsgData::LeaderCertificate> local_lc;
+    if(llc.size())
+    {
+        local_lc=new MsgData::LeaderCertificate;
+        inBuffer in(llc);
+        local_lc->unpack2(in);
+    }
+    if(r->lc->heart_beat->new_epoch>local_lc->heart_beat->new_epoch)
+    {
+        state_Z=STATE_SYNCING;
+        do_sync(src_node);
+    }
+
+
+    return true;
+}
 bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;

@@ -847,13 +847,10 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     switch (msg->type)
     {
     case msgid::DoYouHaveBlockREQ:
-        // last_activity_time=iUtils->getNow();
         return DoYouHaveBlockREQ(static_cast<const MsgData::DoYouHaveBlockREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::LcEnvelopeREQ:
-        // last_activity_time=iUtils->getNow();
         return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::GetTransactionREQ:
-        // last_activity_time=iUtils->getNow();
         return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ValidateBlockREQ:
         last_activity_time=iUtils->getNow();
@@ -864,11 +861,11 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     case msgid::GetSavedBlocksREQ:
         return GetSavedBlocksREQ(static_cast<const MsgData::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderREQ:
-        // last_activity_time=iUtils->getNow();
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::LcREQ:
-        // last_activity_time=iUtils->getNow();
         return LcREQ(static_cast<const MsgData::LcREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::DelayNotificationREQ:
+        return DelayNotificationREQ(static_cast<const MsgData::DelayNotificationREQ *>(msg.get()), m->node_signer, m->route);
 
     default:
         throw CommonError("unjandled3 MsgData %s", msgName(msg->type));
