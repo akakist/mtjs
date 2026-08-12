@@ -202,7 +202,8 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     {
         return true;
     }
-
+    if(c_blocks[prev_root_hash_Z].block_validated)
+        return true;
     b_params t(root,db_state.get());
     bool err = false;
     if(cli_leader_info[prev_root_hash_Z].node_leader!=src_node)
@@ -281,5 +282,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     //     printf("calcer %s\n", z.c_str());
     // }
 #endif
+    c_blocks[prev_root_hash_Z].block_validated = true;
     return true;
 }

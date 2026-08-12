@@ -723,24 +723,71 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 {
     if (nodeLeft == nodeRight)
         return true;
-    auto nv = root->getAllNodes(db_state.get());
-    {
-        int crc = __crc32(0, prev_root_hash_Z.container.data(), prev_root_hash_Z.container.size());
-        int idx = crc % nv.size();
 
-        int npoz = -1;
-        int tpoz = -1;
-        for (int i = 0; i < nv.size(); i++)
-        {
-            if (nodeLeft == nv[i]->getName())
-                npoz = i;
-            if (nodeRight == nv[i]->getName())
-                tpoz = i;
-        }
-        return abs(idx - npoz) < abs(idx - tpoz);
+    auto nv = root->getAllNodes(db_state.get());
+    std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
+    {
+        return a->getName() < b->getName();
+    });
+
+    // ФИКС 1: uint32_t вместо int, чтобы избежать отрицательного crc
+    uint32_t crc = __crc32(0, prev_root_hash_Z.container.data(), prev_root_hash_Z.container.size());
+    int idx = static_cast<int>(crc % nv.size());
+
+    int npoz = -1;
+    int tpoz = -1;
+    for (int i = 0; i < static_cast<int>(nv.size()); i++)
+    {
+        if (nodeLeft == nv[i]->getName())
+            npoz = i;
+        if (nodeRight == nv[i]->getName())
+            tpoz = i;
     }
-    return 0;
+
+    // ФИКС 2: защита от ненайденных нод
+    if (npoz == -1 || tpoz == -1)
+    {
+        return npoz != -1; // если nodeLeft найден, а nodeRight нет — nodeLeft лучше
+    }
+
+    int distLeft  = abs(idx - npoz);
+    int distRight = abs(idx - tpoz);
+
+    // ФИКС 3: TIE-BREAKER при равных расстояниях
+    if (distLeft == distRight)
+    {
+        return nodeLeft < nodeRight;  // побеждает нода с меньшим именем
+    }
+
+    return distLeft < distRight;
 }
+// bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id &nodeRight)
+// {
+//     if (nodeLeft == nodeRight)
+//         return true;
+//     auto nv = root->getAllNodes(db_state.get());
+//     std::sort(nv.begin(),nv.end(),[](const REF_getter<bc_node>&a,const REF_getter<bc_node>&b)
+//     {
+//        return a->getName()<b->getName(); 
+//     });
+//     {
+//         int crc = __crc32(0, prev_root_hash_Z.container.data(), prev_root_hash_Z.container.size());
+//         int idx = crc % nv.size();
+
+//         int npoz = -1;
+//         int tpoz = -1;
+//         for (int i = 0; i < nv.size(); i++)
+//         {
+//             if (nodeLeft == nv[i]->getName())
+//                 npoz = i;
+//             if (nodeRight == nv[i]->getName())
+//                 tpoz = i;
+//         }
+        
+//         return abs(idx - npoz) < abs(idx - tpoz);
+//     }
+//     return 0;
+// }
 bool Node::Service::verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate> &lc)
 {
     /// проверка сертификата лидера
