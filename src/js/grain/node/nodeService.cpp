@@ -152,7 +152,7 @@ void Node::Service::do_start_block()
         sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK, NULL, NULL, 0.5, this));
         return;
     }
-    auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
+    auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     {
         {
@@ -168,7 +168,7 @@ void Node::Service::do_start_block()
             }
             logNode("LC nodes %s",iUtils->join(" ",nnn).c_str());
 
-            auto &bt = blocks_leader[prev_root_hash_Z];
+            auto &bt = l_blocks[prev_root_hash_Z];
             // logNode("before collectTransactions sz %d", transaction_pool_of_leader.size());
             collectTransactions();
             // logNode("AFTER collectTransactions sz %d", transaction_pool_of_leader.size());
@@ -206,7 +206,7 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
             stage_is_working=false;
             c_blocks.clear();
             cli_leader_info.clear();
-            blocks_leader.clear();
+            l_blocks.clear();
 
             do_heart_beat();
         }
@@ -287,7 +287,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     {
         if (state_Z != STATE_NORMAL)
             return true;
-        auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
+        auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
         auto &li = hbs.leader_info;
         do_start_block();
         logNode("do_start_block();");
@@ -306,7 +306,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     {
         if (state_Z != STATE_NORMAL)
             return true;
-        auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
+        auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
         auto &li = hbs.leader_info;
         li.request_for_transactions_sent = true;
         do_request_for_transactions(li);

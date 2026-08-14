@@ -127,7 +127,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(c.blockDBStore, c.att_data, this));
 
     prev_root_hash_Z = r->blockInfo->new_root_hash1;
-    blocks_leader.clear();
+    l_blocks.clear();
     cli_leader_info.clear();
     do_InvalidateRoot();
 

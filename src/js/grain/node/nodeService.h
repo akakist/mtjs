@@ -175,7 +175,7 @@ namespace Node
         void do_InvalidateRoot();
 
 
-        struct block
+        struct block_leader
         {
             std::map<THASH_id /*blockinfo hash*/,REF_getter<MsgData::BlockInfo> > blockInfo;
             std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >responses;
@@ -188,7 +188,7 @@ namespace Node
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         
 
-        struct client_block_info
+        struct block_client
         {
             REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
             REF_getter<MsgData::attachment_data> att_data= nullptr;
@@ -206,14 +206,14 @@ namespace Node
             bool do_you_have_sent=false;
             std::set<NODE_id> havers;
         };
-        std::map<BLOCK_id, client_block_info> c_blocks;
-        std::map<BLOCK_id,block> blocks_leader;
+        std::map<BLOCK_id, block_client> c_blocks;
+        std::map<BLOCK_id,block_leader> l_blocks;
         std::map<BLOCK_id, client_leader_info> cli_leader_info;
         std::map<EPOCH_id, std::map<NODE_id, REF_getter<MsgData::LeaderCertificate> > >lc_responses;
         void clear()
         {
             c_blocks.clear();
-            blocks_leader.clear();
+            l_blocks.clear();
             cli_leader_info.clear();
             lc_responses.clear();
         }

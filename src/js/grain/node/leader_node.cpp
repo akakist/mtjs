@@ -24,7 +24,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         THASH_id h = z->getHash();
         transaction_pool_of_leader.insert({h, z});
     }
-    auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
+    auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     if(iUtils->getNow()-li.TIMER_VALIDATE_BLOCK_DELAY_set < _1sec)
     {
@@ -91,7 +91,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         return true;
     }
 
-    auto &bt = blocks_leader[prev_root_hash_Z];
+    auto &bt = l_blocks[prev_root_hash_Z];
     auto h=r->blockInfo->getHash();
     bt.responses[h].push_back(r);
     if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
@@ -125,7 +125,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         // if (!bt.blockInfo.valid())
         //     throw CommonError("if(!bt.block_payload.valid())");
         std::vector<blst_cpp::PublicKey> agg_pk;
-        auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
+        auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
         // ba->leader_certificateZ = hbs.leader_info.leader_cert_2;
         std::set<std::string> nnn;
 

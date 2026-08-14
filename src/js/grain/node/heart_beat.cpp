@@ -16,7 +16,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 {
     XTRY;
     // logNode("@@ HeartBeatRSP");
-    auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
+    auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     if (prev_root_hash_Z != m->payload_heart_beat->prev_root_hash_1)
     {
@@ -328,7 +328,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     if(state_Z!=STATE_NORMAL)
         return true;
 
-    auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
+    auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     if (prev_root_hash_Z != m->hb->prev_root_hash_1)
     {
@@ -394,7 +394,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 void Node::Service::do_heart_beat()
 {
     // logNode("@@ %s",__FUNCTION__);
-    blocks_leader.clear();
+    l_blocks.clear();
     c_blocks.clear();
     // clear();
     {
@@ -415,7 +415,7 @@ void Node::Service::do_heart_beat()
 
 void Node::Service::make_leader_certificate()
 {
-    auto &hbs = blocks_leader[prev_root_hash_Z].heart_beat_store;
+    auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
     auto &li = hbs.leader_info;
     REF_getter<MsgData::LeaderCertificate> lc = new MsgData::LeaderCertificate();
     if (li.ConfirmLeaderRSP_m.empty())
