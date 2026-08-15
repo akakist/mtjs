@@ -44,10 +44,10 @@ struct CDatabase: public IDatabase
         << block_timestamp
         );
         
-        if(epoch.container>10000)
+        if(epoch.container>20000)
             dbh->execSimple((QUERY)"delete from ?.blocks where height<?"
             <<db_name
-            <<epoch.container-10000);
+            <<epoch.container-20000);
         return 0;
     }
 

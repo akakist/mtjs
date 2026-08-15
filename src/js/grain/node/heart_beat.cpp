@@ -100,14 +100,20 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
 }
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::LeaderCertificate *remote_prev_lc, const NODE_id &src_node, const route_t &route)
 {
+    MUTEX_INSPECTOR;
     
 
     if(state_Z==STATE_SYNCING)
     {
         return true;
     }
-    
-    MUTEX_INSPECTOR;
+    auto& ci=cli_leader_info[h->prev_root_hash_1];
+    if(iUtils->getNow()-ci.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT)
+    {
+        logNode("if(iUtils->getNow()-ci.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT) return true");
+        return true;
+    }
+
     bool need_reply = false;
     REF_getter<MsgData::LeaderCertificate>  local_lc;
     if(h->block_timestamp < (time(NULL)-60) || h->block_timestamp > (time(NULL)+60))
@@ -185,10 +191,8 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
             auto buffer = d->getBuffer();
             auto n=root->getNode(src_node,db_state.get());
             sendEvent(n->get_ip(), ServiceEnum::Node,
-                    new bcEvent::NodeMsgREQ(this_node_name, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
+                    new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 
-
-            // do_heart_beat();
             return true;
         }
         else if(remote_prev_lc->heart_beat->new_epoch > local_lc->heart_beat->new_epoch)
@@ -206,14 +210,13 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::L
                 /// просто проверка на всякий случай.
                 if(remote_prev_lc->heart_beat->prev_root_hash_1!=local_lc->heart_beat->prev_root_hash_1)
                 {
-                        logNode(R"(
+                        logNode(R"( --------------- SPLIT BRAIN DETECTED
 if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)
 remote_prev_lc->heart_beat->prev_root_hash %s local_lc->heart_beat->prev_root_hash %s)", 
                             remote_prev_lc->heart_beat->prev_root_hash_1.str().c_str(), local_lc->heart_beat->prev_root_hash_1.str().c_str());
                         return true;
                 }
-                    // throw CommonError("if(remote_prev_lc->heart_beat->prev_root_hash!=local_lc->heart_beat->prev_root_hash)");
-                /// тоже проверка на всякий случай
+                
                 if(prev_root_hash_Z!=h->prev_root_hash_1)    
                 {
     
@@ -232,49 +235,44 @@ if(prev_root_hash_Z!=h->prev_root_hash)
         remote_prev_lc->heart_beat->new_epoch.container %ld
         local_lc->heart_beat->new_epoch.container %ld
         from node %s )", 
-prev_root_hash_Z.str().c_str(), 
-h->prev_root_hash_1.str().c_str(),
-local_lc->heart_beat->prev_root_hash_1.str().c_str(),
-remote_prev_lc->heart_beat->new_epoch.container,
-local_lc->heart_beat->new_epoch.container,
-src_node.container.c_str());
+            prev_root_hash_Z.str().c_str(), 
+            h->prev_root_hash_1.str().c_str(),
+            local_lc->heart_beat->prev_root_hash_1.str().c_str(),
+            remote_prev_lc->heart_beat->new_epoch.container,
+            local_lc->heart_beat->new_epoch.container,
+            src_node.container.c_str());
+
                     auto& ci=cli_leader_info[prev_root_hash_Z];
-                    if(iUtils->getNow() >  ci.heart_beat_sent+_1sec)
+                    if(iUtils->getNow() >  ci.heart_beat_sent + _1sec * HEART_BEAT_SENT_TIMEOUT)
                     {
                         ci.heart_beat_sent=iUtils->getNow();
                         do_heart_beat();
                     }
                     return true;
                 }
-                    // throw CommonError("if(prev_root_hash_Z!=h->prev_root_hash)    ");
                 
-                auto& ci=cli_leader_info[h->prev_root_hash_1];
-                if(ci.node_leader.container.empty())
-                    ci.node_leader=this_node_name;
+     
+                if(iUtils->getNow()-ci.heart_beat_sent > _1sec * HEART_BEAT_SENT_TIMEOUT)
+                {
+                    if(isNodeGreaterOrEqual(this_node_name, h->node_leader))
+                    {
+                        ci.node_leader=this_node_name;
+                        do_heart_beat();
+                        ci.heart_beat_sent=iUtils->getNow();
+                        return true;
+                    }
+                }
+                // if(ci.node_leader.container.empty())
+                    // ci.node_leader=this_node_name;
 
-                if (isNodeGreaterOrEqual(h->node_leader, ci.node_leader))
+                if (ci.node_leader.container.empty() || isNodeGreaterOrEqual(h->node_leader, ci.node_leader))
                 {
     
                     ci.node_leader=h->node_leader;
                     reply_HeartBeatRSP(h,route);
                     return true;
                 }
-                else
-                {
-    
-                    if(iUtils->getNow() > ci.heart_beat_sent +_1sec)
-                    {
-    
-                        ci.heart_beat_sent=iUtils->getNow();
-                        do_heart_beat();
-                    }
-                    else 
-                    {
-
-                    }
-                }
         }
-
     }
     return true;
 }
@@ -292,19 +290,16 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
 
     if (prev_root_hash_Z != h->hb->prev_root_hash_1)
     {
-        logNode("invalid root hash, no answer this node %s src_node %s", this_node_name.container.c_str(), src_node.container.c_str());
+        logNode("ConfirmLeaderREQ: invalid root hash, no answer this node %s src_node %s", this_node_name.container.c_str(), src_node.container.c_str());
         return true;
     }
     bool need_reply = false;
-    if (cli_leader_info[h->hb->prev_root_hash_1].node_leader.container.empty())
-        cli_leader_info[h->hb->prev_root_hash_1].node_leader = h->hb->node_leader;
-    if (h->hb->node_leader != cli_leader_info[h->hb->prev_root_hash_1].node_leader )
+    auto &cli=cli_leader_info[h->hb->prev_root_hash_1];
+    if (cli.node_leader.container.empty())
+        cli.node_leader = h->hb->node_leader;
+    if (h->hb->node_leader != cli.node_leader )
     {
-        if (isNodeGreaterOrEqual(h->hb->node_leader, cli_leader_info[h->hb->prev_root_hash_1].node_leader))
-        {
-            cli_leader_info[h->hb->prev_root_hash_1].node_leader = h->hb->node_leader;
-            need_reply = true;
-        }
+        return true;
     }
     else
         need_reply = true;
@@ -316,8 +311,8 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
         hbr->node_signer = this_node_name;
         hbr->sig.sign(my_sk_bls, blake2b_hash(h->hb->getBuffer()).container);
 
-
         pass_NodeMsgRSP(hbr.get(),route);
+        cli.confirm_leader_sent=iUtils->getNow();
     }
     return true;
 }

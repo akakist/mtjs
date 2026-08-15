@@ -199,6 +199,7 @@ namespace Node
         {
             NODE_id node_leader;
             int64_t heart_beat_sent=0;
+            int64_t confirm_leader_sent=0;
         };
 
         struct _sync
@@ -210,17 +211,31 @@ namespace Node
         std::map<BLOCK_id,block_leader> l_blocks;
         std::map<BLOCK_id, client_leader_info> cli_leader_info;
         std::map<EPOCH_id, std::map<NODE_id, REF_getter<MsgData::LeaderCertificate> > >lc_responses;
+        std::map<BLOCK_id,_sync> syncs;
+        BLOCK_id prev_root_hash_Z;
+        State state_Z=STATE_NORMAL;
+        bool stage_is_working = false;
+        uint64_t last_activity_time=0;
+        std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
+        int64_t node_start_timestamp=0;
+        int64_t seqId2=0;
         void clear()
         {
             c_blocks.clear();
             l_blocks.clear();
             cli_leader_info.clear();
             lc_responses.clear();
+            syncs.clear();
+            transaction_pool_of_leader.clear();
+            prev_root_hash_Z=BLOCK_id();
+            state_Z=STATE_NORMAL;
+            stage_is_working=false;
+            last_activity_time=0;
+            contracts.clear();
+
         }
 
-        std::map<BLOCK_id,_sync> syncs;
 
-        BLOCK_id prev_root_hash_Z;
         void do_start_block();
 
 
@@ -248,14 +263,11 @@ namespace Node
         // REF_getter<DB_history> db_history=nullptr;
 
 
-        uint64_t last_activity_time=0;
         // std::string sqlite_pn;
         // std::string rocksdb_path;
         std::set<msockaddr_in> rpc_addr;
         void logNode(const char* fmt, ...);
         IInstance *iInstance=NULL;
-        State state_Z=STATE_NORMAL;
-        bool stage_is_working = false;
 
         std::vector<std::string> telnet_data_path;
 
@@ -272,13 +284,26 @@ namespace Node
 
         MsgFactory msgFactory;
 
-        std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::optional<std::string> load_contract(const CONTRACT_id& contract);
         std::optional<std::string> execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params);
 
         JSRuntime *contract_runtime=NULL;
 
+            void dump(nlohmann::json &j)
+            {
+                // msgFactory.dump(j["msgFactory"]);
+                j["db_name"]=db_name;
+                j["my_sk_bls_env_key"]=base16::encode(my_sk_bls_env_key);
+                j["my_sk_ed_env_key"]=base16::encode(my_sk_ed_env_key);
+                j["this_node_name"]=this_node_name.container;
+                j["state_Z"]=state_Z;
+                j["prev_root_hash_Z"]=base16::encode(prev_root_hash_Z.container);
+                j["my_sk_bls_key"]=base16::encode(my_sk_bls.serialize());
+                j["my_sk_ed_key"]=base16::encode(my_sk_ed);
+                j["telnet_data_path"]=telnet_data_path;
 
+            }
+            
     };
 
 }

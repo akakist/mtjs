@@ -187,7 +187,7 @@ void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b)
     auto signature=sign_ed(my_sk_ed,blake2b_hash(msg).container);
     sendEvent(ServiceEnum::BroadcasterTree,
               new bcEvent::BroadcastMessage(ServiceEnum::Node,
-                                            this_node_name, signature,msg, ListenerBase::serviceId));
+                                            this_node_name, node_start_timestamp, seqId2++, signature,msg, ListenerBase::serviceId));
 
 }
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
@@ -202,11 +202,14 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
         if(diff>3. )
         {
             logNode("if(diff>2. && transaction_pool_of_leader.size())");
+            clear();
             last_activity_time=iUtils->getNow();
-            stage_is_working=false;
-            c_blocks.clear();
-            cli_leader_info.clear();
-            l_blocks.clear();
+            root=getRoot(db_state.get());
+            init_root(root,db_state.get());
+            sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
+            sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
+            sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
+            sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
 
             do_heart_beat();
         }
@@ -491,6 +494,7 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
     // db_socket=ins->getConfig()->get_string2("db_socket", "", "mariadb db socket");
     db_name=ins->getConfig()->get_string2("db_name", "grain", "db name");
     contract_runtime=JS_NewRuntime();
+    node_start_timestamp=iUtils->getNow();
 }
 
 bool Node::Service::on_RequestIncoming(const webHandlerEvent::RequestIncoming *)

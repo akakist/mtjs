@@ -27,7 +27,7 @@ void Node::Service::do_sync(const NODE_id &src_node)
     auto buffer = gbr->getBuffer();
 
     sendEvent(n->get_ip(), ServiceEnum::Node,
-              new bcEvent::NodeMsgREQ(this_node_name, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
+              new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 }
 bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r, const NODE_id &src_node, const route_t &route)
 {

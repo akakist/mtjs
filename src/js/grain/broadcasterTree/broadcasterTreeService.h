@@ -63,7 +63,7 @@ namespace BroadcasterTree
         ~Service();
 
         // void make_broadcast_message_to_tree(SERVICE_id dstService,const std::string & msg, const BroadcasterTree::TreeNode& root, const route_t& route);
-        void make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id& node_signer, const std::string& signature, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route);
+        void make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id& node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route);
 
 
     public:

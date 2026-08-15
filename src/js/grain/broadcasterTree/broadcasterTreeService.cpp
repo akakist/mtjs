@@ -52,7 +52,7 @@ bool BroadcasterTree::Service::on_alarm(const timerEvent::TickAlarm *e)
 
         logErr2("TIMER_BROADCAST_ACK_TIMEDOUT %s", c->dstNodeName.container.c_str());
 
-        make_broadcast_message_to_tree(c->dst_service,c->node_signer,c->payload_signature,  c->payload, c->bt, c->route);
+        make_broadcast_message_to_tree(c->dst_service,c->node_signer,c->node_start_timestamp,c->seqId2,c->payload_signature,  c->payload, c->bt, c->route);
 
         return true;
     }
@@ -164,15 +164,12 @@ bool BroadcasterTree::Service::ServiceInit(const bcEvent::ServiceInit *e)
 bool BroadcasterTree::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 {
     root=e->root;
-    // root = getRoot(conf->db.get());
-    // init_root(root);
     return true;
 }
 bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage *e)
 {
     MUTEX_INSPECTOR;
     std::map<NODE_id, NodeElement> nodes;
-// logErr2("BroadcastMessage from %s", e->node_signer.container.c_str());
     auto ks = root->getAllNodes(db_state_4.get());
     for (auto &nd : ks)
     {
@@ -194,18 +191,18 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
         return true;
     BroadcasterTree::TreeNode root = BroadcasterTree::buildTree(nodes, conf->this_node_name);
     // logErr2("BroadcastMessage tree built with root %s", root.node.name.container.c_str());
-    make_broadcast_message_to_tree(e->dstService,e->node_signer,e->signature_pl, e->msg, root, e->route);
+    make_broadcast_message_to_tree(e->dstService,e->node_signer, e->node_start_timestamp,e->seqId,e->signature_pl, e->msg, root, e->route);
     return true;
 }
-void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id & node_signer, const std::string& signature, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route)
+void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id & node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route)
 {
     MUTEX_INSPECTOR;
     auto &ch = root.children;
     for (auto it = ch.begin(); it != ch.end(); it++)
     {
         MUTEX_INSPECTOR;
-        REF_getter<bcEvent::SendToChild> e1 = new bcEvent::SendToChild(node_signer,signature, msg, *it, dstService, it->node.name, route);
-        REF_getter<bcEvent::SendToChild> e2 = new bcEvent::SendToChild(node_signer,signature, msg, *it, dstService, it->node.name, route);
+        REF_getter<bcEvent::SendToChild> e1 = new bcEvent::SendToChild(node_signer, node_start_timestamp, seqId, signature, msg, *it, dstService, it->node.name, route);
+        REF_getter<bcEvent::SendToChild> e2 = new bcEvent::SendToChild(node_signer, node_start_timestamp, seqId, signature, msg, *it, dstService, it->node.name, route);
         sendEvent(it->node.ip, ServiceEnum::BroadcasterTree, e1.get());
 
         sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(TIMER_BROADCAST_ACK_TIMEDOUT,
@@ -259,9 +256,9 @@ void registerBroadcasterTreeService(const char *pn)
 bool BroadcasterTree::Service::SendToChild(const bcEvent::SendToChild *e, bool fromNetwork)
 {
     // logNode("SendToChild from %s to %s", e->node_signer.container.c_str(), e->dstNodeName.container.c_str());
-    sendEvent(e->dst_service, new bcEvent::NodeMsgREQ(e->node_signer,e->payload_signature, e->payload, e->route));
+    sendEvent(e->dst_service, new bcEvent::NodeMsgREQ(e->node_signer, e->node_start_timestamp, e->seqId2, e->payload_signature, e->payload, e->route));
     passEvent(new bcEvent::SendToChildAck(e->hash(), poppedFrontRoute(e->route)));
-    make_broadcast_message_to_tree(e->dst_service, e->node_signer,e->payload_signature, e->payload, e->bt, e->route);
+    make_broadcast_message_to_tree(e->dst_service, e->node_signer, e->node_start_timestamp,e->seqId2,e->payload_signature, e->payload, e->bt, e->route);
     return true;
 }
 bool BroadcasterTree::Service::SendToChildAck(const bcEvent::SendToChildAck *e, bool fromNetwork)

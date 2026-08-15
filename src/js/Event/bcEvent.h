@@ -58,14 +58,16 @@ namespace bcEvent
             return new NodeMsgREQ(r);
         }
         NODE_id node_signer;
+        int64_t node_start_timestamp;
+        int64_t seqId2;
         std::string signature;
         std::string msg_payload;
 
-        NodeMsgREQ(const NODE_id &_node_signer, const std::string &sig,
+        NodeMsgREQ(const NODE_id &_node_signer, int64_t _node_start_timestamp, int64_t _seqId, const std::string &sig,
                    const std::string &_msg,
                    const route_t &r)
             : Base(bcEventEnum::NodeMsgREQ, r),
-              node_signer(_node_signer), signature(sig), msg_payload(_msg)
+              node_signer(_node_signer), node_start_timestamp(_node_start_timestamp), seqId2(_seqId), signature(sig), msg_payload(_msg)
         {
         }
 
@@ -74,12 +76,12 @@ namespace bcEvent
         void unpack(inBuffer &o)
         {
 
-            o >> node_signer >> signature >> msg_payload;
+            o >> node_signer >> node_start_timestamp >> seqId2 >> signature >> msg_payload;
         }
         void pack(outBuffer &o) const
         {
 
-            o << node_signer << signature << msg_payload;
+            o << node_signer << node_start_timestamp << seqId2 << signature << msg_payload;
         }
     };
     class NodeMsgRSP : public Event::Base
@@ -280,15 +282,18 @@ namespace bcEvent
         {
             return NULL;
         }
-        BroadcastMessage(const SERVICE_id &dstService_, const NODE_id& _node_signer,
+        BroadcastMessage(const SERVICE_id &dstService_, const NODE_id& _node_signer, int64_t _node_start_timestamp, int64_t _seqId,
             const std::string& _signature_pl,
             const std::string &m, const route_t &r)
             : NoPacked(bcEventEnum::BroadcastMessage, r), dstService(dstService_),
-            node_signer(_node_signer),signature_pl(_signature_pl),
+            node_signer(_node_signer), node_start_timestamp(_node_start_timestamp), seqId(_seqId),
+            signature_pl(_signature_pl),
             msg(m) {}
 
         SERVICE_id dstService;
         const NODE_id node_signer;
+        const int64_t node_start_timestamp;
+        const int64_t seqId;
         const std::string signature_pl;
         const std::string msg;
     };
@@ -300,8 +305,8 @@ namespace bcEvent
         {
             return new SendToChild(r);
         }
-        SendToChild(const NODE_id& _node_signer, const std::string& signature_pld, const std::string &_payload, const BroadcasterTree::TreeNode &_bt, const SERVICE_id &_dstSvs, const NODE_id &_dstNodeName, const route_t &r)
-            : Base(bcEventEnum::SendToChild, r), node_signer(_node_signer),payload_signature(signature_pld), 
+        SendToChild(const NODE_id& _node_signer, int64_t _node_start_timestamp, int64_t _seqId, const std::string& signature_pld, const std::string &_payload, const BroadcasterTree::TreeNode &_bt, const SERVICE_id &_dstSvs, const NODE_id &_dstNodeName, const route_t &r)
+            : Base(bcEventEnum::SendToChild, r), node_signer(_node_signer), node_start_timestamp(_node_start_timestamp), seqId2(_seqId), payload_signature(signature_pld), 
             payload(_payload), bt(_bt), dst_service(_dstSvs), dstNodeName(_dstNodeName) {}
 
         std::string hash() const
@@ -309,11 +314,16 @@ namespace bcEvent
             MUTEX_INSPECTOR;
             Blake2bHasher h;
             h.update(node_signer.container);
+            h.update(std::to_string(node_start_timestamp));
+            h.update(std::to_string(seqId2));
             h.update(payload_signature);
+            h.update(payload);
             h.update(bt.node.name.container);
             return h.final();
         }
         NODE_id node_signer;
+        int64_t node_start_timestamp;
+        int64_t seqId2;
         std::string payload_signature;
         std::string payload;
         BroadcasterTree::TreeNode bt;
@@ -326,12 +336,12 @@ namespace bcEvent
         void unpack(inBuffer &o)
         {
 
-            o >>node_signer>>payload_signature >> payload >> bt >> dst_service >> dstNodeName;
+            o>>node_signer>>node_start_timestamp>>seqId2>>payload_signature >> payload >> bt >> dst_service >> dstNodeName;
         }
         void pack(outBuffer &o) const
         {
 
-            o<< node_signer<<payload_signature << payload << bt << dst_service << dstNodeName;
+            o<<node_signer<<node_start_timestamp<<seqId2<<payload_signature << payload << bt << dst_service << dstNodeName;
         }
     };
     class SendToChildAck : public Event::Base
