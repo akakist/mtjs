@@ -883,6 +883,17 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
 
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 {
+    auto &s=filter_NodeMsgREQ[m->node_signer][m->node_start_timestamp];
+    while(s.size()>100)
+    {
+        s.erase(s.begin());
+    }
+    if(s.count(m->seqId2))
+    {
+        logNode("filter_NodeMsgREQ.count(m->seqId2) %lld",m->seqId2);
+        return true;
+    }
+    s.insert(m->seqId2);
     auto n = root->getNode(m->node_signer,db_state.get());
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {

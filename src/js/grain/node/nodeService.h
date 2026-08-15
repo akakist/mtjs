@@ -219,6 +219,7 @@ namespace Node
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         int64_t node_start_timestamp=0;
         int64_t seqId2=0;
+        std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         void clear()
         {
             c_blocks.clear();
