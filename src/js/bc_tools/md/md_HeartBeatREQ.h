@@ -30,6 +30,13 @@ namespace MsgData
             j["node_leader"]=node_leader.container;
             
         }
+        bool equals(const REF_getter<HeartBeatREQ> &a)
+        {
+            return prev_root_hash_1 == a->prev_root_hash_1 &&
+                    new_epoch == a->new_epoch &&
+                    node_leader == a->node_leader &&
+                    block_timestamp == a->block_timestamp;
+        }
 
         void update(Blake2bHasher& h) const
         {

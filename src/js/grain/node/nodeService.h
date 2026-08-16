@@ -132,7 +132,7 @@ namespace Node
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
         bool PutTransactionREQ(const bcEvent::PutTransactionREQ* e);
 
-        void do_heart_beat();
+        REF_getter<MsgData::HeartBeatREQ> do_heart_beat();
 
         bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route);
         bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::LeaderCertificate *remote_prev_lc, const NODE_id &src_node, const route_t &route);
@@ -197,7 +197,8 @@ namespace Node
         };
         struct client_leader_info
         {
-            NODE_id node_leader;
+            REF_getter<MsgData::HeartBeatREQ> node_leader;
+            // NODE_id node_leader;
             int64_t heart_beat_sent=0;
             int64_t confirm_leader_sent=0;
         };

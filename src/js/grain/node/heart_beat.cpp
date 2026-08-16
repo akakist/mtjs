@@ -256,8 +256,9 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 {
                     if(isNodeGreaterOrEqual(this_node_name, h->node_leader))
                     {
-                        ci.node_leader=this_node_name;
-                        do_heart_beat();
+                        // ci.node_leader=new MsgData::HeartBeatREQ(prev_root_hash_Z,);
+                        auto hb=do_heart_beat();
+                        ci.node_leader=hb;
                         ci.heart_beat_sent=iUtils->getNow();
                         return true;
                     }
@@ -265,10 +266,10 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 // if(ci.node_leader.container.empty())
                     // ci.node_leader=this_node_name;
 
-                if (ci.node_leader.container.empty() || isNodeGreaterOrEqual(h->node_leader, ci.node_leader))
+                if (!ci.node_leader.valid() || ci.node_leader->node_leader.container.empty() || isNodeGreaterOrEqual(h->node_leader, ci.node_leader->node_leader))
                 {
     
-                    ci.node_leader=h->node_leader;
+                    ci.node_leader=h;
                     reply_HeartBeatRSP(h,route);
                     return true;
                 }
@@ -295,9 +296,9 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
     }
     bool need_reply = false;
     auto &cli=cli_leader_info[h->hb->prev_root_hash_1];
-    if (cli.node_leader.container.empty())
-        cli.node_leader = h->hb->node_leader;
-    if (h->hb->node_leader != cli.node_leader )
+    if (!cli.node_leader.valid())
+        cli.node_leader = h->hb;
+    if (!h->hb->equals(cli.node_leader))
     {
         return true;
     }
@@ -386,26 +387,23 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     return true;
 }
 
-void Node::Service::do_heart_beat()
+REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
 {
     // logNode("@@ %s",__FUNCTION__);
     l_blocks.clear();
     c_blocks.clear();
-    // clear();
-    {
-        EPOCH_id e=root->getEpoch(NULL,db_state.get())->epoch;
-        e.container+=1;
-        REF_getter<MsgData::HeartBeatREQ> hb_req =
-            new MsgData::HeartBeatREQ(prev_root_hash_Z,
-                                      e,
-                                      this_node_name, root->getEpoch(NULL,db_state.get())->prev_lc, time(NULL));
+    EPOCH_id e=root->getEpoch(NULL,db_state.get())->epoch;
+    e.container+=1;
+    REF_getter<MsgData::HeartBeatREQ> hb_req =
+        new MsgData::HeartBeatREQ(prev_root_hash_Z,
+                                    e,
+                                    this_node_name, root->getEpoch(NULL,db_state.get())->prev_lc, time(NULL));
 
-        REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),root->getEpoch(NULL,db_state.get())->prev_lc);
-        // logNode("broadcast heart beat");
-        broadcast_MsgEvent(lce.get());
-    }
+    REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),root->getEpoch(NULL,db_state.get())->prev_lc);
+    // logNode("broadcast heart beat");
+    broadcast_MsgEvent(lce.get());
 
-    return;
+    return hb_req;
 }
 
 void Node::Service::make_leader_certificate()
