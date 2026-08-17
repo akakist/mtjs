@@ -4,6 +4,7 @@
 #include "BLOCK_id.h"
 #include "NODE_id.h"
 #include "md_Base.h"
+#include "md/md_BlockAcceptedREQ.h"
 namespace MsgData
 {
     struct LcEnvelopeREQ: public Base
@@ -13,12 +14,12 @@ namespace MsgData
         {
 
         }
-        LcEnvelopeREQ(const std::string& _msg, const std::string& _prev_lc):Base(msgid::LcEnvelopeREQ),
+        LcEnvelopeREQ(const std::string& _msg, const std::string&& _prev_lc):Base(msgid::LcEnvelopeREQ),
             msg(_msg),  prev_lc(_prev_lc)
         {
         }
         std::string msg;
-        std::string prev_lc;
+        std::string prev_lc; /// can be empty
         void update(Blake2bHasher& h) const
         {
             h.update(msg);

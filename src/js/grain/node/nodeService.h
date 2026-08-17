@@ -60,8 +60,8 @@ namespace Node
         TIMER_RESTART_BLOCK,
         TIMER_PERIODIC_CLOCK,
         TIMER_VALIDATE_BLOCK_DELAY,
-        TIMER_SYNC_TIMEDOUT,
-        TIMER_LC_REQ_TIMEDOUT
+        TIMER_SYNC_TIMEDOUT
+        // TIMER_LC_REQ_TIMEDOUT
     };
     struct heart_beat_node_info
     {
@@ -74,7 +74,7 @@ namespace Node
         int64_t TIMER_VALIDATE_BLOCK_DELAY_set=0;
         int64_t request_for_transactions_sent=0;
         int64_t confirm_leader_sent=0;
-        REF_getter< MsgData::LeaderCertificate> leader_cert_2;
+        REF_getter< MsgData::HeartBeatREQ> leader_cert_2;
         std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > HeartBeatRSP_m;
         std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > ConfirmLeaderRSP_m;
         std::set<NODE_id> transaction_responders;
@@ -135,7 +135,7 @@ namespace Node
         REF_getter<MsgData::HeartBeatREQ> do_heart_beat();
 
         bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route);
-        bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::LeaderCertificate *remote_prev_lc, const NODE_id &src_node, const route_t &route);
+        bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route);
         void reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route);
 
         bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
@@ -152,8 +152,8 @@ namespace Node
 
         bool DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const NODE_id & src_node, const route_t& route);
         bool DoYouHaveBlockRSP(const MsgData::DoYouHaveBlockRSP* m, const NODE_id & src_node, const route_t& route);
-        bool LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route);
-        bool LcRSP(const MsgData::LcRSP* m, const NODE_id & src_node, const route_t& route);
+        // bool LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route);
+        // bool LcRSP(const MsgData::LcRSP* m, const NODE_id & src_node, const route_t& route);
 
         bool DelayNotificationREQ(const MsgData::DelayNotificationREQ* m, const NODE_id & src_node, const route_t& route);
 
@@ -161,7 +161,7 @@ namespace Node
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);
 
 
-        void make_leader_certificate();
+        // void make_leader_certificate();
         bool isNodeGreaterOrEqual(const NODE_id& nodeLeft, const NODE_id& nodeRight);
         int nodeDistanceToLeader(const NODE_id& node);
 
@@ -211,7 +211,7 @@ namespace Node
         std::map<BLOCK_id, block_client> c_blocks;
         std::map<BLOCK_id,block_leader> l_blocks;
         std::map<BLOCK_id, client_leader_info> cli_leader_info;
-        std::map<EPOCH_id, std::map<NODE_id, REF_getter<MsgData::LeaderCertificate> > >lc_responses;
+        // std::map<EPOCH_id, std::map<NODE_id, REF_getter<MsgData::LeaderCertificate> > >lc_responses;
         std::map<BLOCK_id,_sync> syncs;
         BLOCK_id prev_root_hash_Z;
         State state_Z=STATE_NORMAL;
@@ -226,7 +226,7 @@ namespace Node
             c_blocks.clear();
             l_blocks.clear();
             cli_leader_info.clear();
-            lc_responses.clear();
+            // lc_responses.clear();
             syncs.clear();
             transaction_pool_of_leader.clear();
             prev_root_hash_Z=BLOCK_id();
@@ -242,17 +242,17 @@ namespace Node
 
 
         void collectTransactions();
-        BLOCK_id execute_block(b_params &b,  const REF_getter<MsgData::LeaderCertificate> &lc);
+        BLOCK_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc);
 
         void do_sync(const NODE_id &src_node);
 
         // bool CheckState(const MsgData::HeartBeatREQ *r, const NODE_id & src_node);
 
-        void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::LeaderCertificate> &lc);
+        void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::HeartBeatREQ> &lc);
 
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
     
-        bool verify_leader_certificate(const REF_getter<MsgData::LeaderCertificate>& lc);
+        bool verify_leader_certificate(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
 
         std::optional<std::string> execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
                          const REF_getter<MsgData::TX> &tx,  const EPOCH_id& epoch);

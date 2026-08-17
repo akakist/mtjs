@@ -15,6 +15,7 @@
 #include "ADDRESS_id.h"
 #include "CONTRACT_id.h"
 #include "CONTRACT_DATA_id.h"
+#include "md/md_BlockAcceptedREQ.h"
 // #include <ostringstream>
 
 struct bc_contract:  public data_base
@@ -252,6 +253,7 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         fees["node_stake"]=BigInt(2000);
         fees["mint"]=BigInt(95);
         fees["transfer"]=BigInt(1000);
+        fees["cashback"]=BigInt(200);
     }
     std::map<std::string,BigInt> fees;
     std::set<ADDRESS_id> emitters_bin;
@@ -287,20 +289,20 @@ struct bc_epoch: public data_base
         epoch.container=0;
     }
     EPOCH_id epoch;
-    std::string prev_lc;
+    REF_getter<MsgData::BlockAcceptedREQ> prev_block;
     void pack(outBuffer& o) const final
     {
         data_base::pack(o);
         o<<1;
         o<<epoch;
-        o<<prev_lc;
+        o<<prev_block;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
         o>>epoch;
-        o>> prev_lc;
+        o>> prev_block;
     }
     std::string dump() final;
 

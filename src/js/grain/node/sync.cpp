@@ -34,15 +34,15 @@ bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r,
     bool remote_verified=verify_leader_certificate(r->lc);
     if(!remote_verified)
         return true;
-    auto llc=root->getEpoch(NULL,db_state.get())->prev_lc;
-    REF_getter<MsgData::LeaderCertificate> local_lc;
-    if(llc.size())
-    {
-        local_lc=new MsgData::LeaderCertificate;
-        inBuffer in(llc);
-        local_lc->unpack2(in);
-    }
-    if(r->lc->heart_beat->new_epoch>local_lc->heart_beat->new_epoch)
+    auto local_lc=root->getEpoch(NULL,db_state.get())->prev_block;
+    // REF_getter<MsgData::BlockAcceptedREQ> local_lc;
+    // if(llc.size())
+    // {
+    //     local_lc=new MsgData::BlockAcceptedREQ;
+    //     inBuffer in(llc);
+    //     local_lc->unpack2(in);
+    // }
+    if(r->lc->blockInfo->heart_beat->new_epoch > local_lc->blockInfo->heart_beat->new_epoch)
     {
         state_Z=STATE_SYNCING;
         do_sync(src_node);
@@ -121,22 +121,22 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
     }
     for (auto &z : r->blocks_ZZ)
     {
-        logNode("iter block epoch %ld", z->validateBlockREQ->leader_cert->heart_beat->new_epoch);
+        logNode("iter block epoch %ld", z->validateBlockREQ->heart_beat->new_epoch);
         logNode("cur epoch %ld", root->getEpoch(NULL,db_state.get())->epoch);
 
-        logNode("iter prev_root_hash in validateBlockREQ %s", z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.str().c_str());
+        logNode("iter prev_root_hash in validateBlockREQ %s", z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str());
         logNode("iter prev_root_hash in blockAcceptedREQ %s", z->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str());
-        if (prev_root_hash_Z != z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1)
+        if (prev_root_hash_Z != z->validateBlockREQ->heart_beat->prev_root_hash_1)
         {
-            logNode("prev root hash not matched '%s' != '%s'", prev_root_hash_Z.str().c_str(),z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.str().c_str());
+            logNode("prev root hash not matched '%s' != '%s'", prev_root_hash_Z.str().c_str(),z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str());
             continue;
         }
         else
             logNode("prev root hash matched !!!");
-        if (z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
+        if (z->validateBlockREQ->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
         {
 
-            logNode("inval root hash %s %s", z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z.str().c_str());
+            logNode("inval root hash %s %s", z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z.str().c_str());
             continue;
         }
         else
@@ -155,12 +155,12 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         logNode("on_get_blocks_rsp: block verified OK");
         b_params t(root,db_state.get());
         t.validateBlockREQ = z->validateBlockREQ;
-        auto rh = execute_block(t, z->validateBlockREQ->leader_cert);
+        auto rh = execute_block(t, z->validateBlockREQ->heart_beat);
         auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
 
         if (new_root_hash == z->blockAcceptedREQ->blockInfo->new_root_hash1)
         {
-            logNode("on_get_blocks_rsp: block executed OK on epoch %ld", z->validateBlockREQ->leader_cert->heart_beat->new_epoch);
+            logNode("on_get_blocks_rsp: block executed OK on epoch %ld", z->validateBlockREQ->heart_beat->new_epoch);
 
             logNode("before write batch");
             db_state->write_granules_batch(db_to_save_Z);
@@ -191,9 +191,9 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         }
         outBuffer o;
         o<<z;
-        if(db_state->writeBlock(z->validateBlockREQ->leader_cert->heart_beat->new_epoch, 
-            z->validateBlockREQ->leader_cert->heart_beat->block_timestamp,
-            z->validateBlockREQ->leader_cert->heart_beat->prev_root_hash_1.container,
+        if(db_state->writeBlock(z->validateBlockREQ->heart_beat->new_epoch, 
+            z->validateBlockREQ->heart_beat->block_timestamp,
+            z->validateBlockREQ->heart_beat->prev_root_hash_1.container,
                                   o.asString()->container
                                  ))
         {

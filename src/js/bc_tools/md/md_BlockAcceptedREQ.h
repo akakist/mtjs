@@ -13,7 +13,6 @@ namespace MsgData
         {
             return new BlockAcceptedREQ();
         }
-        // REF_getter<LeaderCertificate> leader_certificateZ;
         REF_getter<BlockInfo> blockInfo;
         std::vector<NODE_id> node_validators;
         blst_cpp::AggregateSignature agg_sig;

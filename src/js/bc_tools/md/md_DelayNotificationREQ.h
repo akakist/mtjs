@@ -1,6 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_LeaderCertificate.h"
+#include "md_BlockAcceptedREQ.h"
 namespace MsgData
 {
     struct DelayNotificationREQ: public Base
@@ -16,7 +17,7 @@ namespace MsgData
         }
         // BigInt epoch;
         // BLOCK_id prev_root_hash;
-        REF_getter<LeaderCertificate> lc;
+        REF_getter<BlockAcceptedREQ> lc;
         void update(Blake2bHasher& h) const
         {
             // h.update(epoch.toString());

@@ -16,7 +16,7 @@ namespace MsgData
 
         }
         REF_getter<HeartBeatREQ> hb;
-        blst_cpp::Signature sig;
+        // blst_cpp::Signature sig;
         NODE_id node_signer;
         void update(Blake2bHasher& h) const
         {
@@ -28,14 +28,14 @@ namespace MsgData
             MUTEX_INSPECTOR;
             Base::pack(b);
             b<<hb;
-            b<<sig<<node_signer;
+            b<<node_signer;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>hb;
-            b>>sig>>node_signer;
+            b>>node_signer;
         }
     };
 

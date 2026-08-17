@@ -40,8 +40,8 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetUserNonceREQ, MsgData::GetUserNonceREQ::construct);
     registerMsg(msgid::GetUserNonceRSP, MsgData::GetUserNonceRSP::construct);
     registerMsg(msgid::LcEnvelopeREQ, MsgData::LcEnvelopeREQ::construct);
-    registerMsg(msgid::LcREQ, MsgData::LcREQ::construct);
-    registerMsg(msgid::LcRSP, MsgData::LcRSP::construct);
+    // registerMsg(msgid::LcREQ, MsgData::LcREQ::construct);
+    // registerMsg(msgid::LcRSP, MsgData::LcRSP::construct);
     registerMsg(msgid::DoYouHaveBlockREQ, MsgData::DoYouHaveBlockREQ::construct);
     registerMsg(msgid::DoYouHaveBlockRSP, MsgData::DoYouHaveBlockRSP::construct);
     registerMsg(msgid::DelayNotificationREQ, MsgData::DelayNotificationREQ::construct);

@@ -1,12 +1,13 @@
 #pragma once
 #include "md_Base.h"
+#include "md_HeartBeatREQ.h"
 namespace MsgData
 {
     struct ValidateBlockREQ: public Base
     {
 
         ValidateBlockREQ():Base(msgid::ValidateBlockREQ),
-            leader_cert(new LeaderCertificate())
+            heart_beat(new MsgData::HeartBeatREQ())
         {
         }
         static Base* construct()
@@ -14,15 +15,16 @@ namespace MsgData
             return new ValidateBlockREQ();
         }
 
-        REF_getter<LeaderCertificate>  leader_cert;
+        REF_getter<MsgData::HeartBeatREQ>  heart_beat;
         std::vector<REF_getter<MsgData::TX> > transaction_bodies;
         void update(Blake2bHasher& h) const
         {
-            leader_cert->update(h);
+            // leader_cert->update(h);
             for(auto& z: transaction_bodies)
             {
                 // z->update(h);
-                // leader_cert->update(h);
+                heart_beat->update(h);
+                
                 h.update(z->tx_body);
                 h.update(z->pk_ed_bin);
             }
@@ -33,14 +35,14 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<leader_cert;
+            b<<heart_beat;
             b<<transaction_bodies;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>leader_cert;
+            b>>heart_beat;
             b>>transaction_bodies;
         }
 

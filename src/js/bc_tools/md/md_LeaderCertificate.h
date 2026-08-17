@@ -1,3 +1,4 @@
+#ifdef KALL
 #pragma once
 #include "md_Base.h"
 #include "md_HeartBeatREQ.h"
@@ -64,3 +65,4 @@ inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::LeaderCertificat
     s->unpack2(b);
     return b;
 }
+#endif

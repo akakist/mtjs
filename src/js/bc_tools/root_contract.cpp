@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include "root_contract.h"
 #include "QUORUM.h"
+#include "md/md_BlockAcceptedREQ.h"
 
 std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
@@ -528,26 +529,26 @@ std::string bc_epoch::dump()
 {
     nlohmann::json j;
     j["epoch"]=epoch.container;
-    if(prev_lc.size())
-    {
-        inBuffer in(prev_lc);
-        REF_getter<MsgData::LeaderCertificate> lc=new MsgData::LeaderCertificate();
-        lc->unpack2(in);
-        auto &jp=j["prev_lc"];
-        for(auto& z: lc->nodes)
-        {
-            jp["signers"].push_back(z.container);
-        }
-        jp["aggsig"]=base16::encode(lc->agg_sig.serialize());
-        auto &hb=jp["hb"];
-        hb["block_timestamp"]=lc->heart_beat->block_timestamp;
-        hb["node_leader"]=lc->heart_beat->node_leader.container;
-        hb["epoch"]=lc->heart_beat->new_epoch.container;
-        hb["prev_root_hash"]=base16::encode(lc->heart_beat->prev_root_hash_1.container);
-        return j.dump(2);
+    // if(prev_block.size())
+    // {
+    //     inBuffer in(prev_block);
+    //     REF_getter<MsgData::BlockAcceptedREQ> lc=new MsgData::BlockAcceptedREQ();
+    //     lc->unpack2(in);
+    //     auto &jp=j["prev_lc"];
+    //     for(auto& z: lc->node_validators)
+    //     {
+    //         jp["signers"].push_back(z.container);
+    //     }
+    //     jp["aggsig"]=base16::encode(lc->agg_sig.serialize());
+    //     auto &hb=jp["hb"];
+    //     hb["block_timestamp"]=lc->blockInfo->heart_beat->block_timestamp;
+    //     hb["node_leader"]=lc->blockInfo->heart_beat->node_leader.container;
+    //     hb["epoch"]=lc->blockInfo->heart_beat->new_epoch.container;
+    //     hb["prev_root_hash"]=base16::encode(lc->blockInfo->heart_beat->prev_root_hash_1.container);
+    //     return j.dump(2);
 
-        // j["prev_lc"]["epoch"]=lc->
-    }
+    //     // j["prev_lc"]["epoch"]=lc->
+    // }
 // BigInt epoch;
 // std::string prev_lc;
     return "Values";

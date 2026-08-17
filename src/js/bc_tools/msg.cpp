@@ -52,8 +52,8 @@ const char *msgName(int id)
         return "HeartBeatREQ";
     case msgid::HeartBeatRSP:
         return "HeartBeatRSP";
-    case msgid::LeaderCertificate:
-        return "LeaderCertificate";
+    // case msgid::LeaderCertificate:
+    //     return "LeaderCertificate";
     case msgid::ValidateBlockREQ:
         return "ValidateBlockREQ";
     case msgid::ValidateBlockRSP:
@@ -86,10 +86,10 @@ const char *msgName(int id)
         return "GetUserNonceREQ";
     case msgid::LcEnvelopeREQ:
         return "LcEnvelopeREQ";
-    case msgid::LcREQ:
-        return "LcREQ";
-    case msgid::LcRSP:
-        return "LcRSP";
+    // case msgid::LcREQ:
+    //     return "LcREQ";
+    // case msgid::LcRSP:
+    //     return "LcRSP";
     case msgid::DoYouHaveBlockREQ:
         return "DoYouHaveBlockREQ";
     case msgid::DoYouHaveBlockRSP:

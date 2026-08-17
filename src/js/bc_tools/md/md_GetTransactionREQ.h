@@ -1,15 +1,16 @@
 #pragma once
 #include "md_Base.h"
 #include "md_LeaderCertificate.h"
+#include "md_HeartBeatREQ.h"
 namespace MsgData
 {
     struct GetTransactionREQ: public Base
     {
 
-        GetTransactionREQ():Base(msgid::GetTransactionREQ),lc(new LeaderCertificate())
+        GetTransactionREQ():Base(msgid::GetTransactionREQ),lc(new MsgData::HeartBeatREQ())
         {
         }
-        REF_getter<LeaderCertificate> lc;
+        REF_getter<MsgData::HeartBeatREQ> lc;
         void update(Blake2bHasher& h) const
         {
             lc->update(h);

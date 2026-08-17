@@ -14,7 +14,7 @@ namespace MsgData
         {
 
         }
-        HeartBeatREQ(const BLOCK_id& _prev_block_hash, const EPOCH_id& _newepoch, const NODE_id& _node_leader, const std::string& _prev_lc, time_t _block_ts):Base(msgid::HeartBeatREQ),
+        HeartBeatREQ(const BLOCK_id& _prev_block_hash, const EPOCH_id& _newepoch, const NODE_id& _node_leader, time_t _block_ts):Base(msgid::HeartBeatREQ),
             prev_root_hash_1(_prev_block_hash), new_epoch(_newepoch), node_leader(_node_leader), block_timestamp(_block_ts)
         {
         }

@@ -52,7 +52,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     }
 
-    if (c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader != src_node)
+    if (c.blockDBStore->validateBlockREQ->heart_beat->node_leader != src_node)
     {
         logNode("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
         return true;
@@ -86,7 +86,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         XPASS;
     }
-    if(this_node_name==c.blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader)
+    if(this_node_name==c.blockDBStore->validateBlockREQ->heart_beat->node_leader)
     {
         size_t sz=0;
         for(auto& z:db_to_save_Z.cells)
@@ -95,7 +95,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
-    auto &hb=c.blockDBStore->validateBlockREQ->leader_cert->heart_beat;
+    auto &hb=c.blockDBStore->validateBlockREQ->heart_beat;
     {
         MUTEX_INSPECTOR;
         XTRY;
@@ -163,12 +163,13 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     MUTEX_INSPECTOR;    
     if(state_Z==STATE_SYNCING)
     {
+        logNode("GetTransaction if(state_Z==STATE_SYNCING)");
         return true;
     }
 
     if(cli_leader_info[prev_root_hash_Z].node_leader->node_leader!=src_node)
     {
-        logNode("invalid leader #14  %s %s", cli_leader_info[prev_root_hash_Z].node_leader->node_leader.container.c_str(), src_node.container.c_str());
+        logNode("GetTransaction invalid leader #14  my %s remote %s", cli_leader_info[prev_root_hash_Z].node_leader->node_leader.container.c_str(), src_node.container.c_str());
         return true;
     }
 
@@ -186,12 +187,12 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
     passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
 }
-bool Node::Service::LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route)
-{
-    auto lc=root->getEpoch(NULL,db_state.get())->prev_lc;
-    pass_NodeMsgRSP(new MsgData::LcRSP(lc), route);
-    return true;
-}
+// bool Node::Service::LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route)
+// {
+//     auto lc=root->getEpoch(NULL,db_state.get())->prev_block;
+//     pass_NodeMsgRSP(new MsgData::LcRSP(lc), route);
+//     return true;
+// }
 
 int get_global_refcount();
 
@@ -215,7 +216,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
     if (!err)
     {
-        if (!r->leader_cert->heart_beat->equals(cli_leader_info[r->leader_cert->heart_beat->prev_root_hash_1].node_leader))
+        if (!r->heart_beat->equals(cli_leader_info[r->heart_beat->prev_root_hash_1].node_leader))
         {
             t.emit_block("error", R"({"code":-32602,"error":"cert node leader mismatched"})");
             // t.att_data->block_report = {1, "cert node leader mismatched"};
@@ -224,17 +225,17 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         }
     }
 
-    if (!err && ! verify_leader_certificate(r->leader_cert))
-    {
-        err = true;
-        t.emit_block("error", R"({"code":-32602,"error":"verify_leader_certificate failed"})");
-        // t.att_data->block_report = {1, "verify_leader_certificate failed"};
-        logNode("verify_leader_certificate failed");
-    }
+    // if (!err && ! verify_leader_certificate(r->leader_cert))
+    // {
+    //     err = true;
+    //     t.emit_block("error", R"({"code":-32602,"error":"verify_leader_certificate failed"})");
+    //     // t.att_data->block_report = {1, "verify_leader_certificate failed"};
+    //     logNode("verify_leader_certificate failed");
+    // }
 
-    if (!err && r->leader_cert->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
+    if (!err && r->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
     {
-        if (root->getEpoch(NULL,db_state.get())->epoch.container + 1 != r->leader_cert->heart_beat->new_epoch.container)
+        if (root->getEpoch(NULL,db_state.get())->epoch.container + 1 != r->heart_beat->new_epoch.container)
         {
             t.emit_block("error", R"({"code":-32602,"error":"epoch invalid"})");
             err = true;
@@ -242,7 +243,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             // setBlockId(r->leader_cert->heart_beat->prev_root_hash);
             // return true;
         }
-        logNode("ERROR: ValidateBlock block %s, nextblock %s", r->leader_cert->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z.str().c_str());
+        logNode("ERROR: ValidateBlock block %s, nextblock %s", r->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z.str().c_str());
     }
     if (!err)
     {
@@ -250,7 +251,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         // auto new_root_hash =
         t.validateBlockREQ = r;
 
-        auto new_root_hash = execute_block(t, r->leader_cert);
+        auto new_root_hash = execute_block(t, r->heart_beat);
 
         auto &c = c_blocks[prev_root_hash_Z];
         if (!c.blockDBStore.valid())
@@ -264,7 +265,14 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         block->new_root_hash1 = new_root_hash;
 
         block->attachment_hash = t.att_data->getHash();
-        block->heart_beat = r->leader_cert->heart_beat;
+        block->heart_beat = r->heart_beat;
+        Blake2bHasher h;
+        for(auto & z:r->transaction_bodies)
+        {
+            z->update(h);
+        }
+        block->tx_hash.container=h.final();
+        
 
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
         rsp->node_validator = this_node_name;

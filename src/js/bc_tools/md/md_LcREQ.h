@@ -1,3 +1,5 @@
+#ifdef KALL
+
 #pragma once
 #include "msg.h"
 #include "bigint.h"
@@ -52,3 +54,4 @@ inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::LcREQ> &s)
     s->unpack2(b);
     return b;
 }
+#endif

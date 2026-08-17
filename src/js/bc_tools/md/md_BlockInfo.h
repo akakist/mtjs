@@ -15,27 +15,25 @@ namespace MsgData
         {
 
         }
-        // uint64_t prev_epoch;
-        // BLOCK_id prev_root_hash;
         BLOCK_id new_root_hash1;
         THASH_id attachment_hash;
+        THASH_id tx_hash;
         REF_getter<HeartBeatREQ> heart_beat;
         void dump(nlohmann::json& j)
         {
-            // j["prev_epoch"]=prev_epoch;
-            // j["prev_root_hash"]=prev_root_hash.str();
             j["new_root_hash1"]=new_root_hash1.str();
             j["attachment_hash"]=attachment_hash.str();
+            j["tx_hash"]=tx_hash.str();
+            
             if(heart_beat.valid())
                 heart_beat->dump(j);
             
         }
         void update(Blake2bHasher& h) const
         {
-            // h.update(std::to_string(prev_epoch));
-            // h.update(prev_root_hash.container);
             h.update(new_root_hash1.container);
             h.update(attachment_hash.container);
+            h.update(tx_hash.container);
             heart_beat->update(h);
         }
 
@@ -43,20 +41,18 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            // b<<prev_epoch;
-            // b<<prev_root_hash;
             b<<new_root_hash1;
             b<<attachment_hash;
+            b<<tx_hash;
             b<<heart_beat;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            // b>>prev_epoch;
-            // b>>prev_root_hash;
             b>>new_root_hash1;
             b>>attachment_hash;
+            b>>tx_hash;
             b>>heart_beat;
         }
 
