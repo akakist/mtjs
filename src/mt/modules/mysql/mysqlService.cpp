@@ -3,7 +3,7 @@
 #include "IUtils.h"
 #include "mysqlService.h"
 #include <string>
-#include <mysql/mysql.h>
+#include <mariadb/mysql.h>
 #include "commonError.h"
 #ifdef _WIN32
 #include "compat_win32.h"

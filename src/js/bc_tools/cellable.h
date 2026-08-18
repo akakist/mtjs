@@ -1,7 +1,6 @@
 #pragma once
 #include "REF.h"
 #include <string>
-#include <rocksdb/db.h>
 #include "commonError.h"
 #include "IDatabase.h"
 #include <vector>

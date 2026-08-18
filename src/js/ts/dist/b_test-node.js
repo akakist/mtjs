@@ -99,7 +99,7 @@ try {
                 db_name=db${i}
                 mysql_max_connections=20
                  mysql_host=NULL
-                 mysql_user=root
+                 mysql_user=bsr
                  mysql_passwd=
                  mysql_database=md
                  mysql_port=0

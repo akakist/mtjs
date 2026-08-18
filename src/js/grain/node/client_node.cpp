@@ -18,7 +18,6 @@
 #include "tools_mt.h"
 #include "QUORUM.h"
 #include "md/md_LcRSP.h"
-// #include <SQLiteCpp/Database.h>
 #include <vector>
 
 void Node::Service::do_InvalidateRoot()
