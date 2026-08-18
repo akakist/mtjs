@@ -7,7 +7,6 @@
 #include "db_to_save.h"
 #include "hsh.h"
 #include "THASH_id.h"
-#include "EPOCH_id.h"
 
 struct Cellable;
 
@@ -30,16 +29,16 @@ struct data_base : public Refcountable
     time_t create_time=0;
     int ttl=-1;
 
-    EPOCH_id last_update_epoch;
+    uint64_t last_update_epoch;
 
     data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
         type(t), parent(_parent), create_time(_create_time),ttl(_ttl) {
-            last_update_epoch.container=0;
+            last_update_epoch=0;
         }
     ~data_base()
     {
     }
-    void setDirty(const EPOCH_id& epoch, Rollback* roll);
+    void setDirty(uint64_t epoch, Rollback* roll);
 ;
     virtual void pack(outBuffer& o) const
     {
@@ -100,12 +99,12 @@ struct Cellable: public Refcountable
 public:
     /// @brief выставляется и читается в потоке ноды, мутекс не нужен.
     bool is_dirty=false;
-    EPOCH_id last_update_epoch;
+    uint64_t last_update_epoch;
 
     Cellable(Cellable* _parent, const std::string & id):Refcountable("cellable"),  parent(_parent), m_id(id)
     {
     }
-    void setDirty__(const EPOCH_id& epoch, Rollback* r)
+    void setDirty__(uint64_t epoch, Rollback* r)
     {
     MUTEX_INSPECTOR;
         {

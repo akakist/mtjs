@@ -22,7 +22,7 @@ void Node::Service::do_sync(const NODE_id &src_node)
     if (!n.valid())
         throw CommonError("if(!n.valid())");
     REF_getter<MsgData::GetSavedBlocksREQ> gbr = new MsgData::GetSavedBlocksREQ();
-    gbr->prev_root_hash = prev_root_hash_Z;
+    gbr->prev_root_hash = prev_root_hash_Z();
     logNode("do_sync: @@@@@@@@@@@@@@@@ REQUEST for blocks since '%s'", gbr->prev_root_hash.str().c_str());
     auto buffer = gbr->getBuffer();
 
@@ -31,18 +31,11 @@ void Node::Service::do_sync(const NODE_id &src_node)
 }
 bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r, const NODE_id &src_node, const route_t &route)
 {
-    bool remote_verified=verify_leader_certificate(r->lc);
+    bool remote_verified=verify_block(r->lc);
     if(!remote_verified)
         return true;
-    auto local_lc=root->getEpoch(NULL,db_state.get())->prev_block;
-    // REF_getter<MsgData::BlockAcceptedREQ> local_lc;
-    // if(llc.size())
-    // {
-    //     local_lc=new MsgData::BlockAcceptedREQ;
-    //     inBuffer in(llc);
-    //     local_lc->unpack2(in);
-    // }
-    if(r->lc->blockInfo->heart_beat->new_epoch > local_lc->blockInfo->heart_beat->new_epoch)
+    // auto local_lc=prev_block;
+    if(!prev_block.valid() || r->lc->blockInfo->heart_beat->new_epoch > prev_block->blockInfo->heart_beat->new_epoch)
     {
         state_Z=STATE_SYNCING;
         do_sync(src_node);
@@ -86,7 +79,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const
             ret->blocks_ZZ.push_back(bs);
             prev = bs->blockAcceptedREQ->blockInfo->new_root_hash1;
         }
-        ret->last_prev_root_hash=prev_root_hash_Z;
+        ret->last_prev_root_hash=prev_root_hash_Z();
 
     }
 
@@ -105,15 +98,15 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
     {
         logNode("error if(state_Z!=SYNCING)");
     }
-    logNode("prev_root_hash %s", prev_root_hash_Z.str().c_str());
+    logNode("prev_root_hash %s", prev_root_hash_Z().str().c_str());
     logNode("GetSavedBlocksRSP received blocks %d", r->blocks_ZZ.size());
     if(r->blocks_ZZ.size()==0)
     {
         /// blocks not found
-        auto &s=syncs[prev_root_hash_Z];
+        auto &s=syncs[prev_root_hash_Z()];
         if(!s.do_you_have_sent)
         {
-            broadcast_MsgEvent(new MsgData::DoYouHaveBlockREQ(prev_root_hash_Z));
+            broadcast_MsgEvent(new MsgData::DoYouHaveBlockREQ(prev_root_hash_Z()));
             s.do_you_have_sent=true;    
             sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(timers::TIMER_SYNC_TIMEDOUT,NULL,NULL,3,this));
         }
@@ -122,24 +115,22 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
     for (auto &z : r->blocks_ZZ)
     {
         logNode("iter block epoch %ld", z->validateBlockREQ->heart_beat->new_epoch);
-        auto prev=root->getEpoch(NULL,db_state.get())->prev_block;
-        EPOCH_id en;
-        en.container=0;
-        logNode("prev epoch %ld", prev.valid() ? prev->blockInfo->heart_beat->new_epoch : en);
+        auto prev=prev_block;
+        logNode("cur epoch %ld", epoch_current());
 
         logNode("iter prev_root_hash in validateBlockREQ %s", z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str());
         logNode("iter prev_root_hash in blockAcceptedREQ %s", z->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str());
-        if (prev_root_hash_Z != z->validateBlockREQ->heart_beat->prev_root_hash_1)
+        if (prev_root_hash_Z() != z->validateBlockREQ->heart_beat->prev_root_hash_1)
         {
-            logNode("prev root hash not matched '%s' != '%s'", prev_root_hash_Z.str().c_str(),z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str());
+            logNode("prev root hash not matched '%s' != '%s'", prev_root_hash_Z().str().c_str(),z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str());
             continue;
         }
         else
             logNode("prev root hash matched !!!");
-        if (z->validateBlockREQ->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
+        if (z->validateBlockREQ->heart_beat->prev_root_hash_1 != prev_root_hash_Z())
         {
 
-            logNode("inval root hash %s %s", z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z.str().c_str());
+            logNode("inval root hash %s %s", z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z().str().c_str());
             continue;
         }
         else
@@ -163,24 +154,23 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
 
         if (new_root_hash == z->blockAcceptedREQ->blockInfo->new_root_hash1)
         {
+            db_to_save_Z.add("#last_block#",z->blockAcceptedREQ->getBuffer());
             logNode("on_get_blocks_rsp: block executed OK on epoch %ld", z->validateBlockREQ->heart_beat->new_epoch);
 
             logNode("before write batch");
             db_state->write_granules_batch(db_to_save_Z);
             logNode("after write batch");
-            // sendEvent(ServiceEnum::GrainWriter,
-            //     new bcEvent::WriteGranules(db_to_save_Z,
-            //         t.validateBlockREQ->leader_cert->heart_beat->new_epoch,
-            //         db_state,this));
 
             logNode("db->write_granules_batch(db_to_save_Z); done %d granules", db_to_save_Z.cells.size());
             db_to_save_Z.clear();
-            prev_root_hash_Z = new_root_hash;
+            prev_block=z->blockAcceptedREQ;
+            // prev_root_hash_Z = new_root_hash;
         }
         else
         {
             logNode("!if (new_root_hash == z->blockAcceptedREQ->blockInfo->new_root_hash1)");
-            root = getRoot(db_state.get());
+            auto rrt = getRoot(db_state.get());
+            root=rrt.first;
             // init_root(root);
             do_InvalidateRoot();
             if(state_Z==STATE_SYNCING)
@@ -203,7 +193,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
             logNode("error saving block");
         }
     }
-    if (r->last_prev_root_hash != prev_root_hash_Z)
+    if (r->last_prev_root_hash != prev_root_hash_Z())
     {
         logNode("call3 do_sync();");
 

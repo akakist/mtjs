@@ -3,7 +3,6 @@
 #include "BLOCK_id.h"
 #include "bigint.h"
 #include "NODE_id.h"
-#include "EPOCH_id.h"
 #include <nlohmann/json.hpp>
 namespace MsgData
 {
@@ -14,18 +13,18 @@ namespace MsgData
         {
 
         }
-        HeartBeatREQ(const BLOCK_id& _prev_block_hash, const EPOCH_id& _newepoch, const NODE_id& _node_leader, time_t _block_ts):Base(msgid::HeartBeatREQ),
+        HeartBeatREQ(const BLOCK_id& _prev_block_hash, uint64_t _newepoch, const NODE_id& _node_leader, time_t _block_ts):Base(msgid::HeartBeatREQ),
             prev_root_hash_1(_prev_block_hash), new_epoch(_newepoch), node_leader(_node_leader), block_timestamp(_block_ts)
         {
         }
         BLOCK_id prev_root_hash_1;
-        EPOCH_id new_epoch;
+        uint64_t new_epoch;
         NODE_id node_leader;
         time_t block_timestamp;
         void dump(nlohmann::json& j)
         {
             j["prev_root_hash"]=prev_root_hash_1.str();
-            j["new_epoch"]=new_epoch.container;
+            j["new_epoch"]=new_epoch;
             j["block_timestamp"]=block_timestamp;
             j["node_leader"]=node_leader.container;
             
@@ -41,7 +40,7 @@ namespace MsgData
         void update(Blake2bHasher& h) const
         {
             h.update(prev_root_hash_1.container);
-            h.update(std::to_string(new_epoch.container));
+            h.update(std::to_string(new_epoch));
             h.update(node_leader.container);
             h.update(std::to_string(block_timestamp));
         }

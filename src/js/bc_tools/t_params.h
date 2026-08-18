@@ -61,7 +61,7 @@ struct t_params
     REF_getter<root_data> root;
     ADDRESS_id senderAddress;
     REF_getter<MsgData::TX> tx;
-    EPOCH_id epoch;
+    uint64_t epoch;
     THASH_id tx_id;
     BigInt gasUsed=0;
     BigInt gasLimit=0;

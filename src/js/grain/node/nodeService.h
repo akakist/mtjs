@@ -210,11 +210,26 @@ namespace Node
         std::map<BLOCK_id, block_client> c_blocks;
         std::map<BLOCK_id,block_leader> l_blocks;
         std::map<BLOCK_id, client_leader_info> cli_leader_info;
-        // std::map<EPOCH_id, std::map<NODE_id, REF_getter<MsgData::LeaderCertificate> > >lc_responses;
         std::map<BLOCK_id,_sync> syncs;
-        BLOCK_id prev_root_hash_Z;
+
+        BLOCK_id prev_root_hash_Z()
+        {
+            if(prev_block.valid())
+            return prev_block->blockInfo->new_root_hash1;
+            BLOCK_id r;
+            r.container="";
+            return r;
+        }
+        uint64_t epoch_current()
+        {
+            if(prev_block.valid())
+            return prev_block->blockInfo->heart_beat->new_epoch+1;
+            return 0;
+
+        }
+        REF_getter<MsgData::BlockAcceptedREQ> prev_block;
         State state_Z=STATE_NORMAL;
-        bool stage_is_working = false;
+        int64_t stage_is_working = 0;
         uint64_t last_activity_time=0;
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         int64_t node_start_timestamp=0;
@@ -228,7 +243,7 @@ namespace Node
             // lc_responses.clear();
             syncs.clear();
             transaction_pool_of_leader.clear();
-            prev_root_hash_Z=BLOCK_id();
+            // prev_root_hash_Z=BLOCK_id();
             state_Z=STATE_NORMAL;
             stage_is_working=false;
             last_activity_time=0;
@@ -251,10 +266,10 @@ namespace Node
 
         BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
     
-        bool verify_leader_certificate(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
+        bool verify_block(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
 
         std::optional<std::string> execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
-                         const REF_getter<MsgData::TX> &tx,  const EPOCH_id& epoch);
+                         const REF_getter<MsgData::TX> &tx, uint64_t epoch);
 
         std::optional<std::string> execute_tx_commands(b_params &b, t_params& t, 
              yyjson_val * j_tx);
@@ -298,7 +313,7 @@ namespace Node
                 j["my_sk_ed_env_key"]=base16::encode(my_sk_ed_env_key);
                 j["this_node_name"]=this_node_name.container;
                 j["state_Z"]=state_Z;
-                j["prev_root_hash_Z"]=base16::encode(prev_root_hash_Z.container);
+                j["prev_root_hash_Z"]=base16::encode(prev_root_hash_Z().container);
                 j["my_sk_bls_key"]=base16::encode(my_sk_bls.serialize());
                 j["my_sk_ed_key"]=base16::encode(my_sk_ed);
                 j["telnet_data_path"]=telnet_data_path;

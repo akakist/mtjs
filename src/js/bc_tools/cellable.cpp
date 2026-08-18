@@ -155,7 +155,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     }
     is_dirty = false;
 }
-void data_base::setDirty(const EPOCH_id& epoch, Rollback* roll)
+void data_base::setDirty(uint64_t epoch, Rollback* roll)
 {
         MUTEX_INSPECTOR;
 

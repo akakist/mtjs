@@ -3,8 +3,7 @@
 void init_root(const REF_getter<root_data> &r, IDatabase* db)
 {
     MUTEX_INSPECTOR;
-        EPOCH_id e;
-        e.container=0;
+        uint64_t e=0;
     std::vector<int> stakes;
     for(int i=0; i<10; i++)
     {
