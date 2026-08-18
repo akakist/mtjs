@@ -528,7 +528,7 @@ std::string bc_values::dump()
 std::string bc_epoch::dump() 
 {
     nlohmann::json j;
-    j["epoch"]=epoch.container;
+    // j["epoch"]=epoch.container;
     // if(prev_block.size())
     // {
     //     inBuffer in(prev_block);

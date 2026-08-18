@@ -122,7 +122,10 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
     for (auto &z : r->blocks_ZZ)
     {
         logNode("iter block epoch %ld", z->validateBlockREQ->heart_beat->new_epoch);
-        logNode("cur epoch %ld", root->getEpoch(NULL,db_state.get())->epoch);
+        auto prev=root->getEpoch(NULL,db_state.get())->prev_block;
+        EPOCH_id en;
+        en.container=0;
+        logNode("prev epoch %ld", prev.valid() ? prev->blockInfo->heart_beat->new_epoch : en);
 
         logNode("iter prev_root_hash in validateBlockREQ %s", z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str());
         logNode("iter prev_root_hash in blockAcceptedREQ %s", z->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str());

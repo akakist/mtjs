@@ -286,22 +286,22 @@ struct bc_epoch: public data_base
 {
 
     bc_epoch(Cellable* p): data_base(hsh::bc_epoch,p,0,-1) {
-        epoch.container=0;
+        // epoch.container=0;
     }
-    EPOCH_id epoch;
+    // EPOCH_id epoch;
     REF_getter<MsgData::BlockAcceptedREQ> prev_block;
     void pack(outBuffer& o) const final
     {
         data_base::pack(o);
         o<<1;
-        o<<epoch;
+        // o<<epoch;
         o<<prev_block;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
-        o>>epoch;
+        // o>>epoch;
         o>> prev_block;
     }
     std::string dump() final;

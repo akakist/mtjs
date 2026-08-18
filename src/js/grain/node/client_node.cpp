@@ -187,12 +187,6 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
     passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
 }
-// bool Node::Service::LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route)
-// {
-//     auto lc=root->getEpoch(NULL,db_state.get())->prev_block;
-//     pass_NodeMsgRSP(new MsgData::LcRSP(lc), route);
-//     return true;
-// }
 
 int get_global_refcount();
 
@@ -235,7 +229,15 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
     if (!err && r->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
     {
-        if (root->getEpoch(NULL,db_state.get())->epoch.container + 1 != r->heart_beat->new_epoch.container)
+        auto prev=root->getEpoch(NULL,db_state.get())->prev_block;
+        EPOCH_id prev_epoch;
+        if(prev.valid())
+        {
+            prev_epoch=prev->blockInfo->heart_beat->new_epoch;
+        }
+        else prev_epoch.container=0;
+
+        if (prev_epoch.container + 1 != r->heart_beat->new_epoch.container)
         {
             t.emit_block("error", R"({"code":-32602,"error":"epoch invalid"})");
             err = true;

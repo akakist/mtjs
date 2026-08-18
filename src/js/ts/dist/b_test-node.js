@@ -65,7 +65,7 @@ async function exec() {
             console.log("TX REPORT " + JSON.stringify(obj));
         });
         console.log(rsp);
-        sleep(100);
+        sleep(10000);
     }
 }
 console.log(std.getenv("PATH"));

@@ -417,8 +417,14 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
     // logNode("@@ %s",__FUNCTION__);
     l_blocks.clear();
     c_blocks.clear();
-    
-    EPOCH_id e=root->getEpoch(NULL,db_state.get())->epoch;
+    auto prev=root->getEpoch(NULL,db_state.get())->prev_block;
+    EPOCH_id e;
+    if(prev.valid())
+    {
+        e=prev->blockInfo->heart_beat->new_epoch;
+    }
+    else e.container=0;
+    // =root->getEpoch(NULL,db_state.get())->epoch;
     e.container+=1;
     REF_getter<MsgData::HeartBeatREQ> hb_req =
         new MsgData::HeartBeatREQ(prev_root_hash_Z,

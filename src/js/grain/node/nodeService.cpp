@@ -648,17 +648,17 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     {
         // total_staked+=n->get_full_stake();
     }
-    auto local_lc=root->getEpoch(NULL,db_state.get())->prev_block;
+    auto local_prev_block=root->getEpoch(NULL,db_state.get())->prev_block;
     std::set<NODE_id> ns;
-    if(local_lc.valid())
+    if(local_prev_block.valid())
     {
-        for(auto& z:local_lc->node_validators)
+        for(auto& z:local_prev_block->node_validators)
         {
             ns.insert(z);
             auto n=root->getNode(z,db_state.get());
             total_staked+=n->get_full_stake();
         }
-        for(auto& z:local_lc->node_validators)
+        for(auto& z:local_prev_block->node_validators)
         {
             auto n=root->getNode(z,db_state.get());
             // n->get_full_stake();
@@ -1288,15 +1288,18 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
 void Node::Service::logNode(const char *fmt, ...)
 {
 
-    auto epoch = root->getEpoch(NULL,db_state.get());
+    auto prev=root->getEpoch(NULL,db_state.get())->prev_block;
+    EPOCH_id ep;
+    if(prev.valid())
+    {
+        ep.container=prev->blockInfo->heart_beat->new_epoch.container+1;
+    }
+    else ep.container=0;
+    // auto epoch = root->getEpoch(NULL,db_state.get());
     {
         va_list ap;
         va_start(ap, fmt);
-        if (!epoch.valid())
-        {
-            throw CommonError("if(!epoch.valid())");
-        }
-        fprintf(stdout, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch.container);
+        fprintf(stdout, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), ep.container);
         vfprintf(stdout, fmt, ap);
         fprintf(stdout, "\n");
         va_end(ap);
@@ -1308,7 +1311,7 @@ void Node::Service::logNode(const char *fmt, ...)
         FILE *f = fopen(pn.c_str(), "a");
         if (f)
         {
-            fprintf(f, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), epoch->epoch.container);
+            fprintf(f, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), ep.container);
             vfprintf(f, fmt, ap);
             fprintf(f, "\n");
             fclose(f);
