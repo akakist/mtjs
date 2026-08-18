@@ -13,7 +13,7 @@
 
 bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const NODE_id &src_node, const route_t &route)
 {
-    logNode("GetTransactionRSP %s",src_node.container.c_str());
+    // logNode("GetTransactionRSP %s",src_node.container.c_str());
 
     XTRY;
     MUTEX_INSPECTOR;
@@ -26,7 +26,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         THASH_id h = z->getHash();
         transaction_pool_of_leader.insert({h, z});
     }
-    auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
+    auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
     auto &li = hbs.leader_info;
     if(iUtils->getNow()-li.TIMER_VALIDATE_BLOCK_DELAY_set < _1sec)
     {
@@ -47,7 +47,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         total_staked+=n->get_full_stake();
     }
     auto pers=stake.toDouble()/total_staked.toDouble();
-    logNode("GetTransactionRSP: staked %lf",pers);
+    // logNode("GetTransactionRSP: staked %lf",pers);
     if (stake.toDouble() > total_staked.toDouble() * QUORUM)
     {
         auto curtime=iUtils->getNow();
@@ -60,22 +60,6 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     XPASS;
     return true;
 }
-// bool Node::Service::LcRSP(const MsgData::LcRSP* m, const NODE_id & src_node, const route_t& route)
-// {
-//     if(m->prev_lc.size())
-//     {
-//         REF_getter<MsgData::LeaderCertificate> lc=new MsgData::LeaderCertificate;
-//         inBuffer in(m->prev_lc);
-//         lc->unpack2(in);
-//         if(verify_leader_certificate(lc))
-//         {
-//             logErr2("cert from %s verified",src_node.container.c_str());
-//             lc_responses[lc->heart_beat->new_epoch][src_node]=lc;
-//             sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_LC_REQ_TIMEDOUT,NULL,NULL,0.5,this));
-//         }
-//     }
-//     return true;
-// }
 
 bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
 {
@@ -84,7 +68,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     if (state_Z != STATE_NORMAL)
         return true;
 
-    if (r->blockInfo->heart_beat->prev_root_hash_1 != prev_root_hash_Z)
+    if (r->blockInfo->heart_beat->prev_root_hash_1 != prev_root_hash_Z())
     {
         logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
         return true;
@@ -95,7 +79,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         return true;
     }
 
-    auto &bt = l_blocks[prev_root_hash_Z];
+    auto &bt = l_blocks[prev_root_hash_Z()];
     auto h=r->blockInfo->getHash();
     bt.responses[h].push_back(r);
     if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
@@ -129,7 +113,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         // if (!bt.blockInfo.valid())
         //     throw CommonError("if(!bt.block_payload.valid())");
         std::vector<blst_cpp::PublicKey> agg_pk;
-        auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
+        auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
         // ba->leader_certificateZ = hbs.leader_info.leader_cert_2;
         std::set<std::string> nnn;
 

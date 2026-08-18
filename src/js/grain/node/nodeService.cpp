@@ -66,9 +66,26 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     db_state = new CDatabase(db, db_name);
 
     if (!root.valid())
-        root = getRoot(db_state.get());
+    {
+        auto rrt = getRoot(db_state.get());
+        root=rrt.first;
+        prev_block=rrt.second;
+        // if(rrt.second.valid())
+        // {
+        //     if(!verify_block(rrt.second))
+        //     throw CommonError("last_block not verified");
 
+        //     prev_block=rrt.second;
+        // }
+    }
     init_root(root,db_state.get());
+
+    if(prev_block.valid())
+    {
+            if(!verify_block(prev_block))
+                throw CommonError("last_block not verified");
+
+    }
 
     my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
 
@@ -87,12 +104,12 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 1., this));
 
     std::string res;
-    int err = db_state->getGranule("#root_hash#", &res);
-    if (!err)
-    {
-        // logNode("prev_root_hash_Z.container = res;");
-        prev_root_hash_Z.container = res;
-    }
+    // int err = db_state->getGranule("#root_hash#", &res);
+    // if (!err)
+    // {
+    //     // logNode("prev_root_hash_Z.container = res;");
+    //     prev_root_hash_Z.container = res;
+    // }
 
     logNode("do_heart_beat in startService");
     // do_heart_beat();
@@ -151,7 +168,7 @@ void Node::Service::do_start_block()
         sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK, NULL, NULL, 0.5, this));
         return;
     }
-    auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
+    auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
     auto &li = hbs.leader_info;
     {
         {
@@ -167,7 +184,7 @@ void Node::Service::do_start_block()
             // }
             // logNode("LC nodes %s",iUtils->join(" ",nnn).c_str());
 
-            auto &bt = l_blocks[prev_root_hash_Z];
+            auto &bt = l_blocks[prev_root_hash_Z()];
             // logNode("before collectTransactions sz %d", transaction_pool_of_leader.size());
             collectTransactions();
             // logNode("AFTER collectTransactions sz %d", transaction_pool_of_leader.size());
@@ -182,10 +199,10 @@ void Node::Service::do_start_block()
 void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b)
 {
     std::string msg;
-    logErr2("b get %p",b.get());
+    // logErr2("b get %p",b.get());
     if(b.valid())
         msg=b->getBuffer();
-    logErr2("KALL 1");
+    // logErr2("KALL 1");
     auto signature=sign_ed(my_sk_ed,blake2b_hash(msg).container);
     sendEvent(ServiceEnum::BroadcasterTree,
               new bcEvent::BroadcastMessage(ServiceEnum::Node,
@@ -228,68 +245,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     switch (e->tid)
     {
-#ifdef KALL        
-    case timers::TIMER_LC_REQ_TIMEDOUT:
-    {
-        if(state_Z==State::STATE_SYNCING)
-        {
-            return true;
-        }
-        logNode("timers::TIMER_LC_REQ_TIMEDOUT");
-        for(auto& z:lc_responses)
-        {
-            logErr2("lc epoch %lld, resps %d",z.first.container,z.second.size());
-        }
-        if(lc_responses.empty())
-            return true;
-        if(lc_responses.size())
-        {
-            REF_getter<MsgData::BlockAcceptedREQ> local_lc=NULL;
-            auto &local_lcb=root->getEpoch(NULL,db_state.get())->prev_block;
-            if(local_lcb.size())
-            {
-                local_lc=new MsgData::BlockAcceptedREQ;
-                inBuffer in2(local_lcb);
-                local_lc->unpack2(in2);
-            }
-
-            auto &z=lc_responses.rbegin()->second;
-            if(z.size())
-            {
-                if(local_lc.valid() && local_lc->blockInfo->heart_beat->prev_root_hash_1 == z.rbegin()->second->heart_beat->prev_root_hash_1)
-                {
-                        logErr2("NODE STATE OK");
-                        state_Z=State::STATE_NORMAL;
-                        return true;
-                }
-                else
-                {
-                    if(
-                       (local_lc.valid() && local_lc->blockInfo->heart_beat->new_epoch < z.rbegin()->second->heart_beat->new_epoch)
-                       ||!local_lc.valid()
-                    )
-                    {
-                        std::vector<NODE_id> nn;
-                        for(auto& x: z)
-                        {
-                            nn.push_back(x.first);
-                        }
-                        auto node=nn[rand()%nn.size()];
-                        do_sync(node);
-                        return true;
-                    }
-                    else
-                        state_Z=State::STATE_NORMAL;
-
-                }
-            }
-        }
-        state_Z=State::STATE_NORMAL;
-
-        return true;
-    }
-    break;
-#endif
     case timers::TIMER_SYNC_TIMEDOUT:
         logNode("FAILED SYNC, NODE STOPPED---------------------------------------------------------------");
     break;
@@ -297,7 +252,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     {
         if (state_Z != STATE_NORMAL)
             return true;
-        auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
+        auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
         auto &li = hbs.leader_info;
         do_start_block();
         logNode("do_start_block();");
@@ -316,7 +271,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     {
         if (state_Z != STATE_NORMAL)
             return true;
-        auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
+        auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
         auto &li = hbs.leader_info;
         li.request_for_transactions_sent = true;
         do_request_for_transactions(li);
@@ -609,12 +564,12 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
                         logNode("if(!lc->heart_beat.valid()) AA");
                     // t_params t;
                     // t.senderAddress=senderAddress;
-                    t_err=execute_transaction(tt->getHash(),  b, senderAddress, tt, lc->new_epoch);
+                    t_err=execute_transaction(tt->getHash(),  b, senderAddress, tt, epoch_current());
                     if(!t_err)
                     {
                         u->incNonce();
                     }
-                    u->setDirty(lc->new_epoch,NULL);
+                    u->setDirty(epoch_current(),NULL);
 
                 }
             }
@@ -627,10 +582,6 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
 
     auto rh=proceed_merkle_on_transaction_pool_hashers(root);
     calc_fee_rewards_nodes(b, lc);
-    // auto newEpoch = root->getEpoch(NULL,db_state.get());
-    // newEpoch->epoch.container += 1;
-    // newEpoch->prev_lc = b.validateBlockREQ->leader_cert->getBuffer();
-    // newEpoch->setDirty(lc->heart_beat->new_epoch,NULL);
 
     rh=proceed_merkle_on_transaction_pool_hashers(root);
     return rh;
@@ -640,14 +591,14 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     MUTEX_INSPECTOR;
 
     // auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
-    logNode("calc_fee_rewards_nodes");
+    // logNode("calc_fee_rewards_nodes");
     BigInt total_staked=0;
     auto nn=root->getAllNodes(db_state.get());
     for(auto& n:nn)
     {
         // total_staked+=n->get_full_stake();
     }
-    auto local_prev_block=root->getEpoch(NULL,db_state.get())->prev_block;
+    auto local_prev_block=prev_block;
     std::set<NODE_id> ns;
     if(local_prev_block.valid())
     {
@@ -667,72 +618,14 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
                 M_LOCK(u->parent->mx);
                 u->balance+=portion;
             }
-            u->setDirty(lc->new_epoch,NULL);
+            u->setDirty(epoch_current(),NULL);
             b.emit_block("reward",R"({"node":"%s","fee":"%s"})",z.container.c_str(),portion.toString().c_str());
         }
         
     }
 
 
-    // BigInt total_fees;
-    // for(auto & n:nn)
-    // {
-    //     auto portion=n->get_full_stake()*b.node_rewards/total_staked;
-    //     auto owner=n->get_owner();
-    //     auto u = root->getAddressState(owner,NULL,db_state.get());
-    //     NODE_id name=n->getName();
-    //     {
-    //         M_LOCK(u->parent->mx);
-    //         u->balance+=portion;
-    //     }
-    //     u->setDirty(lc->new_epoch,NULL);
-    //     b.emit_block("reward",R"({"node":"%s","fee":"%s"})",name.container.c_str(),portion.toString().c_str());
-    // }
     b.emit_block("total_fee",R"({"fee":"%s"})",b.node_rewards.toString().c_str());
-    // iUtils->getNow
-    // REF_getter<MsgData::BlockAcceptedREQ>  local_lc;
-    
-    // if(llc.size())
-    // {
-    //     local_lc=new MsgData::BlockAcceptedREQ;
-    //     inBuffer in(llc);
-    //     local_lc->unpack2(in);
-    // }
-
-    // std::set<NODE_id> ns;
-    // if(local_lc.valid())
-    // {
-    //     for(auto& z:local_lc->node_validators)
-    //     {
-    //         ns.insert(z);
-    //     }
-    // }
-    // auto nodes=b.root->getAllNodes(db_state.get());
-    // for(auto &n: nodes)
-    // {
-    //     if(ns.count(n->getName()))
-    //     {
-    //         // if(n->get_missed_rounds()==0)
-    //         //     continue;
-    //         // else
-    //         // {
-    //         //     n->reset_missed_rounds();
-    //         //     n->setDirty(lc->new_epoch,NULL);
-    //         // }
-    //     }
-    //     else
-    //     {
-    //         // if(n->get_missed_rounds()>=100)
-    //         // {
-    //         //     continue;
-    //         // }
-    //         // else    
-    //         // {
-    //         //     n->inc_missed_rounds();
-    //         //     n->setDirty(lc->new_epoch,NULL);
-    //         // }
-    //     }
-    // }
 }
 
 BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)
@@ -748,7 +641,7 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
     }
     auto root_hash = blake2b_hash(root_buf);
     db_to_save_Z.add("#root#", root_buf);
-    db_to_save_Z.add("#root_hash#", root_hash.container);
+    // db_to_save_Z.add("#root_hash#", root_hash.container);
     BLOCK_id ret;
     ret.container = root_hash.container;
     return ret;
@@ -757,7 +650,8 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 {
     auto nv = root->getAllNodes(db_state.get());
-    int crc = __crc32(0, prev_root_hash_Z.container.data(), prev_root_hash_Z.container.size());
+    auto rh=prev_root_hash_Z();
+    int crc = __crc32(0, rh.container.data(), rh.container.size());
     int idx = crc % nv.size();
     int npoz = -1;
     for (int i = 0; i < nv.size(); i++)
@@ -779,7 +673,8 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
     });
 
     // ФИКС 1: uint32_t вместо int, чтобы избежать отрицательного crc
-    uint32_t crc = __crc32(0, prev_root_hash_Z.container.data(), prev_root_hash_Z.container.size());
+    auto prev_rh=prev_root_hash_Z();
+    uint32_t crc = __crc32(0, prev_rh.container.data(), prev_rh.container.size());
     int idx = static_cast<int>(crc % nv.size());
 
     int npoz = -1;
@@ -836,7 +731,7 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 //     }
 //     return 0;
 // }
-bool Node::Service::verify_leader_certificate(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
+bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
 {
     /// проверка сертификата лидера
     {
@@ -884,10 +779,10 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     logNode("@@ %s",__FUNCTION__);
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
-    logNode("stage_is_working %d",stage_is_working);
-    if(!stage_is_working)
+    logNode("stage_is_working %ld",stage_is_working);
+    if(iUtils->getNow()-stage_is_working> STAGE_IS_WORKING_TIMEOUT* _1sec)
     {
-        stage_is_working=true;
+        stage_is_working=iUtils->getNow();
         do_heart_beat();
     }
     return true;
@@ -1117,7 +1012,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 }
 
 std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress, 
-    const REF_getter<MsgData::TX> &tx,  const EPOCH_id& epoch)
+    const REF_getter<MsgData::TX> &tx, uint64_t epoch)
 {
     MUTEX_INSPECTOR;
     // yyjson::Document doc(tx_cmds);
@@ -1230,7 +1125,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     root->calc_tree_hash(db_dump);
     db_to_save_Z.add(db_dump);
     
-    logErr2("user sz %d",sz);
+    // logErr2("user sz %d",sz);
     return std::nullopt;
 }
 std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params)
@@ -1287,18 +1182,12 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
 void Node::Service::logNode(const char *fmt, ...)
 {
 
-    auto prev=root->getEpoch(NULL,db_state.get())->prev_block;
-    EPOCH_id ep;
-    if(prev.valid())
-    {
-        ep.container=prev->blockInfo->heart_beat->new_epoch.container+1;
-    }
-    else ep.container=0;
-    // auto epoch = root->getEpoch(NULL,db_state.get());
+    // auto prev=root->getEpoch(NULL,db_state.get())->prev_block;
+    uint64_t ep=epoch_current();
     {
         va_list ap;
         va_start(ap, fmt);
-        fprintf(stdout, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), ep.container);
+        fprintf(stdout, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z().str().c_str(), ep);
         vfprintf(stdout, fmt, ap);
         fprintf(stdout, "\n");
         va_end(ap);
@@ -1310,7 +1199,7 @@ void Node::Service::logNode(const char *fmt, ...)
         FILE *f = fopen(pn.c_str(), "a");
         if (f)
         {
-            fprintf(f, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z.str().c_str(), ep.container);
+            fprintf(f, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z().str().c_str(), ep);
             vfprintf(f, fmt, ap);
             fprintf(f, "\n");
             fclose(f);

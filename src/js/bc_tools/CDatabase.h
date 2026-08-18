@@ -16,7 +16,7 @@ struct CDatabase: public IDatabase
         block=res->operator[](0)[0];
         return 0;
     }
-    bool writeBlock(const EPOCH_id& epoch, uint64_t block_timestamp,  const std::string& prev_root_hash, const std::string& data)
+    bool writeBlock(uint64_t epoch, uint64_t block_timestamp,  const std::string& prev_root_hash, const std::string& data)
     {
         /*       CREATE TABLE IF NOT EXISTS ?.blocks (
                 height BIGINT UNSIGNED NOT NULL,
@@ -30,22 +30,22 @@ struct CDatabase: public IDatabase
                 INDEX idx_block_timestamp (block_timestamp)
                 
      */
-    logErr2("write block");
+    // logErr2("write block");
         dbh->execSimple((QUERY)R"( REPLACE INTO ?.blocks (height,prev_state_root_hash, block_blob,block_timestamp) VALUES 
             (?,UNHEX('?'),UNHEX('?'),?)
         )"
 
         <<db_name
-        <<epoch.container
+        <<epoch
         <<base16::encode(prev_root_hash)
         <<base16::encode(data)
         << block_timestamp
         );
         
-        if(epoch.container>20000)
+        if(epoch>20000)
             dbh->execSimple((QUERY)"delete from ?.blocks where height<?"
             <<db_name
-            <<epoch.container-20000);
+            <<epoch-20000);
         return 0;
     }
 

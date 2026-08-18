@@ -16,16 +16,12 @@
 std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
     { return new bc_contract(p); },
-    // +[](Cellable *p) -> data_base *
-    // { return new bc_user(p); },
     +[](Cellable *p) -> data_base *
     { return new bc_address_state(p); },
     +[](Cellable *p) -> data_base *
     { return new bc_node(p); },
     +[](Cellable *p) -> data_base *
     { return new bc_values(p); },
-    +[](Cellable *p) -> data_base *
-    { return new bc_epoch(p); },
     +[](Cellable *p) -> data_base *
     { return new bc_contract_data(p); },
 
@@ -138,7 +134,7 @@ REF_getter<bc_contract_data> root_data::getContractData(const CONTRACT_DATA_id &
     return dynamic_cast<bc_contract_data *>(cc->data.get());
 }
 
-REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const EPOCH_id& epoch,Rollback* roll,IDatabase* db)
+REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, uint64_t epoch,Rollback* roll,IDatabase* db)
 {
     MUTEX_INSPECTOR;
     auto v = getContractPath(name);
@@ -153,7 +149,7 @@ REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, const EP
     cc->data->setDirty(epoch,roll);
     return bc;
 }
-REF_getter<bc_contract_data> root_data::addContractData(const CONTRACT_DATA_id &name, const EPOCH_id& epoch,Rollback* roll,IDatabase* db)
+REF_getter<bc_contract_data> root_data::addContractData(const CONTRACT_DATA_id &name, uint64_t epoch,Rollback* roll,IDatabase* db)
 {
     MUTEX_INSPECTOR;
     auto v = getContractDataPath(name);
@@ -167,26 +163,6 @@ REF_getter<bc_contract_data> root_data::addContractData(const CONTRACT_DATA_id &
     cc->payload_ctor_idx = hsh::bc_contract_data;
     cc->data->setDirty(epoch,roll);
     return bc;
-}
-REF_getter<bc_epoch> root_data::getEpoch(Rollback* roll,IDatabase* db)
-{
-    MUTEX_INSPECTOR;
-    auto r = this;
-    MutexLockerDeferred lk(r->mx);
-    auto l = r->getLeafOrCreate("ep", db,lk,roll);
-    if (!l.valid())
-        throw CommonError("if(!l.valid())");
-    if (l->data.valid())
-    {
-        return dynamic_cast<bc_epoch *>(l->data.get());
-    }
-
-    REF_getter<bc_epoch> v = new bc_epoch(l.get());
-    lk.lock();
-    l->data = v.get();
-    l->payload_ctor_idx = hsh::bc_epoch;
-    lk.unlock();
-    return v;
 }
 
 REF_getter<bc_values> root_data::getValues(Rollback* roll,IDatabase* db)
@@ -380,7 +356,7 @@ std::vector<REF_getter<bc_node>> root_data::getAllNodes(IDatabase* db)
     // }
     // return v;
 }
-REF_getter<bc_node> root_data::addNode(const NODE_id &name, const EPOCH_id& epoch,Rollback* roll,IDatabase* db)
+REF_getter<bc_node> root_data::addNode(const NODE_id &name, uint64_t epoch,Rollback* roll,IDatabase* db)
 {
     MUTEX_INSPECTOR;
 
@@ -415,24 +391,27 @@ REF_getter<bc_node> root_data::getNode(const NODE_id &name, IDatabase* db)
         throw CommonError("if(cc->data.valid())");
 }
 
-REF_getter<root_data> getRoot(IDatabase *db)
+std::pair<REF_getter<root_data>,REF_getter<MsgData::BlockAcceptedREQ>>  getRoot(IDatabase *db)
 {
     MUTEX_INSPECTOR;
 
     REF_getter<root_data> r = new root_data();
-    THASH_id root_hash;
+    REF_getter<MsgData::BlockAcceptedREQ> last_block;
+    // BLOCK_id root_hash;
     std::string root_cell;
-    int err1 = db->getGranule("#root_hash#", &root_hash.container);
-    if (!err1)
+    // int err1 = db->getGranule("#root_hash#", &root_hash.container);
+    // if (!err1)
     {
+    MUTEX_INSPECTOR;
         int err = db->getGranule("#root#", &root_cell);
         if (!err)
         {
-            if (blake2b_hash(root_cell) != root_hash)
-            {
-                logErr2("if(blake2b_hash(root_cell)!=root_hash)");
-            }
-            else
+    MUTEX_INSPECTOR;
+            // if (blake2b_hash(root_cell).container != root_hash.container)
+            // {
+            //     logErr2("if(blake2b_hash(root_cell)!=root_hash)");
+            // }
+            // else
             {
                 MUTEX_INSPECTOR;
                 inBuffer in(root_cell);
@@ -440,11 +419,35 @@ REF_getter<root_data> getRoot(IDatabase *db)
                 r->unpack_mx(in);
             }
         }
-    }
-    else
-        logErr2("cannot read #root_hash#");
+        if(!err)
+        {
+    MUTEX_INSPECTOR;
+            std::string lb;
+            int err = db->getGranule("#last_block#", &lb);
+            if(!err && lb.size())
+            {
+    MUTEX_INSPECTOR;
+                last_block=new MsgData::BlockAcceptedREQ;
+                // last_block->unpack2
+                inBuffer in(lb);
+                last_block->unpack2(in);
+                // if(last_block->blockInfo->new_root_hash1!=root_hash)
+                //     throw CommonError("!!!!!!!!!!!!!!!!!!!!!!!!!!!! if(last_block->blockInfo->new_root_hash1!=root_hash)");
 
-    return r;
+            }
+            if(!err && lb.empty())
+            {
+    MUTEX_INSPECTOR;
+                // if(root_hash.container.size())
+                //     throw CommonError("!!!!!!!!@@@@@@@@@@@@@@@@ if(root_hash.container.size()) last block exists but root_hash not empty");
+            }
+        }
+
+    }
+    // else
+    //     logErr2("cannot read #root_hash#");
+
+    return {r,last_block};
 }
 #include <nlohmann/json.hpp>
 std::string bc_contract::dump()
@@ -524,32 +527,4 @@ std::string bc_values::dump()
         j["fees"].push_back(jj);
     }
     return j.dump(2);
-}
-std::string bc_epoch::dump() 
-{
-    nlohmann::json j;
-    // j["epoch"]=epoch.container;
-    // if(prev_block.size())
-    // {
-    //     inBuffer in(prev_block);
-    //     REF_getter<MsgData::BlockAcceptedREQ> lc=new MsgData::BlockAcceptedREQ();
-    //     lc->unpack2(in);
-    //     auto &jp=j["prev_lc"];
-    //     for(auto& z: lc->node_validators)
-    //     {
-    //         jp["signers"].push_back(z.container);
-    //     }
-    //     jp["aggsig"]=base16::encode(lc->agg_sig.serialize());
-    //     auto &hb=jp["hb"];
-    //     hb["block_timestamp"]=lc->blockInfo->heart_beat->block_timestamp;
-    //     hb["node_leader"]=lc->blockInfo->heart_beat->node_leader.container;
-    //     hb["epoch"]=lc->blockInfo->heart_beat->new_epoch.container;
-    //     hb["prev_root_hash"]=base16::encode(lc->blockInfo->heart_beat->prev_root_hash_1.container);
-    //     return j.dump(2);
-
-    //     // j["prev_lc"]["epoch"]=lc->
-    // }
-// BigInt epoch;
-// std::string prev_lc;
-    return "Values";
 }
