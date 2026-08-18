@@ -1,7 +1,5 @@
 #pragma once
 #include "IDatabase.h"
-#include <rocksdb/db.h>
-#include <rocksdb/utilities/checkpoint.h>
 #include <iostream>
 #include <ctime>
 #include "DBH.h"

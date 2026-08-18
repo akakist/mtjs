@@ -1,3 +1,4 @@
+#ifdef KALL
 #pragma once
 #include <cstdio>
 #include <ctime>
@@ -5,7 +6,6 @@
 #include "REF.h"
 #include "commonError.h"
 #include <sys/stat.h>
-#include <SQLiteCpp/Database.h>
 #include "QUORUM.h"
 #define TM_RADIX (3600)
 
@@ -141,3 +141,4 @@ struct DB_history : public Refcountable
         }
     }
 };
+#endif
