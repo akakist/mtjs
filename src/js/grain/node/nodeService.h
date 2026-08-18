@@ -6,7 +6,6 @@
 
 #include "listenerBuffered1Thread.h"
 #include <map>
-#include <rocksdb/db.h>
 #include "Events/System/Run/startServiceEvent.h"
 #include "Events/Tools/telnetEvent.h"
 #include "Events/Tools/webHandlerEvent.h"

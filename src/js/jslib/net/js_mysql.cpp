@@ -7,7 +7,6 @@ extern "C" {
 #include "quickjs.h"
 }
 
-#include <mariadb/mysql.h>
 #include "jsscope.h"
 
 #include "quickjs.h"

@@ -22,7 +22,7 @@ endif()
 
 if(APPLE)
 target_link_libraries(mtjs  node2-serviceS node-serviceS node3-serviceS node4-serviceS  node5-serviceS  node6-serviceS  nodeW-serviceS 
-     mtjsmoduleS mtjscommon    mtjsnet mtjsutils bctools  quickjs megatron-main   zsingle megatron-core   ${linuxlib}  yyjson ssh zstd lz4 bz2 snappy blst
+     mtjsmoduleS mtjscommon    mtjsnet mtjsutils bctools  quickjs megatron-main   zsingle megatron-core   ${linuxlib}  yyjson ssh  blst
 
 #curl  
 ${OPENSSL_LIBRARIES}
@@ -34,8 +34,8 @@ else()
 target_link_libraries(mtjs 
 #-static  
 -Wl,--start-group node2-serviceS node-serviceS node3-serviceS node4-serviceS node5-serviceS node6-serviceS nodeW-serviceS 
-     mtjsmoduleS mtjscommon     mtjsnet  mtjsutils bctools quickjs megatron-main   zsingle megatron-core sodium   rocksdb SQLiteCpp sqlite3  crypto  blst
-      ${linuxlib} yyjson zstd lz4 bz2 snappy
+     mtjsmoduleS mtjscommon     mtjsnet  mtjsutils bctools quickjs megatron-main   zsingle megatron-core sodium     crypto  blst
+      ${linuxlib} yyjson  
 
 #curl  psl idn2 unistring nghttp2
 ssl crypto

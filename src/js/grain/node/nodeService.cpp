@@ -40,7 +40,6 @@
 #include "unknown.h"
 #include "listenerBuffered1Thread.h"
 #include "t_params.h"
-#include <SQLiteCpp/Database.h>
 #include "__crc32.h"
 #include "init_root.h"
 #include "nodeService.h"
