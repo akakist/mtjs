@@ -175,13 +175,23 @@ struct bc_node: public data_base
         M_LOCK(parent->mx);
         return name_;
     }
-    BigInt get_full_stake()
+    BigInt get_full_stake_BN()
     {
         BigInt ret=0;
         M_LOCK(parent->mx);
         for(auto &z: stakes)
         {
             ret+=z.second;
+        }
+        return ret;
+    }
+    double get_full_stake_DBL()
+    {
+        double ret=0;
+        M_LOCK(parent->mx);
+        for(auto &z: stakes)
+        {
+            ret+=z.second.toDouble();
         }
         return ret;
     }
