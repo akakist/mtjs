@@ -18,8 +18,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     XTRY;
     stage_is_working=iUtils->getNow();
     auto prev_root_hash=prev_root_hash_Z();
-    auto &hbs = l_blocks[prev_root_hash].heart_beat_store;
-    auto &li = hbs.leader_info;
+    auto &li = l_blocks[prev_root_hash].leader_info;
     if (prev_root_hash != m->payload_heart_beat->prev_root_hash_1)
     {
         logNode("heat beat expired %s %s", prev_root_hash.str().c_str(), m->payload_heart_beat->prev_root_hash_1.str().c_str());
@@ -314,8 +313,8 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     stage_is_working=iUtils->getNow();
 
     auto prev_root_hash=prev_root_hash_Z();
-    auto &hbs = l_blocks[prev_root_hash].heart_beat_store;
-    auto &li = hbs.leader_info;
+    auto &li = l_blocks[prev_root_hash].leader_info;
+    // auto &li = hbs.leader_info;
     if (prev_root_hash != m->hb->prev_root_hash_1)
     {
         logNode("heat beat expired %s %s", prev_root_hash.str().c_str(), m->hb->prev_root_hash_1.str().c_str());
@@ -394,7 +393,7 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
     // auto prev_lc=prev_block;
     REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),prev_block.valid()?prev_block->getBuffer():"");
     // logNode("broadcast heart beat");
-    l_blocks[prev_root_hash_Z()].heart_beat_store.leader_info.leader_cert_2=hb_req;
+    l_blocks[prev_root_hash_Z()].leader_info.leader_cert_2=hb_req;
     broadcast_MsgEvent(lce.get());
 
     return hb_req;

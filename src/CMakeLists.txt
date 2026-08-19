@@ -169,7 +169,7 @@ include_directories(${CMAKE_BINARY_DIR} common)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fPIC -O3 -march=native  -DNDEBUG -g")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O3 -march=native  -DNDEBUG -g")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ")
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fPIC -O0 -g -fsanitize=address -fno-omit-frame-pointer")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O0 -g -fsanitize=address -fno-omit-frame-pointer")

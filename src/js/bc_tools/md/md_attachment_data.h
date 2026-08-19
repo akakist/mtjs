@@ -6,6 +6,21 @@
 struct EmitNode {
     std::vector<std::pair<std::string,std::string>> emits;                    // события на этом уровне
     std::map<std::string, EmitNode> children;          // дочерние узлы
+    size_t size()
+    {
+        size_t sz=0;
+        for(auto& z:emits)
+        {
+            sz+=z.first.size();
+            sz+=z.second.size();
+        }
+        for(auto& z: children)
+        {
+            sz+=z.first.size();
+            sz+=z.second.size();
+        }
+        return sz;
+    }
     void update(Blake2bHasher &b) const
     {
         for(auto &z:emits)
@@ -45,7 +60,22 @@ namespace MsgData
         std::map<ADDRESS_id,BigInt> fees;
         std::map<NODE_id,BigInt> rewards;
         // std::vector<std::string> emitted_events;
-
+        size_t size()
+        {
+            size_t sz=0;
+            sz+=blockRoot.size();
+            for(auto& z:fees)
+            {
+                sz+=z.first.addr.size();
+                sz+=z.second.toString().size();
+            }
+            for(auto& z:rewards)
+            {
+                sz+=z.first.container.size();
+                sz+=z.second.toString().size();
+            }
+            return sz;
+        }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;

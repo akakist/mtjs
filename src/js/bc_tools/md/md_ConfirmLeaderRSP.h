@@ -18,6 +18,14 @@ namespace MsgData
         REF_getter<HeartBeatREQ> hb;
         // blst_cpp::Signature sig;
         NODE_id node_signer;
+        size_t size()
+        {
+            size_t sz=0;
+            sz+=node_signer.container.size();
+            if(hb.valid())
+                sz+=hb->size();
+            return sz;
+        }
         void update(Blake2bHasher& h) const
         {
             throw CommonError("unimp");

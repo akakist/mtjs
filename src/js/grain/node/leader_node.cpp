@@ -26,8 +26,8 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         THASH_id h = z->getHash();
         transaction_pool_of_leader.insert({h, z});
     }
-    auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
-    auto &li = hbs.leader_info;
+    auto &li = l_blocks[prev_root_hash_Z()].leader_info;
+    // auto &li = hbs.leader_info;
     if(iUtils->getNow()-li.TIMER_VALIDATE_BLOCK_DELAY_set < _1sec)
     {
         // logNode("TIMER_VALIDATE_BLOCK_DELAY_set is true, so do not reset timer");
@@ -113,7 +113,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         // if (!bt.blockInfo.valid())
         //     throw CommonError("if(!bt.block_payload.valid())");
         std::vector<blst_cpp::PublicKey> agg_pk;
-        auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
+        // auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
         // ba->leader_certificateZ = hbs.leader_info.leader_cert_2;
         std::set<std::string> nnn;
 
@@ -158,6 +158,12 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             // n->set_missed_rounds(0);
             // n->setDirty();
         }
+        std::string nodelist;
+        for(auto &z: bt.leader_info.HeartBeatRSP_m)
+        {
+            nodelist+=z.first.container+" ";
+        }
+        logNode("hb list %s",nodelist.c_str());
         XPASS;
     }
     XPASS;

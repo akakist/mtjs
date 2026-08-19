@@ -213,6 +213,7 @@ bool MTJS::Service::on_startService(const systemEvent::startService*)
     JS_SetContextOpaque(js_ctx, &opaque);
 
     sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(Timers::TIMER_POLL,NULL,NULL,pending_timeout,this));
+    sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(Timers::TIMER_REPORT_MEM,NULL,NULL,30.,this));
 #ifdef WEBDUMP
     sendEvent(ServiceEnum::WebHandler, new webHandlerEvent::RegisterDirectory("mem","Memleaks"));
 
