@@ -35,7 +35,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         li.HeartBeatRSP_m.insert_or_assign(m->node_signer, m);
     }
 
-    BigInt hb_staked = 0;
+    double hb_staked = 0;
     if (iUtils->getNow() > li.confirm_leader_sent + _1sec)
     {
         bool matched = true;
@@ -46,18 +46,18 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
             for (auto &z : li.HeartBeatRSP_m)
             {
                 auto nn = root->getNode(z.second->node_signer,db_state.get());
-                hb_staked += nn->get_full_stake();
+                hb_staked += nn->get_full_stake_DBL();
             }
         }
     }
-    BigInt total_staked=0;
+    double total_staked=0;
     
     auto nn=root->getAllNodes(db_state.get());
     for(auto& z: nn)
     {
-        total_staked+=z->get_full_stake();
+        total_staked+=z->get_full_stake_DBL();
     }
-    auto pers = (hb_staked.toDouble()) / total_staked.toDouble();
+    auto pers = hb_staked / total_staked;
 
     if (pers > QUORUM && (iUtils->getNow() > li.confirm_leader_sent+ _1sec))
     {
@@ -337,7 +337,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     {
         li.ConfirmLeaderRSP_m.insert_or_assign(m->node_signer, m);
     }
-    BigInt hb_staked = 0;
+    double hb_staked = 0;
     {
         // blst_cpp::AggregateSignature sig_agg;
         // std::vector<blst_cpp::PublicKey> pk_agg;
@@ -350,16 +350,16 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
             // sig_agg.add(z.second->sig);
             auto nn = root->getNode(z.second->node_signer,db_state.get());
             // pk_agg.push_back(nn->get_bls_pk());
-            hb_staked += nn->get_full_stake();
+            hb_staked += nn->get_full_stake_DBL();
         }
     }
-    BigInt total_staked;
+    double total_staked;
     auto nn=root->getAllNodes(db_state.get());
     for(auto &n:nn)
     {
-        total_staked+=n->get_full_stake();
+        total_staked+=n->get_full_stake_DBL();
     }
-    auto pers = (hb_staked.toDouble()) / total_staked.toDouble();
+    auto pers = hb_staked / total_staked;
     // logNode("ConfirmLeaderRSP hb staked %lf",pers);
 
     if (pers > QUORUM)

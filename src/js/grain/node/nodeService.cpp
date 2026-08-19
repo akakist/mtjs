@@ -622,7 +622,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
 {
     MUTEX_INSPECTOR;
 
-    BigInt total_staked=0;
+    double total_staked=0;
     auto nn=root->getAllNodes(db_state.get());
     for(auto& n:nn)
     {
@@ -636,13 +636,13 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
         {
             ns.insert(z);
             auto n=root->getNode(z,db_state.get());
-            total_staked+=n->get_full_stake();
+            total_staked+=n->get_full_stake_DBL();
         }
         for(auto& z:local_prev_block->node_validators)
         {
             auto n=root->getNode(z,db_state.get());
             // n->get_full_stake();
-            auto portion=n->get_full_stake()*b.node_rewards/total_staked;
+            auto portion=n->get_full_stake_DBL()*b.node_rewards/total_staked;
             auto u = root->getAddressState(n->get_owner(),NULL,db_state.get());
             {
                 M_LOCK(u->parent->mx);
@@ -742,7 +742,7 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
     {
         MUTEX_INSPECTOR;
         std::vector<blst_cpp::PublicKey> agg_pk;
-        BigInt stake;
+        double stake;
         for (auto &z : lc->node_validators)
         {
             auto n = root->getNode(z,db_state.get());
@@ -753,15 +753,15 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
 
             }
             agg_pk.push_back(n->get_bls_pk());
-            stake += n->get_full_stake();
+            stake += n->get_full_stake_DBL();
         }
         auto nn=root->getAllNodes(db_state.get());
-        BigInt ts = 0;
+        double ts = 0;
         for(auto &z: nn)
         {
-            ts+=z->get_full_stake();
+            ts+=z->get_full_stake_DBL();
         }
-        if (stake.toDouble() < ts.toDouble() * QUORUM)
+        if (stake < ts * QUORUM)
         {
             logErr2("verify lc quorum failed");
             return false;

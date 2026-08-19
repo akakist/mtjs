@@ -1,7 +1,7 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 import { sleep } from "os";
-const node = "127.0.0.1:2301";
+const node = "127.0.0.1:2300";
 let sk = std.getenv('k_root_ed_sk');
 let root_pk = std.getenv('k_root_ed_pk');
 // let u0 = std.getenv('k_u0_ed_pk');
