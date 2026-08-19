@@ -7,6 +7,7 @@ namespace Timers
         TIMER_INTERVAL=101,
         TIMER_POLL=102,
         TIMER_ClientMsg_TIMEDOUT=103,
+        TIMER_REPORT_MEM=104,
 
     };
 

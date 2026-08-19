@@ -28,18 +28,20 @@ namespace MsgData
         std::string tx_body;
         std::string pk_ed_bin;
         std::string sig_ed_bin;
-        // uint64_t nonce;
-        // BigInt gasLimit;
-        // BigInt value;
         yyjson_doc *doc=nullptr;
-        // yyjson::Value root;
-
+        size_t size()
+        {
+            size_t sz=0;
+            sz+=tx_body.size();
+            sz+=pk_ed_bin.size();
+            sz+=sig_ed_bin.size();
+            return sz;
+        }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
             b<<tx_body<<pk_ed_bin<<sig_ed_bin;
-            // <<nonce<<gasLimit<<value;
 
         }
         void unpack(inBuffer& b) final
@@ -49,9 +51,6 @@ namespace MsgData
             b>>tx_body>>pk_ed_bin>>sig_ed_bin;
 
             doc=yyjson_read(tx_body.data(),tx_body.size(),0);
-            // doc.read(tx_body);
-            // root=doc.root();
-            // >>nonce>>gasLimit>>value;
         }
         void update(Blake2bHasher &h) const
         {
@@ -59,9 +58,6 @@ namespace MsgData
             // throw CommonError("unimpl");
             h.update(tx_body);
             h.update(pk_ed_bin);
-            // h.update(std::to_string(nonce));
-            // h.update(gasLimit.toString());
-            // h.update(value.toString());
         }
         std::optional<std::string> getNonce(uint64_t & nonce)
         {

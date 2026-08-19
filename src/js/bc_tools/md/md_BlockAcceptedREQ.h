@@ -19,6 +19,18 @@ namespace MsgData
         void update(Blake2bHasher& h) const;
         void pack(outBuffer& b) const final;
         void unpack(inBuffer& b) final;
+        size_t size()
+        {
+            size_t sz=0;
+            if(blockInfo.valid())
+                sz+blockInfo->size();
+            
+            for(auto &z: node_validators)
+                sz+=z.container.size();
+            sz+=agg_sig.serialize().size();
+
+            return sz;
+        }
     };
 
 }

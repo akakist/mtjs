@@ -19,6 +19,16 @@ namespace MsgData
         THASH_id attachment_hash;
         THASH_id tx_hash;
         REF_getter<HeartBeatREQ> heart_beat;
+        size_t size()
+        {
+            size_t sz=0;
+            sz+=new_root_hash1.container.size();
+            sz+=attachment_hash.container.size();
+            sz+=tx_hash.container.size();
+            if(heart_beat.valid())
+            sz+=heart_beat->size();
+            return sz;
+        }
         void dump(nlohmann::json& j)
         {
             j["new_root_hash1"]=new_root_hash1.str();
@@ -26,7 +36,7 @@ namespace MsgData
             j["tx_hash"]=tx_hash.str();
             
             if(heart_beat.valid())
-                heart_beat->dump(j);
+                heart_beat->dump(j["heart_beat"]);
             
         }
         void update(Blake2bHasher& h) const

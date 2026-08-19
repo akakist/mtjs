@@ -59,8 +59,8 @@ namespace Node
         TIMER_RESTART_BLOCK,
         TIMER_PERIODIC_CLOCK,
         TIMER_VALIDATE_BLOCK_DELAY,
-        TIMER_SYNC_TIMEDOUT
-        // TIMER_LC_REQ_TIMEDOUT
+        TIMER_SYNC_TIMEDOUT,
+        TIMER_REPORT_MEM
     };
     struct heart_beat_node_info
     {
@@ -78,7 +78,38 @@ namespace Node
         std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > ConfirmLeaderRSP_m;
         std::set<NODE_id> transaction_responders;
         uint64_t request_for_transactions_time=0;
-
+        size_t size()
+        {
+            size_t sz=0;
+            sz+=sizeof(TIMER_VALIDATE_BLOCK_DELAY_set);
+            sz+=sizeof(request_for_transactions_sent);
+            sz+=sizeof(confirm_leader_sent);
+            sz+=sizeof(request_for_transactions_time);
+            if(leader_cert_2.valid())
+                sz+=leader_cert_2->size();
+            for(auto &z: HeartBeatRSP_m)
+            {
+                sz+=z.first.container.size();
+                sz+=z.second->size();
+            }
+            for(auto &z: ConfirmLeaderRSP_m)
+            {
+                sz+=z.first.container.size();
+                sz+=z.second->size();
+            }
+            for(auto &z: transaction_responders)
+            {
+                sz+=z.container.size();
+            }
+            
+            return sz;
+        }
+        void dump(nlohmann::json& j)
+        {
+            j["HeartBeatRSP_m_SZ"]=HeartBeatRSP_m.size();
+            j["ConfirmLeaderRSP_m_SZ"]=ConfirmLeaderRSP_m.size();
+            j["transaction_responders_SZ"]=transaction_responders.size();
+        }
         // void clear__1()
         // {
         //     request_for_transactions_sent=false;
@@ -91,7 +122,6 @@ namespace Node
     };
     struct heart_beat_info
     {
-        heart_beat_node_info leader_info;
     };
     class Service:
         public UnknownBase,
@@ -179,12 +209,56 @@ namespace Node
             std::map<THASH_id /*blockinfo hash*/,REF_getter<MsgData::BlockInfo> > blockInfo;
             std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >responses;
             int64_t block_accepted_sent=0;
-            heart_beat_info    heart_beat_store;
+            // heart_beat_info    heart_beat_store;
+            heart_beat_node_info leader_info;
+            size_t size()
+            {
+                size_t sz=0;
+                for(auto& z: blockInfo)
+                {
+                    sz+=z.first.container.size();
+                    sz+=z.second->size();
+                }
+                for(auto& z: responses)
+                {
+                    sz+=z.first.container.size();
+                    for(auto& x: z.second)
+                    {
+                        sz+=x->size();
+
+                    }
+                }
+                sz+=sizeof(block_accepted_sent);
+                sz+=leader_info.size();
+                return sz;
+            }
+            void dump(nlohmann::json &j)
+            {
+                j["blockInfo_SZ"]=blockInfo.size();
+                j["responses"]=responses.size();
+                // for(auto& z:blockInfo)
+                // {
+                //     z.second->dump(j["blockInfo"][base16::encode(z.first.container)]);
+                // }
+                // int idx=0;
+                // for(auto& z:responses)
+                // {
+                //     for(auto& x: z.second)
+                //     {
+                //         x->dump(j["responses"][base16::encode(z.first.container)][std::to_string(idx++)]);
+                //     }
+                //     // nlohmann::json jj;
+
+                // }
+                // j["block_accepted_sent"]=block_accepted_sent;
+                // leader_info.
+
+            }
+
         };
         _db_to_save db_to_save_Z;
 
 
-        std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         
 
         struct block_client
@@ -193,6 +267,18 @@ namespace Node
             REF_getter<MsgData::attachment_data> att_data= nullptr;
 
             int64_t block_validated=0;
+            size_t size()
+            {
+                size_t sz=0;
+                if(blockDBStore.valid())
+                    sz+=blockDBStore->size();
+                if(att_data.valid())
+                    sz+=att_data->size();
+                sz+=sizeof(block_validated);
+
+                return sz;
+
+            }
         };
         struct client_leader_info
         {
@@ -200,17 +286,43 @@ namespace Node
             // NODE_id node_leader;
             int64_t heart_beat_sent=0;
             int64_t confirm_leader_sent=0;
+            size_t size()
+            {
+                size_t sz=0;
+                if(node_leader.valid())
+                    sz+=node_leader->size();
+                sz+=sizeof(heart_beat_sent);
+                sz+=sizeof(confirm_leader_sent);
+                return sz;
+            }
         };
 
         struct _sync
         {
             bool do_you_have_sent=false;
             std::set<NODE_id> havers;
+            size_t size()
+            {
+                size_t sz=0;
+                sz+=sizeof(do_you_have_sent);
+                for(auto &z: havers)
+                {
+                    sz+=z.container.size();
+                }
+                return sz;
+            }
+            void dump(nlohmann::json &j)
+            {
+                j["havers SZ"]=havers.size();
+            }
         };
         std::map<BLOCK_id, block_client> c_blocks;
         std::map<BLOCK_id,block_leader> l_blocks;
         std::map<BLOCK_id, client_leader_info> cli_leader_info;
         std::map<BLOCK_id,_sync> syncs;
+        std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
+        std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
+        std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
 
         BLOCK_id prev_root_hash_Z()
         {
@@ -231,10 +343,8 @@ namespace Node
         State state_Z=STATE_NORMAL;
         int64_t stage_is_working = 0;
         uint64_t last_activity_time=0;
-        std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         int64_t node_start_timestamp=0;
         int64_t seqId2=0;
-        std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         void clear()
         {
             c_blocks.clear();
@@ -273,6 +383,7 @@ namespace Node
 
         std::optional<std::string> execute_tx_commands(b_params &b, t_params& t, 
              yyjson_val * j_tx);
+        void report_mem();
 
         REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;
@@ -305,20 +416,35 @@ namespace Node
 
         JSRuntime *contract_runtime=NULL;
 
-            void dump(nlohmann::json &j)
-            {
-                // msgFactory.dump(j["msgFactory"]);
-                j["db_name"]=db_name;
-                j["my_sk_bls_env_key"]=base16::encode(my_sk_bls_env_key);
-                j["my_sk_ed_env_key"]=base16::encode(my_sk_ed_env_key);
-                j["this_node_name"]=this_node_name.container;
-                j["state_Z"]=state_Z;
-                j["prev_root_hash_Z"]=base16::encode(prev_root_hash_Z().container);
-                j["my_sk_bls_key"]=base16::encode(my_sk_bls.serialize());
-                j["my_sk_ed_key"]=base16::encode(my_sk_ed);
-                j["telnet_data_path"]=telnet_data_path;
+        void dump(nlohmann::json &j)
+        {
+            j["msgFactory.registry.size()"]=msgFactory.registry.size();
+            j["c_blocks.size()"]=c_blocks.size();
+            j["l_blocks.size()"]=l_blocks.size();
+            j["cli_leader_info.size()"]=cli_leader_info.size();
+            j["syncs.size()"]=syncs.size();
 
+            size_t ft=0;
+            for(auto &z: filter_NodeMsgREQ)
+            {
+                for(auto& x:z.second)
+                {
+                    for(auto& y:x.second)
+                    {
+                        ft++;
+                    }
+                }
             }
+            j["filter_NodeMsgREQ"]=ft;
+            j["contracts size"]=contracts.size();
+        // std::map<BLOCK_id, block_client> c_blocks;
+        // std::map<BLOCK_id,block_leader> l_blocks;
+        // std::map<BLOCK_id, client_leader_info> cli_leader_info;
+        // std::map<BLOCK_id,_sync> syncs;
+        // std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
+        // std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
+
+        }
             
     };
 

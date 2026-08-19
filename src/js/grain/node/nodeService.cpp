@@ -102,6 +102,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         sendEvent(ServiceEnum::RPC, new rpcEvent::DoListen(z, sec));
     }
     sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 1., this));
+    sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_REPORT_MEM, NULL, NULL, 30., this));
 
     std::string res;
     // int err = db_state->getGranule("#root_hash#", &res);
@@ -168,8 +169,8 @@ void Node::Service::do_start_block()
         sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK, NULL, NULL, 0.5, this));
         return;
     }
-    auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
-    auto &li = hbs.leader_info;
+    auto &li = l_blocks[prev_root_hash_Z()].leader_info;
+    // auto &li = hbs.leader_info;
     {
         {
             // make_leader_certificate();
@@ -212,32 +213,65 @@ void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b)
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
-#ifdef KALL
-    if(e->tid==timers::TIMER_PERIODIC_CLOCK)
+    if(e->tid==timers::TIMER_REPORT_MEM)
     {
-        // logNode("if(e->tid==timers::TIMER_PERIODIC_CLOCK)");
-        auto diff=double(iUtils->getNow()-last_activity_time)/1000000.;
-
-        // logNode("idle time sec %lf",double(iUtils->getNow()-last_activity_time)/1000000.);
-        if(diff>3. )
+        report_mem();
+    }
+    return true;
+}
+void Node::Service::report_mem()
+{
+    size_t sz=0;
+    for(auto&z: c_blocks)
+    {
+        sz+=z.first.container.size();
+        sz+=z.second.size();
+    }
+    for(auto& z: l_blocks)
+    {
+        sz+=z.first.container.size();
+        sz+=z.second.size();
+    }
+    for(auto &z : cli_leader_info)
+    {
+        sz+=z.first.container.size();
+        sz+=z.second.size();
+    }
+    for(auto &z : syncs)
+    {
+        sz+=z.first.container.size();
+        sz+=z.second.size();
+    }
+    for(auto &z : filter_NodeMsgREQ)
+    {
+        sz+=z.first.container.size();
+        for(auto x: z.second)
         {
-            logNode("if(diff>2. && transaction_pool_of_leader.size())");
-            clear();
-            last_activity_time=iUtils->getNow();
-            root=getRoot(db_state.get());
-            init_root(root,db_state.get());
-            sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
-            sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
-            sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
-            sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
-
-            do_heart_beat();
+            sz+=sizeof(x.first);
+            for(auto y: x.second)
+            {
+                sz+=sizeof(y);
+            }
         }
 
-        // if(iUtils->getNow()-last_activity_time)
+        // sz+=z.second.size();
     }
-#endif
-    return true;
+    for(auto& z: transaction_pool_of_leader)
+    {
+        sz+=z.first.container.size();
+        sz+=z.second->size();
+    }
+    logNode("REPORT_MEM NodeService %ld",sz);
+        //     std::map<BLOCK_id, block_client> c_blocks;
+        // std::map<BLOCK_id,block_leader> l_blocks;
+        // std::map<BLOCK_id, client_leader_info> cli_leader_info;
+        // std::map<BLOCK_id,_sync> syncs;
+        // std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
+        // std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
+                // std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
+
+    // return sz;
+
 }
 bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 {
@@ -252,8 +286,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     {
         if (state_Z != STATE_NORMAL)
             return true;
-        auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
-        auto &li = hbs.leader_info;
+        auto &li = l_blocks[prev_root_hash_Z()].leader_info;
+        // auto &li = hbs.leader_info;
         do_start_block();
         logNode("do_start_block();");
         li.transaction_responders.clear();
@@ -271,8 +305,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     {
         if (state_Z != STATE_NORMAL)
             return true;
-        auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
-        auto &li = hbs.leader_info;
+        auto &li = l_blocks[prev_root_hash_Z()].leader_info;
+        // auto &li = hbs.leader_info;
         li.request_for_transactions_sent = true;
         do_request_for_transactions(li);
         return true;
@@ -485,15 +519,16 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
     HTTP::Response r(e->req);
     auto uri = (std::string)e->req->url;
     auto da = iUtils->splitString("/", uri);
-    auto c = getByPathNoCreate(root.get(), da, db_state.get());
-    if (!c.valid())
-    {
-        r.make_response("<pre> if(!c.valid()) </pre>");
-        return true;
-    }
-
-    auto buf = c->dump();
-    r.make_response("<pre>" + buf + "</pre>");
+    // auto c = getByPathNoCreate(root.get(), da, db_state.get());
+    // if (!c.valid())
+    // {
+    //     r.make_response("<pre> if(!c.valid()) </pre>");
+    //     return true;
+    // }
+    nlohmann::json j;
+    dump(j);
+    // auto buf = c->dump();
+    r.make_response("<pre>" + j.dump(2) + "</pre>");
     return true;
 }
 

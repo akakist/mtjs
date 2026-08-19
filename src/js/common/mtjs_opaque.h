@@ -33,6 +33,7 @@ struct mtjs_opaque
     std::map<std::string/*hash*/, JSValueGuard > node_tx_cb;
     std::optional<JSValueGuard> tx_subscription_cb;
 
+    
     void clear()
     {
         rcf=nullptr;

@@ -21,6 +21,21 @@ namespace MsgData
         REF_getter<BlockInfo> blockInfo;
         blst_cpp::Signature sig;
         NODE_id node_validator;
+        size_t size()
+        {
+            size_t sz=0;
+            sz+=node_validator.container.size();
+            sz+=sig.serialize().size();
+            if(blockInfo.valid())
+                sz+=blockInfo->size();
+            return sz;
+        }
+        void dump(nlohmann::json& j)
+        {
+            j["sig"]=base16::encode(sig.serialize());
+            j["node_validator"]=node_validator.container;
+            blockInfo->dump(j["blockInfo"]);
+        }
         void update(Blake2bHasher& h) const
         {
             blockInfo->update(h);

@@ -79,6 +79,7 @@ namespace MTJS
         void executePending();
 
         void checkForExit();
+        void report_mem();
 
 
     private:

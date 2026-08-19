@@ -13,6 +13,14 @@ namespace MsgData
         REF_getter<HeartBeatREQ> payload_heart_beat;
         NODE_id node_signer;
         // blst_cpp::Signature signature;
+        size_t size()
+        {
+            size_t sz=0;
+            sz+=node_signer.container.size();
+            if(payload_heart_beat.valid())
+                sz+=payload_heart_beat->size();
+            return sz;
+        }
         void update(Blake2bHasher& h) const
         {
             payload_heart_beat->update(h);

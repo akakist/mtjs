@@ -9,21 +9,24 @@ namespace MsgData
     {
 
         BlockDBStore():Base(msgid::BlockDBStore),
-            // att_data(new attachment_data),
             validateBlockREQ(new ValidateBlockREQ),
             blockAcceptedREQ(new BlockAcceptedREQ())
 
         {
 
         }
-        // BigInt epoch;
-        // REF_getter<attachment_data> att_data;
         REF_getter<ValidateBlockREQ> validateBlockREQ;
         REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
+        size_t size(){
+            size_t sz=0;
+            if(validateBlockREQ.valid())
+                sz+=validateBlockREQ->size();
+            if(blockAcceptedREQ.valid())
+                sz+=blockAcceptedREQ->size();
+            return sz;
+        }
         void update(Blake2bHasher& h) const
         {
-            // h.update(epoch.toString());
-            // att_data->update(h);
             validateBlockREQ->update(h);
             blockAcceptedREQ->update(h);
         }
@@ -32,8 +35,6 @@ namespace MsgData
             XTRY;
             MUTEX_INSPECTOR;
             Base::pack(b);
-            // b<<epoch;
-            // b<<att_data;
             b<<validateBlockREQ;
             b<<blockAcceptedREQ;
             XPASS;
@@ -43,8 +44,6 @@ namespace MsgData
             XTRY;
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            // b>>epoch;
-            // b>>att_data;
             b>>validateBlockREQ;
             b>>blockAcceptedREQ;
             XPASS;

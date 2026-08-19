@@ -101,12 +101,28 @@ UnknownBase *MTJS::Service::construct(const SERVICE_id &id, const std::string &n
 
 #define CONFIG_MODULE_SUPPORT 1
 #include <quickjs.h>
+#include <malloc.h>
+#include <stdio.h>
 
+void print_mem_stats() {
+    struct mallinfo2 mi = mallinfo2();
+    
+    printf("=== Memory Stats ===\n");
+    printf("Занято приложением:  %zu MB\n", mi.uordblks / 1024 / 1024);
+    printf("Свободно в куче:     %zu MB\n", mi.fordblks / 1024 / 1024);
+    printf("Куча от ОС (brk):    %zu MB\n", mi.arena / 1024 / 1024);
+    printf("Память через mmap:   %zu MB\n", mi.hblkhd / 1024 / 1024);
+    printf("Можно вернуть ОС:    %zu MB\n", mi.keepcost / 1024 / 1024);
+    printf("====================\n");
+}
 void dump_memory_usage(JSRuntime *runtime)
 {
     JSMemoryUsage mem_usage;
     JS_ComputeMemoryUsage(runtime, &mem_usage);      // Заполняем структуру статистики
     JS_DumpMemoryUsage(stdout, &mem_usage, runtime); // Выводим в консоль
+
+    printf("\n");
+    print_mem_stats();
 }
 
 void MTJS::Service::load_config()
@@ -343,7 +359,14 @@ bool MTJS::Service::TickTimer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
     JSScope<10, 10> scope(js_ctx);
-    if (e->tid == Timers::TIMER_INTERVAL)
+    if (e->tid == Timers::TIMER_REPORT_MEM)
+    {
+        printf("REPORT_MEM MTJS ");
+        dump_memory_usage(js_rt);
+        printf("\n");
+        return true;
+    }
+    else if (e->tid == Timers::TIMER_INTERVAL)
     {
         MUTEX_INSPECTOR;
         TimerTask *t = (TimerTask *)e->cookie.get();
@@ -666,4 +689,8 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     }
     XPASS;
     return true;
+}
+void MTJS::Service::report_mem()
+{
+
 }
