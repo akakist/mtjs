@@ -451,9 +451,6 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
     my_sk_ed_env_key = ins->getConfig()->get_string("my_sk_ed_env_key", "sk_ed_env_key", "env key of ed key");
     this_node_name.container = ins->getConfig()->get_string("this_node_name", "n0", "registered name of node");
 
-    // db_user=ins->getConfig()->get_string2("db_user", "root", "mariadb db user");
-    // db_password=ins->getConfig()->get_string2("db_password", "123", "mariadb db password");
-    // db_socket=ins->getConfig()->get_string2("db_socket", "", "mariadb db socket");
     db_name=ins->getConfig()->get_string2("db_name", "grain", "db name");
     contract_runtime=JS_NewRuntime();
     node_start_timestamp=iUtils->getNow();
@@ -590,8 +587,6 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
 {
     MUTEX_INSPECTOR;
 
-    // auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
-    // logNode("calc_fee_rewards_nodes");
     BigInt total_staked=0;
     auto nn=root->getAllNodes(db_state.get());
     for(auto& n:nn)
@@ -704,36 +699,11 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
 
     return distLeft < distRight;
 }
-// bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id &nodeRight)
-// {
-//     if (nodeLeft == nodeRight)
-//         return true;
-//     auto nv = root->getAllNodes(db_state.get());
-//     std::sort(nv.begin(),nv.end(),[](const REF_getter<bc_node>&a,const REF_getter<bc_node>&b)
-//     {
-//        return a->getName()<b->getName(); 
-//     });
-//     {
-//         int crc = __crc32(0, prev_root_hash_Z.container.data(), prev_root_hash_Z.container.size());
-//         int idx = crc % nv.size();
-
-//         int npoz = -1;
-//         int tpoz = -1;
-//         for (int i = 0; i < nv.size(); i++)
-//         {
-//             if (nodeLeft == nv[i]->getName())
-//                 npoz = i;
-//             if (nodeRight == nv[i]->getName())
-//                 tpoz = i;
-//         }
-        
-//         return abs(idx - npoz) < abs(idx - tpoz);
-//     }
-//     return 0;
-// }
 bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
 {
     /// проверка сертификата лидера
+    if(!lc.valid())
+        return false;
     {
         MUTEX_INSPECTOR;
         std::vector<blst_cpp::PublicKey> agg_pk;

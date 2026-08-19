@@ -82,7 +82,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         else
         {
-            // logNode("block verified OK");
         }
         XPASS;
     }
@@ -117,12 +116,9 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(c.blockDBStore, c.att_data, this));
 
     prev_block=r;
-    // prev_root_hash_Z = r->blockInfo->new_root_hash1;
     l_blocks.clear();
     cli_leader_info.clear();
     do_InvalidateRoot();
-
-    // iUtils->getNow();
 
     for (auto &z : c.blockDBStore->validateBlockREQ->transaction_bodies)
     {
@@ -159,9 +155,10 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
         return true;
     }
     auto prev_root_hash=prev_root_hash_Z();
-    if(cli_leader_info[prev_root_hash].node_leader->node_leader!=src_node)
+    auto & cli=cli_leader_info[prev_root_hash];
+    if(cli.node_leader->node_leader!=src_node)
     {
-        logNode("GetTransaction invalid leader #14  my %s remote %s", cli_leader_info[prev_root_hash].node_leader->node_leader.container.c_str(), src_node.container.c_str());
+        logNode("GetTransaction invalid leader #14  my %s remote %s", cli.node_leader->node_leader.container.c_str(), src_node.container.c_str());
         return true;
     }
 
@@ -195,6 +192,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         return true;
     b_params t(root,db_state.get());
     bool err = false;
+    
     if(cli_leader_info[prev_root_hash].node_leader->node_leader!=src_node)
     {
         logNode("invalid leader #15");
@@ -212,15 +210,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             logNode("cert node leader mismatched");
         }
     }
-
-    // if (!err && ! verify_block(r->leader_cert))
-    // {
-    //     err = true;
-    //     t.emit_block("error", R"({"code":-32602,"error":"verify_block failed"})");
-    //     // t.att_data->block_report = {1, "verify_block failed"};
-    //     logNode("verify_block failed");
-    // }
-
     if (!err && r->heart_beat->prev_root_hash_1 != prev_root_hash)
     {
 
@@ -228,7 +217,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         {
             t.emit_block("error", R"({"code":-32602,"error":"epoch invalid"})");
             err = true;
-            logNode("if (root->getEpoch()->epoch+1 < r->leader_cert->heart_beat->new_epoch)");
+            logNode("if (epoch_current() != r->heart_beat->new_epoch)");
             // setBlockId(r->leader_cert->heart_beat->prev_root_hash);
             // return true;
         }
