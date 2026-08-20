@@ -17,6 +17,27 @@
 #include "CONTRACT_DATA_id.h"
 #include "md/md_BlockAcceptedREQ.h"
 // #include <ostringstream>
+struct bc_nodelist:  public data_base
+{
+
+    bc_nodelist(Cellable *p):data_base(hsh::bc_nodelist,p, 0,-1) {}
+    std::set<NODE_id> list;
+    void pack(outBuffer&b) const final
+    {
+        data_base::pack(b);
+        b<<1;
+        b<<list;
+
+    }
+    void unpack(inBuffer&b) final
+    {
+        data_base::unpack(b);
+        auto v=b.get_PN();
+        b>>list;
+
+    }
+    std::string dump(){return "";}
+};
 
 struct bc_contract:  public data_base
 {
@@ -292,29 +313,6 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
 
 };
 
-// struct bc_epoch: public data_base
-// {
-
-//     bc_epoch(Cellable* p): data_base(hsh::bc_epoch,p,0,-1) {
-//     }
-//     REF_getter<MsgData::BlockAcceptedREQ> prev_block;
-//     void pack(outBuffer& o) const final
-//     {
-//         data_base::pack(o);
-//         o<<1;
-//         // o<<epoch;
-//         o<<prev_block;
-//     }
-//     void unpack(inBuffer& o) final
-//     {
-//         data_base::unpack(o);
-//         auto v=o.get_PN();
-//         // o>>epoch;
-//         o>> prev_block;
-//     }
-//     std::string dump() final;
-
-// };
 
 REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string>& v, IDatabase* db, Rollback* roll);
 REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db,Rollback*);
@@ -329,27 +327,27 @@ struct root_data: public Cellable
     {
     }
     Mutex state_mutex;
+    
+    std::vector<std::string> getPath(const std::string& name);
+
 
     std::vector<std::string> getContractPath(const CONTRACT_id &name);
     std::vector<std::string> getContractDataPath(const CONTRACT_DATA_id &name);
     std::vector<std::string> getNodePath(const NODE_id &name);
+
+
     std::vector<std::string> getUserPath(const ADDRESS_id &addr);
     std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
 
     REF_getter<bc_contract> getContract(const CONTRACT_id &name,IDatabase* db);
-    REF_getter<bc_contract> addContract(const CONTRACT_id &name, uint64_t epoch,Rollback*,IDatabase* db);
+    REF_getter<bc_contract> addContract(const CONTRACT_id &name, Rollback*,IDatabase* db);
 
     REF_getter<bc_contract_data> getContractData(const CONTRACT_DATA_id &name,IDatabase* db);
-    REF_getter<bc_contract_data> addContractData(const CONTRACT_DATA_id &name,  uint64_t epoch,Rollback*,IDatabase* db);
+    REF_getter<bc_contract_data> addContractData(const CONTRACT_DATA_id &name,  Rollback*,IDatabase* db);
 
     REF_getter<bc_values> getValues(Rollback*,IDatabase* db);
     REF_getter<bc_values> checkValues(IDatabase* db);
 
-    // REF_getter<bc_epoch> getEpoch(Rollback* roll,IDatabase* db);
-
-
-
-    // REF_getter<bc_user> getUser(const ADDRESS_id &pk);
 
     REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk,Rollback*,IDatabase* db);
     REF_getter<bc_address_state>   checkUserState(const ADDRESS_id &pk,IDatabase* db);
@@ -360,11 +358,12 @@ struct root_data: public Cellable
 
 
     REF_getter<bc_node> getNode(const NODE_id &name,IDatabase* db);
-    REF_getter<bc_node> addNode(const NODE_id &name, uint64_t epoch, Rollback*,IDatabase* db);
+    REF_getter<bc_node> addNode(const NODE_id &name, Rollback*,IDatabase* db);
+    REF_getter<bc_nodelist> getNodeListOrCreate(Rollback* roll,IDatabase* db);
+    REF_getter<bc_nodelist> getNodeListNoCreate(IDatabase* db);
 
 
 
 };
-// REF_getter<root_data> getRoot(IDatabase* db);
 std::pair<REF_getter<root_data>,REF_getter<MsgData::BlockAcceptedREQ>>  getRoot(IDatabase *db);
 

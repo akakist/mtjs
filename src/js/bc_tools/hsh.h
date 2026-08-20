@@ -7,6 +7,7 @@ namespace hsh
         bc_contract,
         bc_address_state,
         bc_node,
+        bc_nodelist,
         bc_values,
         // bc_epoch,
         bc_contract_data,

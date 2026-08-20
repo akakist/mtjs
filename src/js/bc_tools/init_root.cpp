@@ -24,7 +24,7 @@ void init_root(const REF_getter<root_data> &r, IDatabase* db)
             total+=z;
         }
         // v->total_staked=total;
-        v->setDirty(e,NULL);
+        v->setDirty(NULL);
     }
     // u_root pk
     if(!r->checkUserState(u_root_address,db).valid())
@@ -38,7 +38,7 @@ void init_root(const REF_getter<root_data> &r, IDatabase* db)
             M_LOCK(u->parent->mx);
             u->balance+=100000000;
         }
-        u->setDirty(e,NULL);
+        u->setDirty(NULL);
 
     }
 
@@ -61,12 +61,12 @@ void init_root(const REF_getter<root_data> &r, IDatabase* db)
         auto n=r->getNode(name,db);
         if(n.valid()) continue;
 
-        REF_getter<bc_node> nn=r->addNode(name,e,NULL,db);
+        REF_getter<bc_node> nn=r->addNode(name,NULL,db);
         blst_cpp::PublicKey bls_pk;
         bls_pk.deserializeHexStr(getenv2(keys[i].first));
         nn->init(name, u_root_address, bls_pk, base16::decode(getenv2(keys[i].second)), "127.0.0.1:"+std::to_string(2300+i));
         nn->add_stake(u_root_address, 100*i);
-        nn->setDirty(e,NULL);
+        nn->setDirty(NULL);
         // r->;
 
     }

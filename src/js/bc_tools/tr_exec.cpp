@@ -37,7 +37,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
         u->balance+=amount;
     }
     // u->addBalance(amount);
-    u->setDirty(t.epoch,t.roll);
+    u->setDirty(t.roll);
     // b.addCalcer(u.get(),by);
 
     t.gasUsed+=v->getGas("mint");
@@ -100,8 +100,8 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
         to->balance+=amount;
     }
     // to->addBalance(amount);
-    u->setDirty(t.epoch,t.roll);
-    to->setDirty(t.epoch,t.roll);
+    u->setDirty(t.roll);
+    to->setDirty(t.roll);
     t.gasUsed+=v->getGas("transfer");
 
 
@@ -149,8 +149,8 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     }
 
 
-    nn->setDirty(t.epoch,t.roll);
-    us->setDirty(t.epoch,t.roll);
+    nn->setDirty(t.roll);
+    us->setDirty(t.roll);
 
 
     t.gasUsed+=v->getGas("node_update");
@@ -188,7 +188,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
         return "if(!us.valid())";
 
 
-    auto n = t.root->addNode(name, t.epoch,t.roll,b.db);
+    auto n = t.root->addNode(name, t.roll,b.db);
 
     std::string ip,pk_ed,pk_bls;
     err=yy_get_string(params,"ip",ip);
@@ -204,8 +204,8 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
         t.senderAddress, 
         bls, 
         base16::decode(pk_ed), ip);
-    n->setDirty(t.epoch,t.roll);
-    us->setDirty(t.epoch,t.roll);
+    n->setDirty(t.roll);
+    us->setDirty(t.roll);
 
 
 
@@ -255,8 +255,8 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
         amount.toString().c_str(),
         base16::encode(t.senderAddress.addr).c_str()
     );
-    n->setDirty(t.epoch,t.roll);
-    us->setDirty(t.epoch,t.roll);
+    n->setDirty(t.roll);
+    us->setDirty(t.roll);
 
     return std::nullopt;
 }
@@ -293,9 +293,9 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
 
     n->sub_stake(t.senderAddress, amount);
 
-    v->setDirty(t.epoch,t.roll);
-    n->setDirty(t.epoch,t.roll);
-    u->setDirty(t.epoch,t.roll);
+    v->setDirty(t.roll);
+    n->setDirty(t.roll);
+    u->setDirty(t.roll);
 
     t.gasUsed+=v->getGas("node_unstake");
 
@@ -330,7 +330,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     // if (!us.valid())
     //     return "if(!us.valid())";
     n->reset_missed_rounds();
-    n->setDirty(t.epoch,t.roll);
+    n->setDirty(t.roll);
 
     t.gasUsed+=v->getGas("node_enable");
 
@@ -373,7 +373,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
         return "if(!us.valid())";
 
 
-    auto n = t.root->addContract(cn, t.epoch,t.roll,b.db);
+    auto n = t.root->addContract(cn, t.roll,b.db);
 
     std::string src;
      err=yy_get_string(params,"src",src);
@@ -385,8 +385,8 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
         n->owner=t.senderAddress;
     }
 
-    n->setDirty(t.epoch,t.roll);
-    us->setDirty(t.epoch,t.roll);
+    n->setDirty(t.roll);
+    us->setDirty(t.roll);
 
     t.gasUsed+=v->getGas("contract_deploy");
 
@@ -428,8 +428,8 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
         n->src=src;
     }
 
-    n->setDirty(t.epoch,t.roll);
-    us->setDirty(t.epoch,t.roll);
+    n->setDirty(t.roll);
+    us->setDirty(t.roll);
 
     t.gasUsed+=v->getGas("contract_update");
 

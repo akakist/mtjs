@@ -90,7 +90,7 @@ struct t_params
         if(nn.valid())
         {
             nodes[n]=nn;
-            nn->setDirty(epoch, roll);
+            nn->setDirty(roll);
         }
         return nn;
     }
@@ -105,7 +105,7 @@ struct t_params
         if(nn.valid())
         {
             addrs[n]=nn;
-            nn->setDirty(epoch,roll);
+            nn->setDirty(roll);
         }
         return nn;
     }

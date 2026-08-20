@@ -29,30 +29,30 @@ struct data_base : public Refcountable
     time_t create_time=0;
     int ttl=-1;
 
-    uint64_t last_update_epoch;
+    // uint64_t last_update_epoch;
 
     data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
         type(t), parent(_parent), create_time(_create_time),ttl(_ttl) {
-            last_update_epoch=0;
+            // last_update_epoch=0;
         }
     ~data_base()
     {
     }
-    void setDirty(uint64_t epoch, Rollback* roll);
+    void setDirty(Rollback* roll);
 ;
     virtual void pack(outBuffer& o) const
     {
         o<<1;
         o<<type;
         o<<create_time<<ttl;
-        o<<last_update_epoch;
+        // o<<last_update_epoch;
     }
     virtual void unpack(inBuffer& in)
     {
         int ver=in.get_PN();
         in>>type;
         in>>create_time>>ttl;
-        in>>last_update_epoch;
+        // in>>last_update_epoch;
     }
     std::string getBuffer()
     {
@@ -86,7 +86,7 @@ struct Cellable: public Refcountable
     const std::string m_id;
 
     /// @brief  выставляется только в потоке ноды, мутекс не нужен
-    size_t last_size=0;
+    // size_t last_size=0;
 
     std::map<std::string,THASH_id > children_hashes_mx;
     std::map<std::string, REF_getter<Cellable>> children_ptrs_mx;
@@ -99,12 +99,12 @@ struct Cellable: public Refcountable
 public:
     /// @brief выставляется и читается в потоке ноды, мутекс не нужен.
     bool is_dirty=false;
-    uint64_t last_update_epoch;
+    // uint64_t last_update_epoch;
 
     Cellable(Cellable* _parent, const std::string & id):Refcountable("cellable"),  parent(_parent), m_id(id)
     {
     }
-    void setDirty__(uint64_t epoch, Rollback* r)
+    void setDirty__(Rollback* r)
     {
     MUTEX_INSPECTOR;
         {
@@ -117,14 +117,14 @@ public:
                     r->data[this]=getBuffer_mx();
             }
             is_dirty=true;
-            last_update_epoch=epoch;
+            // last_update_epoch=epoch;
 
         }
         // if(bc.valid())
         //     calcers_Z.insert(bc);
         if(parent)
         {
-            parent->setDirty__(epoch,r);
+            parent->setDirty__(r);
         }
     }
     std::string dump();
@@ -154,7 +154,7 @@ public:
         o<<1;
         // o<<m_id;
         o<<payload_ctor_idx;
-        o<<last_update_epoch;
+        // o<<last_update_epoch;
         {
             // MutexLocker lk(mx);
             o<<children_hashes_mx;
@@ -170,7 +170,7 @@ public:
         int v=in.get_PN();
         // in>>m_id;
         in>>payload_ctor_idx;
-        in>>last_update_epoch;
+        // in>>last_update_epoch;
         {
             // MutexLocker lk(mx);
             in>>children_hashes_mx;
@@ -219,22 +219,22 @@ public:
 //     "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
 //     "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"
 // };
-inline void appendRelativeInternalPath(std::vector<std::string>&vs, const std::string & k, int depth2)
-{
-    MUTEX_INSPECTOR;
-    if(k.size()<depth2)
-    {
-        throw CommonError("if(k.size()<depth2)");
-    }
-    int i=0;
-    for(i=0; i<depth2; i++)
-    {
-        vs.push_back(k.substr(i, 1));
-    }
-    if(k.size()>depth2)
-    {
-        vs.push_back(k.substr(depth2));
-    }
-}
+// inline void appendRelativeInternalPath(std::vector<std::string>&vs, const std::string & k, int depth2)
+// {
+//     MUTEX_INSPECTOR;
+//     if(k.size()<depth2)
+//     {
+//         throw CommonError("if(k.size()<depth2)");
+//     }
+//     int i=0;
+//     for(i=0; i<depth2; i++)
+//     {
+//         vs.push_back(k.substr(i, 1));
+//     }
+//     if(k.size()>depth2)
+//     {
+//         vs.push_back(k.substr(depth2));
+//     }
+// }
 
 

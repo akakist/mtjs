@@ -601,7 +601,7 @@ BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
                     {
                         u->incNonce();
                     }
-                    u->setDirty(epoch_current(),NULL);
+                    u->setDirty(NULL);
 
                 }
             }
@@ -648,7 +648,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
                 M_LOCK(u->parent->mx);
                 u->balance+=portion;
             }
-            u->setDirty(epoch_current(),NULL);
+            u->setDirty(NULL);
             b.emit_block("reward",R"({"node":"%s","fee":"%s"})",z.container.c_str(),portion.toString().c_str());
         }
         
