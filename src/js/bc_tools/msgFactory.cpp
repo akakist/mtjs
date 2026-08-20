@@ -9,7 +9,7 @@
 #include "md/md_BlockAcceptedREQ.h"
 #include "md/md_GetSavedBlocksREQ.h"
 #include "md/md_GetSavedBlocksRSP.h"
-#include "md/md_DoHeartBeatREQ.h"
+
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
 #include "md/md_TX.h"
@@ -18,8 +18,8 @@
 #include "md/md_LcEnvelopeREQ.h"
 #include "md/md_DoYouHaveBlockREQ.h"
 #include "md/md_DoYouHaveBlockRSP.h"
-#include "md/md_LcREQ.h"
-#include "md/md_LcRSP.h"
+
+
 #include "md/md_DelayNotificationREQ.h"
 
 

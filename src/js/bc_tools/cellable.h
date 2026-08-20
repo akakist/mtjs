@@ -60,7 +60,7 @@ struct data_base : public Refcountable
         pack(o);
         return o.asString()->container;
     }
-    virtual std::string dump()=0;
+    // virtual std::string dump()=0;
 
 };
 
@@ -117,17 +117,12 @@ public:
                     r->data[this]=getBuffer_mx();
             }
             is_dirty=true;
-            // last_update_epoch=epoch;
-
         }
-        // if(bc.valid())
-        //     calcers_Z.insert(bc);
         if(parent)
         {
             parent->setDirty__(r);
         }
     }
-    std::string dump();
 
     REF_getter<Cellable> getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l, Rollback *roll);
 

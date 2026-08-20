@@ -1,6 +1,6 @@
 #pragma once
 #include "md_Base.h"
-#include "md_LeaderCertificate.h"
+
 namespace MsgData
 {
     struct GetUserNonceRSP: public Base

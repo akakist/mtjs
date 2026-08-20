@@ -8,7 +8,7 @@
 #include "base16.h"
 #include "NODE_id.h"
 #include "hsh.h"
-#include "md/md_LeaderCertificate.h"
+
 #include <yyjson.h>
 #include <sstream>
 #include "nodeElement.h"
@@ -16,7 +16,6 @@
 #include "CONTRACT_id.h"
 #include "CONTRACT_DATA_id.h"
 #include "md/md_BlockAcceptedREQ.h"
-// #include <ostringstream>
 struct bc_nodelist:  public data_base
 {
 
@@ -36,7 +35,6 @@ struct bc_nodelist:  public data_base
         b>>list;
 
     }
-    std::string dump(){return "";}
 };
 
 struct bc_contract:  public data_base
@@ -60,7 +58,6 @@ struct bc_contract:  public data_base
         b>>name_>>owner>>src;
 
     }
-    std::string dump() final;
 };
 struct bc_contract_data:  public data_base
 {
@@ -81,7 +78,6 @@ struct bc_contract_data:  public data_base
         b>>container;
 
     }
-    std::string dump() final;
 };
 struct bc_address_state: public data_base
 {
@@ -118,7 +114,6 @@ struct bc_address_state: public data_base
         o>>nonce;
         o>>balance;
     }
-    std::string dump() final;
 
 };
 
@@ -266,7 +261,6 @@ struct bc_node: public data_base
 
         o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>missed_rounds;
     }
-    std::string dump() final;
 
 };
 
@@ -309,7 +303,6 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
 
         o>>fees>>emitters_bin;
     }
-    std::string dump() final;
 
 };
 

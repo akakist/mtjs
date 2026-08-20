@@ -44,8 +44,8 @@
 #include "init_root.h"
 #include "nodeService.h"
 #include "CDatabase.h"
-#include "md/md_LcREQ.h"
-#include "md/md_LcRSP.h"
+
+
 #include "tr_exec.h"
 #include "yyjson_to_quickjs.h"
 #include "js_tools.h"
@@ -422,7 +422,7 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
         auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
         if (cc.valid())
         {
-            sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, cc->dump() + "\n", this));
+            // sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, cc->dump() + "\n", this));
         }
     }
     if (match(go, e->command, tokens))

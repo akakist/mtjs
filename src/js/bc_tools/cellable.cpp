@@ -6,27 +6,11 @@
 std::string Cellable::getDbId() const
 {
     if (parent)
-        return parent->getDbId() + "." + m_id;
+        return parent->getDbId()  + m_id;
 
     return parent ? m_id : "";
 }
 
-std::string Cellable::dump()
-{
-    std::ostringstream str;
-    str << "Cellable " << std::endl
-        << "children:" << std::endl;
-    {
-        MutexLocker lk(mx);
-        for (auto &z : children_hashes_mx)
-        {
-            str << "<a href='" << z.first << "/'>" << z.first << "</a>" << " -> " << base16::encode(z.second.container) << std::endl;
-        }
-    }
-    if (data.valid())
-        str << data->dump();
-    return str.str();
-}
 
 REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l, Rollback* roll)
 {

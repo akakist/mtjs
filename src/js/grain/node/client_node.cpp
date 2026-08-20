@@ -17,7 +17,7 @@
 #include "t_params.h"
 #include "tools_mt.h"
 #include "QUORUM.h"
-#include "md/md_LcRSP.h"
+
 #include <vector>
 
 void Node::Service::do_InvalidateRoot()

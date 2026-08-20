@@ -19,7 +19,7 @@
 #include "db_to_save.h"
 #include "blst_cp.h"
 #include "md/md_ConfirmLeaderRSP.h"
-#include "md/md_LeaderCertificate.h"
+
 #include "md/md_HeartBeatRSP.h"
 #include "md/md_BlockAcceptedREQ.h"
 #include "md/md_ValidateBlockRSP.h"
@@ -29,16 +29,15 @@
 #include "md/md_GetTransactionRSP.h"
 #include "md/md_GetTransactionREQ.h"
 #include "md/md_BlockAcceptedREQ.h"
-#include "md/md_DoHeartBeatREQ.h"
+
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
 #include "md/md_LcEnvelopeREQ.h"
 #include "md/md_DoYouHaveBlockREQ.h"
 #include "md/md_DoYouHaveBlockRSP.h"
-#include "md/md_LcREQ.h"
-#include "md/md_LcRSP.h"
+
+
 #include "md/md_DelayNotificationREQ.h"
-#include "dbHistory.h"
 #include "t_params.h"
 #include "cached_state.h"
 #include "contract_rt.h"
