@@ -1,6 +1,6 @@
 #include "NODE_id.h"
 #include "blake2bHasher.h"
-#include "bigint.h"
+// #include "bigint.h"
 #include "commonError.h"
 #include "blst_cp.h"
 #include "REF.h"
@@ -34,25 +34,20 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         return true;
     }
     li.transaction_responders.insert(src_node);
-    double stake = 0;
+    auto mf=getMetaFull();
+    uint64_t stake = 0;
     for (auto &z : li.transaction_responders)
     {
+        
         auto n = root->getNode(z,db_state.get());
-        stake += n->get_full_stake_DBL();
+        stake += mf->getStake(z);
     }
-    auto nn=root->getAllNodes(db_state.get());
-    double total_staked=0;
-    for(auto &n:nn)
-    {
-        total_staked+=n->get_full_stake_DBL();
-    }
-    auto pers=stake/total_staked;
-    // logNode("GetTransactionRSP: staked %lf",pers);
-    if (stake > total_staked * QUORUM)
+    auto pers=(stake*100)/mf->total_full_stake;
+
+    if (pers >  QUORUM)
     {
         auto curtime=iUtils->getNow();
         auto diff_mks=curtime-li.request_for_transactions_time;
-        // logNode("diff_mks %ld, stake %s, total_staked %s", diff_mks, stake.toString().c_str(), total_staked.toString().c_str());
         sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_VALIDATE_BLOCK_DELAY,NULL,NULL,double(diff_mks)/1000000., this));
         li.TIMER_VALIDATE_BLOCK_DELAY_set=iUtils->getNow();
 
@@ -65,6 +60,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 {
     XTRY;
     MUTEX_INSPECTOR;
+    // logNode("@@ %s",__func__);
     if (state_Z != STATE_NORMAL)
         return true;
 
@@ -81,23 +77,23 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 
     auto &bt = l_blocks[prev_root_hash_Z()];
     auto h=r->blockInfo->getHash();
-    bt.responses[h].push_back(r);
+    bt.ValidateBlockRSP_m[h].push_back(r);
     if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
         return true;
-    // auto & bh=bt[bl.root_hash];
-    // bt.responses.push_back(r);
-    double stakeVal = 0;
-    for (auto &z : bt.responses[h])
+    auto mf=getMetaFull();
+    #ifndef FULL_M
+    auto mv=getMetaValidator(bt.leader_info.leader_cert_2->block_timestamp);
+    #endif
+    uint64_t stakeVal = 0;
+    for (auto &z : bt.ValidateBlockRSP_m[h])
     {
-        stakeVal += root->getNode(z->node_validator,db_state.get())->get_full_stake_DBL();
+        stakeVal += mf->getStake(z->node_validator);
     }
-    double total_staked=0;
-    auto nn=root->getAllNodes(db_state.get());
-    for(auto& n:nn)
-    {
-        total_staked+=n->get_full_stake_DBL();
-    }
-    if (stakeVal > total_staked * QUORUM)
+#ifdef FULL_M
+    if (stakeVal * 100 / mf->total_full_stake > QUORUM)
+#else
+    if (stakeVal * 100 / mv->total_validator_stake > QUORUM)
+#endif
     {
         XTRY;
         logNode("Block stake finalized");
@@ -110,16 +106,11 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             throw CommonError("else if(bh.block_payload!=r->payload_block)");
 
         ba->blockInfo = r->blockInfo;
-        // if (!bt.blockInfo.valid())
-        //     throw CommonError("if(!bt.block_payload.valid())");
         std::vector<blst_cpp::PublicKey> agg_pk;
-        // auto &hbs = l_blocks[prev_root_hash_Z()].heart_beat_store;
-        // ba->leader_certificateZ = hbs.leader_info.leader_cert_2;
         std::set<std::string> nnn;
-
-        for (auto &z : bt.responses[h])
+        for (auto &z : bt.ValidateBlockRSP_m[h])
         {
-            auto n = root->getNode(z->node_validator,db_state.get());
+            auto n = mf->getNode(z->node_validator);
             agg_pk.push_back(n->get_bls_pk());
             ba->agg_sig.add(z->sig);
             ba->node_validators.push_back(z->node_validator);
@@ -134,30 +125,13 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
             return true;
         }
-        broadcast_MsgEvent(ba.get());
+        
+        broadcast_MsgEvent(ba.get(),getMetaFull()->full_broadcast);
 
-        logNode("validators %s",iUtils->join(" ",nnn).c_str());
+        // logNode("validators %s",iUtils->join(" ",nnn).c_str());
 
         bt.block_accepted_sent = iUtils->getNow();
 
-        //// slash missed nodes;
-        
-        for(auto& z: bt.responses)
-        {
-            if(z.first!=h)
-            {
-                for(auto& z2: z.second)
-                {
-                    logNode("@@@@@@@@@@@@@@@@ slash node %s for missed block validation", z2->node_validator.container.c_str()); 
-                    // auto n=root->getNode(z2->node_validator);
-                    // n->inc_missed_rounds();
-                    // n->setDirty();
-                }
-            }
-            // auto n=root->getNode(z->node_validator);
-            // n->set_missed_rounds(0);
-            // n->setDirty();
-        }
         std::string nodelist;
         for(auto &z: bt.leader_info.HeartBeatRSP_m)
         {

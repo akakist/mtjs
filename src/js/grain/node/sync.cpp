@@ -53,7 +53,7 @@ bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const
 
     REF_getter<MsgData::GetSavedBlocksRSP> ret = new MsgData::GetSavedBlocksRSP();
 
-    BigInt epoch = 0;
+    uint64_t epoch = 0;
     {
         MUTEX_INSPECTOR;
         logNode("Query FROM root hash '%s' blocks %d", r->prev_root_hash.str().c_str(),ret->blocks_ZZ.size());
@@ -106,7 +106,11 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
         auto &s=syncs[prev_root_hash_Z()];
         if(!s.do_you_have_sent)
         {
-            broadcast_MsgEvent(new MsgData::DoYouHaveBlockREQ(prev_root_hash_Z()));
+            auto nn=root->getNodeListNoCreate(db_state.get());
+            if(!nn.valid())
+                throw CommonError("if(!nn.valid())");
+            
+            broadcast_MsgEvent(new MsgData::DoYouHaveBlockREQ(prev_root_hash_Z()),nn->getList());
             s.do_you_have_sent=true;    
             sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(timers::TIMER_SYNC_TIMEDOUT,NULL,NULL,3,this));
         }
@@ -216,7 +220,7 @@ bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const
 
 bool Node::Service::DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const NODE_id & src_node, const route_t& route)
 {
-    logErr2("@@ %s",__PRETTY_FUNCTION__);
+    // logErr2("@@ %s",__PRETTY_FUNCTION__);
     std::string res;
     if (db_state->getBlock(m->prev_root_hash, res))
     {
@@ -228,7 +232,7 @@ bool Node::Service::DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const
 }
 bool Node::Service::DoYouHaveBlockRSP(const MsgData::DoYouHaveBlockRSP* m, const NODE_id & src_node, const route_t& route)
 {
-    logErr2("@@ %s",__PRETTY_FUNCTION__);
+    // logErr2("@@ %s",__PRETTY_FUNCTION__);
     auto& s=syncs[m->prev_root_hash];
     s.havers.insert(src_node);
     if(s.havers.size()==1)

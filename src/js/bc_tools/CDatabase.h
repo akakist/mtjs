@@ -96,17 +96,12 @@ struct CDatabase: public IDatabase
     REF_getter<DBH> dbh;
     std::string db_name;
 
+    std::string getDbName()
+    {
+        return db_name;
+    }
 
-    // int put_cell(const std::string& k, const std::string& v)
-    // {
-    //     rocksdb::Status s;
-    //     rocksdb::WriteOptions w;
-    //     // w.sync=true;
-    //     s = db->Put(w, k, v);
-    //     if (!s.ok()) std::cerr << "Put failed: " << s.ToString() << "\n";
-    //     // db->Flush(rocksdb::FlushOptions());
-    //     return !s.ok();
-    // }
+
     int write_granules_batch(const _db_to_save &v)
     {
         st_TRANSACTION tr(dbh);

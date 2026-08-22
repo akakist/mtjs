@@ -14,7 +14,7 @@ void init_root(const REF_getter<root_data> &r, IDatabase* db)
     u_root_address.addr=blake2b_hash(u_root_pk).container;
     if(!r->checkValues(db).valid())
     {
-        auto v=r->getValues(NULL,db);
+        auto v=r->getValuesOrCreate(NULL,db);
         if(!v->emitters_bin.count(u_root_address))
             v->emitters_bin.insert(u_root_address);
 
@@ -23,7 +23,6 @@ void init_root(const REF_getter<root_data> &r, IDatabase* db)
         {
             total+=z;
         }
-        // v->total_staked=total;
         v->setDirty(NULL);
     }
     // u_root pk

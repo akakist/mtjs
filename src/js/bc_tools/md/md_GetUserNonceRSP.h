@@ -9,11 +9,11 @@ namespace MsgData
         GetUserNonceRSP():Base(msgid::GetUserNonceRSP)
         {
         }
-        BigInt balance;
+        uint64_t balance;
         uint64_t nonce;
         void update(Blake2bHasher& h) const
         {
-            h.update(balance.toString());
+            h.update(std::to_string(balance));
             h.update(std::to_string(nonce));
         }
 

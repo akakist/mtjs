@@ -4,7 +4,7 @@
 #include "cellable.h"
 #include <fcntl.h>
 #include "ioBuffer.h"
-#include "bigint.h"
+// #include "bigint.h"
 #include "base16.h"
 #include "NODE_id.h"
 #include "hsh.h"
@@ -20,7 +20,24 @@ struct bc_nodelist:  public data_base
 {
 
     bc_nodelist(Cellable *p):data_base(hsh::bc_nodelist,p, 0,-1) {}
+    private:
     std::set<NODE_id> list;
+    public:
+    std::set<NODE_id> getList()
+    {
+        M_LOCK(parent->mx);
+        return list;
+    }
+    int count(const NODE_id& n)
+    {
+        M_LOCK(parent->mx);
+        return list.count(n);
+    }
+    void insert(const NODE_id& n)
+    {
+        M_LOCK(parent->mx);
+        list.insert(n);
+    }
     void pack(outBuffer&b) const final
     {
         data_base::pack(b);
@@ -86,7 +103,7 @@ struct bc_address_state: public data_base
         nonce=0;
         balance=0;
     }
-    BigInt balance;
+    uint64_t balance;
     uint64_t nonce;
     private:
     public:
@@ -129,15 +146,13 @@ struct bc_node: public data_base
     blst_cpp::PublicKey bls_pk;
     std::string ed_pk;
     std::string ip;
-    std::map<ADDRESS_id /*user*/, BigInt> stakes;
-    int missed_rounds = 0;
+    std::map<ADDRESS_id /*user*/, uint64_t> stakes;
     public:
     NodeElement getElement()
     {
         NodeElement n;
         M_LOCK(parent->mx);
         n.ip=ip;
-        n.missed_rounds=missed_rounds;
         n.name=name_;
         n.stake_A=0;
         for(auto &z: stakes)
@@ -161,21 +176,6 @@ struct bc_node: public data_base
         M_LOCK(parent->mx);
         ip=_ip;
     }
-    void inc_missed_rounds()
-    {
-        M_LOCK(parent->mx);
-        missed_rounds++;
-    }
-    void reset_missed_rounds()
-    {
-        M_LOCK(parent->mx);
-        missed_rounds=0;
-    }
-    int get_missed_rounds()
-    {
-        M_LOCK(parent->mx);
-        return missed_rounds;
-    }
     ADDRESS_id get_owner()
     {
         M_LOCK(parent->mx);
@@ -191,9 +191,9 @@ struct bc_node: public data_base
         M_LOCK(parent->mx);
         return name_;
     }
-    BigInt get_full_stake_BN()
+    uint64_t get_full_stake()
     {
-        BigInt ret=0;
+        uint64_t ret=0;
         M_LOCK(parent->mx);
         for(auto &z: stakes)
         {
@@ -201,17 +201,7 @@ struct bc_node: public data_base
         }
         return ret;
     }
-    double get_full_stake_DBL()
-    {
-        double ret=0;
-        M_LOCK(parent->mx);
-        for(auto &z: stakes)
-        {
-            ret+=z.second.toDouble();
-        }
-        return ret;
-    }
-    BigInt get_user_stake(const ADDRESS_id& user)
+    uint64_t get_user_stake(const ADDRESS_id& user)
     {
         M_LOCK(parent->mx);
         auto it = stakes.find(user);
@@ -236,12 +226,12 @@ struct bc_node: public data_base
         ed_pk=_ed_pk;
         ip=_ip;
     }
-    void add_stake(const ADDRESS_id& user, const BigInt &amount)
+    void add_stake(const ADDRESS_id& user, const uint64_t &amount)
     {
         M_LOCK (parent->mx);
         stakes[user]+=amount;
     }
-    void sub_stake(const ADDRESS_id& user, const BigInt &amount)
+    void sub_stake(const ADDRESS_id& user, const uint64_t &amount)
     {
         M_LOCK (parent->mx);
         stakes[user]-=amount;
@@ -252,14 +242,14 @@ struct bc_node: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<missed_rounds;
+        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>missed_rounds;
+        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes;
     }
 
 };
@@ -269,32 +259,36 @@ struct bc_values: public data_base
 
 
 bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
-        fees["contract_deploy"]=BigInt(5000);
-        fees["contract_transfer"]=BigInt(1000);
-        fees["node_create"]=BigInt(20000);
-        fees["node_update"]=BigInt(10000);
-        fees["node_enable"]=BigInt(5000);
-        fees["node_unstake"]=BigInt(2000);
-        fees["node_stake"]=BigInt(2000);
-        fees["mint"]=BigInt(95);
-        fees["transfer"]=BigInt(1000);
-        fees["cashback"]=BigInt(200);
+        fees["contract_deploy"]=5000;
+        fees["contract_transfer"]=1000;
+        fees["node_create"]=20000;
+        fees["node_update"]=10000;
+        fees["node_enable"]=5000;
+        fees["node_unstake"]=2000;
+        fees["node_stake"]=2000;
+        fees["mint"]=95;
+        fees["transfer"]=1000;
+        fees["cashback"]=200;
     }
-    std::map<std::string,BigInt> fees;
+    std::map<std::string,uint64_t> fees;
     std::set<ADDRESS_id> emitters_bin;
-    BigInt getGas(const std::string &fee_type) const
+    int validator_count=5;
+    uint64_t validator_minstake=100;
+
+    uint64_t getGas(const std::string &fee_type) const
     {
         auto it=fees.find(fee_type);
         if(it!=fees.end())
             return it->second;
         throw CommonError("fee '%s' not found", fee_type.c_str());
-        return BigInt(0);
+        return 0;
     }
     void pack(outBuffer& o) const final
     {
         data_base::pack(o);
         o<<1;
         o<<fees<<emitters_bin;
+        o<<validator_count<<validator_minstake;
     }
     void unpack(inBuffer& o) final
     {
@@ -302,6 +296,7 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         auto v=o.get_PN();
 
         o>>fees>>emitters_bin;
+        o>>validator_count>>validator_minstake;
     }
 
 };
@@ -338,7 +333,8 @@ struct root_data: public Cellable
     REF_getter<bc_contract_data> getContractData(const CONTRACT_DATA_id &name,IDatabase* db);
     REF_getter<bc_contract_data> addContractData(const CONTRACT_DATA_id &name,  Rollback*,IDatabase* db);
 
-    REF_getter<bc_values> getValues(Rollback*,IDatabase* db);
+    REF_getter<bc_values> getValuesOrCreate(Rollback*,IDatabase* db);
+    REF_getter<bc_values> getValuesNoCreate(IDatabase* db);
     REF_getter<bc_values> checkValues(IDatabase* db);
 
 

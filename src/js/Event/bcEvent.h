@@ -282,17 +282,22 @@ namespace bcEvent
         {
             return NULL;
         }
-        BroadcastMessage(const SERVICE_id &dstService_, const NODE_id& _node_signer, int64_t _node_start_timestamp, int64_t _seqId,
+        BroadcastMessage(const SERVICE_id &dstService_, const NODE_id& _node_signer, int64_t _node_start_timestamp, 
+            const std::set<NODE_id> &_nodes,
+            int64_t _seqId,
             const std::string& _signature_pl,
             const std::string &m, const route_t &r)
             : NoPacked(bcEventEnum::BroadcastMessage, r), dstService(dstService_),
-            node_signer(_node_signer), node_start_timestamp(_node_start_timestamp), seqId(_seqId),
+            node_signer(_node_signer), node_start_timestamp(_node_start_timestamp), 
+            nodes(_nodes),
+            seqId(_seqId),
             signature_pl(_signature_pl),
             msg(m) {}
 
         SERVICE_id dstService;
         const NODE_id node_signer;
         const int64_t node_start_timestamp;
+        std::set<NODE_id> nodes;
         const int64_t seqId;
         const std::string signature_pl;
         const std::string msg;

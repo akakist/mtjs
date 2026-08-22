@@ -12,8 +12,6 @@
 
 add_library(bctools STATIC
     tree.cpp
-#    messages.cpp
-#    mcrypto.cpp
     base16.cpp
     normalizeNick.cpp
 root_contract.cpp
@@ -30,10 +28,7 @@ blst_cp.h
 CDatabase.h
 cellable.h
 db_to_save.h
-dbHistory.h
-dirty.h
 execute_transaction.h
-fee_calcer.h
 getenv2.h
 hsh.h
 IDatabase.h
@@ -55,6 +50,7 @@ md/md_LcEnvelopeREQ.h
 get_tariff.h
 yyjson_to_quickjs.cpp
 yyjson_to_quickjs.h
+getValidators.cpp
 )
 
 

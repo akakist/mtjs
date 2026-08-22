@@ -4,7 +4,7 @@
 #include <gmp.h>
 #include <vector>
 #include <string>
-#include "bigint.h"
+// #include "bigint.h"
 #include "blake2bHasher.h"
 #include "blst_cp.h"
 #include "ioBuffer.h"
@@ -173,7 +173,7 @@ REF_getter<bc_contract_data> root_data::addContractData(const CONTRACT_DATA_id &
     return bc;
 }
 
-REF_getter<bc_values> root_data::getValues(Rollback* roll,IDatabase* db)
+REF_getter<bc_values> root_data::getValuesOrCreate(Rollback* roll,IDatabase* db)
 {
     MUTEX_INSPECTOR;
     auto r = this;
@@ -193,6 +193,22 @@ REF_getter<bc_values> root_data::getValues(Rollback* roll,IDatabase* db)
     lk.unlock();
     return v;
 }
+REF_getter<bc_values> root_data::getValuesNoCreate(IDatabase* db)
+{
+    MUTEX_INSPECTOR;
+    auto r = this;
+    MutexLockerDeferred lk(r->mx);
+    auto l = getByPathNoCreate(this, getPath("VALUES"), db);
+    if(!l.valid())
+        return NULL;
+    if (l->data.valid())
+    {
+        return dynamic_cast<bc_values *>(l->data.get());
+    }
+    return NULL;
+
+}
+
 REF_getter<bc_values> root_data::checkValues(IDatabase* db)
 {
     MUTEX_INSPECTOR;
@@ -256,8 +272,8 @@ std::vector<REF_getter<bc_node>> root_data::getAllNodes(IDatabase* db)
         throw CommonError("if(!nl.valid())");
 
     std::vector<REF_getter<bc_node>> vv;
-
-    for(auto& z: nl->list)
+    auto ll=nl->getList();
+    for(auto& z: ll)
     {
         vv.push_back(getNode(z,db));
     }
@@ -269,11 +285,11 @@ REF_getter<bc_node> root_data::addNode(const NODE_id &name, Rollback* roll,IData
     MUTEX_INSPECTOR;
 
     auto nl=getNodeListOrCreate(roll,db);
-    if(!nl.valid())
-        throw CommonError("if(!nl.valid())");
-    if(nl->list.count(name))
-        throw CommonError("if(nl->list.count(name))");
-    nl->list.insert(name);
+    // if(!nl.valid())
+    //     throw CommonError("if(!nl.valid())");
+    if(nl->count(name))
+        throw CommonError("if(!nl->list.count(name))");
+    nl->insert(name);
     nl->setDirty(roll);
 
     auto cc = getByPathOrCreate(this, getNodePath(name), db,roll);
@@ -309,36 +325,57 @@ std::pair<REF_getter<root_data>,REF_getter<MsgData::BlockAcceptedREQ>>  getRoot(
     std::string root_cell;
     {
     MUTEX_INSPECTOR;
-        int err = db->getGranule("#root#", &root_cell);
-        if (!err)
-        {
-    MUTEX_INSPECTOR;
-            {
-                MUTEX_INSPECTOR;
-                inBuffer in(root_cell);
-                M_LOCK(r->mx);
-                r->unpack_mx(in);
-            }
-        }
-        if(!err)
-        {
-    MUTEX_INSPECTOR;
-            std::string lb;
-            int err = db->getGranule("#last_block#", &lb);
+    // int err=0;
+    //     int err = db->getGranule("#root#", &root_cell);
+    //     if (!err)
+    //     {
+    // MUTEX_INSPECTOR;
+    //         {
+    //             MUTEX_INSPECTOR;
+    //             inBuffer in(root_cell);
+    //             M_LOCK(r->mx);
+    //             r->unpack_mx(in);
+    //         }
+    //     }
+        std::string lb;
+        int err = db->getGranule("", &lb);
             if(!err && lb.size())
             {
     MUTEX_INSPECTOR;
-                last_block=new MsgData::BlockAcceptedREQ;
-                // last_block->unpack2
                 inBuffer in(lb);
-                last_block->unpack2(in);
+                r->unpack_mx(in);
 
             }
-            if(!err && lb.empty())
-            {
-    MUTEX_INSPECTOR;
-            }
+        std::string pn=db->getDbName()+".last_block";
+        auto buf=iUtils->load_file_no_throw(pn);
+        if(buf.size())
+        {
+            logErr2("buf.size() %d",buf.size());
+                last_block=new MsgData::BlockAcceptedREQ;
+                inBuffer in(buf);
+                M_LOCK(r->mx);
+                last_block->unpack2(in);
         }
+
+        // if(!err)
+    //     {
+    // MUTEX_INSPECTOR;
+    //         std::string lb;
+    //         int err = db->getGranule("#last_block#", &lb);
+    //         if(!err && lb.size())
+    //         {
+    // MUTEX_INSPECTOR;
+    //             last_block=new MsgData::BlockAcceptedREQ;
+    //             // last_block->unpack2
+    //             inBuffer in(lb);
+    //             last_block->unpack2(in);
+
+    //         }
+    //         if(!err && lb.empty())
+    //         {
+    // MUTEX_INSPECTOR;
+    //         }
+    //     }
 
     }
 

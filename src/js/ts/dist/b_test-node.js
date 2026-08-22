@@ -23,6 +23,7 @@ for (let i = 0; i < 10; i++) {
 async function exec() {
     let i = 0;
     while (true) {
+    try{
         mtjs.tx_subscribe(node, (params) => {
             // console.log("tx report from js:", JSON.stringify(params));
         });
@@ -66,6 +67,7 @@ async function exec() {
         });
         console.log(rsp);
         sleep(150);
+    } catch(e){}
     }
 }
 console.log(std.getenv("PATH"));
@@ -104,9 +106,10 @@ try {
                  mysql_database=md
                  mysql_port=0
                  mysql_sock=/run/mysqld/mysqld.sock
+		 mysql_flag=
         `);
     }
-    sleep(200);
+    sleep(100);
     console.log("Start");
     try {
         const sk = std.getenv('u_root_ed_sk');

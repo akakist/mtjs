@@ -13,7 +13,7 @@ void dump(const BroadcasterTree::TreeNode &t, int level, std::vector<std::pair<i
 
     for(auto &c:t.children)
     {
-        out.push_back({level,c.node.name.container+" stake="+c.node.stake_A.toString()});
+        out.push_back({level,c.node.name.container+" stake="+std::to_string(c.node.stake_A)});
         dump(c,level+1,out);
     }
 }
@@ -31,8 +31,6 @@ BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,Node
     }
     sort(ranked.begin(), ranked.end(),
     [](const auto& a, const auto& b) {
-        if(a.node.missed_rounds!=b.node.missed_rounds)
-            return a.node.missed_rounds < b.node.missed_rounds; // меньше пропущенных раундов выше
         return a.node.stake_A > b.node.stake_A;
     });
 

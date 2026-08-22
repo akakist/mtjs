@@ -10,7 +10,7 @@ struct b_params
     IDatabase* db;
     REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
     REF_getter<MsgData::attachment_data> att_data;
-    BigInt node_rewards;
+    uint64_t node_rewards;
 
     void emit_command(const THASH_id& txId, int seqId, const std::string& command, const char* fmt, ...)
     {
@@ -63,9 +63,9 @@ struct t_params
     REF_getter<MsgData::TX> tx;
     uint64_t epoch;
     THASH_id tx_id;
-    BigInt gasUsed=0;
-    BigInt gasLimit=0;
-    BigInt value=0;
+    uint64_t gasUsed=0;
+    uint64_t gasLimit=0;
+    uint64_t value=0;
     Rollback *roll=NULL;
     void rollback()
     {

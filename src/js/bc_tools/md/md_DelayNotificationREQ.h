@@ -15,8 +15,6 @@ namespace MsgData
         {
             return new DelayNotificationREQ();
         }
-        // BigInt epoch;
-        // BLOCK_id prev_root_hash;
         REF_getter<BlockAcceptedREQ> lc;
         void update(Blake2bHasher& h) const
         {

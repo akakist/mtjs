@@ -1,7 +1,7 @@
 #include "commonError.h"
 #include "ioBuffer.h"
 #include "blake2bHasher.h"
-#include "bigint.h"
+// #include "bigint.h"
 #include "REF.h"
 #include "mutexInspector.h"
 #include "nodeService.h"
@@ -34,8 +34,9 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     {
         li.HeartBeatRSP_m.insert_or_assign(m->node_signer, m);
     }
+    auto mf=getMetaFull();
 
-    double hb_staked = 0;
+    uint64_t hb_staked = 0;
     if (iUtils->getNow() > li.confirm_leader_sent + _1sec)
     {
         bool matched = true;
@@ -45,19 +46,21 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         {
             for (auto &z : li.HeartBeatRSP_m)
             {
-                auto nn = root->getNode(z.second->node_signer,db_state.get());
-                hb_staked += nn->get_full_stake_DBL();
+                auto stake=mf->getStake(z.second->node_signer);
+                hb_staked+=stake;
+                // auto nn = root->getNode(z.second->node_signer,db_state.get());
+                // hb_staked += nn->get_full_stake();
             }
         }
     }
-    double total_staked=0;
+    // double total_staked=0;
     
-    auto nn=root->getAllNodes(db_state.get());
-    for(auto& z: nn)
-    {
-        total_staked+=z->get_full_stake_DBL();
-    }
-    auto pers = hb_staked / total_staked;
+    // auto nn=root->getAllNodes(db_state.get());
+    // for(auto& z: nn)
+    // {
+    //     total_staked+=z->get_full_stake();
+    // }
+    auto pers = (hb_staked * 100) / mf->total_full_stake;
 
     if (pers > QUORUM && (iUtils->getNow() > li.confirm_leader_sent+ _1sec))
     {
@@ -67,7 +70,8 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 
             REF_getter<MsgData::ConfirmLeaderREQ> rt = new MsgData::ConfirmLeaderREQ();
             rt->hb = m->payload_heart_beat;
-            broadcast_MsgEvent(rt.get());
+
+                broadcast_MsgEvent(rt.get(), mf->full_broadcast);
         }
     }
     XPASS;
@@ -89,6 +93,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     
     stage_is_working=iUtils->getNow();
 
+    // logNode("HeartBeatREQ");
     if(state_Z==STATE_SYNCING)
     {
         return true;
@@ -321,46 +326,23 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         return false;
     }
 
-    auto n = root->getNode(m->node_signer,db_state.get());
-    if (!n.valid())
-    {
-        logNode("if(!n.valid())");
-        return false;
-    }
-    // outBuffer o;
-    // m->hb->pack(o);
-    // if (!m->sig.verify(n->get_bls_pk(), blake2b_hash(o.asString()->container).container))
-    // {
-    //     logNode("if(!sig_check.verify(n->bls_pk, blake2b_hash(mhbr.payload)))");
-    //     return false;
-    // }
     {
         li.ConfirmLeaderRSP_m.insert_or_assign(m->node_signer, m);
     }
-    double hb_staked = 0;
+    auto mf=getMetaFull();
+    uint64_t hb_staked = 0;
     {
-        // blst_cpp::AggregateSignature sig_agg;
-        // std::vector<blst_cpp::PublicKey> pk_agg;
         bool matched = true;
         if (li.ConfirmLeaderRSP_m.empty())
             throw CommonError("if(li.responses.empty())");
 
         for (auto &z : li.ConfirmLeaderRSP_m)
         {
-            // sig_agg.add(z.second->sig);
-            auto nn = root->getNode(z.second->node_signer,db_state.get());
-            // pk_agg.push_back(nn->get_bls_pk());
-            hb_staked += nn->get_full_stake_DBL();
+            auto stake = mf->getStake(z.second->node_signer);
+            hb_staked += stake;
         }
     }
-    double total_staked;
-    auto nn=root->getAllNodes(db_state.get());
-    for(auto &n:nn)
-    {
-        total_staked+=n->get_full_stake_DBL();
-    }
-    auto pers = hb_staked / total_staked;
-    // logNode("ConfirmLeaderRSP hb staked %lf",pers);
+    auto pers = hb_staked * 100 / mf->total_full_stake;
 
     if (pers > QUORUM)
     {
@@ -383,7 +365,10 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
     stage_is_working=iUtils->getNow();
     // logNode("@@ %s",__FUNCTION__);
     l_blocks.clear();
+    block_meta_full.clear();
+    block_meta_validator.clear();
     c_blocks.clear();
+    auto mf=getMetaFull();
     // auto prev=prev_block;
     REF_getter<MsgData::HeartBeatREQ> hb_req =
         new MsgData::HeartBeatREQ(prev_root_hash_Z(),
@@ -394,7 +379,14 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
     REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),prev_block.valid()?prev_block->getBuffer():"");
     // logNode("broadcast heart beat");
     l_blocks[prev_root_hash_Z()].leader_info.leader_cert_2=hb_req;
-    broadcast_MsgEvent(lce.get());
+    auto mm=mf->full_broadcast;
+    std::string s;
+    for(auto & z:mm)
+    {
+        s+=" "+z.container;
+    }
+    // logErr2("validators %s",s.c_str());
+    broadcast_MsgEvent(lce.get(),mm);
 
     return hb_req;
 }

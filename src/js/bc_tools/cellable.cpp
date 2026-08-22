@@ -39,7 +39,7 @@ REF_getter<Cellable> Cellable::getLeafOrCreate(const std::string &id, IDatabase 
     REF_getter<Cellable> c = new Cellable(this, id);
     children_ptrs_mx.insert({id, c});
     l.unlock();
-
+    c->setDirty__(roll);
     return c;
 }
 

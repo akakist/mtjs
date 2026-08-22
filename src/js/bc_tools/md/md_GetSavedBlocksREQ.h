@@ -13,7 +13,6 @@ namespace MsgData
         {
             return new GetSavedBlocksREQ();
         }
-        // BigInt epoch;
         BLOCK_id prev_root_hash;
         void update(Blake2bHasher& h) const
         {

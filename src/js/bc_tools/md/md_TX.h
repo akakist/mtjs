@@ -1,7 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "s_ed.h"
-#include "bigint.h"
+// #include "bigint.h"
 #include "yyjson.h"
 #include <optional>
 namespace MsgData
@@ -82,7 +82,7 @@ namespace MsgData
             else return "yyjson: nonce must be string or num";
             return std::nullopt;
         }
-        std::optional<std::string> getGasLimit(BigInt & gasLimit)
+        std::optional<std::string> getGasLimit(uint64_t & gasLimit)
         {
             if(!doc)
                 return "yyjson: !doc";
@@ -99,13 +99,13 @@ namespace MsgData
             }
             else if(yyjson_is_str(v))
             {
-                gasLimit.from_string(yyjson_get_str(v));
+                gasLimit=yyjson_get_uint(v);
                 return std::nullopt;
             }
             else return "yyjson: gasLimit must be string or num";
             return std::nullopt;
         }
-        std::optional<std::string> getGasPrice(BigInt & gasPrice)
+        std::optional<std::string> getGasPrice(uint64_t & gasPrice)
         {
             if(!doc)
                 return "yyjson: !doc";
@@ -122,13 +122,13 @@ namespace MsgData
             }
             else if(yyjson_is_str(v))
             {
-                gasPrice.from_string(yyjson_get_str(v));
+                gasPrice=std::stoull(yyjson_get_str(v));
                 return std::nullopt;
             }
             else return "yyjson: gasPrice must be string or num";
             return std::nullopt;
         }
-        std::optional<std::string> getValue(BigInt & value)
+        std::optional<std::string> getValue(uint64_t & value)
         {
             if(!doc)
                 return "yyjson: !doc";
@@ -145,7 +145,7 @@ namespace MsgData
             }
             else if(yyjson_is_str(v))
             {
-                value.from_string(yyjson_get_str(v));
+                value=yyjson_get_uint(v);
                 return std::nullopt;
             }
             else return "yyjson: value must be string or num";

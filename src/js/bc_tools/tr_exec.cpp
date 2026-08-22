@@ -3,7 +3,7 @@
 #include <yyjson.h>
 #include <string>
 #include "commonError.h"
-#include "bigint.h"
+// #include "bigint.h"
 #include "root_contract.h"
 #include "tr_exec.h"
 #include "ADDRESS_id.h"
@@ -15,15 +15,15 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
 {
         MUTEX_INSPECTOR;
 
-    auto v = t.root->getValues(t.roll,b.db);
+    auto v = t.root->getValuesNoCreate(b.db);
     auto it = v->emitters_bin.find(t.senderAddress);
     if (it == v->emitters_bin.end())
     {
         logErr2("insufficient_privileges");
         return "insufficient_privileges";
     }
-    BigInt amount=0;
-    auto err=yy_get_bn(params,"amount",amount);
+    uint64_t amount=0;
+    auto err=yy_get_uint64_t(params,"amount",amount);
     if(err) return err;
 
 
@@ -36,15 +36,13 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
         M_LOCK(u->parent->mx);
         u->balance+=amount;
     }
-    // u->addBalance(amount);
     u->setDirty(t.roll);
-    // b.addCalcer(u.get(),by);
 
     t.gasUsed+=v->getGas("mint");
 
     b.emit_command(t.tx_id, seqId,"mint",R"({"to":"%s","amount":"%s"})",
         base16::encode(t.senderAddress.addr).c_str(),
-        amount.toString().c_str());
+         std::to_string(amount).c_str());
 
     return std::nullopt;
 }
@@ -52,10 +50,10 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll,b.db);
+    auto v = t.root->getValuesNoCreate(b.db);
 
-    BigInt amount=0;
-    auto err=yy_get_bn(params,"amount",amount);
+    uint64_t amount=0;
+    auto err=yy_get_uint64_t(params,"amount",amount);
     if(err) return err;
 
     std::string to_;
@@ -109,7 +107,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     b.emit_command(t.tx_id, seqId, "transfer", R"({"from":"%s","to":"%s","amount":"%s"})", 
         base16::encode(t.senderAddress.addr).c_str(), 
         base16::encode(to_addr.addr).c_str(), 
-        amount.toString().c_str()
+        std::to_string(amount).c_str()
         );
 
     return std::nullopt;
@@ -119,7 +117,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
 {
     MUTEX_INSPECTOR;
     // if(senderAddress!=)
-    auto v = t.root->getValues(t.roll,b.db);
+    auto v = t.root->getValuesNoCreate(b.db);
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
@@ -163,7 +161,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll,b.db);
+    auto v = t.root->getValuesNoCreate(b.db);
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
@@ -220,10 +218,10 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll,b.db);
+    auto v = t.root->getValuesNoCreate(b.db);
 
-    BigInt amount=0;
-    auto err=yy_get_bn(params,"amount",amount);
+    uint64_t amount=0;
+    auto err=yy_get_uint64_t(params,"amount",amount);
     if(err) return err;
 
     NODE_id node;
@@ -252,7 +250,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
 
     b.emit_command(t.tx_id, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
         node.container.c_str(),
-        amount.toString().c_str(),
+        std::to_string(amount).c_str(),
         base16::encode(t.senderAddress.addr).c_str()
     );
     n->setDirty(t.roll);
@@ -264,9 +262,9 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll,b.db);
-    BigInt amount=0;
-    auto err=yy_get_bn(params,"amount",amount);
+    auto v = t.root->getValuesNoCreate(b.db);
+    uint64_t amount=0;
+    auto err=yy_get_uint64_t(params,"amount",amount);
     if(err) return err;
     NODE_id node;
     err=yy_get_string(params,"node",node.container);
@@ -302,7 +300,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     b.emit_command(t.tx_id, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
         node.container.c_str(),
         base16::encode(t.senderAddress.addr).c_str(),
-        amount.toString().c_str()
+        std::to_string(amount).c_str()
     );
 
     return std::nullopt;
@@ -312,7 +310,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll,b.db);
+    auto v = t.root->getValuesNoCreate(b.db);
     NODE_id node;
     auto err=yy_get_string(params,"node",node.container);
     if(err)return err;
@@ -326,10 +324,6 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     {
         return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(t.senderAddress.addr);
     }
-    // auto us = t.getAddressState(t.senderAddress);
-    // if (!us.valid())
-    //     return "if(!us.valid())";
-    n->reset_missed_rounds();
     n->setDirty(t.roll);
 
     t.gasUsed+=v->getGas("node_enable");
@@ -347,7 +341,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll,b.db);
+    auto v = t.root->getValuesNoCreate(b.db);
     std::string name;
     auto err=yy_get_string(params,"name",name);
     if(err) return err;
@@ -398,7 +392,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValues(t.roll,b.db);
+    auto v = t.root->getValuesNoCreate(b.db);
     CONTRACT_id cn;
     auto err=yy_get_string(params,"name",cn.container);
     if(err)

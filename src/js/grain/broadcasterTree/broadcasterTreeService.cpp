@@ -170,22 +170,12 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
 {
     MUTEX_INSPECTOR;
     std::map<NODE_id, NodeElement> nodes;
-    auto ks = root->getAllNodes(db_state_4.get());
-    for (auto &nd : ks)
+    // auto ks = root->getAllNodes(db_state_4.get());
+    for (auto &nd : e->nodes)
     {
-        // auto nn = root->getNode(nd);
-        if(nd->get_missed_rounds()>=100)
-        {
-            /// TODO
-            // continue;
-
-        }
-        NodeElement n=nd->getElement();
-        // n.name = nd->getName();
-        // n.stake_A = nd->get_full_stake();
-        // n.ip = nd->get_ip();
-        // n.missed_rounds = nd->get_missed_rounds();
-        nodes[nd->getName()] = n;
+        auto n=root->getNode(nd,db_state_4.get());
+        NodeElement ne=n->getElement();
+        nodes[nd] = ne;
     }
     if (nodes.size() == 0)
         return true;

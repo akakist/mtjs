@@ -3,7 +3,7 @@
 #include "broadcaster.h"
 
 // #include "signedBuffer.h"
-
+#define FULL_M 1
 #include "listenerBuffered1Thread.h"
 #include <map>
 #include "Events/System/Run/startServiceEvent.h"
@@ -44,6 +44,7 @@
 #include "DBH.h"
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 // #define HEART_BEAT_INTERVAL_SEC 5
+std::set<NODE_id> getValidators(const REF_getter<root_data>& r, uint64_t block_timestamp, IDatabase* db);
 
 enum State
 {
@@ -60,6 +61,45 @@ namespace Node
         TIMER_VALIDATE_BLOCK_DELAY,
         TIMER_SYNC_TIMEDOUT,
         TIMER_REPORT_MEM
+    };
+    struct BlockMetaFull: public Refcountable
+    {
+        std::map<NODE_id,REF_getter<bc_node>> nodes;
+        std::set<NODE_id> full_broadcast;
+        std::map<NODE_id, uint64_t> node_stakes;
+        uint64_t total_full_stake=0;
+        REF_getter<bc_node> getNode(const NODE_id &n)
+        {
+            auto it=nodes.find(n);
+            if(it==nodes.end())
+                throw CommonError("if(n==nodes.end())");
+            return it->second;
+        }
+        uint64_t getStake(const NODE_id &n)        
+        {
+            auto it=node_stakes.find(n);
+            if(it==node_stakes.end())
+                throw CommonError("if(n==nodes.end())");
+            return it->second;
+        }
+        BlockMetaFull(): Refcountable("BlockMetaFull"){}
+        
+    };
+    struct BlockMetaValidator: public Refcountable
+    {
+        std::set<NODE_id> validator_broadcast;
+        std::map<NODE_id, uint64_t> validator_stake;
+        uint64_t total_validator_stake=0;
+        uint64_t getStake(const NODE_id& n)
+        {
+            auto it=validator_stake.find(n);
+            if(it==validator_stake.end())
+                throw CommonError("if(it==validator_stake.end())");
+            return it->second;
+            
+        }
+        BlockMetaValidator(): Refcountable("BlockMeta"){}
+        
     };
     struct heart_beat_node_info
     {
@@ -197,7 +237,7 @@ namespace Node
 
         void do_request_for_transactions( Node::heart_beat_node_info& li);
 
-        void broadcast_MsgEvent(const REF_getter<MsgData::Base>& p);
+        void broadcast_MsgEvent(const REF_getter<MsgData::Base>& p, const std::set<NODE_id>& nodes);
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
 
         void do_InvalidateRoot();
@@ -206,7 +246,7 @@ namespace Node
         struct block_leader
         {
             std::map<THASH_id /*blockinfo hash*/,REF_getter<MsgData::BlockInfo> > blockInfo;
-            std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >responses;
+            std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
             int64_t block_accepted_sent=0;
             // heart_beat_info    heart_beat_store;
             heart_beat_node_info leader_info;
@@ -218,7 +258,7 @@ namespace Node
                     sz+=z.first.container.size();
                     sz+=z.second->size();
                 }
-                for(auto& z: responses)
+                for(auto& z: ValidateBlockRSP_m)
                 {
                     sz+=z.first.container.size();
                     for(auto& x: z.second)
@@ -234,23 +274,7 @@ namespace Node
             void dump(nlohmann::json &j)
             {
                 j["blockInfo_SZ"]=blockInfo.size();
-                j["responses"]=responses.size();
-                // for(auto& z:blockInfo)
-                // {
-                //     z.second->dump(j["blockInfo"][base16::encode(z.first.container)]);
-                // }
-                // int idx=0;
-                // for(auto& z:responses)
-                // {
-                //     for(auto& x: z.second)
-                //     {
-                //         x->dump(j["responses"][base16::encode(z.first.container)][std::to_string(idx++)]);
-                //     }
-                //     // nlohmann::json jj;
-
-                // }
-                // j["block_accepted_sent"]=block_accepted_sent;
-                // leader_info.
+                j["responses"]=ValidateBlockRSP_m.size();
 
             }
 
@@ -322,6 +346,59 @@ namespace Node
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
+        std::map<BLOCK_id,REF_getter<BlockMetaFull>> block_meta_full;
+        std::map<BLOCK_id,REF_getter<BlockMetaValidator>> block_meta_validator;
+        REF_getter<BlockMetaFull> getMetaFull()
+        {
+            auto b=prev_root_hash_Z();
+            auto it=block_meta_full.find(b);
+            if(it!=block_meta_full.end())
+            {
+                if(it->second.valid())
+                return it->second;
+            }
+            REF_getter<BlockMetaFull> m=new BlockMetaFull();
+            auto nn=root->getNodeListNoCreate(db_state.get());
+            m->full_broadcast=nn->getList();
+            auto an=root->getAllNodes(db_state.get());
+
+            for(auto& z: an)
+            {
+                auto name=z->getName();
+                m->nodes.insert_or_assign(name,z);
+                auto stake=z->get_full_stake();
+                m->node_stakes[name]=stake;
+                m->total_full_stake+=stake;
+            }
+            return m;
+        }
+        REF_getter<BlockMetaValidator> getMetaValidator(uint64_t block_timestamp)
+        {
+            auto b=prev_root_hash_Z();
+            auto it=block_meta_validator.find(b);
+            if(it!=block_meta_validator.end())
+            {
+                if(it->second.valid())
+                return it->second;
+            }
+            REF_getter<BlockMetaValidator> m=new BlockMetaValidator();
+            auto nn=root->getNodeListNoCreate(db_state.get());
+            m->validator_broadcast=getValidators(root, block_timestamp,db_state.get());
+            // auto nm=root->getAllNodes(db_state.get());
+            // m->full_broadcast=nn->getList();
+            auto an=root->getAllNodes(db_state.get());
+
+            for(auto& z: m->validator_broadcast)
+            {
+                auto n=root->getNode(z,db_state.get());
+                // auto name=z->getName();
+                // m->nodes.insert_or_assign(name,z);
+                auto stake=n->get_full_stake();
+                m->validator_stake[z]=stake;
+                m->total_validator_stake+=stake;
+            }
+            return m;
+        }
 
         BLOCK_id prev_root_hash_Z()
         {
@@ -348,6 +425,8 @@ namespace Node
         {
             c_blocks.clear();
             l_blocks.clear();
+            block_meta_full.clear();
+            block_meta_validator.clear();
             cli_leader_info.clear();
             // lc_responses.clear();
             syncs.clear();
@@ -357,6 +436,7 @@ namespace Node
             stage_is_working=false;
             last_activity_time=0;
             contracts.clear();
+            prev_block=NULL;
 
         }
 

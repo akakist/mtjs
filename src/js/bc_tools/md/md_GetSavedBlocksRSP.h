@@ -16,7 +16,6 @@ namespace MsgData
 
         }
         std::vector<REF_getter<MsgData::BlockDBStore>> blocks_ZZ;
-        // BigInt lastEpoch;
         BLOCK_id last_prev_root_hash;
         void update(Blake2bHasher& h) const
         {

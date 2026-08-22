@@ -5,7 +5,7 @@
 #include "base16.h"
 #include "commonError.h"
 #include "Events/Tools/telnetEvent.h"
-#include "bigint.h"
+// #include "bigint.h"
 #include "blake2bHasher.h"
 #include "REF.h"
 #include "Events/Tools/webHandlerEvent.h"
@@ -170,34 +170,28 @@ void Node::Service::do_start_block()
         return;
     }
     auto &li = l_blocks[prev_root_hash_Z()].leader_info;
-    // auto &li = hbs.leader_info;
+#ifdef FULL_M
+    auto mf=getMetaFull();
+#else
+    auto mv=getMetaValidator(li.leader_cert_2->block_timestamp);
+#endif
     {
-        {
-            // make_leader_certificate();
-            REF_getter<MsgData::ValidateBlockREQ> b = new MsgData::ValidateBlockREQ();
-            // msg::block_request b;
-            b->heart_beat = li.leader_cert_2;
+        REF_getter<MsgData::ValidateBlockREQ> b = new MsgData::ValidateBlockREQ();
+        b->heart_beat = li.leader_cert_2;
 
-            // std::set<std::string> nnn;
-            // for(auto& z:b->heart_beat->nodes)
-            // {
-            //     nnn.insert(z.container);
-            // }
-            // logNode("LC nodes %s",iUtils->join(" ",nnn).c_str());
+        auto &bt = l_blocks[prev_root_hash_Z()];
+        collectTransactions();
 
-            auto &bt = l_blocks[prev_root_hash_Z()];
-            // logNode("before collectTransactions sz %d", transaction_pool_of_leader.size());
-            collectTransactions();
-            // logNode("AFTER collectTransactions sz %d", transaction_pool_of_leader.size());
-
-            for (auto &z : transaction_pool_of_leader)
-                b->transaction_bodies.push_back(z.second);
-            // logNode("broadcast ValidateBlockREQ");
-            broadcast_MsgEvent(b.get());
-        }
+        for (auto &z : transaction_pool_of_leader)
+            b->transaction_bodies.push_back(z.second);
+#ifdef FULL_M
+        broadcast_MsgEvent(b.get(), mf->full_broadcast);
+#else
+        broadcast_MsgEvent(b.get(), mv->validator_broadcast);
+#endif
     }
 }
-void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b)
+void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b, const std::set<NODE_id>& nodes)
 {
     std::string msg;
     // logErr2("b get %p",b.get());
@@ -207,7 +201,7 @@ void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b)
     auto signature=sign_ed(my_sk_ed,blake2b_hash(msg).container);
     sendEvent(ServiceEnum::BroadcasterTree,
               new bcEvent::BroadcastMessage(ServiceEnum::Node,
-                                            this_node_name, node_start_timestamp, seqId2++, signature,msg, ListenerBase::serviceId));
+                                            this_node_name, node_start_timestamp, nodes, seqId2++, signature,msg, ListenerBase::serviceId));
 
 }
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
@@ -543,7 +537,8 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
     }
     rt->lc = li.leader_cert_2;
     li.request_for_transactions_time = iUtils->getNow();
-    broadcast_MsgEvent(rt.get());
+
+    broadcast_MsgEvent(rt.get(),getMetaFull()->full_broadcast);
 }
 
 // #include "sql"
@@ -636,26 +631,26 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
         {
             ns.insert(z);
             auto n=root->getNode(z,db_state.get());
-            total_staked+=n->get_full_stake_DBL();
+            total_staked+=n->get_full_stake();
         }
         for(auto& z:local_prev_block->node_validators)
         {
             auto n=root->getNode(z,db_state.get());
             // n->get_full_stake();
-            auto portion=n->get_full_stake_DBL()*b.node_rewards/total_staked;
+            auto portion=n->get_full_stake()*b.node_rewards/total_staked;
             auto u = root->getAddressState(n->get_owner(),NULL,db_state.get());
             {
                 M_LOCK(u->parent->mx);
                 u->balance+=portion;
             }
             u->setDirty(NULL);
-            b.emit_block("reward",R"({"node":"%s","fee":"%s"})",z.container.c_str(),portion.toString().c_str());
+            b.emit_block("reward",R"({"node":"%s","fee":"%s"})",z.container.c_str(),std::to_string(portion).c_str());
         }
         
     }
 
 
-    b.emit_block("total_fee",R"({"fee":"%s"})",b.node_rewards.toString().c_str());
+    b.emit_block("total_fee",R"({"fee":"%s"})",std::to_string(b.node_rewards).c_str());
 }
 
 BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)
@@ -741,27 +736,40 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
         return false;
     {
         MUTEX_INSPECTOR;
+        auto mf=getMetaFull();
+#ifndef FULL_M
+        auto vals=getValidators(root,lc->blockInfo->heart_beat->block_timestamp,db_state.get());
+#endif
         std::vector<blst_cpp::PublicKey> agg_pk;
-        double stake;
+
+        uint64_t stake=0;
+#ifndef FULL_M
+        uint64_t val_stake=0;
+#endif
         for (auto &z : lc->node_validators)
         {
-            auto n = root->getNode(z,db_state.get());
-            if (!n.valid())
-            {
-                logErr2("            if (!n.valid()) %s",z.container.c_str());
-                return false;
+#ifndef FULL_M
+            if(!vals.count(z))
+                throw CommonError("if(!vals.count(z))");
+#endif
 
-            }
+            auto n = mf->getNode(z);
             agg_pk.push_back(n->get_bls_pk());
-            stake += n->get_full_stake_DBL();
+            stake += mf->getStake(z);
         }
-        auto nn=root->getAllNodes(db_state.get());
-        double ts = 0;
-        for(auto &z: nn)
+        
+        // auto nn=root->getAllNodes(db_state.get());
+#ifndef FULL_M
+        for(auto &z: vals)
         {
-            ts+=z->get_full_stake_DBL();
+            val_stake+=mf->getStake(z);
         }
-        if (stake < ts * QUORUM)
+#endif
+#ifdef FULL_M
+        if (stake * 100 / mf->total_full_stake < QUORUM)
+#else
+        if (stake * 100 / val_stake < QUORUM)
+#endif
         {
             logErr2("verify lc quorum failed");
             return false;
@@ -1021,23 +1029,20 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 {
     MUTEX_INSPECTOR;
     // yyjson::Document doc(tx_cmds);
-    BigInt gasLimit=0;
-    BigInt gasPrice=0;
-    BigInt value=0;
+    uint64_t gasLimit=0;
+    uint64_t gasPrice=0;
+    uint64_t value=0;
     
     yyjson_val *jroot=yyjson_doc_get_root(tx->doc);
 
     yyjson_val * j_tx = yyjson_obj_get(jroot,"tx");
     if(!j_tx)
         throw CommonError("if(!j_tx)");
-    // BigInt gasLimit=0;
-    // BigInt gasPrice=0;
-    // BigInt value=0;
-    auto err=yy_get_bn(jroot,"value",value);
+    auto err=yy_get_uint64_t(jroot,"value",value);
     if(!err)
-        err=yy_get_bn(jroot,"gasLimit",gasLimit);
+        err=yy_get_uint64_t(jroot,"gasLimit",gasLimit);
     if(!err)
-        err=yy_get_bn(jroot,"gasPrice",gasPrice);
+        err=yy_get_uint64_t(jroot,"gasPrice",gasPrice);
     if(err)
     {
         b.emit_tx(tx_id,"error",R"({"error":"%s"})",err->c_str());

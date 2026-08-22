@@ -29,6 +29,8 @@ void Node::Service::do_InvalidateRoot()
 }
 bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
 {
+        // logErr2("@@ %s",__func__);
+
     if(state_Z==STATE_SYNCING)
     {
         return true;
@@ -94,7 +96,16 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
-    db_to_save_Z.add("#last_block#",r->getBuffer());
+    auto pn=db_state->getDbName()+".last_block";
+    FILE *f=fopen(pn.c_str(),"w");
+    if(f)
+    {
+        auto lb=r->getBuffer();
+        fwrite(lb.data(),lb.size(),1,f);
+        fclose(f);
+
+    }
+    // db_to_save_Z.add("#last_block#",r->getBuffer());
     auto &hb=c.blockDBStore->validateBlockREQ->heart_beat;
     {
         MUTEX_INSPECTOR;
@@ -109,6 +120,8 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         XPASS;
     }
     db_state->write_granules_batch(db_to_save_Z);
+
+    // FILE *f= fopen("")
     logErr2("written %d granules",db_to_save_Z.cells.size());
     db_to_save_Z.clear();
 
@@ -117,6 +130,8 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     prev_block=r;
     l_blocks.clear();
+    block_meta_full.clear();
+    block_meta_validator.clear();
     cli_leader_info.clear();
     do_InvalidateRoot();
 

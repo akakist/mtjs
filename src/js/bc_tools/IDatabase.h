@@ -7,6 +7,7 @@
 struct IDatabase: public Refcountable
 {
 
+    virtual std::string getDbName()=0;
 
     virtual int getGranule(const std::string& k, std::string* v)=0;
     virtual int write_granules_batch(const _db_to_save &v)=0;

@@ -1,7 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_TX.h"
-#include "bigint.h"
+// #include "bigint.h"
 #include "ADDRESS_id.h"
 struct EmitNode {
     std::vector<std::pair<std::string,std::string>> emits;                    // события на этом уровне
@@ -57,8 +57,8 @@ namespace MsgData
 
         }
         EmitNode blockRoot;
-        std::map<ADDRESS_id,BigInt> fees;
-        std::map<NODE_id,BigInt> rewards;
+        std::map<ADDRESS_id,uint64_t> fees;
+        std::map<NODE_id,uint64_t> rewards;
         // std::vector<std::string> emitted_events;
         size_t size()
         {
@@ -67,12 +67,12 @@ namespace MsgData
             for(auto& z:fees)
             {
                 sz+=z.first.addr.size();
-                sz+=z.second.toString().size();
+                sz+=sizeof(z.second);
             }
             for(auto& z:rewards)
             {
                 sz+=z.first.container.size();
-                sz+=z.second.toString().size();
+                sz+=sizeof(z.second);
             }
             return sz;
         }
@@ -95,12 +95,12 @@ namespace MsgData
             for(auto &z: fees)
             {
                 h.update(z.first.addr);
-                h.update(z.second.toString());
+                h.update(std::to_string(z.second));
             }
             for(auto &z: rewards)
             {
                 h.update(z.first.container);
-                h.update(z.second.toString());
+                h.update(std::to_string(z.second));
             }
         }
     };
