@@ -46,10 +46,10 @@
 // #define HEART_BEAT_INTERVAL_SEC 5
 std::set<NODE_id> getValidators(const REF_getter<root_data>& r, uint64_t block_timestamp, IDatabase* db);
 
-enum State
-{
-    STATE_NORMAL,STATE_SYNCING
-};
+// enum State
+// {
+//     STATE_NORMAL,STATE_SYNCING
+// };
 
 namespace Node
 {
@@ -213,20 +213,24 @@ namespace Node
         bool ValidateBlockRSP(const MsgData::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
         bool BlockAcceptedREQ(const MsgData::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route);
 
-        bool GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP* r, const NODE_id & src_node, const route_t& route);
-        bool GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ* r, const NODE_id & src_node, const route_t& route);
+        // bool GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP* r, const NODE_id & src_node, const route_t& route);
+        // bool GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ* r, const NODE_id & src_node, const route_t& route);
         bool ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
         bool ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
 
-        bool DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const NODE_id & src_node, const route_t& route);
-        bool DoYouHaveBlockRSP(const MsgData::DoYouHaveBlockRSP* m, const NODE_id & src_node, const route_t& route);
+        // bool DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const NODE_id & src_node, const route_t& route);
+        // bool DoYouHaveBlockRSP(const MsgData::DoYouHaveBlockRSP* m, const NODE_id & src_node, const route_t& route);
         // bool LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route);
         // bool LcRSP(const MsgData::LcRSP* m, const NODE_id & src_node, const route_t& route);
 
         bool DelayNotificationREQ(const MsgData::DelayNotificationREQ* m, const NODE_id & src_node, const route_t& route);
+        
 
         bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);
+
+        bool GetGranulesRSP(const bcEvent::GetGranulesRSP* m);
+        bool GetGranulesREQ(const bcEvent::GetGranulesREQ*e);
 
 
         // void make_leader_certificate();
@@ -339,15 +343,15 @@ namespace Node
                 j["havers SZ"]=havers.size();
             }
         };
-        std::map<BLOCK_id, block_client> c_blocks;
-        std::map<BLOCK_id,block_leader> l_blocks;
-        std::map<BLOCK_id, client_leader_info> cli_leader_info;
-        std::map<BLOCK_id,_sync> syncs;
+        std::map<THASH_id, block_client> c_blocks;
+        std::map<THASH_id,block_leader> l_blocks;
+        std::map<THASH_id, client_leader_info> cli_leader_info;
+        std::map<THASH_id,_sync> syncs;
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
-        std::map<BLOCK_id,REF_getter<BlockMetaFull>> block_meta_full;
-        std::map<BLOCK_id,REF_getter<BlockMetaValidator>> block_meta_validator;
+        std::map<THASH_id,REF_getter<BlockMetaFull>> block_meta_full;
+        std::map<THASH_id,REF_getter<BlockMetaValidator>> block_meta_validator;
         REF_getter<BlockMetaFull> getMetaFull()
         {
             auto b=prev_root_hash_Z();
@@ -400,11 +404,11 @@ namespace Node
             return m;
         }
 
-        BLOCK_id prev_root_hash_Z()
+        THASH_id prev_root_hash_Z()
         {
             if(prev_block.valid())
             return prev_block->blockInfo->new_root_hash1;
-            BLOCK_id r;
+            THASH_id r;
             r.container="";
             return r;
         }
@@ -416,7 +420,7 @@ namespace Node
 
         }
         REF_getter<MsgData::BlockAcceptedREQ> prev_block;
-        State state_Z=STATE_NORMAL;
+        // State state_Z=STATE_NORMAL;
         int64_t stage_is_working = 0;
         uint64_t last_activity_time=0;
         int64_t node_start_timestamp=0;
@@ -431,8 +435,8 @@ namespace Node
             // lc_responses.clear();
             syncs.clear();
             transaction_pool_of_leader.clear();
-            // prev_root_hash_Z=BLOCK_id();
-            state_Z=STATE_NORMAL;
+            // prev_root_hash_Z=THASH_id();
+            // state_Z=STATE_NORMAL;
             stage_is_working=false;
             last_activity_time=0;
             contracts.clear();
@@ -445,15 +449,15 @@ namespace Node
 
 
         void collectTransactions();
-        BLOCK_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc);
+        THASH_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc);
 
-        void do_sync(const NODE_id &src_node);
+        void do_sync(const NODE_id &src_node, const THASH_id& prev_root_hash_remote);
 
         // bool CheckState(const MsgData::HeartBeatREQ *r, const NODE_id & src_node);
 
         void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::HeartBeatREQ> &lc);
 
-        BLOCK_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
+        THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
     
         bool verify_block(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
 
@@ -516,15 +520,15 @@ namespace Node
             }
             j["filter_NodeMsgREQ"]=ft;
             j["contracts size"]=contracts.size();
-        // std::map<BLOCK_id, block_client> c_blocks;
-        // std::map<BLOCK_id,block_leader> l_blocks;
-        // std::map<BLOCK_id, client_leader_info> cli_leader_info;
-        // std::map<BLOCK_id,_sync> syncs;
+        // std::map<THASH_id, block_client> c_blocks;
+        // std::map<THASH_id,block_leader> l_blocks;
+        // std::map<THASH_id, client_leader_info> cli_leader_info;
+        // std::map<THASH_id,_sync> syncs;
         // std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         // std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
 
         }
-            
+            // std::set<std::string> front_sync;
     };
 
 }

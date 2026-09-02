@@ -83,7 +83,8 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     if(prev_block.valid())
     {
             if(!verify_block(prev_block))
-                throw CommonError("last_block not verified");
+                prev_block=NULL;
+                // throw CommonError("last_block not verified");
 
     }
 
@@ -125,7 +126,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     // REF_getter<MsgData::LcREQ> lr=new MsgData::LcREQ();
     // broadcast_MsgEvent(lr.get());
     // sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_LC_REQ_TIMEDOUT,NULL,NULL,1.,this));
-    state_Z=State::STATE_NORMAL;
+    // state_Z=State::STATE_NORMAL;
 
 
     return true;
@@ -256,10 +257,10 @@ void Node::Service::report_mem()
         sz+=z.second->size();
     }
     logNode("REPORT_MEM NodeService %ld",sz);
-        //     std::map<BLOCK_id, block_client> c_blocks;
-        // std::map<BLOCK_id,block_leader> l_blocks;
-        // std::map<BLOCK_id, client_leader_info> cli_leader_info;
-        // std::map<BLOCK_id,_sync> syncs;
+        //     std::map<THASH_id, block_client> c_blocks;
+        // std::map<THASH_id,block_leader> l_blocks;
+        // std::map<THASH_id, client_leader_info> cli_leader_info;
+        // std::map<THASH_id,_sync> syncs;
         // std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         // std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
                 // std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
@@ -278,8 +279,11 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     break;
     case timers::TIMER_VALIDATE_BLOCK_DELAY:
     {
-        if (state_Z != STATE_NORMAL)
+        if(!db_state->sync_empty)
+        {
+            logNode("TIMER_VALIDATE_BLOCK_DELAY if(!db_state->sync_empty)");
             return true;
+        }
         auto &li = l_blocks[prev_root_hash_Z()].leader_info;
         // auto &li = hbs.leader_info;
         do_start_block();
@@ -297,8 +301,11 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     }
     case timers::TIMER_RESTART_BLOCK:
     {
-        if (state_Z != STATE_NORMAL)
+        if(!db_state->sync_empty)
+        {
+            logNode("TIMER_RESTART_BLOCK if(!db_state->sync_empty)");
             return true;
+        }
         auto &li = l_blocks[prev_root_hash_Z()].leader_info;
         // auto &li = hbs.leader_info;
         li.request_for_transactions_sent = true;
@@ -320,6 +327,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         auto &ID = e->id;
         switch (ID)
         {
+        case bcEventEnum::GetGranulesREQ:
+            return GetGranulesREQ((const bcEvent::GetGranulesREQ *)e.get());
+        case bcEventEnum::GetGranulesRSP:
+            return GetGranulesRSP((const bcEvent::GetGranulesRSP *)e.get());
         case bcEventEnum::NodeMsgREQ:
             return NodeMsgREQ((const bcEvent::NodeMsgREQ *)e.get());
         case bcEventEnum::NodeMsgRSP:
@@ -348,6 +359,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
 
             switch (IDA)
             {
+            case bcEventEnum::GetGranulesREQ:
+                return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
+            case bcEventEnum::GetGranulesRSP:
+                return GetGranulesRSP((const bcEvent::GetGranulesRSP *)ev->e.get());
             case bcEventEnum::NodeMsgREQ:
                 return NodeMsgREQ((const bcEvent::NodeMsgREQ *)ev->e.get());
             case bcEventEnum::NodeMsgRSP:
@@ -363,6 +378,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             auto &IDC = ev->e->id;
             switch (IDC)
             {
+            case bcEventEnum::GetGranulesREQ:
+                return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
+            case bcEventEnum::GetGranulesRSP:
+                return GetGranulesRSP((const bcEvent::GetGranulesRSP *)ev->e.get());
             case bcEventEnum::NodeMsgREQ:
                 return NodeMsgREQ((const bcEvent::NodeMsgREQ *)ev->e.get());
             case bcEventEnum::NodeMsgRSP:
@@ -542,7 +561,7 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
 }
 
 // #include "sql"
-BLOCK_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
+THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
 {
     MUTEX_INSPECTOR;
     M_LOCK(root->state_mutex);
@@ -653,7 +672,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     b.emit_block("total_fee",R"({"fee":"%s"})",std::to_string(b.node_rewards).c_str());
 }
 
-BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)
+THASH_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)
 {
     MUTEX_INSPECTOR;
     r->calc_tree_hash(db_to_save_Z);
@@ -665,9 +684,9 @@ BLOCK_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
         root_buf = r->getBuffer_mx();
     }
     auto root_hash = blake2b_hash(root_buf);
-    db_to_save_Z.add("#root#", root_buf);
+    db_to_save_Z.add("", root_buf);
     // db_to_save_Z.add("#root_hash#", root_hash.container);
-    BLOCK_id ret;
+    THASH_id ret;
     ret.container = root_hash.container;
     return ret;
 }
@@ -861,8 +880,8 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
     switch (msg->type)
     {
-    case msgid::DoYouHaveBlockREQ:
-        return DoYouHaveBlockREQ(static_cast<const MsgData::DoYouHaveBlockREQ *>(msg.get()), m->node_signer, m->route);
+    // case msgid::DoYouHaveBlockREQ:
+    //     return DoYouHaveBlockREQ(static_cast<const MsgData::DoYouHaveBlockREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::LcEnvelopeREQ:
         return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::GetTransactionREQ:
@@ -873,8 +892,8 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     case msgid::BlockAcceptedREQ:
         last_activity_time=iUtils->getNow();
         return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::GetSavedBlocksREQ:
-        return GetSavedBlocksREQ(static_cast<const MsgData::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
+    // case msgid::GetSavedBlocksREQ:
+    //     return GetSavedBlocksREQ(static_cast<const MsgData::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderREQ:
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
     // case msgid::LcREQ:
@@ -905,8 +924,8 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     switch (id)
     {
-    case msgid::DoYouHaveBlockRSP:
-        return DoYouHaveBlockRSP(static_cast<const MsgData::DoYouHaveBlockRSP *>(ee.get()), m->node_signer, m->route);
+    // case msgid::DoYouHaveBlockRSP:
+    //     return DoYouHaveBlockRSP(static_cast<const MsgData::DoYouHaveBlockRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::HeartBeatRSP:
         return HeartBeatRSP(static_cast<const MsgData::HeartBeatRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderRSP:
@@ -915,8 +934,8 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
         return GetTransactionRSP(static_cast<const MsgData::GetTransactionRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ValidateBlockRSP:
         return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
-    case msgid::GetSavedBlocksRSP:
-        return GetSavedBlocksRSP(static_cast<const MsgData::GetSavedBlocksRSP *>(ee.get()), m->node_signer, m->route);
+    // case msgid::GetSavedBlocksRSP:
+    //     return GetSavedBlocksRSP(static_cast<const MsgData::GetSavedBlocksRSP *>(ee.get()), m->node_signer, m->route);
     // case msgid::LcRSP:
     //     return LcRSP(static_cast<const MsgData::LcRSP *>(ee.get()), m->node_signer, m->route);
     default:

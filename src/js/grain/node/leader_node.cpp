@@ -17,8 +17,12 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
 
     XTRY;
     MUTEX_INSPECTOR;
-    if (state_Z != STATE_NORMAL)
+    if(!db_state->sync_empty)
+    {
+        logNode("GetTransactionRSP if(!db_state->sync_empty)");
         return true;
+    }
+
 
     // logNode("GetTransactionRSP from %s", src_node.container.c_str());
     for (auto &z : r->trs)
@@ -61,8 +65,11 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     XTRY;
     MUTEX_INSPECTOR;
     // logNode("@@ %s",__func__);
-    if (state_Z != STATE_NORMAL)
+    if(!db_state->sync_empty)
+    {
+        logNode("ValidateBlockRSP if(!db_state->sync_empty)");
         return true;
+    }
 
     if (r->blockInfo->heart_beat->prev_root_hash_1 != prev_root_hash_Z())
     {
@@ -128,7 +135,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         
         broadcast_MsgEvent(ba.get(),getMetaFull()->full_broadcast);
 
-        // logNode("validators %s",iUtils->join(" ",nnn).c_str());
+        logNode("validators %s",iUtils->join(" ",nnn).c_str());
 
         bt.block_accepted_sent = iUtils->getNow();
 

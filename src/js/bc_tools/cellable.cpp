@@ -88,7 +88,9 @@ REF_getter<Cellable> Cellable::getLeafNoCreate(const std::string &id, IDatabase 
         }
         else
         {
-            throw CommonError("getGranule: cell hash not matched %s %s", base16::encode(it->second.container).c_str(), base16::encode(h.container).c_str());
+            db->clear_root = true;
+            return NULL;
+            // throw CommonError("getGranule: cell hash not matched %s %s granule size %ld", base16::encode(it->second.container).c_str(), base16::encode(h.container).c_str(), result.size());
         }
     }
     {

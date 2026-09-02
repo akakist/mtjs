@@ -132,6 +132,7 @@ bool GrainReader::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
     root=e->root;
     return true;
 }
+
 bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
 {
 

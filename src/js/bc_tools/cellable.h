@@ -127,6 +127,42 @@ public:
     REF_getter<Cellable> getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l, Rollback *roll);
 
     std::string getDbId() const;
+    void clear(const std::string &id)
+    {
+        std::deque<std::string> v;
+        if(id.size()>0)
+            v.push_back(id.substr(0,1));
+        if(id.size()>1)
+            v.push_back(id.substr(1,1));
+        if(id.size()>2)
+            v.push_back(id.substr(2,1));
+        if(id.size()>3)
+            v.push_back(id.substr(3,1));
+        if(id.size()>4)
+            v.push_back(id.substr(4,28));
+        
+        Cellable *r=this;
+        while(v.size())
+        {
+            auto it=r->children_ptrs_mx.find(v[0]);
+            if(it!=r->children_ptrs_mx.end())
+            {
+                r=it->second.get();
+                v.pop_front();
+            }
+            else break;
+        }
+        if(v.size() == 0)
+        {
+            auto id=r->m_id;
+            r=r->parent;
+            if(r)
+            {
+                r->children_ptrs_mx.erase(id);
+            }
+        }
+        
+    }
 
     void get_path(std::vector<const Cellable*> &s) const
     {

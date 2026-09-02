@@ -1,6 +1,6 @@
 #pragma once
 #include "md_Base.h"
-#include "BLOCK_id.h"
+#include "THASH_id.h"
 // #include "bigint.h"
 #include "NODE_id.h"
 #include <nlohmann/json.hpp>
@@ -13,11 +13,11 @@ namespace MsgData
         {
 
         }
-        HeartBeatREQ(const BLOCK_id& _prev_block_hash, uint64_t _newepoch, const NODE_id& _node_leader, time_t _block_ts):Base(msgid::HeartBeatREQ),
+        HeartBeatREQ(const THASH_id& _prev_block_hash, uint64_t _newepoch, const NODE_id& _node_leader, time_t _block_ts):Base(msgid::HeartBeatREQ),
             prev_root_hash_1(_prev_block_hash), new_epoch(_newepoch), node_leader(_node_leader), block_timestamp(_block_ts)
         {
         }
-        BLOCK_id prev_root_hash_1;
+        THASH_id prev_root_hash_1;
         uint64_t new_epoch;
         NODE_id node_leader;
         time_t block_timestamp;

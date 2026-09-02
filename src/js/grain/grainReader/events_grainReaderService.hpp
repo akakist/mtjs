@@ -7,11 +7,7 @@
 #include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
 #include "Events/System/Run/startServiceEvent.h"
-#include "Events/Tools/telnetEvent.h"
-#include "Events/Tools/webHandlerEvent.h"
-#include "Events/System/Net/httpEvent.h"
 #include "Events/System/timerEvent.h"
-#include "Events/System/Net/httpEvent.h"
 #include "Event/bcEvent.h"
 inline std::set<EVENT_id> getEvents_grainReaderService()
 {
@@ -19,6 +15,8 @@ inline std::set<EVENT_id> getEvents_grainReaderService()
 	std::set<EVENT_id> out;
 	out.insert(bcEventEnum::ClientMsg);
 	out.insert(bcEventEnum::ClientMsgReply);
+	out.insert(bcEventEnum::GetGranulesREQ);
+	out.insert(bcEventEnum::GetGranulesRSP);
 	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(rpcEventEnum::IncomingOnAcceptor);
@@ -34,6 +32,8 @@ inline void regEvents_grainReaderService()
 {
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
+	iUtils->registerEvent(bcEvent::GetGranulesREQ::construct);
+	iUtils->registerEvent(bcEvent::GetGranulesRSP::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnAcceptor::construct);

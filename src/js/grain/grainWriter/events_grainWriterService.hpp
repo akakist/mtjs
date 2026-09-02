@@ -14,12 +14,14 @@ inline std::set<EVENT_id> getEvents_grainWriterService()
 
 	std::set<EVENT_id> out;
 	out.insert(bcEventEnum::ClientMsg);
-	out.insert(bcEventEnum::ClientMsgReply);
 	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::ServiceInit);
+	out.insert(bcEventEnum::WriteGranules);
 	out.insert(rpcEventEnum::IncomingOnAcceptor);
 	out.insert(rpcEventEnum::IncomingOnConnector);
 	out.insert(systemEventEnum::startService);
+	out.insert(timerEventEnum::SetAlarm);
+	out.insert(timerEventEnum::SetTimer);
 	out.insert(timerEventEnum::TickAlarm);
 	out.insert(timerEventEnum::TickTimer);
 
@@ -29,12 +31,14 @@ inline std::set<EVENT_id> getEvents_grainWriterService()
 inline void regEvents_grainWriterService()
 {
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
-	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
+	iUtils->registerEvent(bcEvent::WriteGranules::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnAcceptor::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnConnector::construct);
 	iUtils->registerEvent(systemEvent::startService::construct);
+	iUtils->registerEvent(timerEvent::SetAlarm::construct);
+	iUtils->registerEvent(timerEvent::SetTimer::construct);
 	iUtils->registerEvent(timerEvent::TickAlarm::construct);
 	iUtils->registerEvent(timerEvent::TickTimer::construct);
 }

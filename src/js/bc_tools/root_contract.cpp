@@ -357,25 +357,6 @@ std::pair<REF_getter<root_data>,REF_getter<MsgData::BlockAcceptedREQ>>  getRoot(
                 last_block->unpack2(in);
         }
 
-        // if(!err)
-    //     {
-    // MUTEX_INSPECTOR;
-    //         std::string lb;
-    //         int err = db->getGranule("#last_block#", &lb);
-    //         if(!err && lb.size())
-    //         {
-    // MUTEX_INSPECTOR;
-    //             last_block=new MsgData::BlockAcceptedREQ;
-    //             // last_block->unpack2
-    //             inBuffer in(lb);
-    //             last_block->unpack2(in);
-
-    //         }
-    //         if(!err && lb.empty())
-    //         {
-    // MUTEX_INSPECTOR;
-    //         }
-    //     }
 
     }
 

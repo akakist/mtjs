@@ -2,11 +2,6 @@
 #define __________nodeService_EventInfo__HH
 
 
-#include "Events/System/timerEvent.h"
-#include "Event/bcEvent.h"
-#include "bcEvent.h"
-#include "Events/System/timerEvent.h"
-#include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
 #include "Events/System/Net/httpEvent.h"
 #include "Events/System/Net/rpcEvent.h"
@@ -29,6 +24,8 @@ inline std::set<EVENT_id> getEvents_nodeService()
 	std::set<EVENT_id> out;
 	out.insert(bcEventEnum::BroadcastMessage);
 	out.insert(bcEventEnum::ClientMsgReply);
+	out.insert(bcEventEnum::GetGranulesREQ);
+	out.insert(bcEventEnum::GetGranulesRSP);
 	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::NodeMsgREQ);
 	out.insert(bcEventEnum::NodeMsgRSP);
@@ -46,6 +43,7 @@ inline std::set<EVENT_id> getEvents_nodeService()
 	out.insert(telnetEventEnum::Reply);
 	out.insert(timerEventEnum::ResetAlarm);
 	out.insert(timerEventEnum::SetAlarm);
+	out.insert(timerEventEnum::SetTimer);
 	out.insert(timerEventEnum::TickAlarm);
 	out.insert(timerEventEnum::TickTimer);
 	out.insert(webHandlerEventEnum::RequestIncoming);
@@ -57,6 +55,8 @@ inline void regEvents_nodeService()
 {
 	iUtils->registerEvent(bcEvent::BroadcastMessage::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
+	iUtils->registerEvent(bcEvent::GetGranulesREQ::construct);
+	iUtils->registerEvent(bcEvent::GetGranulesRSP::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgREQ::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgRSP::construct);
@@ -74,6 +74,7 @@ inline void regEvents_nodeService()
 	iUtils->registerEvent(telnetEvent::Reply::construct);
 	iUtils->registerEvent(timerEvent::ResetAlarm::construct);
 	iUtils->registerEvent(timerEvent::SetAlarm::construct);
+	iUtils->registerEvent(timerEvent::SetTimer::construct);
 	iUtils->registerEvent(timerEvent::TickAlarm::construct);
 	iUtils->registerEvent(timerEvent::TickTimer::construct);
 	iUtils->registerEvent(webHandlerEvent::RequestIncoming::construct);

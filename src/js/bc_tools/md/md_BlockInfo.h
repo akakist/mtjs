@@ -15,7 +15,7 @@ namespace MsgData
         {
 
         }
-        BLOCK_id new_root_hash1;
+        THASH_id new_root_hash1;
         THASH_id attachment_hash;
         THASH_id tx_hash;
         REF_getter<HeartBeatREQ> heart_beat;

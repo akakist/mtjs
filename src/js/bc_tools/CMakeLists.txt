@@ -23,7 +23,7 @@ msgFactory.cpp
 init_root.cpp
 base16.h
 blake2bHasher.h
-BLOCK_id.h
+THASH_id.h
 blst_cp.h
 CDatabase.h
 cellable.h

@@ -4,13 +4,8 @@
 
 #include "Events/System/Net/rpcEvent.h"
 #include "Events/System/timerEvent.h"
-#include "Event/bcEvent.h"
 #include "Events/System/Run/startServiceEvent.h"
-#include "Events/Tools/telnetEvent.h"
-#include "Events/Tools/webHandlerEvent.h"
-#include "Events/System/Net/httpEvent.h"
 #include "Events/System/timerEvent.h"
-#include "Events/System/Net/httpEvent.h"
 #include "Event/bcEvent.h"
 inline std::set<EVENT_id> getEvents_txValidatorService()
 {
@@ -19,7 +14,6 @@ inline std::set<EVENT_id> getEvents_txValidatorService()
 	out.insert(bcEventEnum::AddTxREQ);
 	out.insert(bcEventEnum::AddTxRSP);
 	out.insert(bcEventEnum::ClientMsg);
-	out.insert(bcEventEnum::ClientMsgReply);
 	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::PutTransactionREQ);
 	out.insert(bcEventEnum::ServiceInit);
@@ -37,7 +31,6 @@ inline void regEvents_txValidatorService()
 	iUtils->registerEvent(bcEvent::AddTxREQ::construct);
 	iUtils->registerEvent(bcEvent::AddTxRSP::construct);
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
-	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
 	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::PutTransactionREQ::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);

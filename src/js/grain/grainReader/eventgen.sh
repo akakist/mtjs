@@ -1,1 +1,1 @@
-../../../megatron/tools/ifacegen2/ifacegen2.debug.exe grainReaderService *.cpp *.h 
+../../../mt/tools/ifacegen2/ifacegen2.debug.exe grainReaderService *.cpp *.h 

@@ -43,6 +43,9 @@ namespace bcEventEnum
     const EVENT_id GetUserNonceRSP(ghash("@g_GetUserNonceRSP"));
     const EVENT_id WriteGranules(ghash("@g_WriteGranules"));
     const EVENT_id WriteBlock(ghash("@g_WriteBlock"));
+    const EVENT_id GetGranulesREQ(ghash("@g_GetGranulesREQ"));
+    const EVENT_id GetGranulesRSP(ghash("@g_GetGranulesRSP"));
+    
 
 }
 
@@ -509,5 +512,67 @@ namespace bcEvent
         const uint64_t epoch;
         const REF_getter<IDatabase> db;
     };
+    class GetGranulesREQ : public Event::Base
+    {
+
+    public:
+        static Base *construct(const route_t &r)
+        {
+            return new GetGranulesREQ(r);
+        }
+        GetGranulesREQ(const std::vector<std::string> &_keys, const route_t &r)
+            : Base(bcEventEnum::GetGranulesREQ, r), keys(_keys) {}
+
+        std::vector<std::string> keys;
+
+        GetGranulesREQ(const route_t &r)
+            : Base(bcEventEnum::GetGranulesREQ, r) {}
+
+
+        void unpack(inBuffer &o)
+        {
+            o>>keys;
+        }
+        void pack(outBuffer &o) const
+        {
+            o<<keys;
+        }
+    };
+    class GetGranulesRSP : public Event::Base
+    {
+
+    public:
+        static Base *construct(const route_t &r)
+        {
+            return new GetGranulesRSP(r);
+        }
+        GetGranulesRSP(const THASH_id& _root_hash, const NODE_id &_responder, const std::vector<std::pair<std::string,std::string>> &_v, const route_t &r)
+            : Base(bcEventEnum::GetGranulesRSP, r), 
+            root_hash(_root_hash),
+            responder(_responder),
+            v(_v) {}
+
+        THASH_id root_hash;
+        NODE_id responder;
+        std::vector<std::pair<std::string,std::string>> v;
+
+        GetGranulesRSP(const route_t &r)
+            : Base(bcEventEnum::GetGranulesRSP, r) {}
+
+
+        void unpack(inBuffer &o)
+        {
+            o>>root_hash;
+            o>>responder;
+            o>>v;
+        }
+        void pack(outBuffer &o) const
+        {
+            o<<root_hash;
+            o<<responder;
+            o<<v;
+        }
+    };
+
  
 }

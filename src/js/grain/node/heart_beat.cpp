@@ -94,10 +94,16 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     stage_is_working=iUtils->getNow();
 
     // logNode("HeartBeatREQ");
-    if(state_Z==STATE_SYNCING)
+    if(!db_state->sync_empty)
     {
+        logNode("HeartBeatREQ if(!db_state->sync_empty)");
         return true;
     }
+
+    // if(state_Z==STATE_SYNCING)
+    // {
+    //     return true;
+    // }
     auto& cli=cli_leader_info[h->prev_root_hash_1];
     if(iUtils->getNow()-cli.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT)
     {
@@ -167,10 +173,11 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         /// если локально нет сертиката, нода стартанула с генезиса, а у удаленной есть сертификат
         /// то надо синхронизироваться, переходим в синк, не отвечаем
         logNode("if(remote_verified && !local_verified) do sync return");
-        if(state_Z!=STATE_SYNCING){
-            state_Z = STATE_SYNCING;
-            logNode("do sync");
-            do_sync(src_node);
+        if(db_state->sync_empty){
+            // state_Z = STATE_SYNCING;
+            logNode("start SYNC");
+            prev_block=remote_prev_lc;
+            do_sync(src_node, remote_prev_lc->blockInfo->new_root_hash1);
         }
         return true;
     }
@@ -192,9 +199,11 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         }
         else if(remote_prev_lc->blockInfo->heart_beat->new_epoch > local_prev_block->blockInfo->heart_beat->new_epoch)
         {
-    
-            state_Z = STATE_SYNCING;
-            do_sync(src_node);
+            MUTEX_INSPECTOR;
+            // state_Z = STATE_SYNCING;
+            logNode("START SYNCING");
+            prev_block=remote_prev_lc;
+            do_sync(src_node,remote_prev_lc->blockInfo->new_root_hash1);
             return true;
         }
         else if(remote_prev_lc->blockInfo->heart_beat->new_epoch == local_prev_block->blockInfo->heart_beat->new_epoch)
@@ -269,7 +278,7 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
 
 {
     MUTEX_INSPECTOR;
-    if(state_Z==STATE_SYNCING)
+    if(!db_state->sync_empty)
     {
         return true;
     }
@@ -313,8 +322,10 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     XTRY;
         // logNode("@@ ConfirmLeaderRSP from %s",src_node.container.c_str());
 
-    if(state_Z!=STATE_NORMAL)
+    if(!db_state->sync_empty)
+    {
         return true;
+    }
     stage_is_working=iUtils->getNow();
 
     auto prev_root_hash=prev_root_hash_Z();

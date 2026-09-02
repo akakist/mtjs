@@ -65,7 +65,9 @@ namespace msgid
         // LeaderCertificate, 
         ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,
         GetTransactionREQ,GetTransactionRSP,
-        BlockDBStore, GetSavedBlocksREQ,GetSavedBlocksRSP, DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP,
+        BlockDBStore, 
+        // GetSavedBlocksREQ,GetSavedBlocksRSP, 
+        DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP,
         TX,
         attachment_data,
         GetUserNonceREQ,
@@ -73,8 +75,8 @@ namespace msgid
         LcEnvelopeREQ,
         // LcREQ,
         // LcRSP,
-	DoYouHaveBlockREQ,
-	DoYouHaveBlockRSP,
+	// DoYouHaveBlockREQ,
+	// DoYouHaveBlockRSP,
     DelayNotificationREQ
     };
 

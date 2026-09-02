@@ -13,21 +13,168 @@
 #include "init_root.h"
 #include "md_DoYouHaveBlockREQ.h"
 #include "md_DoYouHaveBlockRSP.h"
+#include "tools_mt.h"
+std::pair<std::string,std::string> splice(const std::string& id)
+{
+    switch(id.size())
+    {
+        case 0: return {"",""};
+        case 1: return {"",id};
+        case 2: return {id.substr(0,1),id.substr(1,1)};
+        case 3: return {id.substr(0,2),id.substr(2,1)};
+        case 4: return {id.substr(0,3),id.substr(3,1)};
+        case 32:return {id.substr(0,4),id.substr(4,28)};
+        default: throw CommonError("defauil switch(id.size())");
+    }
+}
+void collect_sync_req2(const std::string& id, const std::string &granule,IDatabase* db)
+{
+    {
+        inBuffer in(granule);
+        REF_getter< Cellable> c=new Cellable(NULL,id);
+        c->unpack_mx(in);
+        for(auto& z: c->children_hashes_mx)
+        {
+            std::string cid=id+z.first;
+            std::string cbuf;
+            auto r2=db->getGranule(cid, &cbuf);
+            auto h=blake2b_hash(cbuf);
+            if(h!=z.second)
+            {
+                db->add_sync_out(cid);
+            }
+        }
+    }
+}
 
-void Node::Service::do_sync(const NODE_id &src_node)
+bool Node::Service::GetGranulesREQ(const bcEvent::GetGranulesREQ*e)
+{
+
+    // bcEvent::GetGranulesRSP()
+    std::vector<std::pair<std::string,std::string>> ret;
+    std::string rg;
+    int err=db_state->getGranule("",& rg);
+    if(err)
+    {
+        logNode("root granule not found");
+        return true;
+    }
+    auto root_hash=blake2b_hash(rg);
+    for(auto& z: e->keys)
+    {
+        err=db_state->getGranule(z,& rg);
+        if(err)
+        {
+            logNode("granule not found %s",base16::encode(z).c_str());
+            return true;
+        }
+        logErr2("GetGranulesREQ: ret add %s",base16::encode(z).c_str());
+        ret.push_back({z,rg});
+    }
+    passEvent(new bcEvent::GetGranulesRSP(root_hash, this_node_name, ret, poppedFrontRoute(e->route)));
+    return true;    
+}
+
+bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
+{
+
+    // root->getLeafNoCreate()
+    // getByPathNoCreate()
+
+    
+    _db_to_save db;
+
+    for(auto& z: m->v)
+    {
+        if(z.first=="")
+        {
+
+        }
+        else 
+        {
+            logNode("GetGranulesRSP: recv granule '%s'",base16::encode(z.first).c_str());
+            auto id=splice(z.first);
+            std::string pbuf;
+            auto r2=db_state->getGranule(id.first, &pbuf);
+            // if(r2) throw CommonError("if(r2) ");
+            if(pbuf.size())
+            {
+                REF_getter< Cellable> par=new Cellable(NULL,id.first);
+                inBuffer inpar(pbuf);
+                par->unpack_mx(inpar);
+                auto it=par->children_hashes_mx.find(id.second);
+                if(it==par->children_hashes_mx.end())
+                    throw CommonError("if(it==par->children_hashes_mx.end())");
+                if(it->second!=blake2b_hash(z.second))
+                    throw CommonError("if(it->second!=blake2b_hash(z.second))");
+            }
+
+
+        }
+        db.add(z.first,z.second);
+    }
+    db_state->write_granules_batch(db);
+    for(auto &z :m->v)
+    {
+        db_state->remove_sync_out(z.first);
+        // sync_out[z.first.size()].erase(z.first);
+    }
+    for(auto &z :m->v)
+    {
+        collect_sync_req2(z.first,z.second, db_state.get());
+    }
+    std::vector<std::string> pathes=db_state->getPathes();
+    // for(auto &z: sync_out)
+    // {
+    //     if(z.second.size())
+    //     {
+    //         for(auto& x: z.second)
+    //         {
+    //             pathes.push_back(x);
+    //             // z.second.erase(x);
+    //             if(pathes.size()>1000)
+    //                 break;
+    //         }
+    //         break;
+    //     }
+    // }
+    if(pathes.size())
+    {
+        auto n=root->getNode(m->responder,db_state.get());
+        auto ip=n->get_ip();
+        sendEvent(ip,ServiceEnum::Node,new bcEvent::GetGranulesREQ(pathes,ListenerBase::serviceId));
+
+    }
+    else{
+
+    }
+    // root->clear
+    return true;
+}
+
+void Node::Service::do_sync(const NODE_id &src_node, const THASH_id& prev_root_hash_remote)
 {
     MUTEX_INSPECTOR;
-    logNode("void Node::Service::do_sync(const NODE_id &src_node) ");
-    auto n = root->getNode(src_node,db_state.get());
-    if (!n.valid())
-        throw CommonError("if(!n.valid())");
-    REF_getter<MsgData::GetSavedBlocksREQ> gbr = new MsgData::GetSavedBlocksREQ();
-    gbr->prev_root_hash = prev_root_hash_Z();
-    logNode("do_sync: @@@@@@@@@@@@@@@@ REQUEST for blocks since '%s'", gbr->prev_root_hash.str().c_str());
-    auto buffer = gbr->getBuffer();
 
-    sendEvent(n->get_ip(), ServiceEnum::Node,
-              new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
+    // THASH_id
+    // front_sync.clear();
+    // collect_sync_req(root.get(),prev_root_hash_remote,pathes,db_state.get(),front_sync);
+    // std::string root_granule;
+    // db_state->getGranule("",& root_granule);
+    // if(root_granule.empty())
+    // throw
+
+    logNode ("do_sync");
+    /// reequest root granule
+    std::vector<std::string> pathes;
+    pathes.push_back("");
+
+    auto n=root->getNode(src_node,db_state.get());
+    auto ip=n->get_ip();
+
+    sendEvent(ip,ServiceEnum::Node,new bcEvent::GetGranulesREQ(pathes,ListenerBase::serviceId));
+
+
 }
 bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r, const NODE_id &src_node, const route_t &route)
 {
@@ -37,207 +184,14 @@ bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r,
     // auto local_lc=prev_block;
     if(!prev_block.valid() || r->lc->blockInfo->heart_beat->new_epoch > prev_block->blockInfo->heart_beat->new_epoch)
     {
-        state_Z=STATE_SYNCING;
-        do_sync(src_node);
-    }
-
-
-    return true;
-}
-bool Node::Service::GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ *r, const NODE_id &src_node, const route_t &route)
-{
-    MUTEX_INSPECTOR;
-    if(state_Z==STATE_SYNCING)
-        return true;
-
-
-    REF_getter<MsgData::GetSavedBlocksRSP> ret = new MsgData::GetSavedBlocksRSP();
-
-    uint64_t epoch = 0;
-    {
         MUTEX_INSPECTOR;
-        logNode("Query FROM root hash '%s' blocks %d", r->prev_root_hash.str().c_str(),ret->blocks_ZZ.size());
-        BLOCK_id prev = r->prev_root_hash;
-        while (ret->blocks_ZZ.size() < 40)
-        {
-
-            std::string res;
-            if (db_state->getBlock(prev, res))
-            {
-                logNode("cannot find block %s", r->prev_root_hash.str().c_str());
-                break;
-            }
-
-            REF_getter<MsgData::BlockDBStore> bs;
-            {
-                MUTEX_INSPECTOR;
-                inBuffer in(res);
-                in >> bs;
-
-            }
-            logNode("append to ret->blocks_ZZ");
-            ret->blocks_ZZ.push_back(bs);
-            prev = bs->blockAcceptedREQ->blockInfo->new_root_hash1;
-        }
-        ret->last_prev_root_hash=prev_root_hash_Z();
-
+        // state_Z=STATE_SYNCING;
+        logNode("STATE_SYNCING");
+        prev_block=r->lc;
+        do_sync(src_node,r->lc->blockInfo->new_root_hash1);
+        // r->lc->blockInfo->heart_beat->prev_root_hash_1;
     }
 
-    logNode("GetSavedBlocksREQ QUERY RESULTS size %d", ret->blocks_ZZ.size());
 
-    pass_NodeMsgRSP(ret.get(), route);
-
-    return true;
-}
-
-bool Node::Service::GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP *r, const NODE_id &src_node, const route_t &route)
-{
-    XTRY;
-    MUTEX_INSPECTOR;
-    if(state_Z!=STATE_SYNCING)
-    {
-        logNode("error if(state_Z!=SYNCING)");
-    }
-    logNode("prev_root_hash %s", prev_root_hash_Z().str().c_str());
-    logNode("GetSavedBlocksRSP received blocks %d", r->blocks_ZZ.size());
-    if(r->blocks_ZZ.size()==0)
-    {
-        /// blocks not found
-        auto &s=syncs[prev_root_hash_Z()];
-        if(!s.do_you_have_sent)
-        {
-            auto nn=root->getNodeListNoCreate(db_state.get());
-            if(!nn.valid())
-                throw CommonError("if(!nn.valid())");
-            
-            broadcast_MsgEvent(new MsgData::DoYouHaveBlockREQ(prev_root_hash_Z()),nn->getList());
-            s.do_you_have_sent=true;    
-            sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(timers::TIMER_SYNC_TIMEDOUT,NULL,NULL,3,this));
-        }
-        return true;
-    }
-    for (auto &z : r->blocks_ZZ)
-    {
-        logNode("iter block epoch %ld", z->validateBlockREQ->heart_beat->new_epoch);
-        auto prev=prev_block;
-        logNode("cur epoch %ld", epoch_current());
-
-        logNode("iter prev_root_hash in validateBlockREQ %s", z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str());
-        logNode("iter prev_root_hash in blockAcceptedREQ %s", z->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str());
-        if (prev_root_hash_Z() != z->validateBlockREQ->heart_beat->prev_root_hash_1)
-        {
-            logNode("prev root hash not matched '%s' != '%s'", prev_root_hash_Z().str().c_str(),z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str());
-            continue;
-        }
-        else
-            logNode("prev root hash matched !!!");
-        if (z->validateBlockREQ->heart_beat->prev_root_hash_1 != prev_root_hash_Z())
-        {
-
-            logNode("inval root hash %s %s", z->validateBlockREQ->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z().str().c_str());
-            continue;
-        }
-        else
-            logNode("ok received block %ld", z->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
-
-        std::vector<blst_cpp::PublicKey> agg_pk;
-        for (auto &k : z->blockAcceptedREQ->node_validators)
-        {
-            auto n = root->getNode(k,db_state.get());
-            agg_pk.push_back(n->get_bls_pk());
-        }
-        if (!z->blockAcceptedREQ->agg_sig.verify(agg_pk, blake2b_hash(z->blockAcceptedREQ->blockInfo->getBuffer()).container))
-        {
-            throw CommonError("on_get_blocks_rsp: !ba.agg_sig.verify");
-        }
-        logNode("on_get_blocks_rsp: block verified OK");
-        b_params t(root,db_state.get());
-        t.validateBlockREQ = z->validateBlockREQ;
-        auto rh = execute_block(t, z->validateBlockREQ->heart_beat);
-        auto new_root_hash = proceed_merkle_on_transaction_pool_hashers(root);
-
-        if (new_root_hash == z->blockAcceptedREQ->blockInfo->new_root_hash1)
-        {
-            db_to_save_Z.add("#last_block#",z->blockAcceptedREQ->getBuffer());
-            logNode("on_get_blocks_rsp: block executed OK on epoch %ld", z->validateBlockREQ->heart_beat->new_epoch);
-
-            logNode("before write batch");
-            db_state->write_granules_batch(db_to_save_Z);
-            logNode("after write batch");
-
-            logNode("db->write_granules_batch(db_to_save_Z); done %d granules", db_to_save_Z.cells.size());
-            db_to_save_Z.clear();
-            prev_block=z->blockAcceptedREQ;
-            // prev_root_hash_Z = new_root_hash;
-        }
-        else
-        {
-            logNode("!if (new_root_hash == z->blockAcceptedREQ->blockInfo->new_root_hash1)");
-            auto rrt = getRoot(db_state.get());
-            root=rrt.first;
-            // init_root(root);
-            do_InvalidateRoot();
-            if(state_Z==STATE_SYNCING)
-            {
-                return true;
-            }
-            state_Z=STATE_SYNCING;
-            do_sync(src_node);
-            logNode("if(new_root_hash!=bl.new_root_hash1) %s %s", new_root_hash.str().c_str(), z->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
-            return true;
-        }
-        outBuffer o;
-        o<<z;
-        if(db_state->writeBlock(z->validateBlockREQ->heart_beat->new_epoch, 
-            z->validateBlockREQ->heart_beat->block_timestamp,
-            z->validateBlockREQ->heart_beat->prev_root_hash_1.container,
-                                  o.asString()->container
-                                 ))
-        {
-            logNode("error saving block");
-        }
-    }
-    if (r->last_prev_root_hash != prev_root_hash_Z())
-    {
-        logNode("call3 do_sync();");
-
-        logNode("do_sync again: ");
-        state_Z=STATE_SYNCING;
-        do_sync(src_node);
-        return true;
-    }
-    else
-    {
-    }
-
-    logNode("!!! SUCCESS CATCH UP ");
-    state_Z = State::STATE_NORMAL;
-    logNode("State::NORMAL");
-    XPASS;
-    return true;
-}
-
-
-bool Node::Service::DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const NODE_id & src_node, const route_t& route)
-{
-    // logErr2("@@ %s",__PRETTY_FUNCTION__);
-    std::string res;
-    if (db_state->getBlock(m->prev_root_hash, res))
-    {
-        logNode("cannot find block %s", m->prev_root_hash.str().c_str());
-        return true;
-    }
-    pass_NodeMsgRSP(new MsgData::DoYouHaveBlockRSP(true,m->prev_root_hash), route);
-    return true;
-}
-bool Node::Service::DoYouHaveBlockRSP(const MsgData::DoYouHaveBlockRSP* m, const NODE_id & src_node, const route_t& route)
-{
-    // logErr2("@@ %s",__PRETTY_FUNCTION__);
-    auto& s=syncs[m->prev_root_hash];
-    s.havers.insert(src_node);
-    if(s.havers.size()==1)
-    {
-        do_sync(src_node);
-    }
     return true;
 }

@@ -31,16 +31,23 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 {
         // logErr2("@@ %s",__func__);
 
-    if(state_Z==STATE_SYNCING)
+    if(!db_state->sync_empty)
     {
         return true;
     }
+    // if(state_Z==STATE_SYNCING)
      stage_is_working=iUtils->getNow();
    MUTEX_INSPECTOR;
 
     XTRY;
+    auto &cli = cli_leader_info[prev_root_hash_Z()];
+    if(!cli.node_leader.valid())
+    {
+        logNode("if(!cli.node_leader.valid())");
+        return true;
+    }
 
-    if(cli_leader_info[prev_root_hash_Z()].node_leader->node_leader!=src_node)
+    if(cli.node_leader->node_leader!=src_node)
     {
         logNode("invalid leader 12");
         return true;
@@ -60,8 +67,10 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         return true;
     }
 
-    if (state_Z != State::STATE_NORMAL)
+    if(!db_state->sync_empty)
+    {
         return true;
+    }
 
     if (! c.blockDBStore.valid())
         throw CommonError("if (!blockDBStore.valid())");
@@ -105,18 +114,17 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         fclose(f);
 
     }
-    // db_to_save_Z.add("#last_block#",r->getBuffer());
     auto &hb=c.blockDBStore->validateBlockREQ->heart_beat;
     {
         MUTEX_INSPECTOR;
         XTRY;
-        outBuffer o;
-        o<<c.blockDBStore;
-        db_state->writeBlock(hb->new_epoch, 
-                                hb->block_timestamp,
-                                hb->prev_root_hash_1.container,
-                                o.asString()->container
-                              );
+        // outBuffer o;
+        // o<<c.blockDBStore;
+        // db_state->writeBlock(hb->new_epoch, 
+        //                         hb->block_timestamp,
+        //                         hb->prev_root_hash_1.container,
+        //                         o.asString()->container
+        //                       );
         XPASS;
     }
     db_state->write_granules_batch(db_to_save_Z);
@@ -163,17 +171,30 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;    
+
     stage_is_working=iUtils->getNow();
-   if(state_Z==STATE_SYNCING)
+    if(!db_state->sync_empty)
     {
-        logNode("GetTransaction if(state_Z==STATE_SYNCING)");
+        logNode("GetTransaction if(!db_state->sync_empty)");
         return true;
     }
+
+//    if(state_Z==STATE_SYNCING)
+//     {
+//         
+//         return true;
+//     }
     auto prev_root_hash=prev_root_hash_Z();
     auto & cli=cli_leader_info[prev_root_hash];
-    if(cli.node_leader->node_leader!=src_node)
+    if(!cli.node_leader.valid())
     {
-        logNode("GetTransaction invalid leader #14  my %s remote %s", cli.node_leader->node_leader.container.c_str(), src_node.container.c_str());
+        logNode("if(!cli.node_leader.valid())");
+        return true;
+    }
+
+    if(!cli.node_leader.valid() || cli.node_leader->node_leader!=src_node)
+    {
+        logNode("GetTransaction invalid leader #14  my %s remote %s", cli.node_leader.valid()?cli.node_leader->node_leader.container.c_str():"", src_node.container.c_str());
         return true;
     }
 
@@ -198,7 +219,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 {
     MUTEX_INSPECTOR;
      stage_is_working=iUtils->getNow();
-   if (state_Z != State::STATE_NORMAL)
+    if(!db_state->sync_empty)
     {
         return true;
     }
@@ -208,7 +229,13 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     b_params t(root,db_state.get());
     bool err = false;
     
-    if(cli_leader_info[prev_root_hash].node_leader->node_leader!=src_node)
+    auto &cli=cli_leader_info[prev_root_hash];
+    if(!cli.node_leader.valid())
+    {
+        logNode("if(!cli.node_leader.valid())");
+        return true;
+    }
+    if(cli.node_leader->node_leader!=src_node)
     {
         logNode("invalid leader #15");
         return true;

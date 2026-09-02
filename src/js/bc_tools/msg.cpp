@@ -68,10 +68,10 @@ const char *msgName(int id)
         return "GetTransactionRSP";
     case msgid::BlockDBStore:
         return "BlockDBStore";
-    case msgid::GetSavedBlocksREQ:
-        return "GetSavedBlocksREQ";
-    case msgid::GetSavedBlocksRSP:
-        return "GetSavedBlocksRSP";
+    // case msgid::GetSavedBlocksREQ:
+    //     return "GetSavedBlocksREQ";
+    // case msgid::GetSavedBlocksRSP:
+    //     return "GetSavedBlocksRSP";
     case msgid::DoHeartBeatREQ:
         return "DoHeartBeatREQ";
     case msgid::ConfirmLeaderREQ:
@@ -90,10 +90,10 @@ const char *msgName(int id)
     //     return "LcREQ";
     // case msgid::LcRSP:
     //     return "LcRSP";
-    case msgid::DoYouHaveBlockREQ:
-        return "DoYouHaveBlockREQ";
-    case msgid::DoYouHaveBlockRSP:
-        return "DoYouHaveBlockRSP";
+    // case msgid::DoYouHaveBlockREQ:
+    //     return "DoYouHaveBlockREQ";
+    // case msgid::DoYouHaveBlockRSP:
+    //     return "DoYouHaveBlockRSP";
     case msgid::DelayNotificationREQ:
         return "DelayNotificationREQ";
         
