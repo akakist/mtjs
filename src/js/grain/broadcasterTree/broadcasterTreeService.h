@@ -48,7 +48,6 @@ namespace BroadcasterTree
         bool handleEvent(const REF_getter<Event::Base>& e);
 
         bool ServiceInit(const bcEvent::ServiceInit *e);
-        bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
 
         bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
         bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
@@ -78,10 +77,10 @@ namespace BroadcasterTree
             XPASS;
         }
 
-        REF_getter<root_data> root=NULL;
+        // REF_getter<root_data> root=NULL;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
-        REF_getter<IDatabase> db_state_4;
+        // REF_getter<IDatabase> db_state_4;
 
 
     };

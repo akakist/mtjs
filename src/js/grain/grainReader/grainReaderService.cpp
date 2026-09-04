@@ -55,8 +55,6 @@ bool GrainReader::Service::handleEvent(const REF_getter<Event::Base> &e)
         auto &ID = e->id;
         switch (ID)
         {
-        case bcEventEnum::InvalidateRoot:
-            return InvalidateRoot((const bcEvent::InvalidateRoot *)e.get());
         case bcEventEnum::ClientMsg:
             return ClientMsg((const bcEvent::ClientMsg *)e.get());
         case bcEventEnum::ServiceInit:
@@ -123,13 +121,7 @@ GrainReader::Service::Service(const SERVICE_id &id, const std::string &nm, IInst
 bool GrainReader::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     conf = e;
-    root=e->root;
-    db_state_3=new CDatabase(getDB(),conf->db_name2);
-    return true;
-}
-bool GrainReader::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
-{
-    root=e->root;
+    db_state_3=e->db;
     return true;
 }
 
@@ -150,7 +142,7 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
     {
         ADDRESS_id addr;
         auto pp=(MsgData::GetUserNonceREQ*) b.get();
-        auto u = root->getAddressState(pp->user_address,NULL,db_state_3.get());
+        auto u = db_state_3->getAddressState(pp->user_address,NULL,db_state_3.get());
 
         REF_getter<MsgData::GetUserNonceRSP> rsp=new MsgData::GetUserNonceRSP;
         {

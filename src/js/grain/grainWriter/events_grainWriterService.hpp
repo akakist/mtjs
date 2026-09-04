@@ -14,7 +14,6 @@ inline std::set<EVENT_id> getEvents_grainWriterService()
 
 	std::set<EVENT_id> out;
 	out.insert(bcEventEnum::ClientMsg);
-	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(bcEventEnum::WriteGranules);
 	out.insert(rpcEventEnum::IncomingOnAcceptor);
@@ -31,7 +30,6 @@ inline std::set<EVENT_id> getEvents_grainWriterService()
 inline void regEvents_grainWriterService()
 {
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
-	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(bcEvent::WriteGranules::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnAcceptor::construct);

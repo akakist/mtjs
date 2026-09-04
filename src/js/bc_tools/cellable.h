@@ -2,7 +2,7 @@
 #include "REF.h"
 #include <string>
 #include "commonError.h"
-#include "IDatabase.h"
+// #include "IDatabase.h"
 #include <vector>
 #include "db_to_save.h"
 #include "hsh.h"
@@ -124,7 +124,6 @@ public:
         }
     }
 
-    REF_getter<Cellable> getLeafOrCreate(const std::string &id, IDatabase *db, MutexLockerDeferred &l, Rollback *roll);
 
     std::string getDbId() const;
     void clear(const std::string &id)
@@ -241,31 +240,8 @@ public:
 
 
     // REF_getter<Cellable> getLeafOrCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
-    REF_getter<Cellable> getLeafNoCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
 
     void calc_tree_hash(_db_to_save &db_dump);
 };
-// static const char* base16_TABLE[62] = {
-//     "0","1","2","3","4","5","6","7","8","9",
-//     "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
-//     "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"
-// };
-// inline void appendRelativeInternalPath(std::vector<std::string>&vs, const std::string & k, int depth2)
-// {
-//     MUTEX_INSPECTOR;
-//     if(k.size()<depth2)
-//     {
-//         throw CommonError("if(k.size()<depth2)");
-//     }
-//     int i=0;
-//     for(i=0; i<depth2; i++)
-//     {
-//         vs.push_back(k.substr(i, 1));
-//     }
-//     if(k.size()>depth2)
-//     {
-//         vs.push_back(k.substr(depth2));
-//     }
-// }
 
 

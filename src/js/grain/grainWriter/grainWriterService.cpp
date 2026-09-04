@@ -69,8 +69,6 @@ bool GrainWriter::Service::handleEvent(const REF_getter<Event::Base> &e)
         {
         case bcEventEnum::WriteGranules:
             return WriteGranules((const bcEvent::WriteGranules *)e.get());
-        case bcEventEnum::InvalidateRoot:
-            return InvalidateRoot((const bcEvent::InvalidateRoot *)e.get());
         case bcEventEnum::ClientMsg:
             return ClientMsg((const bcEvent::ClientMsg *)e.get());
         case bcEventEnum::ServiceInit:
@@ -137,18 +135,7 @@ GrainWriter::Service::Service(const SERVICE_id &id, const std::string &nm, IInst
 bool GrainWriter::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     conf = e;
-    root=e->root;
-    // if (!root.valid())
-    //     root = getRoot(conf->db.get());
-
-    // init_root(root);
-    return true;
-}
-bool GrainWriter::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
-{
-    root=e->root;
-    // root = getRoot(conf->db.get());
-    // init_root(root);
+    db_state=e->db;
     return true;
 }
 bool GrainWriter::Service::ClientMsg(const bcEvent::ClientMsg *e)

@@ -14,7 +14,6 @@ inline std::set<EVENT_id> getEvents_txValidatorService()
 	out.insert(bcEventEnum::AddTxREQ);
 	out.insert(bcEventEnum::AddTxRSP);
 	out.insert(bcEventEnum::ClientMsg);
-	out.insert(bcEventEnum::InvalidateRoot);
 	out.insert(bcEventEnum::PutTransactionREQ);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(rpcEventEnum::IncomingOnAcceptor);
@@ -31,7 +30,6 @@ inline void regEvents_txValidatorService()
 	iUtils->registerEvent(bcEvent::AddTxREQ::construct);
 	iUtils->registerEvent(bcEvent::AddTxRSP::construct);
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
-	iUtils->registerEvent(bcEvent::InvalidateRoot::construct);
 	iUtils->registerEvent(bcEvent::PutTransactionREQ::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnAcceptor::construct);

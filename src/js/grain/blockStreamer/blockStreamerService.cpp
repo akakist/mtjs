@@ -54,8 +54,6 @@ bool BlockStreamer::Service::handleEvent(const REF_getter<Event::Base> &e)
         case bcEventEnum::StreamBlock:
             return StreamBlock(static_cast<const bcEvent::StreamBlock *>(e.get()));
 
-        case bcEventEnum::InvalidateRoot:
-            return InvalidateRoot((const bcEvent::InvalidateRoot *)e.get());
         case bcEventEnum::ServiceInit:
             return ServiceInit((const bcEvent::ServiceInit *)e.get());
         case timerEventEnum::TickTimer:
@@ -117,11 +115,6 @@ BlockStreamer::Service::Service(const SERVICE_id &id, const std::string &nm, IIn
 }
 bool BlockStreamer::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
-    return true;
-}
-bool BlockStreamer::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
-{
-    
     return true;
 }
 

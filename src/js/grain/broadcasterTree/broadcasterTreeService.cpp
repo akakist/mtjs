@@ -75,8 +75,6 @@ bool BroadcasterTree::Service::handleEvent(const REF_getter<Event::Base> &e)
         {
         case bcEventEnum::NodeMsgRSP:
             return NodeMsgRSP((const bcEvent::NodeMsgRSP *)e.get());
-        case bcEventEnum::InvalidateRoot:
-            return InvalidateRoot((const bcEvent::InvalidateRoot *)e.get());
         case bcEventEnum::BroadcastMessage:
             return BroadcastMessage((const bcEvent::BroadcastMessage *)e.get());
         case bcEventEnum::ServiceInit:
@@ -157,13 +155,8 @@ BroadcasterTree::Service::Service(const SERVICE_id &id, const std::string &nm, I
 bool BroadcasterTree::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     conf = e;
-    root=e->root;
-    db_state_4=new CDatabase(getDB(),conf->db_name2);
-    return true;
-}
-bool BroadcasterTree::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
-{
-    root=e->root;
+    // root=e->root;
+    // db_state_4=new CDatabase(getDB(),conf->db_name2);
     return true;
 }
 bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage *e)
@@ -173,7 +166,7 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
     // auto ks = root->getAllNodes(db_state_4.get());
     for (auto &nd : e->nodes)
     {
-        auto n=root->getNode(nd,db_state_4.get());
+        auto n=conf->db->getNode(nd,conf->db.get());
         NodeElement ne=n->getElement();
         nodes[nd] = ne;
     }

@@ -65,20 +65,13 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     auto db=getDB();
     db_state = new CDatabase(db, db_name);
 
-    if (!root.valid())
+    prev_block=load_last_block(db_state.get());
+    // if (!root.valid())
     {
-        auto rrt = getRoot(db_state.get());
-        root=rrt.first;
-        prev_block=rrt.second;
-        // if(rrt.second.valid())
-        // {
-        //     if(!verify_block(rrt.second))
-        //     throw CommonError("last_block not verified");
-
-        //     prev_block=rrt.second;
-        // }
+        db_state->root=getRoot(db_state.get(),prev_block);
+        // prev_block=rrt.second;
     }
-    init_root(root,db_state.get());
+    init_root(db_state.get());
 
     if(prev_block.valid())
     {
@@ -92,10 +85,10 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 
     my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
     logNode("ServiceInit nodename %s", this_node_name.container.c_str());
-    sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
-    sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
-    sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
-    sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_name, root, this));
+    sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
     for (auto &z : rpc_addr)
     {
         SECURE sec;
@@ -432,11 +425,11 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 
     if (match(ds, e->command, tokens))
     {
-        auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
-        if (cc.valid())
-        {
-            // sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, cc->dump() + "\n", this));
-        }
+        // auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
+        // if (cc.valid())
+        // {
+        //     // sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, cc->dump() + "\n", this));
+        // }
     }
     if (match(go, e->command, tokens))
     {
@@ -446,30 +439,30 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
         {
             sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "if(tokens.size()==2)\n", this));
             telnet_data_path.push_back(tokens[1]);
-            auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
-            if (cc.valid())
-            {
-                sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "OK, current path: " + cc->getDbId() + "\n", this));
-            }
-            else
-            {
-                sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "FAILURE, cannot change path\n", this));
-                telnet_data_path.pop_back();
-            }
+            // auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
+            // if (cc.valid())
+            // {
+            //     sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "OK, current path: " + cc->getDbId() + "\n", this));
+            // }
+            // else
+            // {
+            //     sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "FAILURE, cannot change path\n", this));
+            //     telnet_data_path.pop_back();
+            // }
         }
     }
     if (match(back, e->command, tokens))
     {
         telnet_data_path.pop_back();
-        auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
-        if (cc.valid())
-        {
-            sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "OK, current path: " + cc->getDbId() + "\n", this));
-        }
-        else
-        {
-            sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "FAILURE, cannot change path\n", this));
-        }
+        // auto cc = db_state->getByPathNoCreate(db_state->root.get(), telnet_data_path, db_state.get());
+        // if (cc.valid())
+        // {
+        //     sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "OK, current path: " + cc->getDbId() + "\n", this));
+        // }
+        // else
+        // {
+        //     sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "FAILURE, cannot change path\n", this));
+        // }
     }
 
     sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "NodeService received command: " + e->command + "\n", this));
@@ -564,7 +557,7 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
 THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
 {
     MUTEX_INSPECTOR;
-    M_LOCK(root->state_mutex);
+    // M_LOCK(root->state_mutex);
     // outBuffer o;
     for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
     {
@@ -584,7 +577,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         if (!t_err)
         {
             MUTEX_INSPECTOR;
-            auto u = root->getAddressState(senderAddress,NULL,db_state.get());
+            auto u = b.db->getAddressState(senderAddress,NULL,db_state.get());
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -626,10 +619,10 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
             b.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());    
     }
 
-    auto rh=proceed_merkle_on_transaction_pool_hashers(root);
+    auto rh=proceed_merkle_on_transaction_pool_hashers(db_state->root);
     calc_fee_rewards_nodes(b, lc);
 
-    rh=proceed_merkle_on_transaction_pool_hashers(root);
+    rh=proceed_merkle_on_transaction_pool_hashers(db_state->root);
     return rh;
 }
 void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData::HeartBeatREQ> &lc)
@@ -637,7 +630,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     MUTEX_INSPECTOR;
 
     double total_staked=0;
-    auto nn=root->getAllNodes(db_state.get());
+    auto nn=db_state->getAllNodes(db_state.get());
     for(auto& n:nn)
     {
         // total_staked+=n->get_full_stake();
@@ -649,15 +642,15 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
         for(auto& z:local_prev_block->node_validators)
         {
             ns.insert(z);
-            auto n=root->getNode(z,db_state.get());
+            auto n=db_state->getNode(z,db_state.get());
             total_staked+=n->get_full_stake();
         }
         for(auto& z:local_prev_block->node_validators)
         {
-            auto n=root->getNode(z,db_state.get());
+            auto n=db_state->getNode(z,db_state.get());
             // n->get_full_stake();
             auto portion=n->get_full_stake()*b.node_rewards/total_staked;
-            auto u = root->getAddressState(n->get_owner(),NULL,db_state.get());
+            auto u = db_state->getAddressState(n->get_owner(),NULL,db_state.get());
             {
                 M_LOCK(u->parent->mx);
                 u->balance+=portion;
@@ -672,7 +665,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     b.emit_block("total_fee",R"({"fee":"%s"})",std::to_string(b.node_rewards).c_str());
 }
 
-THASH_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r)
+THASH_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &r)
 {
     MUTEX_INSPECTOR;
     r->calc_tree_hash(db_to_save_Z);
@@ -693,7 +686,7 @@ THASH_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 #include <stdlib.h>
 int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 {
-    auto nv = root->getAllNodes(db_state.get());
+    auto nv = db_state->getAllNodes(db_state.get());
     auto rh=prev_root_hash_Z();
     int crc = __crc32(0, rh.container.data(), rh.container.size());
     int idx = crc % nv.size();
@@ -710,7 +703,7 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
     if (nodeLeft == nodeRight)
         return true;
 
-    auto nv = root->getAllNodes(db_state.get());
+    auto nv = db_state->getAllNodes(db_state.get());
     std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
     {
         return a->getName() < b->getName();
@@ -866,7 +859,9 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
         return true;
     }
     s.insert(m->seqId2);
-    auto n = root->getNode(m->node_signer,db_state.get());
+    auto n = db_state->getNode(m->node_signer,db_state.get());
+    if(!n.valid())
+        return true;
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {
         logNode("verify failed 11");
@@ -910,7 +905,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
 bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 {
-    auto n = root->getNode(m->node_signer,db_state.get());
+    auto n = db_state->getNode(m->node_signer,db_state.get());
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {
         logNode("verify failed @4");
@@ -1068,7 +1063,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         return err;
     }    
     Rollback roll;
-    t_params t(root);
+    t_params t;
     t.senderAddress=senderAddress;
     t.tx=tx;
     t.epoch=epoch;
@@ -1076,7 +1071,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.roll=&roll;
     t.value=value;
     t.gasLimit=gasLimit;
-    auto uu=root->getAddressState(senderAddress,NULL,db_state.get());
+    auto uu=db_state->getAddressState(senderAddress,NULL,db_state.get());
     if(!uu.valid())
     throw CommonError("if(!uu.valid())");
     {
@@ -1086,7 +1081,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     }
     /// сбрасываем все изменения состояния перед транзакцией
     // _db_to_save db_dump0;
-    root->calc_tree_hash(db_to_save_Z);
+    db_state->root->calc_tree_hash(db_to_save_Z);
 
     err=execute_tx_commands(b,t,j_tx);
     if(err)
@@ -1099,7 +1094,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         if(gu>gasLimit)
             gu=gasLimit;
 
-        auto u=root->getAddressState(t.senderAddress,NULL,db_state.get());
+        auto u=db_state->getAddressState(t.senderAddress,NULL,db_state.get());
         M_LOCK(u->parent->mx);
         u->balance-=gu*gasPrice;
         b.node_rewards+=gu*gasPrice;
@@ -1112,7 +1107,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         t.gasUsed+=t.roll->size();
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
-        auto u=root->getAddressState(t.senderAddress,NULL,db_state.get());
+        auto u=db_state->getAddressState(t.senderAddress,NULL,db_state.get());
         M_LOCK(u->parent->mx);
         u->balance-=t.gasUsed*gasPrice;
         b.node_rewards+=t.gasUsed*gasPrice;
@@ -1122,7 +1117,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        auto u=root->getAddressState(t.senderAddress,NULL,db_state.get());
+        auto u=db_state->getAddressState(t.senderAddress,NULL,db_state.get());
         M_LOCK(u->parent->mx);
         u->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
@@ -1130,7 +1125,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     }
 
     _db_to_save db_dump;
-    root->calc_tree_hash(db_dump);
+    db_state->root->calc_tree_hash(db_dump);
     size_t sz=db_dump.size();
     t.gasUsed+=sz;
     if(t.gasUsed>gasLimit)
@@ -1138,20 +1133,20 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        auto u=root->getAddressState(t.senderAddress,NULL,db_state.get());
+        auto u=db_state->getAddressState(t.senderAddress,NULL,db_state.get());
         M_LOCK(u->parent->mx);
         u->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
         return "gas exceeds limit";
     }
     // OK
-    auto u=root->getAddressState(t.senderAddress,NULL,db_state.get());
+    auto u=db_state->getAddressState(t.senderAddress,NULL,db_state.get());
     {
         M_LOCK(u->parent->mx);
         u->balance-=t.gasUsed*gasPrice+value-t.value;
     }
 
-    root->calc_tree_hash(db_dump);
+    db_state->root->calc_tree_hash(db_dump);
     db_to_save_Z.add(db_dump);
     
     // logErr2("user sz %d",sz);
@@ -1183,7 +1178,7 @@ std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct
 #include "js_tools.h"
 std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contract)
 {
-    auto c=root->getContract(contract,db_state.get());
+    auto c=db_state->getContract(contract,db_state.get());
     REF_getter<contract_rt> ct=new contract_rt();
     contracts.insert_or_assign(contract,ct);
     ct->ctx=JS_NewContext(contract_runtime);

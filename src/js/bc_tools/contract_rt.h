@@ -17,7 +17,6 @@ struct contract_rt: public Refcountable
     std::string src;
     ADDRESS_id owner;
     CONTRACT_id name;
-    REF_getter<root_data> root;
     REF_getter<IDatabase> db;
     
 

@@ -12,6 +12,14 @@
 #include "root_contract.h"
 #include "QUORUM.h"
 #include "md/md_BlockAcceptedREQ.h"
+#include "bc_address_state.h"
+#include "bc_contract.h"
+#include "bc_contract_data.h"
+#include "bc_node.h"
+#include "bc_node.h"
+#include "bc_nodelist.h"
+#include "bc_values.h"
+#include "IDatabase.h"
 
 std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
@@ -35,37 +43,40 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
 };
 
 
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::vector<std::string> &v, IDatabase *db,Rollback* roll)
+REF_getter<Cellable> IDatabase::getByPathOrCreate(const REF_getter<Cellable>& _cur, const std::vector<std::string> &v, IDatabase *db, Rollback* roll)
 {
+    auto cur=_cur;
     for (auto &z : v)
     {
         MutexLockerDeferred l(cur->mx);
-        cur = cur->getLeafOrCreate(z, db,l,roll);
+        cur = getLeafOrCreate(cur,z, db,l,roll);
     }
     return cur;
 }
-REF_getter<Cellable> getByPathOrCreate(REF_getter<Cellable> cur, const std::deque<std::string> &v, IDatabase *db,Rollback* roll)
+REF_getter<Cellable> IDatabase::getByPathOrCreate(const REF_getter<Cellable>& _cur, const std::deque<std::string> &v, IDatabase *db,Rollback* roll)
 {
+    auto cur=_cur;
     for (auto &z : v)
     {
         MutexLockerDeferred l(cur->mx);
-        cur = cur->getLeafOrCreate(z, db,l,roll);
+        cur = getLeafOrCreate(cur,z, db,l,roll);
     }
     return cur;
 }
-REF_getter<Cellable> getByPathNoCreate(REF_getter<Cellable> cur, const std::vector<std::string> &v, IDatabase *db)
+REF_getter<Cellable> IDatabase::getByPathNoCreate(const REF_getter<Cellable>& _cur, const std::vector<std::string> &v, IDatabase *db)
 {
+    auto cur=_cur;
     // M_LOCK(cur->lock);
     for (auto &z : v)
     {
         MutexLockerDeferred l(cur->mx);
-        cur = cur->getLeafNoCreate(z, db,l);
+        cur = getLeafNoCreate(cur,z, db,l);
         if (!cur.valid())
             return NULL;
     }
     return cur;
 }
-std::vector<std::string> root_data::getPath(const std::string& name) 
+std::vector<std::string> IDatabase::getPath(const std::string& name) 
 {
     std::vector<std::string> out;
     auto h = blake2b_hash(name);
@@ -78,46 +89,46 @@ std::vector<std::string> root_data::getPath(const std::string& name)
     return out;
 }
 
-std::vector<std::string> root_data::getContractPath(const CONTRACT_id &name)
+std::vector<std::string> IDatabase::getContractPath(const CONTRACT_id &name)
 {
     return getPath("CONTRACT_"+name.container);
 }
-std::vector<std::string> root_data::getContractDataPath(const CONTRACT_DATA_id &name)
+std::vector<std::string> IDatabase::getContractDataPath(const CONTRACT_DATA_id &name)
 {
     std::string key="CONTRACT_DATA_"+name.container;    
     return getPath(key);
 
 }
 
-std::vector<std::string> root_data::getNodePath(const NODE_id &name)
+std::vector<std::string> IDatabase::getNodePath(const NODE_id &name)
 {
     return getPath("NODE_"+name.container);
 }
 
-REF_getter<bc_contract> root_data::getContract(const CONTRACT_id &name,IDatabase* db)
+REF_getter<bc_contract> IDatabase::getContract(const CONTRACT_id &name,IDatabase* db)
 {
     MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(this, getContractPath(name), db);
+    auto cc = getByPathNoCreate(root.get(), getContractPath(name), db);
     if (!cc.valid())
         return NULL;
     if (!cc->data.valid())
         throw CommonError("if(!cc->data.valid())");
     return dynamic_cast<bc_contract *>(cc->data.get());
 }
-REF_getter<bc_contract_data> root_data::getContractData(const CONTRACT_DATA_id &name,IDatabase* db)
+REF_getter<bc_contract_data> IDatabase::getContractData(const CONTRACT_DATA_id &name,IDatabase* db)
 {
     MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(this, getContractDataPath(name), db);
+    auto cc = getByPathNoCreate(root.get(), getContractDataPath(name), db);
     if (!cc.valid())
         return NULL;
     if (!cc->data.valid())
         throw CommonError("if(!cc->data.valid())");
     return dynamic_cast<bc_contract_data *>(cc->data.get());
 }
-REF_getter<bc_nodelist> root_data::getNodeListOrCreate(Rollback* roll,IDatabase* db)
+REF_getter<bc_nodelist> IDatabase::getNodeListOrCreate(Rollback* roll,IDatabase* db)
 {
     MUTEX_INSPECTOR;
-    auto cc = getByPathOrCreate(this, getPath("NODE LIST"), db,roll);
+    auto cc = getByPathOrCreate(root.get(), getPath("NODE LIST"), db,roll);
     if (!cc.valid())
         return NULL;
     if (cc->data.valid())
@@ -130,10 +141,10 @@ REF_getter<bc_nodelist> root_data::getNodeListOrCreate(Rollback* roll,IDatabase*
     cc->payload_ctor_idx = hsh::bc_nodelist;
     return u;
 }
-REF_getter<bc_nodelist> root_data::getNodeListNoCreate(IDatabase* db)
+REF_getter<bc_nodelist> IDatabase::getNodeListNoCreate(IDatabase* db)
 {
     MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(this, getPath("NODE LIST"), db);
+    auto cc = getByPathNoCreate(root.get(), getPath("NODE LIST"), db);
     if (!cc.valid())
         return NULL;
     if (cc->data.valid())
@@ -144,10 +155,10 @@ REF_getter<bc_nodelist> root_data::getNodeListNoCreate(IDatabase* db)
     return NULL;
 }
 
-REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, Rollback* roll,IDatabase* db)
+REF_getter<bc_contract> IDatabase::addContract(const CONTRACT_id &name, Rollback* roll,IDatabase* db)
 {
     MUTEX_INSPECTOR;
-    auto cc = getByPathOrCreate(this, getContractPath(name), db,roll);
+    auto cc = getByPathOrCreate(root.get(), getContractPath(name), db,roll);
     if (!cc.valid())
         throw CommonError("if(!cc.valid())");
     if (cc->data.valid())
@@ -158,10 +169,10 @@ REF_getter<bc_contract> root_data::addContract(const CONTRACT_id &name, Rollback
     cc->data->setDirty(roll);
     return bc;
 }
-REF_getter<bc_contract_data> root_data::addContractData(const CONTRACT_DATA_id &name, Rollback* roll,IDatabase* db)
+REF_getter<bc_contract_data> IDatabase::addContractData(const CONTRACT_DATA_id &name, Rollback* roll,IDatabase* db)
 {
     MUTEX_INSPECTOR;
-    auto cc = getByPathOrCreate(this, getContractDataPath(name), db,roll);
+    auto cc = getByPathOrCreate(root.get(), getContractDataPath(name), db,roll);
     if (!cc.valid())
         throw CommonError("if(!cc.valid())");
     if (cc->data.valid())
@@ -173,12 +184,12 @@ REF_getter<bc_contract_data> root_data::addContractData(const CONTRACT_DATA_id &
     return bc;
 }
 
-REF_getter<bc_values> root_data::getValuesOrCreate(Rollback* roll,IDatabase* db)
+REF_getter<bc_values> IDatabase::getValuesOrCreate(Rollback* roll,IDatabase* db)
 {
     MUTEX_INSPECTOR;
     auto r = this;
     MutexLockerDeferred lk(r->mx);
-    auto l = getByPathOrCreate(this, getPath("VALUES"), db, roll);
+    auto l = getByPathOrCreate(root.get(), getPath("VALUES"), db, roll);
     if (!l.valid())
         throw CommonError("if(!l.valid())");
     if (l->data.valid())
@@ -193,12 +204,12 @@ REF_getter<bc_values> root_data::getValuesOrCreate(Rollback* roll,IDatabase* db)
     lk.unlock();
     return v;
 }
-REF_getter<bc_values> root_data::getValuesNoCreate(IDatabase* db)
+REF_getter<bc_values> IDatabase::getValuesNoCreate(IDatabase* db)
 {
     MUTEX_INSPECTOR;
     auto r = this;
     MutexLockerDeferred lk(r->mx);
-    auto l = getByPathNoCreate(this, getPath("VALUES"), db);
+    auto l = getByPathNoCreate(root.get(), getPath("VALUES"), db);
     if(!l.valid())
         return NULL;
     if (l->data.valid())
@@ -209,12 +220,12 @@ REF_getter<bc_values> root_data::getValuesNoCreate(IDatabase* db)
 
 }
 
-REF_getter<bc_values> root_data::checkValues(IDatabase* db)
+REF_getter<bc_values> IDatabase::checkValues(IDatabase* db)
 {
     MUTEX_INSPECTOR;
     auto r = this;
     MutexLockerDeferred lk(r->mx);
-    auto l = getByPathNoCreate(this, getPath("VALUES"), db);
+    auto l = getByPathNoCreate(root.get(), getPath("VALUES"), db);
     if (!l.valid())
         return NULL;
     lk.lock();
@@ -227,21 +238,21 @@ REF_getter<bc_values> root_data::checkValues(IDatabase* db)
     return NULL;
 }
 
-std::vector<std::string> root_data::getUserPath(const ADDRESS_id &addr)
+std::vector<std::string> IDatabase::getUserPath(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTORS("getUserPath");
     return getPath("USER_"+addr.addr);
 }
-std::vector<std::string> root_data::getAddressStatePath(const ADDRESS_id &addr)
+std::vector<std::string> IDatabase::getAddressStatePath(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTOR;
     return getPath("USER_STATE_"+addr.addr);
 }
 
-REF_getter<bc_address_state> root_data::getAddressState(const ADDRESS_id &addr, Rollback* roll,IDatabase* db)
+REF_getter<bc_address_state> IDatabase::getAddressState(const ADDRESS_id &addr, Rollback* roll,IDatabase* db)
 {
     MUTEX_INSPECTOR;
-    auto cc = getByPathOrCreate(this, getAddressStatePath(addr), db,roll);
+    auto cc = getByPathOrCreate(root.get(), getAddressStatePath(addr), db,roll);
     if (!cc.valid())
         return NULL;
     if (cc->data.valid())
@@ -254,17 +265,17 @@ REF_getter<bc_address_state> root_data::getAddressState(const ADDRESS_id &addr, 
     cc->payload_ctor_idx = hsh::bc_address_state;
     return u;
 }
-REF_getter<bc_address_state> root_data::checkUserState(const ADDRESS_id &addr,IDatabase* db)
+REF_getter<bc_address_state> IDatabase::checkUserState(const ADDRESS_id &addr,IDatabase* db)
 {
     MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(this, getAddressStatePath(addr), db);
+    auto cc = getByPathNoCreate(root.get(), getAddressStatePath(addr), db);
     if (!cc.valid())
         return NULL;
 
     return dynamic_cast<bc_address_state *>(cc->data.get());
 }
 
-std::vector<REF_getter<bc_node>> root_data::getAllNodes(IDatabase* db)
+std::vector<REF_getter<bc_node>> IDatabase::getAllNodes(IDatabase* db)
 {
     MUTEX_INSPECTOR;
     auto nl=getNodeListNoCreate(db);
@@ -280,7 +291,7 @@ std::vector<REF_getter<bc_node>> root_data::getAllNodes(IDatabase* db)
     return vv;
 
 }
-REF_getter<bc_node> root_data::addNode(const NODE_id &name, Rollback* roll,IDatabase* db)
+REF_getter<bc_node> IDatabase::addNode(const NODE_id &name, Rollback* roll,IDatabase* db)
 {
     MUTEX_INSPECTOR;
 
@@ -292,7 +303,7 @@ REF_getter<bc_node> root_data::addNode(const NODE_id &name, Rollback* roll,IData
     nl->insert(name);
     nl->setDirty(roll);
 
-    auto cc = getByPathOrCreate(this, getNodePath(name), db,roll);
+    auto cc = getByPathOrCreate(root.get(), getNodePath(name), db,roll);
 
     if (cc->data.valid())
         throw CommonError("if(cc->data.valid())");
@@ -303,11 +314,11 @@ REF_getter<bc_node> root_data::addNode(const NODE_id &name, Rollback* roll,IData
     return n;
 }
 
-REF_getter<bc_node> root_data::getNode(const NODE_id &name, IDatabase* db)
+REF_getter<bc_node> IDatabase::getNode(const NODE_id &name, IDatabase* db)
 {
     MUTEX_INSPECTOR;
 
-    auto cc = getByPathNoCreate(this, getNodePath(name), db);
+    auto cc = getByPathNoCreate(root.get(), getNodePath(name), db);
     if (!cc.valid())
         return NULL;
     if (cc->data.valid())
@@ -316,49 +327,51 @@ REF_getter<bc_node> root_data::getNode(const NODE_id &name, IDatabase* db)
         throw CommonError("if(cc->data.valid())");
 }
 
-std::pair<REF_getter<root_data>,REF_getter<MsgData::BlockAcceptedREQ>>  getRoot(IDatabase *db)
+REF_getter<MsgData::BlockAcceptedREQ> load_last_block(IDatabase *db)
+{
+    REF_getter<MsgData::BlockAcceptedREQ> last_block;
+    std::string pn=db->getDbName()+".last_block";
+    auto buf=iUtils->load_file_no_throw(pn);
+    if(buf.size())
+    {
+        logErr2("buf.size() %d",buf.size());
+        last_block=new MsgData::BlockAcceptedREQ;
+        inBuffer in(buf);
+        // M_LOCK(r->mx);
+        last_block->unpack2(in);
+    }
+    return last_block;
+}
+REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcceptedREQ>& pb)
 {
     MUTEX_INSPECTOR;
 
-    REF_getter<root_data> r = new root_data();
+    REF_getter<Cellable> r = new Cellable(NULL,"");
     REF_getter<MsgData::BlockAcceptedREQ> last_block;
     std::string root_cell;
     {
-    MUTEX_INSPECTOR;
-    // int err=0;
-    //     int err = db->getGranule("#root#", &root_cell);
-    //     if (!err)
-    //     {
-    // MUTEX_INSPECTOR;
-    //         {
-    //             MUTEX_INSPECTOR;
-    //             inBuffer in(root_cell);
-    //             M_LOCK(r->mx);
-    //             r->unpack_mx(in);
-    //         }
-    //     }
+        MUTEX_INSPECTOR;
         std::string lb;
         int err = db->getGranule("", &lb);
-            if(!err && lb.size())
+        
+        if(!err && lb.size() && pb.valid())
+        {
+            MUTEX_INSPECTOR;
+            auto h=blake2b_hash(lb);
+            if(pb->blockInfo->new_root_hash1!=h)
             {
-    MUTEX_INSPECTOR;
                 inBuffer in(lb);
                 r->unpack_mx(in);
-
             }
-        std::string pn=db->getDbName()+".last_block";
-        auto buf=iUtils->load_file_no_throw(pn);
-        if(buf.size())
-        {
-            logErr2("buf.size() %d",buf.size());
-                last_block=new MsgData::BlockAcceptedREQ;
-                inBuffer in(buf);
-                M_LOCK(r->mx);
-                last_block->unpack2(in);
+            else{
+                 logErr2("block hash not matched");
+                 return new root_data;
+            }
+            
         }
 
 
     }
 
-    return {r,last_block};
+    return r;
 }

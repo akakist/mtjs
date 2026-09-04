@@ -3,7 +3,6 @@
 #include "NODE_id.h"
 #include "REF.h"
 #include "ioBuffer.h"
-#include "md_GetSavedBlocksRSP.h"
 #include "bcEvent.h"
 #include "listenerBase.h"
 #include "mutexInspector.h"
@@ -11,8 +10,6 @@
 #include <cstdlib>
 #include <cstddef>
 #include "init_root.h"
-#include "md_DoYouHaveBlockREQ.h"
-#include "md_DoYouHaveBlockRSP.h"
 #include "tools_mt.h"
 std::pair<std::string,std::string> splice(const std::string& id)
 {
@@ -117,62 +114,49 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
     for(auto &z :m->v)
     {
         db_state->remove_sync_out(z.first);
-        // sync_out[z.first.size()].erase(z.first);
     }
     for(auto &z :m->v)
     {
         collect_sync_req2(z.first,z.second, db_state.get());
     }
     std::vector<std::string> pathes=db_state->getPathes();
-    // for(auto &z: sync_out)
-    // {
-    //     if(z.second.size())
-    //     {
-    //         for(auto& x: z.second)
-    //         {
-    //             pathes.push_back(x);
-    //             // z.second.erase(x);
-    //             if(pathes.size()>1000)
-    //                 break;
-    //         }
-    //         break;
-    //     }
-    // }
     if(pathes.size())
     {
-        auto n=root->getNode(m->responder,db_state.get());
+        auto n=db_state->getNode(m->responder,db_state.get());
         auto ip=n->get_ip();
         sendEvent(ip,ServiceEnum::Node,new bcEvent::GetGranulesREQ(pathes,ListenerBase::serviceId));
 
     }
     else{
-
     }
-    // root->clear
     return true;
+}
+void Node::Service::continue_sync()
+{
+    // std::vector<std::string> pathes;
+    auto p=db_state->getPathes();
+    sendEvent(db_state->getIp(),ServiceEnum::Node,new bcEvent::GetGranulesREQ(p,ListenerBase::serviceId));
+
 }
 
 void Node::Service::do_sync(const NODE_id &src_node, const THASH_id& prev_root_hash_remote)
 {
     MUTEX_INSPECTOR;
 
-    // THASH_id
-    // front_sync.clear();
-    // collect_sync_req(root.get(),prev_root_hash_remote,pathes,db_state.get(),front_sync);
-    // std::string root_granule;
-    // db_state->getGranule("",& root_granule);
-    // if(root_granule.empty())
-    // throw
 
     logNode ("do_sync");
-    /// reequest root granule
-    std::vector<std::string> pathes;
-    pathes.push_back("");
 
-    auto n=root->getNode(src_node,db_state.get());
+    // std::vector<std::string> pathes;
+    // pathes.push_back("");
+    db_state->add_sync_out("");
+
+    auto n=db_state->getNode(src_node,db_state.get());
+    // root=NULL;
     auto ip=n->get_ip();
+    db_state->setIp(ip);
+    continue_sync();
 
-    sendEvent(ip,ServiceEnum::Node,new bcEvent::GetGranulesREQ(pathes,ListenerBase::serviceId));
+    // sendEvent(db_state->getIp(),ServiceEnum::Node,new bcEvent::GetGranulesREQ(pathes,ListenerBase::serviceId));
 
 
 }

@@ -33,7 +33,6 @@ namespace BlockStreamer
         bool handleEvent(const REF_getter<Event::Base>& e);
 
         bool ServiceInit(const bcEvent::ServiceInit *e);
-        bool InvalidateRoot(const bcEvent::InvalidateRoot*e);
         bool ClientTxSubscribeREQ(const bcEvent::ClientTxSubscribeREQ*);
         bool StreamBlock(const bcEvent::StreamBlock*);
 

@@ -23,8 +23,6 @@
 #include "md/md_HeartBeatRSP.h"
 #include "md/md_BlockAcceptedREQ.h"
 #include "md/md_ValidateBlockRSP.h"
-#include "md/md_GetSavedBlocksRSP.h"
-#include "md/md_GetSavedBlocksREQ.h"
 #include "md/md_ValidateBlockREQ.h"
 #include "md/md_GetTransactionRSP.h"
 #include "md/md_GetTransactionREQ.h"
@@ -33,8 +31,6 @@
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
 #include "md/md_LcEnvelopeREQ.h"
-#include "md/md_DoYouHaveBlockREQ.h"
-#include "md/md_DoYouHaveBlockRSP.h"
 
 
 #include "md/md_DelayNotificationREQ.h"
@@ -44,7 +40,7 @@
 #include "DBH.h"
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 // #define HEART_BEAT_INTERVAL_SEC 5
-std::set<NODE_id> getValidators(const REF_getter<root_data>& r, uint64_t block_timestamp, IDatabase* db);
+std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db);
 
 // enum State
 // {
@@ -244,7 +240,6 @@ namespace Node
         void broadcast_MsgEvent(const REF_getter<MsgData::Base>& p, const std::set<NODE_id>& nodes);
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
 
-        void do_InvalidateRoot();
 
 
         struct block_leader
@@ -362,9 +357,9 @@ namespace Node
                 return it->second;
             }
             REF_getter<BlockMetaFull> m=new BlockMetaFull();
-            auto nn=root->getNodeListNoCreate(db_state.get());
+            auto nn=db_state->getNodeListNoCreate(db_state.get());
             m->full_broadcast=nn->getList();
-            auto an=root->getAllNodes(db_state.get());
+            auto an=db_state->getAllNodes(db_state.get());
 
             for(auto& z: an)
             {
@@ -386,15 +381,15 @@ namespace Node
                 return it->second;
             }
             REF_getter<BlockMetaValidator> m=new BlockMetaValidator();
-            auto nn=root->getNodeListNoCreate(db_state.get());
-            m->validator_broadcast=getValidators(root, block_timestamp,db_state.get());
+            auto nn=db_state->getNodeListNoCreate(db_state.get());
+            m->validator_broadcast=getValidators(block_timestamp,db_state.get());
             // auto nm=root->getAllNodes(db_state.get());
             // m->full_broadcast=nn->getList();
-            auto an=root->getAllNodes(db_state.get());
+            auto an=db_state->getAllNodes(db_state.get());
 
             for(auto& z: m->validator_broadcast)
             {
-                auto n=root->getNode(z,db_state.get());
+                auto n=db_state->getNode(z,db_state.get());
                 // auto name=z->getName();
                 // m->nodes.insert_or_assign(name,z);
                 auto stake=n->get_full_stake();
@@ -452,12 +447,14 @@ namespace Node
         THASH_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc);
 
         void do_sync(const NODE_id &src_node, const THASH_id& prev_root_hash_remote);
+        void continue_sync();
+
 
         // bool CheckState(const MsgData::HeartBeatREQ *r, const NODE_id & src_node);
 
         void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::HeartBeatREQ> &lc);
 
-        THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<root_data> &r);
+        THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &r);
     
         bool verify_block(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
 
@@ -468,7 +465,7 @@ namespace Node
              yyjson_val * j_tx);
         void report_mem();
 
-        REF_getter<root_data> root=nullptr;
+        // REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;
         // REF_getter<DB_history> db_history=nullptr;
 

@@ -74,7 +74,7 @@ static JSValue js_granular_map_set(JSContext* ctx, JSValueConst this_val,
 
     CONTRACT_DATA_id cid;
     cid.container="c."+cc->name.container+"."+map->name+"."+key;
-    auto d=cc->root->getContractData(cid,cc->db.get());
+    auto d=cc->db->getContractData(cid,cc->db.get());
     if(!d.valid());
         return JS_ThrowInternalError(ctx, "granule not exists for update");
     d->container=buff;
@@ -110,7 +110,7 @@ static JSValue js_granular_map_get(JSContext* ctx, JSValueConst this_val,
 
     CONTRACT_DATA_id cid;
     cid.container="c."+cc->name.container+"."+map->name+"."+key;
-    auto d=cc->root->getContractData(cid,cc->db.get());
+    auto d=cc->db->getContractData(cid,cc->db.get());
     if(!d.valid());
         return JS_ThrowInternalError(ctx, "granule not exists for get");
     
@@ -143,7 +143,7 @@ static JSValue js_granular_map_has(JSContext* ctx, JSValueConst this_val,
 
     CONTRACT_DATA_id cid;
     cid.container="c."+cc->name.container+"."+map->name+"."+key;
-    auto d=cc->root->getContractData(cid,cc->db.get());
+    auto d=cc->db->getContractData(cid,cc->db.get());
     if(d.valid())
         return JS_NewBool(ctx,true);
     else 

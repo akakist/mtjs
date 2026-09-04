@@ -20,13 +20,6 @@
 
 #include <vector>
 
-void Node::Service::do_InvalidateRoot()
-{
-    sendEvent(ServiceEnum::TxValidator, new bcEvent::InvalidateRoot(root, this));
-    sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::InvalidateRoot(root, this));
-    sendEvent(ServiceEnum::GrainReader, new bcEvent::InvalidateRoot(root, this));
-
-}
 bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
 {
         // logErr2("@@ %s",__func__);
@@ -79,7 +72,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     for (auto &z : r->node_validators)
     {
         XTRY;
-        agg_pk.push_back(root->getNode(z,db_state.get())->get_bls_pk());
+        agg_pk.push_back(db_state->getNode(z,db_state.get())->get_bls_pk());
         XPASS;
     }
 
@@ -141,7 +134,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     block_meta_full.clear();
     block_meta_validator.clear();
     cli_leader_info.clear();
-    do_InvalidateRoot();
 
     for (auto &z : c.blockDBStore->validateBlockREQ->transaction_bodies)
     {
@@ -226,7 +218,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     auto prev_root_hash=prev_root_hash_Z();
     if(c_blocks[prev_root_hash].block_validated)
         return true;
-    b_params t(root,db_state.get());
+    b_params t(db_state.get());
     bool err = false;
     
     auto &cli=cli_leader_info[prev_root_hash];

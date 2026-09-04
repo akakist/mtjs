@@ -38,8 +38,6 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base> &e)
         {
         case bcEventEnum::AddTxREQ:
             return AddTxREQ((const bcEvent::AddTxREQ *)e.get());
-        case bcEventEnum::InvalidateRoot:
-            return InvalidateRoot((const bcEvent::InvalidateRoot *)e.get());
         case bcEventEnum::ClientMsg:
             return ClientMsg((const bcEvent::ClientMsg *)e.get());
         case bcEventEnum::ServiceInit:
@@ -110,19 +108,8 @@ bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     MUTEX_INSPECTOR;
     conf = e;
-    // if (!root.valid())
-    //     root = getRoot(conf->db.get());
-
-    // init_root(root);
-    root=e->root;
-    return true;
-}
-bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
-{
-    MUTEX_INSPECTOR;
-    root=e->root;
-    // root = getRoot(conf->db.get());
-    // init_root(root);
+    // db=e->db;
+    // dbroot=e->root;
     return true;
 }
 bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)

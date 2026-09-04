@@ -15,7 +15,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
 {
         MUTEX_INSPECTOR;
 
-    auto v = t.root->getValuesNoCreate(b.db);
+    auto v = b.db->getValuesNoCreate(b.db);
     auto it = v->emitters_bin.find(t.senderAddress);
     if (it == v->emitters_bin.end())
     {
@@ -50,7 +50,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValuesNoCreate(b.db);
+    auto v = b.db->getValuesNoCreate(b.db);
 
     uint64_t amount=0;
     auto err=yy_get_uint64_t(params,"amount",amount);
@@ -117,7 +117,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
 {
     MUTEX_INSPECTOR;
     // if(senderAddress!=)
-    auto v = t.root->getValuesNoCreate(b.db);
+    auto v = b.db->getValuesNoCreate(b.db);
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
@@ -161,7 +161,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValuesNoCreate(b.db);
+    auto v = b.db->getValuesNoCreate(b.db);
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
@@ -186,7 +186,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
         return "if(!us.valid())";
 
 
-    auto n = t.root->addNode(name, t.roll,b.db);
+    auto n = b.db->addNode(name, t.roll,b.db);
 
     std::string ip,pk_ed,pk_bls;
     err=yy_get_string(params,"ip",ip);
@@ -218,7 +218,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValuesNoCreate(b.db);
+    auto v = b.db->getValuesNoCreate(b.db);
 
     uint64_t amount=0;
     auto err=yy_get_uint64_t(params,"amount",amount);
@@ -262,7 +262,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValuesNoCreate(b.db);
+    auto v = b.db->getValuesNoCreate(b.db);
     uint64_t amount=0;
     auto err=yy_get_uint64_t(params,"amount",amount);
     if(err) return err;
@@ -310,7 +310,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValuesNoCreate(b.db);
+    auto v = b.db->getValuesNoCreate(b.db);
     NODE_id node;
     auto err=yy_get_string(params,"node",node.container);
     if(err)return err;
@@ -341,7 +341,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValuesNoCreate(b.db);
+    auto v = b.db->getValuesNoCreate(b.db);
     std::string name;
     auto err=yy_get_string(params,"name",name);
     if(err) return err;
@@ -358,7 +358,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     }
     CONTRACT_id cn;
     cn.container=name;
-    auto nn = t.root->getContract(cn,b.db);
+    auto nn = b.db->getContract(cn,b.db);
     if (nn.valid())
         return "Contract already registered with name";
 
@@ -367,7 +367,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
         return "if(!us.valid())";
 
 
-    auto n = t.root->addContract(cn, t.roll,b.db);
+    auto n = b.db->addContract(cn, t.roll,b.db);
 
     std::string src;
      err=yy_get_string(params,"src",src);
@@ -392,13 +392,13 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = t.root->getValuesNoCreate(b.db);
+    auto v = b.db->getValuesNoCreate(b.db);
     CONTRACT_id cn;
     auto err=yy_get_string(params,"name",cn.container);
     if(err)
         return err;
 
-    auto n = t.root->getContract(cn,b.db);
+    auto n = b.db->getContract(cn,b.db);
     if (!n.valid())
         return "contract not exists";
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "REF.h"
 #include "root_contract.h"
+#include "IDatabase.h"
 
-void init_root(const REF_getter<root_data> &r, IDatabase* db);
+void init_root(IDatabase* db);

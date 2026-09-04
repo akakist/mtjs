@@ -1,5 +1,5 @@
 #include "root_contract.h"
-
+#include "IDatabase.h"
 uint64_t fnv1a_64(const void* buffer, size_t len) 
 {
     const unsigned char* data = (const unsigned char*)buffer;
@@ -12,12 +12,12 @@ uint64_t fnv1a_64(const void* buffer, size_t len)
     
     return hash;
 }
-std::set<NODE_id> getValidators(const REF_getter<root_data>& r, uint64_t block_timestamp, IDatabase* db)
+std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db)
 {
-    auto ns=r->getNodeListNoCreate(db);
+    auto ns=db->getNodeListNoCreate(db);
     if(!ns.valid())
         throw CommonError("if(!ns.valid())");
-    auto v=r->getValuesNoCreate(db);
+    auto v=db->getValuesNoCreate(db);
     if(!v.valid())
         throw CommonError("if(!v.valid()");
     // auto n_validators=
@@ -28,7 +28,7 @@ std::set<NODE_id> getValidators(const REF_getter<root_data>& r, uint64_t block_t
     {
         auto s=z.container+ts;
         auto h=fnv1a_64(s.data(),s.size());
-        auto node=r->getNode(z,db);
+        auto node=db->getNode(z,db);
         h/=node->get_full_stake()+1;
         res[h].insert(z);
     }

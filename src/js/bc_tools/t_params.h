@@ -2,11 +2,11 @@
 #include "root_contract.h"
 #include "md/md_attachment_data.h"
 #include "md/md_ValidateBlockREQ.h"
+#include "IDatabase.h"
 
 struct b_params
 {
-    b_params(const REF_getter<root_data>& r, IDatabase* _db): root(r),att_data(new MsgData::attachment_data()),db(_db) {}
-    REF_getter<root_data> root;
+    b_params(IDatabase* _db): att_data(new MsgData::attachment_data()),db(_db) {}
     IDatabase* db;
     REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
     REF_getter<MsgData::attachment_data> att_data;
@@ -57,8 +57,11 @@ struct b_params
 
 struct t_params
 {
-    t_params(const REF_getter<root_data>& r): root(r) {}
-    REF_getter<root_data> root;
+    t_params()
+    // : 
+    // db(r) 
+    {}
+    // REF_getter<IDatabase> db;
     ADDRESS_id senderAddress;
     REF_getter<MsgData::TX> tx;
     uint64_t epoch;
@@ -85,7 +88,7 @@ struct t_params
         if(it!=nodes.end())
             return it->second;
 
-        auto nn=root->getNode(n,db);
+        auto nn=db->getNode(n,db);
 
         if(nn.valid())
         {
@@ -101,7 +104,7 @@ struct t_params
         if(it!=addrs.end())
             return it->second;
 
-        auto nn=root->getAddressState(n,roll,db);
+        auto nn=db->getAddressState(n,roll,db);
         if(nn.valid())
         {
             addrs[n]=nn;

@@ -32,7 +32,7 @@ namespace bcEventEnum
     const EVENT_id ClientTxSubscribeREQ(ghash("@g_ClientTxSubscribeREQ"));
     const EVENT_id ClientTxSubscribeRSP(ghash("@g_ClientTxSubscribeRSP"));
     const EVENT_id ServiceInit(ghash("@g_ServiceInit"));
-    const EVENT_id InvalidateRoot(ghash("@g_InvalidateRoot"));
+    // const EVENT_id InvalidateRoot(ghash("@g_InvalidateRoot"));
     const EVENT_id BroadcastMessage(ghash("@g_BroadcastMessage"));
     const EVENT_id SendToChild(ghash("@g_SendToChild"));
     const EVENT_id SendToChildAck(ghash("@g_SendToChildAck"));
@@ -246,36 +246,38 @@ namespace bcEvent
             return NULL;
         }
         ServiceInit(blst_cpp::SecretKey my_sk_bls_,
-                    std::string my_sk_ed_, const NODE_id &this_node_name_, const std::string& db_name_ ,
-                    const REF_getter<root_data>& _root,
+                    std::string my_sk_ed_, const NODE_id &this_node_name_, const REF_getter<IDatabase>& db_ ,
+                    // const REF_getter<root_data>& _root,
                     const route_t &r)
             : NoPacked(bcEventEnum::ServiceInit, r), 
                 my_sk_bls(my_sk_bls_), 
                 my_sk_ed(my_sk_ed_), 
                 this_node_name(this_node_name_), 
-                db_name2(db_name_),
-                root(_root) {}
+                db(db_)
+                // ,
+                // root(_root) 
+                {}
 
         blst_cpp::SecretKey my_sk_bls;
         std::string my_sk_ed;
 
         NODE_id this_node_name;
-        std::string db_name2;
-        REF_getter<root_data> root;
+        REF_getter<IDatabase> db;
+        // REF_getter<root_data> root;
     };
 
-    class InvalidateRoot : public Event::NoPacked
-    {
-    public:
-        static Base *construct(const route_t &r)
-        {
-            return NULL;
-        }
-        InvalidateRoot(const REF_getter<root_data>& _root, const route_t &r)
-            : NoPacked(bcEventEnum::InvalidateRoot, r), root(_root) {}
+    // class InvalidateRoot : public Event::NoPacked
+    // {
+    // public:
+    //     static Base *construct(const route_t &r)
+    //     {
+    //         return NULL;
+    //     }
+    //     InvalidateRoot(const REF_getter<root_data>& _root, const route_t &r)
+    //         : NoPacked(bcEventEnum::InvalidateRoot, r), root(_root) {}
         
-        REF_getter<root_data> root;
-    };
+    //     REF_getter<root_data> root;
+    // };
 
     class BroadcastMessage : public Event::NoPacked
     {
