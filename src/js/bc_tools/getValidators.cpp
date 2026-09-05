@@ -14,10 +14,10 @@ uint64_t fnv1a_64(const void* buffer, size_t len)
 }
 std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db)
 {
-    auto ns=db->getNodeListNoCreate(db);
+    auto ns=db->getNodeListNoCreate();
     if(!ns.valid())
         throw CommonError("if(!ns.valid())");
-    auto v=db->getValuesNoCreate(db);
+    auto v=db->getValuesNoCreate();
     if(!v.valid())
         throw CommonError("if(!v.valid()");
     // auto n_validators=
@@ -28,7 +28,7 @@ std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db)
     {
         auto s=z.container+ts;
         auto h=fnv1a_64(s.data(),s.size());
-        auto node=db->getNode(z,db);
+        auto node=db->getNode(z);
         h/=node->get_full_stake()+1;
         res[h].insert(z);
     }

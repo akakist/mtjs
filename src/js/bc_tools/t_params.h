@@ -57,11 +57,11 @@ struct b_params
 
 struct t_params
 {
-    t_params()
-    // : 
-    // db(r) 
+    t_params(const REF_getter<IDatabase>& d)
+    : 
+    db(d) 
     {}
-    // REF_getter<IDatabase> db;
+    REF_getter<IDatabase> db;
     ADDRESS_id senderAddress;
     REF_getter<MsgData::TX> tx;
     uint64_t epoch;
@@ -82,13 +82,13 @@ struct t_params
         }
     }
     std::map<NODE_id,REF_getter<bc_node>> nodes;
-    REF_getter<bc_node> getNode(const NODE_id& n,IDatabase* db)
+    REF_getter<bc_node> getNode(const NODE_id& n)
     {
         auto it=nodes.find(n);
         if(it!=nodes.end())
             return it->second;
 
-        auto nn=db->getNode(n,db);
+        auto nn=db->getNode(n);
 
         if(nn.valid())
         {
@@ -98,13 +98,13 @@ struct t_params
         return nn;
     }
     std::map<ADDRESS_id,REF_getter<bc_address_state>> addrs;
-    REF_getter<bc_address_state> getAddressState(const ADDRESS_id& n,IDatabase* db)
+    REF_getter<bc_address_state> getAddressState(const ADDRESS_id& n)
     {
         auto it=addrs.find(n);
         if(it!=addrs.end())
             return it->second;
 
-        auto nn=db->getAddressState(n,roll,db);
+        auto nn=db->getAddressState(n,roll);
         if(nn.valid())
         {
             addrs[n]=nn;

@@ -577,7 +577,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         if (!t_err)
         {
             MUTEX_INSPECTOR;
-            auto u = b.db->getAddressState(senderAddress,NULL,db_state.get());
+            auto u = b.db->getAddressState(senderAddress,NULL);
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -630,7 +630,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     MUTEX_INSPECTOR;
 
     double total_staked=0;
-    auto nn=db_state->getAllNodes(db_state.get());
+    auto nn=db_state->getAllNodes();
     for(auto& n:nn)
     {
         // total_staked+=n->get_full_stake();
@@ -642,15 +642,15 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
         for(auto& z:local_prev_block->node_validators)
         {
             ns.insert(z);
-            auto n=db_state->getNode(z,db_state.get());
+            auto n=db_state->getNode(z);
             total_staked+=n->get_full_stake();
         }
         for(auto& z:local_prev_block->node_validators)
         {
-            auto n=db_state->getNode(z,db_state.get());
+            auto n=db_state->getNode(z);
             // n->get_full_stake();
             auto portion=n->get_full_stake()*b.node_rewards/total_staked;
-            auto u = db_state->getAddressState(n->get_owner(),NULL,db_state.get());
+            auto u = db_state->getAddressState(n->get_owner(),NULL);
             {
                 M_LOCK(u->parent->mx);
                 u->balance+=portion;
@@ -686,7 +686,7 @@ THASH_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 #include <stdlib.h>
 int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 {
-    auto nv = db_state->getAllNodes(db_state.get());
+    auto nv = db_state->getAllNodes();
     auto rh=prev_root_hash_Z();
     int crc = __crc32(0, rh.container.data(), rh.container.size());
     int idx = crc % nv.size();
@@ -703,7 +703,7 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
     if (nodeLeft == nodeRight)
         return true;
 
-    auto nv = db_state->getAllNodes(db_state.get());
+    auto nv = db_state->getAllNodes();
     std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
     {
         return a->getName() < b->getName();
@@ -859,7 +859,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
         return true;
     }
     s.insert(m->seqId2);
-    auto n = db_state->getNode(m->node_signer,db_state.get());
+    auto n = db_state->getNode(m->node_signer);
     if(!n.valid())
         return true;
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
@@ -905,7 +905,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
 bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 {
-    auto n = db_state->getNode(m->node_signer,db_state.get());
+    auto n = db_state->getNode(m->node_signer);
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {
         logNode("verify failed @4");
@@ -1063,7 +1063,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         return err;
     }    
     Rollback roll;
-    t_params t;
+    t_params t(db_state);
     t.senderAddress=senderAddress;
     t.tx=tx;
     t.epoch=epoch;
@@ -1071,7 +1071,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.roll=&roll;
     t.value=value;
     t.gasLimit=gasLimit;
-    auto uu=db_state->getAddressState(senderAddress,NULL,db_state.get());
+    auto uu=db_state->getAddressState(senderAddress,NULL);
     if(!uu.valid())
     throw CommonError("if(!uu.valid())");
     {
@@ -1094,7 +1094,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         if(gu>gasLimit)
             gu=gasLimit;
 
-        auto u=db_state->getAddressState(t.senderAddress,NULL,db_state.get());
+        auto u=db_state->getAddressState(t.senderAddress,NULL);
         M_LOCK(u->parent->mx);
         u->balance-=gu*gasPrice;
         b.node_rewards+=gu*gasPrice;
@@ -1107,7 +1107,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         t.gasUsed+=t.roll->size();
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
-        auto u=db_state->getAddressState(t.senderAddress,NULL,db_state.get());
+        auto u=db_state->getAddressState(t.senderAddress,NULL);
         M_LOCK(u->parent->mx);
         u->balance-=t.gasUsed*gasPrice;
         b.node_rewards+=t.gasUsed*gasPrice;
@@ -1117,7 +1117,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        auto u=db_state->getAddressState(t.senderAddress,NULL,db_state.get());
+        auto u=db_state->getAddressState(t.senderAddress,NULL);
         M_LOCK(u->parent->mx);
         u->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
@@ -1133,14 +1133,14 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        auto u=db_state->getAddressState(t.senderAddress,NULL,db_state.get());
+        auto u=db_state->getAddressState(t.senderAddress,NULL);
         M_LOCK(u->parent->mx);
         u->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
         return "gas exceeds limit";
     }
     // OK
-    auto u=db_state->getAddressState(t.senderAddress,NULL,db_state.get());
+    auto u=db_state->getAddressState(t.senderAddress,NULL);
     {
         M_LOCK(u->parent->mx);
         u->balance-=t.gasUsed*gasPrice+value-t.value;
@@ -1178,7 +1178,7 @@ std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct
 #include "js_tools.h"
 std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contract)
 {
-    auto c=db_state->getContract(contract,db_state.get());
+    auto c=db_state->getContract(contract);
     REF_getter<contract_rt> ct=new contract_rt();
     contracts.insert_or_assign(contract,ct);
     ct->ctx=JS_NewContext(contract_runtime);

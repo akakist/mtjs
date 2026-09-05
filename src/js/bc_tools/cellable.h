@@ -85,9 +85,6 @@ struct Cellable: public Refcountable
     /// @brief  не изменяется, выставляется только в конструкторе
     const std::string m_id;
 
-    /// @brief  выставляется только в потоке ноды, мутекс не нужен
-    // size_t last_size=0;
-
     std::map<std::string,THASH_id > children_hashes_mx;
     std::map<std::string, REF_getter<Cellable>> children_ptrs_mx;
 
@@ -99,7 +96,6 @@ struct Cellable: public Refcountable
 public:
     /// @brief выставляется и читается в потоке ноды, мутекс не нужен.
     bool is_dirty=false;
-    // uint64_t last_update_epoch;
 
     Cellable(Cellable* _parent, const std::string & id):Refcountable("cellable"),  parent(_parent), m_id(id)
     {

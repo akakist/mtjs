@@ -13,9 +13,9 @@ void init_root(IDatabase* db)
     std::string u_root_pk=base16::decode(getenv2("k_root_ed_pk"));
     ADDRESS_id u_root_address;
     u_root_address.addr=blake2b_hash(u_root_pk).container;
-    if(!db->checkValues(db).valid())
+    if(!db->checkValues().valid())
     {
-        auto v=db->getValuesOrCreate(NULL,db);
+        auto v=db->getValuesOrCreate(NULL);
         if(!v->emitters_bin.count(u_root_address))
             v->emitters_bin.insert(u_root_address);
 
@@ -27,9 +27,9 @@ void init_root(IDatabase* db)
         v->setDirty(NULL);
     }
     // u_root pk
-    if(!db->checkUserState(u_root_address,db).valid())
+    if(!db->checkUserState(u_root_address).valid())
     {
-        auto u=db->getAddressState(u_root_address,NULL,db);
+        auto u=db->getAddressState(u_root_address,NULL);
         if(!u.valid())
         {
             throw CommonError("cannot find root user state");
@@ -58,10 +58,10 @@ void init_root(IDatabase* db)
     {
         NODE_id name;
         name.container="n"+std::to_string(i);
-        auto n=db->getNode(name,db);
+        auto n=db->getNode(name);
         if(n.valid()) continue;
 
-        REF_getter<bc_node> nn=db->addNode(name,NULL,db);
+        REF_getter<bc_node> nn=db->addNode(name,NULL);
         blst_cpp::PublicKey bls_pk;
         bls_pk.deserializeHexStr(getenv2(keys[i].first));
         nn->init(name, u_root_address, bls_pk, base16::decode(getenv2(keys[i].second)), "127.0.0.1:"+std::to_string(2300+i));

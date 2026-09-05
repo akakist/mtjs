@@ -54,7 +54,7 @@ namespace GrainWriter
         }
 
 
-        REF_getter<root_data> root=NULL;
+        // REF_getter<root_data> root=NULL;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
 

@@ -23,16 +23,16 @@
 
 
 
-struct root_data: public Cellable
-{
+// struct root_data: public Cellable
+// {
 
-    root_data(): Cellable(nullptr,"r")
-    {
-    }
-    Mutex state_mutex;
+//     root_data(): Cellable(nullptr,"r")
+//     {
+//     }
+//     Mutex state_mutex;
     
 
 
-};
+// };
 
 

@@ -25,7 +25,7 @@ struct TIMER_BROADCAST_ACK_TIMEDOUT_cookie: public Refcountable
     NODE_id dstName_;
     BroadcasterTree::TreeNode tree;
     std::string msg;
-    REF_getter<root_data> root=NULL;
+    // REF_getter<root_data> root=NULL;
     route_t route;
 
 };

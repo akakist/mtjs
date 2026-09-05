@@ -43,7 +43,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     for (auto &z : li.transaction_responders)
     {
         
-        auto n = db_state->getNode(z,db_state.get());
+        auto n = db_state->getNode(z);
         stake += mf->getStake(z);
     }
     auto pers=(stake*100)/mf->total_full_stake;
@@ -76,7 +76,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
         return true;
     }
-    if (!r->verify(db_state->getNode(r->node_validator,db_state.get())->get_bls_pk()))
+    if (!r->verify(db_state->getNode(r->node_validator)->get_bls_pk()))
     {
         logNode("block response not validated");
         return true;

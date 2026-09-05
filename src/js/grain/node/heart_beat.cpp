@@ -25,7 +25,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         return false;
     }
 
-    auto n = db_state->getNode(m->node_signer,db_state.get());
+    auto n = db_state->getNode(m->node_signer);
     if (!n.valid())
     {
         logNode("if(!n.valid())");
@@ -140,7 +140,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
         d->lc=local_prev_block;
         auto buffer = d->getBuffer();
-        auto n=db_state->getNode(src_node,db_state.get());
+        auto n=db_state->getNode(src_node);
         sendEvent(n->get_ip(), ServiceEnum::Node,
                 new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 
@@ -191,7 +191,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
             d->lc=local_prev_block;
             auto buffer = d->getBuffer();
-            auto n=db_state->getNode(src_node,db_state.get());
+            auto n=db_state->getNode(src_node);
             sendEvent(n->get_ip(), ServiceEnum::Node,
                     new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 
@@ -402,22 +402,3 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
     return hb_req;
 }
 
-// void Node::Service::make_leader_certificate()
-// {
-//     auto &hbs = l_blocks[prev_root_hash_Z].heart_beat_store;
-//     auto &li = hbs.leader_info;
-//     REF_getter<MsgData::LeaderCertificate> lc = new MsgData::LeaderCertificate();
-//     if (li.ConfirmLeaderRSP_m.empty())
-//         throw CommonError("if(li.ConfirmLeaderRSP_m.empty())");
-//     // return nullptr;
-//     auto msg = li.ConfirmLeaderRSP_m.begin()->second->hb;
-//     lc->heart_beat = li.ConfirmLeaderRSP_m.begin()->second->hb;
-//     for (auto &r : li.ConfirmLeaderRSP_m)
-//     {
-//         lc->agg_sig.add(r.second->sig);
-//         auto nn = root->getNode(r.second->node_signer,db_state.get());
-//         lc->nodes.push_back(r.second->node_signer);
-//     }
-
-//     li.leader_cert_2 = lc;
-// }

@@ -357,9 +357,9 @@ namespace Node
                 return it->second;
             }
             REF_getter<BlockMetaFull> m=new BlockMetaFull();
-            auto nn=db_state->getNodeListNoCreate(db_state.get());
+            auto nn=db_state->getNodeListNoCreate();
             m->full_broadcast=nn->getList();
-            auto an=db_state->getAllNodes(db_state.get());
+            auto an=db_state->getAllNodes();
 
             for(auto& z: an)
             {
@@ -381,15 +381,15 @@ namespace Node
                 return it->second;
             }
             REF_getter<BlockMetaValidator> m=new BlockMetaValidator();
-            auto nn=db_state->getNodeListNoCreate(db_state.get());
+            auto nn=db_state->getNodeListNoCreate();
             m->validator_broadcast=getValidators(block_timestamp,db_state.get());
             // auto nm=root->getAllNodes(db_state.get());
             // m->full_broadcast=nn->getList();
-            auto an=db_state->getAllNodes(db_state.get());
+            auto an=db_state->getAllNodes();
 
             for(auto& z: m->validator_broadcast)
             {
-                auto n=db_state->getNode(z,db_state.get());
+                auto n=db_state->getNode(z);
                 // auto name=z->getName();
                 // m->nodes.insert_or_assign(name,z);
                 auto stake=n->get_full_stake();

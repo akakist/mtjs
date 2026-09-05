@@ -2,6 +2,36 @@
 #include "commonError.h"
 #include "blake2bHasher.h"
 #include <sstream>
+#include "bc_address_state.h"
+#include "bc_contract.h"
+#include "bc_contract_data.h"
+#include "bc_node.h"
+#include "bc_node.h"
+#include "bc_nodelist.h"
+#include "bc_values.h"
+
+
+std::vector<data_base *(*)(Cellable *)> db_constructors = {
+    +[](Cellable *p) -> data_base *
+    { return new bc_contract(p); },
+
+    +[](Cellable *p) -> data_base *
+    { return new bc_address_state(p); },
+
+    +[](Cellable *p) -> data_base *
+    { return new bc_node(p); },
+
+    +[](Cellable *p) -> data_base *
+    { return new bc_nodelist(p); },
+
+    +[](Cellable *p) -> data_base *
+    { return new bc_values(p); },
+
+    +[](Cellable *p) -> data_base *
+    { return new bc_contract_data(p); },
+
+};
+
 
 std::string Cellable::getDbId() const
 {

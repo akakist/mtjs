@@ -72,7 +72,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     for (auto &z : r->node_validators)
     {
         XTRY;
-        agg_pk.push_back(db_state->getNode(z,db_state.get())->get_bls_pk());
+        agg_pk.push_back(db_state->getNode(z)->get_bls_pk());
         XPASS;
     }
 
@@ -98,15 +98,16 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
-    auto pn=db_state->getDbName()+".last_block";
-    FILE *f=fopen(pn.c_str(),"w");
-    if(f)
-    {
-        auto lb=r->getBuffer();
-        fwrite(lb.data(),lb.size(),1,f);
-        fclose(f);
+    // auto pn=db_state->getDbName()+".last_block";
+    db_to_save_Z.add(".last_block",r->getBuffer());
+    // FILE *f=fopen(pn.c_str(),"w");
+    // if(f)
+    // {
+    //     auto lb=r->getBuffer();
+    //     fwrite(lb.data(),lb.size(),1,f);
+    //     fclose(f);
 
-    }
+    // }
     auto &hb=c.blockDBStore->validateBlockREQ->heart_beat;
     {
         MUTEX_INSPECTOR;
