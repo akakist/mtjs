@@ -80,6 +80,7 @@ if (MYSQL_FOUND)
     link_directories(${MYSQL_LIBRARY_DIRS})
 endif()
 endif()
+find_package(RocksDB REQUIRED)
 
 find_package(OpenSSL REQUIRED)
 
@@ -213,7 +214,7 @@ CONFIGURE_FILE( "${PROJECT_SOURCE_DIR}/version.h.in"
 
 SET(CAPS_IP "x.testquant.com")
 SET(PORT 10100)
-add_definitions(  )
+add_definitions( )
 #-DMEMLEAK_CHECK 
 #-DDEBUG  -DMUTEX_INSPECTOR_DEBUG 
 #-DDEBUG  -DMUTEX_INSPECTOR_DEBUG -DWEBDUMP -DDEBUG  -DMUTEX_INSPECTOR_DEBUG

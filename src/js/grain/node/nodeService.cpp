@@ -43,7 +43,7 @@
 #include "__crc32.h"
 #include "init_root.h"
 #include "nodeService.h"
-#include "CDatabase.h"
+#include "CDatabaseRocksdb.h"
 
 
 #include "tr_exec.h"
@@ -63,7 +63,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
 
     auto db=getDB();
-    db_state = new CDatabase(db, db_name);
+    db_state = new CDatabaseRocksdb(db_name);
 
     prev_block=load_last_block(db_state.get());
     // if (!root.valid())

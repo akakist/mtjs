@@ -25,7 +25,7 @@
 #include "md/md_GetUserNonceREQ.h"
 #include "md/md_GetUserNonceRSP.h"
 #include "init_root.h"
-#include "CDatabase.h"
+#include "CDatabaseRocksdb.h"
 
 bool GrainReader::Service::on_startService(const systemEvent::startService *)
 {

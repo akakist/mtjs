@@ -25,7 +25,6 @@ base16.h
 blake2bHasher.h
 THASH_id.h
 blst_cp.h
-CDatabase.h
 cellable.h
 db_to_save.h
 execute_transaction.h
