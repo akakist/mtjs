@@ -28,7 +28,10 @@ std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db)
     {
         auto s=z.container+ts;
         auto h=fnv1a_64(s.data(),s.size());
-        auto node=db->getNode(z);
+        auto node=db->getNodeNoCreate(z);
+        if(!node.valid())
+            throw CommonError("if(!n.valid())");
+
         h/=node->get_full_stake()+1;
         res[h].insert(z);
     }

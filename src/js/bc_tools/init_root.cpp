@@ -13,9 +13,10 @@ void init_root(IDatabase* db)
     std::string u_root_pk=base16::decode(getenv2("k_root_ed_pk"));
     ADDRESS_id u_root_address;
     u_root_address.addr=blake2b_hash(u_root_pk).container;
-    if(!db->checkValues().valid())
+    auto v=db->getValuesNoCreate();
+    if(!v.valid())
     {
-        auto v=db->getValuesOrCreate(NULL);
+        v=db->getValuesOrCreate(NULL);
         if(!v->emitters_bin.count(u_root_address))
             v->emitters_bin.insert(u_root_address);
 
@@ -27,9 +28,9 @@ void init_root(IDatabase* db)
         v->setDirty(NULL);
     }
     // u_root pk
-    if(!db->checkUserState(u_root_address).valid())
+    if(!db->getAddressStateNoCreate(u_root_address).valid())
     {
-        auto u=db->getAddressState(u_root_address,NULL);
+        auto u=db->getAddressStateOrCreate(u_root_address,NULL);
         if(!u.valid())
         {
             throw CommonError("cannot find root user state");
@@ -58,7 +59,7 @@ void init_root(IDatabase* db)
     {
         NODE_id name;
         name.container="n"+std::to_string(i);
-        auto n=db->getNode(name);
+        auto n=db->getNodeNoCreate(name);
         if(n.valid()) continue;
 
         REF_getter<bc_node> nn=db->addNode(name,NULL);

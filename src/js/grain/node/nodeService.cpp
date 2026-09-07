@@ -185,19 +185,6 @@ void Node::Service::do_start_block()
 #endif
     }
 }
-void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b, const std::set<NODE_id>& nodes)
-{
-    std::string msg;
-    // logErr2("b get %p",b.get());
-    if(b.valid())
-        msg=b->getBuffer();
-    // logErr2("KALL 1");
-    auto signature=sign_ed(my_sk_ed,blake2b_hash(msg).container);
-    sendEvent(ServiceEnum::BroadcasterTree,
-              new bcEvent::BroadcastMessage(ServiceEnum::Node,
-                                            this_node_name, node_start_timestamp, nodes, seqId2++, signature,msg, ListenerBase::serviceId));
-
-}
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
@@ -267,6 +254,9 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     switch (e->tid)
     {
+    // case timers::TIMER_BROADCAST_ACK_TIMEDOUT:
+    //     return on_TIMER_BROADCAST_ACK_TIMEDOUT(e);
+    // break;
     case timers::TIMER_SYNC_TIMEDOUT:
         logNode("FAILED SYNC, NODE STOPPED---------------------------------------------------------------");
     break;
@@ -320,6 +310,13 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         auto &ID = e->id;
         switch (ID)
         {
+        // case bcEventEnum::SendToChild:
+        //     return SendToChild(static_cast<const bcEvent::SendToChild *>(e.get()), false);
+        // case bcEventEnum::SendToChildAck:
+        //     return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(e.get()), false);
+
+        // case bcEventEnum::BroadcastMessage:
+        //     return BroadcastMessage((const bcEvent::BroadcastMessage *)e.get());
         case bcEventEnum::GetGranulesREQ:
             return GetGranulesREQ((const bcEvent::GetGranulesREQ *)e.get());
         case bcEventEnum::GetGranulesRSP:
@@ -352,6 +349,11 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
 
             switch (IDA)
             {
+            // case bcEventEnum::SendToChild:
+            //     return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
+            // case bcEventEnum::SendToChildAck:
+            //     return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
+
             case bcEventEnum::GetGranulesREQ:
                 return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
             case bcEventEnum::GetGranulesRSP:
@@ -371,6 +373,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             auto &IDC = ev->e->id;
             switch (IDC)
             {
+            // case bcEventEnum::SendToChild:
+            //     return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
+            // case bcEventEnum::SendToChildAck:
+            //     return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
             case bcEventEnum::GetGranulesREQ:
                 return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
             case bcEventEnum::GetGranulesRSP:
@@ -577,7 +583,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         if (!t_err)
         {
             MUTEX_INSPECTOR;
-            auto u = b.db->getAddressState(senderAddress,NULL);
+            auto u = b.db->getAddressStateOrCreate(senderAddress,NULL);
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -642,15 +648,21 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
         for(auto& z:local_prev_block->node_validators)
         {
             ns.insert(z);
-            auto n=db_state->getNode(z);
+            auto n=db_state->getNodeNoCreate(z);
+            if(!n.valid())
+                throw CommonError("if(!n.valid())");
+
             total_staked+=n->get_full_stake();
         }
         for(auto& z:local_prev_block->node_validators)
         {
-            auto n=db_state->getNode(z);
+            auto n=db_state->getNodeNoCreate(z);
+            if(!n.valid())
+                throw CommonError("if(!n.valid())");
+
             // n->get_full_stake();
             auto portion=n->get_full_stake()*b.node_rewards/total_staked;
-            auto u = db_state->getAddressState(n->get_owner(),NULL);
+            auto u = db_state->getAddressStateOrCreate(n->get_owner(),NULL);
             {
                 M_LOCK(u->parent->mx);
                 u->balance+=portion;
@@ -859,7 +871,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
         return true;
     }
     s.insert(m->seqId2);
-    auto n = db_state->getNode(m->node_signer);
+    auto n = db_state->getNodeNoCreate(m->node_signer);
     if(!n.valid())
         return true;
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
@@ -905,7 +917,9 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
 bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 {
-    auto n = db_state->getNode(m->node_signer);
+    auto n = db_state->getNodeNoCreate(m->node_signer);
+    if(!n.valid())
+        throw CommonError("if(!n.valid())");
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {
         logNode("verify failed @4");
@@ -1071,7 +1085,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.roll=&roll;
     t.value=value;
     t.gasLimit=gasLimit;
-    auto uu=db_state->getAddressState(senderAddress,NULL);
+    auto uu=db_state->getAddressStateOrCreate(senderAddress,NULL);
     if(!uu.valid())
     throw CommonError("if(!uu.valid())");
     {
@@ -1094,7 +1108,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         if(gu>gasLimit)
             gu=gasLimit;
 
-        auto u=db_state->getAddressState(t.senderAddress,NULL);
+        auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
         M_LOCK(u->parent->mx);
         u->balance-=gu*gasPrice;
         b.node_rewards+=gu*gasPrice;
@@ -1107,7 +1121,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         t.gasUsed+=t.roll->size();
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
-        auto u=db_state->getAddressState(t.senderAddress,NULL);
+        auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
         M_LOCK(u->parent->mx);
         u->balance-=t.gasUsed*gasPrice;
         b.node_rewards+=t.gasUsed*gasPrice;
@@ -1117,7 +1131,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        auto u=db_state->getAddressState(t.senderAddress,NULL);
+        auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
         M_LOCK(u->parent->mx);
         u->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
@@ -1133,14 +1147,14 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        auto u=db_state->getAddressState(t.senderAddress,NULL);
+        auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
         M_LOCK(u->parent->mx);
         u->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
         return "gas exceeds limit";
     }
     // OK
-    auto u=db_state->getAddressState(t.senderAddress,NULL);
+    auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
     {
         M_LOCK(u->parent->mx);
         u->balance-=t.gasUsed*gasPrice+value-t.value;

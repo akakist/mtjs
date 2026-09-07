@@ -122,7 +122,10 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
     std::vector<std::string> pathes=db_state->getPathes();
     if(pathes.size())
     {
-        auto n=db_state->getNode(m->responder);
+        auto n=db_state->getNodeNoCreate(m->responder);
+        if(!n.valid())
+            throw CommonError("if(!n.valid())");
+
         auto ip=n->get_ip();
         sendEvent(ip,ServiceEnum::Node,new bcEvent::GetGranulesREQ(pathes,ListenerBase::serviceId));
 
@@ -150,7 +153,9 @@ void Node::Service::do_sync(const NODE_id &src_node, const THASH_id& prev_root_h
     // pathes.push_back("");
     db_state->add_sync_out("");
 
-    auto n=db_state->getNode(src_node);
+    auto n=db_state->getNodeNoCreate(src_node);
+    if(!n.valid())
+        throw CommonError("if(!n.valid())");
     // root=NULL;
     auto ip=n->get_ip();
     db_state->setIp(ip);

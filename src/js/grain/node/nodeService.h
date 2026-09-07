@@ -46,6 +46,8 @@ std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db);
 // {
 //     STATE_NORMAL,STATE_SYNCING
 // };
+#define BROADCAST_ACK_TIMEDOUT_SEC 0.2
+
 
 namespace Node
 {
@@ -56,7 +58,8 @@ namespace Node
         TIMER_PERIODIC_CLOCK,
         TIMER_VALIDATE_BLOCK_DELAY,
         TIMER_SYNC_TIMEDOUT,
-        TIMER_REPORT_MEM
+        TIMER_REPORT_MEM,
+        TIMER_BROADCAST_ACK_TIMEDOUT,
     };
     struct BlockMetaFull: public Refcountable
     {
@@ -195,6 +198,16 @@ namespace Node
 
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
         bool PutTransactionREQ(const bcEvent::PutTransactionREQ* e);
+        // bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
+        // bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
+        // bool SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork);
+
+
+        // bool on_TIMER_BROADCAST_ACK_TIMEDOUT(const timerEvent::TickAlarm *e);
+
+        
+        // void make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id& node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route);
+
 
         REF_getter<MsgData::HeartBeatREQ> do_heart_beat();
 
@@ -389,7 +402,9 @@ namespace Node
 
             for(auto& z: m->validator_broadcast)
             {
-                auto n=db_state->getNode(z);
+                auto n=db_state->getNodeNoCreate(z);
+                if(!n.valid())
+                throw CommonError("if(!n.valid())");
                 // auto name=z->getName();
                 // m->nodes.insert_or_assign(name,z);
                 auto stake=n->get_full_stake();

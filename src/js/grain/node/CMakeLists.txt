@@ -6,6 +6,7 @@ add_library(node-serviceS STATIC
     heart_beat.cpp
     client_node.cpp
     leader_node.cpp
+    broadcaster.cpp
 )
 
 

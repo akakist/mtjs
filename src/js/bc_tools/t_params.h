@@ -88,7 +88,7 @@ struct t_params
         if(it!=nodes.end())
             return it->second;
 
-        auto nn=db->getNode(n);
+        auto nn=db->getNodeNoCreate(n);
 
         if(nn.valid())
         {
@@ -104,7 +104,7 @@ struct t_params
         if(it!=addrs.end())
             return it->second;
 
-        auto nn=db->getAddressState(n,roll);
+        auto nn=db->getAddressStateOrCreate(n,roll);
         if(nn.valid())
         {
             addrs[n]=nn;

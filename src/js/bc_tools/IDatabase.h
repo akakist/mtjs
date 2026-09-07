@@ -106,18 +106,18 @@ struct IDatabase: public Refcountable
 
     REF_getter<bc_values> getValuesOrCreate(Rollback*);
     REF_getter<bc_values> getValuesNoCreate();
-    REF_getter<bc_values> checkValues();
 
 
-    REF_getter<bc_address_state> getAddressState(const ADDRESS_id &pk,Rollback*);
-    REF_getter<bc_address_state>   checkUserState(const ADDRESS_id &pk);
+    REF_getter<bc_address_state> getAddressStateOrCreate(const ADDRESS_id &pk,Rollback*);
+    REF_getter<bc_address_state> getAddressStateNoCreate(const ADDRESS_id &pk);
+    REF_getter<const bc_address_state> getAddressStateNoCreateConst(const ADDRESS_id &pk);
 
 
     // std::vector<NODE_id> getNodesNames();
     std::vector<REF_getter<bc_node>> getAllNodes();
 
 
-    REF_getter<bc_node> getNode(const NODE_id &name);
+    REF_getter<bc_node> getNodeNoCreate(const NODE_id &name);
     REF_getter<bc_node> addNode(const NODE_id &name, Rollback*);
     REF_getter<bc_nodelist> getNodeListOrCreate(Rollback* roll);
     REF_getter<bc_nodelist> getNodeListNoCreate();

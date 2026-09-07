@@ -25,7 +25,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         return false;
     }
 
-    auto n = db_state->getNode(m->node_signer);
+    auto n = db_state->getNodeNoCreate(m->node_signer);
     if (!n.valid())
     {
         logNode("if(!n.valid())");
@@ -140,7 +140,9 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
         d->lc=local_prev_block;
         auto buffer = d->getBuffer();
-        auto n=db_state->getNode(src_node);
+        auto n=db_state->getNodeNoCreate(src_node);
+        if(!n.valid())
+            throw CommonError("if(!n.valid())");
         sendEvent(n->get_ip(), ServiceEnum::Node,
                 new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 
@@ -191,7 +193,10 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
             d->lc=local_prev_block;
             auto buffer = d->getBuffer();
-            auto n=db_state->getNode(src_node);
+            auto n=db_state->getNodeNoCreate(src_node);
+            if(!n.valid())
+                throw CommonError("if(!n.valid())");
+
             sendEvent(n->get_ip(), ServiceEnum::Node,
                     new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 

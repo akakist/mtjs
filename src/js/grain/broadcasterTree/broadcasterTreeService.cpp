@@ -166,7 +166,9 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
     // auto ks = root->getAllNodes(db_state_4.get());
     for (auto &nd : e->nodes)
     {
-        auto n=conf->db->getNode(nd);
+        auto n=conf->db->getNodeNoCreate(nd);
+        if(!n.valid())
+            throw CommonError("if(!n.valid())");
         NodeElement ne=n->getElement();
         nodes[nd] = ne;
     }

@@ -72,7 +72,11 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     for (auto &z : r->node_validators)
     {
         XTRY;
-        agg_pk.push_back(db_state->getNode(z)->get_bls_pk());
+        auto n=db_state->getNodeNoCreate(z);
+        if(!n.valid())
+            throw CommonError("if(!n.valid())");
+
+        agg_pk.push_back(n->get_bls_pk());
         XPASS;
     }
 

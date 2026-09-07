@@ -21,7 +21,7 @@ class Refcountable
 
     const char* ___nm;
 public:
-    std::atomic<int> __Ref_Count;
+    mutable std::atomic<int> __Ref_Count;
     Refcountable (const char* nm): __Ref_Count(0),___nm(nm)
     {
 #ifdef MEMLEAK_CHECK
