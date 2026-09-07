@@ -378,6 +378,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 
 REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
 {
+    
     stage_is_working=iUtils->getNow();
     // logNode("@@ %s",__FUNCTION__);
     l_blocks.clear();
