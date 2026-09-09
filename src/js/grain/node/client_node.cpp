@@ -161,7 +161,9 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     if(transaction_pool_of_leader.size())
     {
-        do_heart_beat(time(NULL));
+        auto hb=do_heart_beat(time(NULL));
+        cli_leader_info[prev_root_hash_Z()].set_node_leader(hb);
+        build_node_lists(hb);
     }
     XPASS;
     return true;

@@ -715,43 +715,54 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
     if (nodeLeft == nodeRight)
         return true;
 
-    auto nv = db_state->getAllNodes();
-    std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
-    {
-        return a->getName() < b->getName();
-    });
+        
+    auto & cli=cli_leader_info[prev_root_hash_Z()];
+    if(cli.position_in_allodes.empty())
+        throw CommonError("if(cli.position_in_allodes.empty())");
+    auto itL=cli.position_in_allodes.find(nodeLeft);
+    auto itR=cli.position_in_allodes.find(nodeRight);
+    if(itL==cli.position_in_allodes.end())
+        throw CommonError("if(itL==cli.position_in_allodes.end())");
+    if(itR==cli.position_in_allodes.end())
+        throw CommonError("if(itR==cli.position_in_allodes.end())");
+    return itL->second < itR->second;
+    // auto nv = db_state->getAllNodes();
+    // std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
+    // {
+    //     return a->getName() < b->getName();
+    // });
 
-    // ФИКС 1: uint32_t вместо int, чтобы избежать отрицательного crc
-    auto prev_rh=prev_root_hash_Z();
-    uint32_t crc = __crc32(0, prev_rh.container.data(), prev_rh.container.size());
-    int idx = static_cast<int>(crc % nv.size());
+    // // ФИКС 1: uint32_t вместо int, чтобы избежать отрицательного crc
+    // auto prev_rh=prev_root_hash_Z();
+    // uint32_t crc = __crc32(0, prev_rh.container.data(), prev_rh.container.size());
+    // int idx = static_cast<int>(crc % nv.size());
 
-    int npoz = -1;
-    int tpoz = -1;
-    for (int i = 0; i < static_cast<int>(nv.size()); i++)
-    {
-        if (nodeLeft == nv[i]->getName())
-            npoz = i;
-        if (nodeRight == nv[i]->getName())
-            tpoz = i;
-    }
+    // int npoz = -1;
+    // int tpoz = -1;
+    // for (int i = 0; i < static_cast<int>(nv.size()); i++)
+    // {
+    //     if (nodeLeft == nv[i]->getName())
+    //         npoz = i;
+    //     if (nodeRight == nv[i]->getName())
+    //         tpoz = i;
+    // }
 
-    // ФИКС 2: защита от ненайденных нод
-    if (npoz == -1 || tpoz == -1)
-    {
-        return npoz != -1; // если nodeLeft найден, а nodeRight нет — nodeLeft лучше
-    }
+    // // ФИКС 2: защита от ненайденных нод
+    // if (npoz == -1 || tpoz == -1)
+    // {
+    //     return npoz != -1; // если nodeLeft найден, а nodeRight нет — nodeLeft лучше
+    // }
 
-    int distLeft  = abs(idx - npoz);
-    int distRight = abs(idx - tpoz);
+    // int distLeft  = abs(idx - npoz);
+    // int distRight = abs(idx - tpoz);
 
-    // ФИКС 3: TIE-BREAKER при равных расстояниях
-    if (distLeft == distRight)
-    {
-        return nodeLeft < nodeRight;  // побеждает нода с меньшим именем
-    }
+    // // ФИКС 3: TIE-BREAKER при равных расстояниях
+    // if (distLeft == distRight)
+    // {
+    //     return nodeLeft < nodeRight;  // побеждает нода с меньшим именем
+    // }
 
-    return distLeft < distRight;
+    // return distLeft < distRight;
 }
 bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
 {
@@ -820,7 +831,9 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     if(iUtils->getNow()-stage_is_working> STAGE_IS_WORKING_TIMEOUT* _1sec)
     {
         stage_is_working=iUtils->getNow();
-        do_heart_beat(time(NULL));
+        auto hb=do_heart_beat(time(NULL));
+        cli_leader_info[prev_root_hash_Z()].set_node_leader(hb);
+        build_node_lists(hb);
     }
     return true;
 }

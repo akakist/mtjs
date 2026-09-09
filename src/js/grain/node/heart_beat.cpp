@@ -24,16 +24,16 @@ inline uint64_t read_uint64(const uint8_t* data) {
            (static_cast<uint64_t>(data[7]));
 }
 
-void Node::Service::build_node_lists(const THASH_id& prev_state,time_t blocktimestamp, IDatabase* db)
+void Node::Service::build_node_lists(const REF_getter<MsgData::HeartBeatREQ>& h)
 {
     // auto nl=db->getNodeListNoCreate();
     // auto l=nl->getList();
-    
-    auto& cli=cli_leader_info[prev_state];
+    // logNode("build_node_lists");
+    auto& cli=cli_leader_info[h->prev_root_hash_1];
 
     cli.allnodes.clear();
     cli.position_in_allodes.clear();
-    auto ll=db->getAllNodes();
+    auto ll=db_state->getAllNodes();
     std::map<uint64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
     // std::vector<NodeElement> allnodes;
     // std::map<NODE_id,size_t> position_in_allodes;
@@ -41,7 +41,7 @@ void Node::Service::build_node_lists(const THASH_id& prev_state,time_t blocktime
     for(auto &x: ll)
     {
         // x->
-        std::string seed=x->getName().container+prev_state.container+std::to_string(blocktimestamp);
+        std::string seed=x->getName().container+h->prev_root_hash_1.container+std::to_string(h->block_timestamp);
         auto h=blake2b_hash(seed);
         if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
         auto w=read_uint64((uint8_t*)h.container.data());
@@ -155,13 +155,16 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     auto ct=time(NULL);
     if(h->block_timestamp<ct-1 || h->block_timestamp>ct+1)
     {
+        MUTEX_INSPECTOR;
         logNode("hb block_timestamp invalid");
         return true;
     }
     auto& cli=cli_leader_info[h->prev_root_hash_1];
     auto nl=cli.get_node_leader();
+
     if(nl.valid())
     {
+        MUTEX_INSPECTOR;
         /// ignore if blocktimestamp changed
         if(nl->block_timestamp!=h->block_timestamp)
         {
@@ -169,8 +172,14 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             return true;
         }
     }
+    else
+    {
+        cli.set_node_leader(h);
+        build_node_lists(h);
+    }
     if(iUtils->getNow()-cli.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT)
     {
+        MUTEX_INSPECTOR;
         logNode("if(iUtils->getNow()-ci.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT) return true");
         return true;
     }
@@ -199,6 +208,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
 
     if(local_verified && !remote_verified)
     {
+        MUTEX_INSPECTOR;
         /// не отвечаем, поскольку ремоте нода не имеет сертификата
         logNode("if(local_verified && !remote_verified) return ");
         REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
@@ -216,19 +226,22 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
 
     if(!remote_verified && !local_verified)    /// block 0
     {
+        MUTEX_INSPECTOR;
         /// отвечаем, поскольку это кейс старта с генезиса
         logNode("if(!remote_verified && !local_verified) ");
         if(isNodeGreaterOrEqual(this_node_name,h->node_leader))
         {
+        MUTEX_INSPECTOR;
             logNode("do_heart_beat();");
             auto hb=do_heart_beat(h->block_timestamp);
             cli.set_node_leader(hb);
-            build_node_lists(hb->prev_root_hash_1,hb->block_timestamp,db_state.get());
+            build_node_lists(hb);
             cli.heart_beat_sent=iUtils->getNow();
             return true;
         }
         else
         {
+        MUTEX_INSPECTOR;
             logNode("reply_HeartBeatRSP(h,route);");
             reply_HeartBeatRSP(h,route);
             return true;
@@ -237,6 +250,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     
     if(remote_verified && !local_verified)
     {
+        MUTEX_INSPECTOR;
         /// если локально нет сертиката, нода стартанула с генезиса, а у удаленной есть сертификат
         /// то надо синхронизироваться, переходим в синк, не отвечаем
         logNode("if(remote_verified && !local_verified) do sync return");
@@ -251,9 +265,11 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     
     if(remote_verified && local_verified)
     {
+        MUTEX_INSPECTOR;
     
         if(remote_prev_lc->blockInfo->heart_beat->new_epoch < local_prev_block->blockInfo->heart_beat->new_epoch)
         {
+        MUTEX_INSPECTOR;
             logNode("if(remote_prev_lc->heart_beat->new_epoch (%s) < local_lc->heart_beat->new_epoch) return",src_node.container.c_str());
             REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
             d->lc=local_prev_block;
@@ -278,6 +294,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         }
         else if(remote_prev_lc->blockInfo->heart_beat->new_epoch == local_prev_block->blockInfo->heart_beat->new_epoch)
         {
+        MUTEX_INSPECTOR;
     
                 /// оба в одинаковой эпохе
                 
@@ -321,12 +338,14 @@ if(prev_root_hash_Z!=h->prev_root_hash)
      
                 if(iUtils->getNow()-cli.heart_beat_sent > _1sec * HEART_BEAT_SENT_TIMEOUT)
                 {
+        MUTEX_INSPECTOR;
                     if(isNodeGreaterOrEqual(this_node_name, h->node_leader))
                     {
+        MUTEX_INSPECTOR;
                         // ci.node_leader=new MsgData::HeartBeatREQ(prev_root_hash_Z,);
                         auto hb=do_heart_beat(h->block_timestamp);
                         cli.set_node_leader(hb);
-                        build_node_lists(hb->prev_root_hash_1,hb->block_timestamp,db_state.get());
+                        build_node_lists(hb);
                         cli.heart_beat_sent=iUtils->getNow();
                         return true;
                     }
@@ -337,9 +356,10 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 auto nl=cli.get_node_leader();
                 if (!nl.valid() || nl->node_leader.container.empty() || isNodeGreaterOrEqual(h->node_leader, nl->node_leader))
                 {
+        MUTEX_INSPECTOR;
     
                     cli.set_node_leader(h);
-                    build_node_lists(h->prev_root_hash_1,h->block_timestamp,db_state.get());
+                    build_node_lists(h);
 
                     reply_HeartBeatRSP(h,route);
                     return true;
@@ -373,8 +393,10 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
     if (!nl.valid())
     {
         cli.set_node_leader(h->hb);
-        build_node_lists(h->hb->prev_root_hash_1,h->hb->block_timestamp,db_state.get());
+        build_node_lists(h->hb);
     }
+    if(!h->hb.valid())
+        throw CommonError("if(!h->hb.valid())");
     if (!h->hb->equals(nl))
     {
         return true;

@@ -375,10 +375,12 @@ namespace Node
         std::map<THASH_id,REF_getter<BlockMetaValidator>> block_meta_validator;
         REF_getter<BlockMetaFull> getMetaFull()
         {
+            MUTEX_INSPECTOR;
             auto b=prev_root_hash_Z();
             auto it=block_meta_full.find(b);
             if(it!=block_meta_full.end())
             {
+            MUTEX_INSPECTOR;
                 if(it->second.valid())
                 return it->second;
             }
@@ -389,6 +391,7 @@ namespace Node
 
             for(auto& z: an)
             {
+            MUTEX_INSPECTOR;
                 auto name=z->getName();
                 m->nodes.insert_or_assign(name,z);
                 auto stake=z->get_full_stake();
@@ -469,7 +472,7 @@ namespace Node
 
 
         void do_start_block();
-        void build_node_lists(const THASH_id& prev_state,time_t blocktimestamp, IDatabase* db);
+        void build_node_lists(const REF_getter<MsgData::HeartBeatREQ>& h);
 
 
         void collectTransactions();
