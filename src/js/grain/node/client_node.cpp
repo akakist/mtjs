@@ -34,13 +34,14 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     XTRY;
     auto &cli = cli_leader_info[prev_root_hash_Z()];
-    if(!cli.node_leader.valid())
+    auto nl=cli.get_node_leader();
+    if(!nl.valid())
     {
         logNode("if(!cli.node_leader.valid())");
         return true;
     }
 
-    if(cli.node_leader->node_leader!=src_node)
+    if(nl->node_leader!=src_node)
     {
         logNode("invalid leader 12");
         return true;
@@ -160,7 +161,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     if(transaction_pool_of_leader.size())
     {
-        do_heart_beat();
+        do_heart_beat(time(NULL));
     }
     XPASS;
     return true;
@@ -183,15 +184,15 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
 //     }
     auto prev_root_hash=prev_root_hash_Z();
     auto & cli=cli_leader_info[prev_root_hash];
-    if(!cli.node_leader.valid())
+    auto nl=cli.get_node_leader();
+    if(!nl.valid())
     {
         logNode("if(!cli.node_leader.valid())");
         return true;
     }
-
-    if(!cli.node_leader.valid() || cli.node_leader->node_leader!=src_node)
+    if(!nl.valid() || nl->node_leader!=src_node)
     {
-        logNode("GetTransaction invalid leader #14  my %s remote %s", cli.node_leader.valid()?cli.node_leader->node_leader.container.c_str():"", src_node.container.c_str());
+        logNode("GetTransaction invalid leader #14  my %s remote %s", nl.valid()?nl->node_leader.container.c_str():"", src_node.container.c_str());
         return true;
     }
 
@@ -227,12 +228,13 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     bool err = false;
     
     auto &cli=cli_leader_info[prev_root_hash];
-    if(!cli.node_leader.valid())
+    auto nl=cli.get_node_leader();
+    if(!nl.valid())
     {
         logNode("if(!cli.node_leader.valid())");
         return true;
     }
-    if(cli.node_leader->node_leader!=src_node)
+    if(nl->node_leader!=src_node)
     {
         logNode("invalid leader #15");
         return true;
@@ -241,7 +243,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
     if (!err)
     {
-        if (!r->heart_beat->equals(cli_leader_info[r->heart_beat->prev_root_hash_1].node_leader))
+        if (!r->heart_beat->equals(cli_leader_info[r->heart_beat->prev_root_hash_1].get_node_leader()))
         {
             t.emit_block("error", R"({"code":-32602,"error":"cert node leader mismatched"})");
             // t.att_data->block_report = {1, "cert node leader mismatched"};

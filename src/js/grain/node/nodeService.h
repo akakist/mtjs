@@ -209,7 +209,7 @@ namespace Node
         // void make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id& node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route);
 
 
-        REF_getter<MsgData::HeartBeatREQ> do_heart_beat();
+        REF_getter<MsgData::HeartBeatREQ> do_heart_beat(time_t hbtime);
 
         bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route);
         bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route);
@@ -317,7 +317,20 @@ namespace Node
         };
         struct client_leader_info
         {
+            private:
             REF_getter<MsgData::HeartBeatREQ> node_leader;
+            public:
+            void set_node_leader(const REF_getter<MsgData::HeartBeatREQ> & nl)
+            {
+                node_leader=nl;
+            }
+            REF_getter<MsgData::HeartBeatREQ> get_node_leader() const
+            {
+                return node_leader;
+            }
+            std::vector<NodeElement> allnodes;
+            std::map<NODE_id,size_t> position_in_allodes;
+
             // NODE_id node_leader;
             int64_t heart_beat_sent=0;
             int64_t confirm_leader_sent=0;
@@ -456,6 +469,7 @@ namespace Node
 
 
         void do_start_block();
+        void build_node_lists(const THASH_id& prev_state,time_t blocktimestamp, IDatabase* db);
 
 
         void collectTransactions();

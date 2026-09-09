@@ -820,7 +820,7 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     if(iUtils->getNow()-stage_is_working> STAGE_IS_WORKING_TIMEOUT* _1sec)
     {
         stage_is_working=iUtils->getNow();
-        do_heart_beat();
+        do_heart_beat(time(NULL));
     }
     return true;
 }

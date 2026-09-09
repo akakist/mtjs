@@ -13,6 +13,53 @@
 #include "route_t.h"
 #include <cstddef>
 #include <vector>
+inline uint64_t read_uint64(const uint8_t* data) {
+    return (static_cast<uint64_t>(data[0]) << 56) |
+           (static_cast<uint64_t>(data[1]) << 48) |
+           (static_cast<uint64_t>(data[2]) << 40) |
+           (static_cast<uint64_t>(data[3]) << 32) |
+           (static_cast<uint64_t>(data[4]) << 24) |
+           (static_cast<uint64_t>(data[5]) << 16) |
+           (static_cast<uint64_t>(data[6]) << 8)  |
+           (static_cast<uint64_t>(data[7]));
+}
+
+void Node::Service::build_node_lists(const THASH_id& prev_state,time_t blocktimestamp, IDatabase* db)
+{
+    // auto nl=db->getNodeListNoCreate();
+    // auto l=nl->getList();
+    
+    auto& cli=cli_leader_info[prev_state];
+
+    cli.allnodes.clear();
+    cli.position_in_allodes.clear();
+    auto ll=db->getAllNodes();
+    std::map<uint64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
+    // std::vector<NodeElement> allnodes;
+    // std::map<NODE_id,size_t> position_in_allodes;
+
+    for(auto &x: ll)
+    {
+        // x->
+        std::string seed=x->getName().container+prev_state.container+std::to_string(blocktimestamp);
+        auto h=blake2b_hash(seed);
+        if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
+        auto w=read_uint64((uint8_t*)h.container.data());
+        auto fs=x->get_full_stake();
+        if(fs)
+            w/=x->get_full_stake();
+        result[w].insert_or_assign(x->getName(),x);
+    }
+    for(auto& x:result)
+    {
+        for(auto& z:x.second)
+        {
+            cli.position_in_allodes[z.second->getName()]=cli.allnodes.size();
+            cli.allnodes.push_back(z.second->getElement());
+        }
+    }
+}
+
 bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
@@ -87,6 +134,7 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
     pass_NodeMsgRSP(hbr.get(),route);
 
 }
+
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
@@ -104,7 +152,23 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     // {
     //     return true;
     // }
+    auto ct=time(NULL);
+    if(h->block_timestamp<ct-1 || h->block_timestamp>ct+1)
+    {
+        logNode("hb block_timestamp invalid");
+        return true;
+    }
     auto& cli=cli_leader_info[h->prev_root_hash_1];
+    auto nl=cli.get_node_leader();
+    if(nl.valid())
+    {
+        /// ignore if blocktimestamp changed
+        if(nl->block_timestamp!=h->block_timestamp)
+        {
+            logNode("ignore if blocktimestamp changed");
+            return true;
+        }
+    }
     if(iUtils->getNow()-cli.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT)
     {
         logNode("if(iUtils->getNow()-ci.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT) return true");
@@ -157,8 +221,9 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         if(isNodeGreaterOrEqual(this_node_name,h->node_leader))
         {
             logNode("do_heart_beat();");
-            auto hb=do_heart_beat();
-            cli.node_leader=hb;
+            auto hb=do_heart_beat(h->block_timestamp);
+            cli.set_node_leader(hb);
+            build_node_lists(hb->prev_root_hash_1,hb->block_timestamp,db_state.get());
             cli.heart_beat_sent=iUtils->getNow();
             return true;
         }
@@ -259,8 +324,9 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                     if(isNodeGreaterOrEqual(this_node_name, h->node_leader))
                     {
                         // ci.node_leader=new MsgData::HeartBeatREQ(prev_root_hash_Z,);
-                        auto hb=do_heart_beat();
-                        cli.node_leader=hb;
+                        auto hb=do_heart_beat(h->block_timestamp);
+                        cli.set_node_leader(hb);
+                        build_node_lists(hb->prev_root_hash_1,hb->block_timestamp,db_state.get());
                         cli.heart_beat_sent=iUtils->getNow();
                         return true;
                     }
@@ -268,10 +334,13 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 // if(ci.node_leader.container.empty())
                     // ci.node_leader=this_node_name;
 
-                if (!cli.node_leader.valid() || cli.node_leader->node_leader.container.empty() || isNodeGreaterOrEqual(h->node_leader, cli.node_leader->node_leader))
+                auto nl=cli.get_node_leader();
+                if (!nl.valid() || nl->node_leader.container.empty() || isNodeGreaterOrEqual(h->node_leader, nl->node_leader))
                 {
     
-                    cli.node_leader=h;
+                    cli.set_node_leader(h);
+                    build_node_lists(h->prev_root_hash_1,h->block_timestamp,db_state.get());
+
                     reply_HeartBeatRSP(h,route);
                     return true;
                 }
@@ -300,9 +369,13 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
     }
     bool need_reply = false;
     auto &cli=cli_leader_info[h->hb->prev_root_hash_1];
-    if (!cli.node_leader.valid())
-        cli.node_leader = h->hb;
-    if (!h->hb->equals(cli.node_leader))
+    auto nl=cli.get_node_leader();
+    if (!nl.valid())
+    {
+        cli.set_node_leader(h->hb);
+        build_node_lists(h->hb->prev_root_hash_1,h->hb->block_timestamp,db_state.get());
+    }
+    if (!h->hb->equals(nl))
     {
         return true;
     }
@@ -376,7 +449,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     return true;
 }
 
-REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
+REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t hbtime)
 {
     
     stage_is_working=iUtils->getNow();
@@ -390,7 +463,7 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
     REF_getter<MsgData::HeartBeatREQ> hb_req =
         new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                                     epoch_current(),
-                                    this_node_name,  time(NULL));
+                                    this_node_name,  hbtime);
 
     // auto prev_lc=prev_block;
     REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),prev_block.valid()?prev_block->getBuffer():"");
