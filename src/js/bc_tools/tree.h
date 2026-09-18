@@ -25,7 +25,7 @@ namespace BroadcasterTree
             }
         }
     };
-    TreeNode buildTree(const std::map<NODE_id,NodeElement>& nodes, const NODE_id& rootName);
+    TreeNode buildTree(const std::vector<NodeElement>& nodes, const NODE_id& rootName);
 
 } // namespace BroadcasterTree
 inline outBuffer & operator<< (outBuffer& o,const NodeElement& t)

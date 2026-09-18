@@ -165,22 +165,22 @@ void Node::Service::do_sync(const NODE_id &src_node, const THASH_id& prev_root_h
 
 
 }
-bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r, const NODE_id &src_node, const route_t &route)
-{
-    bool remote_verified=verify_block(r->lc);
-    if(!remote_verified)
-        return true;
-    // auto local_lc=prev_block;
-    if(!prev_block.valid() || r->lc->blockInfo->heart_beat->new_epoch > prev_block->blockInfo->heart_beat->new_epoch)
-    {
-        MUTEX_INSPECTOR;
-        // state_Z=STATE_SYNCING;
-        logNode("STATE_SYNCING");
-        prev_block=r->lc;
-        do_sync(src_node,r->lc->blockInfo->new_root_hash1);
-        // r->lc->blockInfo->heart_beat->prev_root_hash_1;
-    }
+// bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r, const NODE_id &src_node, const route_t &route)
+// {
+//     bool remote_verified=verify_block(r->lc);
+//     if(!remote_verified)
+//         return true;
+//     // auto local_lc=prev_block;
+//     if(!prev_block.valid() || r->lc->blockInfo->heart_beat->new_epoch > prev_block->blockInfo->heart_beat->new_epoch)
+//     {
+//         MUTEX_INSPECTOR;
+//         // state_Z=STATE_SYNCING;
+//         logNode("STATE_SYNCING");
+//         prev_block=r->lc;
+//         do_sync(src_node,r->lc->blockInfo->new_root_hash1);
+//         // r->lc->blockInfo->heart_beat->prev_root_hash_1;
+//     }
 
 
-    return true;
-}
+//     return true;
+// }

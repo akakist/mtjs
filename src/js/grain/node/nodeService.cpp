@@ -106,7 +106,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     //     prev_root_hash_Z.container = res;
     // }
 
-    logNode("do_heart_beat in startService");
+    // logNode("do_heart_beat in startService");
     // do_heart_beat();
 
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^ds$", "show current element dump", ListenerBase::serviceId));
@@ -156,7 +156,6 @@ void Node::Service::collectTransactions()
 void Node::Service::do_start_block()
 {
     MUTEX_INSPECTOR;
-    // logNode("@@ %s",__FUNCTION__);
     if (transaction_pool_of_leader.empty())
     {
         logNode("if (transaction_pool_of_leader.empty())");
@@ -164,11 +163,6 @@ void Node::Service::do_start_block()
         return;
     }
     auto &li = l_blocks[prev_root_hash_Z()].leader_info;
-#ifdef FULL_M
-    auto mf=getMetaFull();
-#else
-    auto mv=getMetaValidator(li.leader_cert_2->block_timestamp);
-#endif
     {
         REF_getter<MsgData::ValidateBlockREQ> b = new MsgData::ValidateBlockREQ();
         b->heart_beat = li.leader_cert_2;
@@ -179,7 +173,7 @@ void Node::Service::do_start_block()
         for (auto &z : transaction_pool_of_leader)
             b->transaction_bodies.push_back(z.second);
 #ifdef FULL_M
-        broadcast_MsgEvent(b.get(), mf->full_broadcast);
+        broadcast_MsgEvent(b.get(), cli_leader_info[prev_root_hash_Z()][b->heart_beat->block_timestamp].nodes_hb_state->allnodes);
 #else
         broadcast_MsgEvent(b.get(), mv->validator_broadcast);
 #endif
@@ -555,8 +549,8 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
     }
     rt->lc = li.leader_cert_2;
     li.request_for_transactions_time = iUtils->getNow();
-
-    broadcast_MsgEvent(rt.get(),getMetaFull()->full_broadcast);
+    auto &cli=cli_leader_info[prev_root_hash_Z()][li.leader_cert_2->block_timestamp];
+    broadcast_MsgEvent(rt.get(),cli.nodes_hb_state->allnodes);
 }
 
 // #include "sql"
@@ -710,21 +704,22 @@ int Node::Service::nodeDistanceToLeader(const NODE_id &node)
     }
     return abs(idx - npoz);
 }
-bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id &nodeRight)
+bool Node::Service::isNodeGreater(client_leader_info& cli, const NODE_id &nodeLeft, const NODE_id &nodeRight)
 {
     if (nodeLeft == nodeRight)
         return true;
 
         
-    auto & cli=cli_leader_info[prev_root_hash_Z()];
-    if(cli.position_in_allodes.empty())
+    
+    if(cli.nodes_hb_state->position_in_allodes.empty())
         throw CommonError("if(cli.position_in_allodes.empty())");
-    auto itL=cli.position_in_allodes.find(nodeLeft);
-    auto itR=cli.position_in_allodes.find(nodeRight);
-    if(itL==cli.position_in_allodes.end())
+    auto itL=cli.nodes_hb_state->position_in_allodes.find(nodeLeft);
+    auto itR=cli.nodes_hb_state->position_in_allodes.find(nodeRight);
+    if(itL==cli.nodes_hb_state->position_in_allodes.end())
         throw CommonError("if(itL==cli.position_in_allodes.end())");
-    if(itR==cli.position_in_allodes.end())
+    if(itR==cli.nodes_hb_state->position_in_allodes.end())
         throw CommonError("if(itR==cli.position_in_allodes.end())");
+    // logNode("isNodeGreaterOrEqual %s %s %d",nodeLeft.container.c_str(),nodeRight.container.c_str(),itL->second < itR->second);
     return itL->second < itR->second;
     // auto nv = db_state->getAllNodes();
     // std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
@@ -771,16 +766,33 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
         return false;
     {
         MUTEX_INSPECTOR;
-        auto mf=getMetaFull();
-#ifndef FULL_M
-        auto vals=getValidators(root,lc->blockInfo->heart_beat->block_timestamp,db_state.get());
-#endif
+//         auto mf=getMetaFull();
+// #ifndef FULL_M
+//         auto vals=getValidators(root,lc->blockInfo->heart_beat->block_timestamp,db_state.get());
+// #endif
         std::vector<blst_cpp::PublicKey> agg_pk;
 
         uint64_t stake=0;
-#ifndef FULL_M
-        uint64_t val_stake=0;
-#endif
+// #ifndef FULL_M
+        uint64_t full_stake=0;
+// #endif
+        auto & cli=cli_leader_info[lc->blockInfo->heart_beat->prev_root_hash_1][lc->blockInfo->heart_beat->block_timestamp];
+        auto hn=cli.nodes_hb_state;
+        if(!hn.valid())
+        {
+            hn=build_node_lists(lc->blockInfo->heart_beat->prev_root_hash_1,lc->blockInfo->heart_beat->block_timestamp);
+        }
+        // if(!cli.nodes_hb_state.valid())
+        // throw CommonError("if(!cli.nodes_hb_state.valid())");
+        // if(hn->allnodes.empty())
+        //     build_node_lists(lc->blockInfo->heart_beat);
+
+        // logNode("cli.allnodes.size %d",cli.allnodes.size());
+            // throw CommonError("if(cli.allnodes.empty())");
+        for(auto& z: hn->allnodes)
+        {
+            full_stake+=z.stake_A;
+        }
         for (auto &z : lc->node_validators)
         {
 #ifndef FULL_M
@@ -788,9 +800,9 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
                 throw CommonError("if(!vals.count(z))");
 #endif
 
-            auto n = mf->getNode(z);
+            auto n = db_state->getNodeNoCreate(z);
             agg_pk.push_back(n->get_bls_pk());
-            stake += mf->getStake(z);
+            stake += n->get_full_stake();
         }
         
         // auto nn=root->getAllNodes(db_state.get());
@@ -800,8 +812,10 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
             val_stake+=mf->getStake(z);
         }
 #endif
+        if(full_stake==0)
+            throw CommonError("if(full_stake==0)");
 #ifdef FULL_M
-        if (stake * 100 / mf->total_full_stake < QUORUM)
+        if (stake * 100 / full_stake < QUORUM)
 #else
         if (stake * 100 / val_stake < QUORUM)
 #endif
@@ -832,8 +846,11 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     {
         stage_is_working=iUtils->getNow();
         auto hb=do_heart_beat(time(NULL));
-        cli_leader_info[prev_root_hash_Z()].set_node_leader(hb);
-        build_node_lists(hb);
+        // cli_leader_info[prev_root_hash_Z()][hb->block_timestamp].set_node_leader(hb);
+        // logNode("set node leader from %s to %s","",h->node_leader.container.c_str());
+
+        //     auto & cli=cli_leader_info[hb->prev_root_hash_1][hb->block_timestamp];
+        // cli.nodes_hb_state=build_node_lists(hb->prev_root_hash_1,hb->block_timestamp);
     }
     return true;
 }
@@ -918,8 +935,8 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
     // case msgid::LcREQ:
     //     return LcREQ(static_cast<const MsgData::LcREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::DelayNotificationREQ:
-        return DelayNotificationREQ(static_cast<const MsgData::DelayNotificationREQ *>(msg.get()), m->node_signer, m->route);
+    // case msgid::DelayNotificationREQ:
+    //     return DelayNotificationREQ(static_cast<const MsgData::DelayNotificationREQ *>(msg.get()), m->node_signer, m->route);
 
     default:
         throw CommonError("unjandled3 MsgData %s", msgName(msg->type));
@@ -1229,10 +1246,11 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
 
     return std::nullopt;
 }
-
+Mutex mxl;
 void Node::Service::logNode(const char *fmt, ...)
 {
 
+    M_LOCK(mxl);
     // auto prev=root->getEpoch(NULL,db_state.get())->prev_block;
     uint64_t ep=epoch_current();
     {

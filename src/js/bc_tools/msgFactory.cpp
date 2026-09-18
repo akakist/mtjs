@@ -16,7 +16,7 @@
 #include "md/md_LcEnvelopeREQ.h"
 
 
-#include "md/md_DelayNotificationREQ.h"
+// #include "md/md_DelayNotificationREQ.h"
 
 
 MsgFactory::MsgFactory()
@@ -40,6 +40,6 @@ MsgFactory::MsgFactory()
     // registerMsg(msgid::LcRSP, MsgData::LcRSP::construct);
     // registerMsg(msgid::DoYouHaveBlockREQ, MsgData::DoYouHaveBlockREQ::construct);
     // registerMsg(msgid::DoYouHaveBlockRSP, MsgData::DoYouHaveBlockRSP::construct);
-    registerMsg(msgid::DelayNotificationREQ, MsgData::DelayNotificationREQ::construct);
+    // registerMsg(msgid::DelayNotificationREQ, MsgData::DelayNotificationREQ::construct);
 
 }

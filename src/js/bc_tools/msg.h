@@ -77,7 +77,7 @@ namespace msgid
         // LcRSP,
 	// DoYouHaveBlockREQ,
 	// DoYouHaveBlockRSP,
-    DelayNotificationREQ
+    // DelayNotificationREQ
     };
 
 }

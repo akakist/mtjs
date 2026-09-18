@@ -22,18 +22,16 @@
 
 bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
 {
-        // logErr2("@@ %s",__func__);
 
     if(!db_state->sync_empty)
     {
         return true;
     }
-    // if(state_Z==STATE_SYNCING)
      stage_is_working=iUtils->getNow();
    MUTEX_INSPECTOR;
 
     XTRY;
-    auto &cli = cli_leader_info[prev_root_hash_Z()];
+    auto &cli = cli_leader_info[prev_root_hash_Z()][r->blockInfo->heart_beat->block_timestamp];
     auto nl=cli.get_node_leader();
     if(!nl.valid())
     {
@@ -137,8 +135,6 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     prev_block=r;
     l_blocks.clear();
-    block_meta_full.clear();
-    block_meta_validator.clear();
     cli_leader_info.clear();
 
     for (auto &z : c.blockDBStore->validateBlockREQ->transaction_bodies)
@@ -162,8 +158,8 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     if(transaction_pool_of_leader.size())
     {
         auto hb=do_heart_beat(time(NULL));
-        cli_leader_info[prev_root_hash_Z()].set_node_leader(hb);
-        build_node_lists(hb);
+        // cli_leader_info[prev_root_hash_Z()][hb->block_timestamp].set_node_leader(hb);
+        // build_node_lists(hb);
     }
     XPASS;
     return true;
@@ -185,7 +181,7 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
 //         return true;
 //     }
     auto prev_root_hash=prev_root_hash_Z();
-    auto & cli=cli_leader_info[prev_root_hash];
+    auto & cli=cli_leader_info[prev_root_hash][r->lc->block_timestamp];
     auto nl=cli.get_node_leader();
     if(!nl.valid())
     {
@@ -229,7 +225,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     b_params t(db_state.get());
     bool err = false;
     
-    auto &cli=cli_leader_info[prev_root_hash];
+    auto &cli=cli_leader_info[prev_root_hash][r->heart_beat->block_timestamp];
     auto nl=cli.get_node_leader();
     if(!nl.valid())
     {
@@ -245,7 +241,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
     if (!err)
     {
-        if (!r->heart_beat->equals(cli_leader_info[r->heart_beat->prev_root_hash_1].get_node_leader()))
+        if (!r->heart_beat->equals(cli.get_node_leader()))
         {
             t.emit_block("error", R"({"code":-32602,"error":"cert node leader mismatched"})");
             // t.att_data->block_report = {1, "cert node leader mismatched"};

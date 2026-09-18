@@ -38,8 +38,16 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         return true;
     }
     li.transaction_responders.insert(src_node);
-    auto mf=getMetaFull();
+    // auto mf=getMetaFull();
+    uint64_t fullstake=0;
     uint64_t stake = 0;
+    auto & cli=cli_leader_info[prev_root_hash_Z()][li.leader_cert_2->block_timestamp];
+    if(!cli.nodes_hb_state.valid())
+        throw CommonError("if(!cli.nodes_hb_state.valid())");
+    for(auto& z: cli.nodes_hb_state->allnodes)
+    {
+        fullstake+=z.stake_A;
+    }
     for (auto &z : li.transaction_responders)
     {
         
@@ -47,9 +55,9 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         if(!n.valid())
             throw CommonError("if(!n.valid())");
 
-        stake += mf->getStake(z);
+        stake += n->get_full_stake();
     }
-    auto pers=(stake*100)/mf->total_full_stake;
+    auto pers=(stake*100)/fullstake;
 
     if (pers >  QUORUM)
     {
@@ -67,7 +75,6 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 {
     XTRY;
     MUTEX_INSPECTOR;
-    // logNode("@@ %s",__func__);
     if(!db_state->sync_empty)
     {
         logNode("ValidateBlockRSP if(!db_state->sync_empty)");
@@ -93,17 +100,26 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     bt.ValidateBlockRSP_m[h].push_back(r);
     if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
         return true;
-    auto mf=getMetaFull();
-    #ifndef FULL_M
-    auto mv=getMetaValidator(bt.leader_info.leader_cert_2->block_timestamp);
-    #endif
+    // auto mf=getMetaFull();
+    // #ifndef FULL_M
+    // auto mv=getMetaValidator(bt.leader_info.leader_cert_2->block_timestamp);
+    // #endif
     uint64_t stakeVal = 0;
     for (auto &z : bt.ValidateBlockRSP_m[h])
     {
-        stakeVal += mf->getStake(z->node_validator);
+        auto n=db_state->getNodeNoCreate(z->node_validator);
+        stakeVal += n->get_full_stake();
+    }
+    uint64_t full_stake=0;
+    auto & cli=cli_leader_info[prev_root_hash_Z()][bt.leader_info.leader_cert_2->block_timestamp];
+    if(!cli.nodes_hb_state.valid())
+        throw CommonError("if(!cli.nodes_hb_state.valid())");
+    for(auto& z: cli.nodes_hb_state->allnodes)
+    {
+        full_stake+=z.stake_A;
     }
 #ifdef FULL_M
-    if (stakeVal * 100 / mf->total_full_stake > QUORUM)
+    if (stakeVal * 100 / full_stake > QUORUM)
 #else
     if (stakeVal * 100 / mv->total_validator_stake > QUORUM)
 #endif
@@ -123,7 +139,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         std::set<std::string> nnn;
         for (auto &z : bt.ValidateBlockRSP_m[h])
         {
-            auto n = mf->getNode(z->node_validator);
+            auto n = db_state->getNodeNoCreate(z->node_validator);
             agg_pk.push_back(n->get_bls_pk());
             ba->agg_sig.add(z->sig);
             ba->node_validators.push_back(z->node_validator);
@@ -139,7 +155,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             return true;
         }
         
-        broadcast_MsgEvent(ba.get(),getMetaFull()->full_broadcast);
+        broadcast_MsgEvent(ba.get(),cli.nodes_hb_state->allnodes);
 
         logNode("validators %s",iUtils->join(" ",nnn).c_str());
 

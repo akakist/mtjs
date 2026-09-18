@@ -17,22 +17,23 @@ void dump(const BroadcasterTree::TreeNode &t, int level, std::vector<std::pair<i
         dump(c,level+1,out);
     }
 }
-BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,NodeElement>& nodes, const NODE_id& rootName_)
+BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::vector<NodeElement>& nodes, const NODE_id& rootName_)
 {
     MUTEX_INSPECTOR;
     if(nodes.empty())
         throw CommonError("if(nodes.empty())");
 
-    std::deque<BroadcasterTree::TreeNode> ranked;
-    for (auto& kv : nodes) {
-        BroadcasterTree::TreeNode n;
-        n.node=kv.second;
-        ranked.emplace_back(kv.second);
-    }
-    sort(ranked.begin(), ranked.end(),
-    [](const auto& a, const auto& b) {
-        return a.node.stake_A > b.node.stake_A;
-    });
+    // std::deque<BroadcasterTree::TreeNode> ranked;
+    // for(auto& z: nodes)
+    // for (auto& kv : nodes) {
+    //     BroadcasterTree::TreeNode n;
+    //     n.node=kv.second;
+    //     ranked.emplace_back(kv.second);
+    // }
+    // sort(ranked.begin(), ranked.end(),
+    // [](const auto& a, const auto& b) {
+    //     return a.node.stake_A > b.node.stake_A;
+    // });
 
     int idx_r=0;
 
@@ -43,7 +44,7 @@ BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,Node
     BroadcasterTree::TreeNode root=fake;
     q.push(&root);
 
-    while (!q.empty() && idx_r<ranked.size()) {
+    while (!q.empty() && idx_r<nodes.size()) {
         MUTEX_INSPECTOR;
         BroadcasterTree::TreeNode* cur = q.front();
         q.pop();
@@ -52,10 +53,10 @@ BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,Node
 
         for (int i = 0; i < 2; i++) {
 
-            if(idx_r>=ranked.size())
+            if(idx_r>=nodes.size())
                 break;
 
-            auto r=ranked[idx_r++];
+            auto r=nodes[idx_r++];
             cur->children.emplace_back(r);   // копия в дерево
             BroadcasterTree::TreeNode* childPtr = &cur->children.back(); // стабильный адрес
             // nodes.erase(it);                          // удаляем из map

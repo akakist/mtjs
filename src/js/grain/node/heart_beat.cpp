@@ -5,7 +5,7 @@
 #include "REF.h"
 #include "mutexInspector.h"
 #include "nodeService.h"
-#include "md/md_DelayNotificationREQ.h"
+// #include "md/md_DelayNotificationREQ.h"
 #include "md/md_BlockAcceptedREQ.h"
 #include "QUORUM.h"
 #include "blst_cp.h"
@@ -24,15 +24,17 @@ inline uint64_t read_uint64(const uint8_t* data) {
            (static_cast<uint64_t>(data[7]));
 }
 
-void Node::Service::build_node_lists(const REF_getter<MsgData::HeartBeatREQ>& h)
+REF_getter<hb_nodes_state> Node::Service::build_node_lists(const THASH_id& prev_block_hash, time_t block_timestamp)
 {
     // auto nl=db->getNodeListNoCreate();
     // auto l=nl->getList();
     // logNode("build_node_lists");
-    auto& cli=cli_leader_info[h->prev_root_hash_1];
+    REF_getter<hb_nodes_state> ret=new hb_nodes_state;
 
-    cli.allnodes.clear();
-    cli.position_in_allodes.clear();
+    // auto& cli=cli_leader_info[h->prev_root_hash_1][h->block_timestamp];
+
+    // cli.allnodes.clear();
+    // cli.position_in_allodes.clear();
     auto ll=db_state->getAllNodes();
     std::map<uint64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
     // std::vector<NodeElement> allnodes;
@@ -41,7 +43,7 @@ void Node::Service::build_node_lists(const REF_getter<MsgData::HeartBeatREQ>& h)
     for(auto &x: ll)
     {
         // x->
-        std::string seed=x->getName().container+h->prev_root_hash_1.container+std::to_string(h->block_timestamp);
+        std::string seed=x->getName().container+prev_block_hash.container+std::to_string(block_timestamp);
         auto h=blake2b_hash(seed);
         if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
         auto w=read_uint64((uint8_t*)h.container.data());
@@ -54,10 +56,23 @@ void Node::Service::build_node_lists(const REF_getter<MsgData::HeartBeatREQ>& h)
     {
         for(auto& z:x.second)
         {
-            cli.position_in_allodes[z.second->getName()]=cli.allnodes.size();
-            cli.allnodes.push_back(z.second->getElement());
+            ret->position_in_allodes[z.second->getName()]=ret->allnodes.size();
+            ret->allnodes.push_back(z.second->getElement());
         }
     }
+    // std::string bn;
+    // for(int i=0;i<ret->allnodes.size();i++)
+    // {
+    //     bn+="NORDER "+std::to_string(i)+" "+ret->allnodes[i].name.container+"; ";
+    //     // logNode("BN %d %s",i,cli.allnodes[i].name.container.c_str());
+    // }
+    // logNode("bn %s",bn.c_str());
+    // for(auto& z: ret->position_in_allodes)
+    // {
+    //     // logNode("PIAN %s %d",z.first.container.c_str(),z.second);
+
+    // }
+    return ret;
 }
 
 bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &src_node, const route_t &route)
@@ -71,7 +86,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         logNode("heat beat expired %s %s", prev_root_hash.str().c_str(), m->payload_heart_beat->prev_root_hash_1.str().c_str());
         return false;
     }
-
+    // logNode("HeartBeatRSP from node %s", src_node.container.c_str());
     auto n = db_state->getNodeNoCreate(m->node_signer);
     if (!n.valid())
     {
@@ -81,9 +96,10 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     {
         li.HeartBeatRSP_m.insert_or_assign(m->node_signer, m);
     }
-    auto mf=getMetaFull();
+    // auto mf=getMetaFull();
 
     uint64_t hb_staked = 0;
+    uint64_t full_stake = 0;
     if (iUtils->getNow() > li.confirm_leader_sent + _1sec)
     {
         bool matched = true;
@@ -93,21 +109,24 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         {
             for (auto &z : li.HeartBeatRSP_m)
             {
-                auto stake=mf->getStake(z.second->node_signer);
+                auto n=db_state->getNodeNoCreate(z.second->node_signer);
+                auto stake=n->get_full_stake();
                 hb_staked+=stake;
                 // auto nn = root->getNode(z.second->node_signer,db_state.get());
                 // hb_staked += nn->get_full_stake();
             }
         }
     }
-    // double total_staked=0;
-    
-    // auto nn=root->getAllNodes(db_state.get());
-    // for(auto& z: nn)
-    // {
-    //     total_staked+=z->get_full_stake();
-    // }
-    auto pers = (hb_staked * 100) / mf->total_full_stake;
+    auto & cli=cli_leader_info[prev_root_hash_Z()][m->payload_heart_beat->block_timestamp];
+    // auto hbstate=cli.nodes_hb_state;
+    if(!cli.nodes_hb_state.valid())
+    throw CommonError("if(!cli.nodes_hb_state.valid())");
+    for(auto& z: cli.nodes_hb_state->allnodes)
+    {
+        full_stake+=z.stake_A;
+    }
+    // logNode("hb resp stake %lld total stake %lld (%ld)",hb_staked,full_stake,m->payload_heart_beat->block_timestamp);
+    auto pers = (hb_staked * 100) / full_stake;
 
     if (pers > QUORUM && (iUtils->getNow() > li.confirm_leader_sent+ _1sec))
     {
@@ -117,8 +136,9 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 
             REF_getter<MsgData::ConfirmLeaderREQ> rt = new MsgData::ConfirmLeaderREQ();
             rt->hb = m->payload_heart_beat;
+            // auto& cli=cli_leader_info[prev_root_hash_Z()][];
 
-                broadcast_MsgEvent(rt.get(), mf->full_broadcast);
+                broadcast_MsgEvent(rt.get(), cli.nodes_hb_state->allnodes);
         }
     }
     XPASS;
@@ -141,113 +161,42 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     
     stage_is_working=iUtils->getNow();
 
-    // logNode("HeartBeatREQ");
+    // logNode("HeartBeatREQ from %s",src_node.container.c_str());
     if(!db_state->sync_empty)
     {
+        MUTEX_INSPECTOR;
         logNode("HeartBeatREQ if(!db_state->sync_empty)");
         return true;
     }
-
-    // if(state_Z==STATE_SYNCING)
-    // {
-    //     return true;
-    // }
     auto ct=time(NULL);
-    if(h->block_timestamp<ct-1 || h->block_timestamp>ct+1)
+    if(h->block_timestamp<ct-2 || h->block_timestamp>ct+2)
     {
         MUTEX_INSPECTOR;
-        logNode("hb block_timestamp invalid");
-        return true;
-    }
-    auto& cli=cli_leader_info[h->prev_root_hash_1];
-    auto nl=cli.get_node_leader();
-
-    if(nl.valid())
-    {
-        MUTEX_INSPECTOR;
-        /// ignore if blocktimestamp changed
-        if(nl->block_timestamp!=h->block_timestamp)
-        {
-            logNode("ignore if blocktimestamp changed");
-            return true;
-        }
-    }
-    else
-    {
-        cli.set_node_leader(h);
-        build_node_lists(h);
-    }
-    if(iUtils->getNow()-cli.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT)
-    {
-        MUTEX_INSPECTOR;
-        logNode("if(iUtils->getNow()-ci.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT) return true");
+        logNode("hb block_timestamp invalid %ld %ld",h->block_timestamp,ct);
         return true;
     }
 
-    bool need_reply = false;
     auto local_prev_block=prev_block;
-    
     bool remote_verified=false;
     bool local_verified=false;
-    // if(!remote_prev_lc)
-    // {
-    //     logNode("remote prev lc NULL from %s", src_node.container.c_str());
-    // }
-    
-    // if(remote_prev_lc)
-    // {
     remote_verified=verify_block(remote_prev_lc);
-    // }
-    // else logNode("!if(remote_lc.valid())");
-    // if(local_prev_block.valid())
-    // {
     local_verified=verify_block(local_prev_block);
-    // }
-    // else logNode("!if(local_lc.valid())");
-    
 
     if(local_verified && !remote_verified)
     {
         MUTEX_INSPECTOR;
-        /// не отвечаем, поскольку ремоте нода не имеет сертификата
-        logNode("if(local_verified && !remote_verified) return ");
-        REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
-        d->lc=local_prev_block;
-        auto buffer = d->getBuffer();
-        auto n=db_state->getNodeNoCreate(src_node);
-        if(!n.valid())
-            throw CommonError("if(!n.valid())");
-        sendEvent(n->get_ip(), ServiceEnum::Node,
-                new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
-
-        return true;
-    }
-    
-
-    if(!remote_verified && !local_verified)    /// block 0
-    {
-        MUTEX_INSPECTOR;
-        /// отвечаем, поскольку это кейс старта с генезиса
-        logNode("if(!remote_verified && !local_verified) ");
-        if(isNodeGreaterOrEqual(this_node_name,h->node_leader))
+        auto& cli=cli_leader_info[h->prev_root_hash_1][h->block_timestamp];
+        if(iUtils->getNow() - cli.heart_beat_sent > _1sec * HEART_BEAT_SENT_TIMEOUT && !cli.get_node_leader().valid())
         {
-        MUTEX_INSPECTOR;
-            logNode("do_heart_beat();");
+            // logNode("if(iUtils->getNow() - cli.heart_beat_sent > _1sec * HEART_BEAT_SENT_TIMEOUT)");
+            logNode("do_heart_beat(); 11");
             auto hb=do_heart_beat(h->block_timestamp);
-            cli.set_node_leader(hb);
-            build_node_lists(hb);
             cli.heart_beat_sent=iUtils->getNow();
             return true;
         }
-        else
-        {
-        MUTEX_INSPECTOR;
-            logNode("reply_HeartBeatRSP(h,route);");
-            reply_HeartBeatRSP(h,route);
-            return true;
-        }
+        return true;
     }
-    
+    /// если локально нет ластблока, то делаем догон.
     if(remote_verified && !local_verified)
     {
         MUTEX_INSPECTOR;
@@ -262,29 +211,22 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         }
         return true;
     }
-    
+    /// если оба проверены, то сравниваем парамс касательно догона. 
     if(remote_verified && local_verified)
     {
         MUTEX_INSPECTOR;
     
         if(remote_prev_lc->blockInfo->heart_beat->new_epoch < local_prev_block->blockInfo->heart_beat->new_epoch)
         {
+            /// ничего не делаем, пусть догоняет иначе,
         MUTEX_INSPECTOR;
             logNode("if(remote_prev_lc->heart_beat->new_epoch (%s) < local_lc->heart_beat->new_epoch) return",src_node.container.c_str());
-            REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
-            d->lc=local_prev_block;
-            auto buffer = d->getBuffer();
-            auto n=db_state->getNodeNoCreate(src_node);
-            if(!n.valid())
-                throw CommonError("if(!n.valid())");
-
-            sendEvent(n->get_ip(), ServiceEnum::Node,
-                    new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
 
             return true;
         }
         else if(remote_prev_lc->blockInfo->heart_beat->new_epoch > local_prev_block->blockInfo->heart_beat->new_epoch)
         {
+            /// эпоха меньше, чем у ремоте, делаем догон
             MUTEX_INSPECTOR;
             // state_Z = STATE_SYNCING;
             logNode("START SYNCING");
@@ -298,9 +240,10 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     
                 /// оба в одинаковой эпохе
                 
-                /// просто проверка на всякий случай.
+                /// просто проверка на всякий случай на сплит брейн.
                 if(remote_prev_lc->blockInfo->heart_beat->prev_root_hash_1!=local_prev_block->blockInfo->heart_beat->prev_root_hash_1)
                 {
+        MUTEX_INSPECTOR;
                         logNode(R"( --------------- SPLIT BRAIN DETECTED
 if(remote_prev_lc->blockInfo->heart_beat->prev_root_hash!=local_lc->blockInfo->heart_beat->prev_root_hash)
 remote_prev_lc->blockInfo->heart_beat->prev_root_hash %s local_lc->blockInfo->heart_beat->prev_root_hash %s)", 
@@ -310,6 +253,7 @@ remote_prev_lc->blockInfo->heart_beat->prev_root_hash %s local_lc->blockInfo->he
                 
                 if(prev_root_hash_Z()!=h->prev_root_hash_1)    
                 {
+        MUTEX_INSPECTOR;
     
                     /// нужно сделать голосование за прев-блок
                     /// делаем просто хартбит. В это случае поврежденная нода отваливается 
@@ -336,44 +280,86 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 }
                 
      
-                if(iUtils->getNow()-cli.heart_beat_sent > _1sec * HEART_BEAT_SENT_TIMEOUT)
-                {
-        MUTEX_INSPECTOR;
-                    if(isNodeGreaterOrEqual(this_node_name, h->node_leader))
-                    {
-        MUTEX_INSPECTOR;
-                        // ci.node_leader=new MsgData::HeartBeatREQ(prev_root_hash_Z,);
-                        auto hb=do_heart_beat(h->block_timestamp);
-                        cli.set_node_leader(hb);
-                        build_node_lists(hb);
-                        cli.heart_beat_sent=iUtils->getNow();
-                        return true;
-                    }
-                }
-                // if(ci.node_leader.container.empty())
-                    // ci.node_leader=this_node_name;
-
-                auto nl=cli.get_node_leader();
-                if (!nl.valid() || nl->node_leader.container.empty() || isNodeGreaterOrEqual(h->node_leader, nl->node_leader))
-                {
-        MUTEX_INSPECTOR;
-    
-                    cli.set_node_leader(h);
-                    build_node_lists(h);
-
-                    reply_HeartBeatRSP(h,route);
-                    return true;
-                }
         }
     }
+
+    bool need_reply = false;
+    bool need_do_heart_beat = false;
+    auto& cli=cli_leader_info[h->prev_root_hash_1][h->block_timestamp];
+    auto nl=cli.get_node_leader();
+    // REF_getter<hb_nodes_state> ns=NULL;
+
+    if(!nl.valid())
+    {
+        MUTEX_INSPECTOR;
+        cli.nodes_hb_state=build_node_lists(h->prev_root_hash_1,h->block_timestamp);
+    }
+    // if(!nl.valid() && )
+    
+    if(nl.valid())
+    {
+        MUTEX_INSPECTOR;
+        /// ignore if blocktimestamp changed
+        if(nl->block_timestamp!=h->block_timestamp)
+        {
+            logNode("ignore if blocktimestamp changed");
+            return true;
+        }
+    }
+    if(!nl.valid())
+    {
+        MUTEX_INSPECTOR;
+        if(isNodeGreater(cli,this_node_name, h->node_leader) )
+        {
+        MUTEX_INSPECTOR;
+            auto hb=do_heart_beat(h->block_timestamp);
+            // nl->new node_leader=this_node_name;
+            cli.heart_beat_sent=iUtils->getNow();
+            return true;
+        }
+        else
+        {
+        MUTEX_INSPECTOR;
+            cli.set_node_leader(h);
+            cli.nodes_hb_state=build_node_lists(h->prev_root_hash_1,h->block_timestamp);
+            reply_HeartBeatRSP(h,route);
+            return true;
+        }
+    }
+    if(nl.valid())
+    {
+        MUTEX_INSPECTOR;
+        if(isNodeGreater(cli,this_node_name, h->node_leader) && isNodeGreater(cli,this_node_name, nl->node_leader))
+        {
+        MUTEX_INSPECTOR;
+                auto hb=do_heart_beat(h->block_timestamp);
+                nl->node_leader=this_node_name;
+                cli.heart_beat_sent=iUtils->getNow();
+                return true;
+        }
+        if(isNodeGreater(cli,h->node_leader, nl->node_leader))
+        {
+        MUTEX_INSPECTOR;
+            reply_HeartBeatRSP(h,route);
+            nl->node_leader=h->node_leader;
+            cli.heart_beat_sent=iUtils->getNow();
+            return true;
+        }
+
+    }
+    
+    
     return true;
 }
 bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const NODE_id &src_node, const route_t &route)
 
 {
+
     MUTEX_INSPECTOR;
+    // logNode("ConfirmLeaderREQ from %s",src_node.container.c_str());
     if(!db_state->sync_empty)
     {
+        logNode("if(!db_state->sync_empty)");
         return true;
     }
     stage_is_working=iUtils->getNow();
@@ -387,25 +373,31 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
             prev_root_hash_Z().str().c_str(),h->hb->prev_root_hash_1.str().c_str());
         return true;
     }
-    bool need_reply = false;
-    auto &cli=cli_leader_info[h->hb->prev_root_hash_1];
+    if(!h->hb.valid())
+        throw CommonError("if(!h->hb.valid()) %s %d",__FILE__,__LINE__);
+
+        // bool need_reply = false;
+    auto &cli=cli_leader_info[h->hb->prev_root_hash_1][h->hb->block_timestamp];
     auto nl=cli.get_node_leader();
     if (!nl.valid())
     {
-        cli.set_node_leader(h->hb);
-        build_node_lists(h->hb);
+        throw CommonError("!!!!!!!!!!!!!!!!!!! if (!nl.valid()) %s %d",__FILE__,__LINE__);
+        // if(nl->node_leader!=src_node)
+        // {
+        //     logNode("if(cli.get_node_leader()!=src_node)");
+        // }
+        // cli.set_node_leader(h->hb);
+        // build_node_lists(h->hb);
     }
-    if(!h->hb.valid())
-        throw CommonError("if(!h->hb.valid())");
     if (!h->hb->equals(nl))
     {
+        logNode("if (!h->hb->equals(nl))  %s %s",nl->node_leader.container.c_str(),h->hb->node_leader.container.c_str());
+        logNode("ConfirmLeaderREQ failed - local node %s,  req node %s",nl->node_leader.container.c_str(),h->hb->node_leader.container.c_str());
         return true;
     }
     else
-        need_reply = true;
-
-    if (need_reply)
     {
+        // logNode("ConfirmLeaderRSP %s",h->hb->node_leader.container.c_str());
         REF_getter<MsgData::ConfirmLeaderRSP> hbr = new MsgData::ConfirmLeaderRSP();
         hbr->hb = h->hb;
         hbr->node_signer = this_node_name;
@@ -440,7 +432,16 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     {
         li.ConfirmLeaderRSP_m.insert_or_assign(m->node_signer, m);
     }
-    auto mf=getMetaFull();
+    // auto mf=getMetaFull();
+    uint64_t fullstake=0;
+    auto &cli=cli_leader_info[prev_root_hash_Z()][m->hb->block_timestamp];
+    if(!cli.nodes_hb_state.valid())
+        throw CommonError("if(!cli.nodes_hb_state.valid())");
+
+    for(auto&z :cli.nodes_hb_state->allnodes)
+    {
+        fullstake+=z.stake_A;
+    }
     uint64_t hb_staked = 0;
     {
         bool matched = true;
@@ -449,11 +450,13 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 
         for (auto &z : li.ConfirmLeaderRSP_m)
         {
-            auto stake = mf->getStake(z.second->node_signer);
+            auto n=db_state->getNodeNoCreate(z.second->node_signer);
+            auto stake = n->get_full_stake();
             hb_staked += stake;
         }
     }
-    auto pers = hb_staked * 100 / mf->total_full_stake;
+    auto pers = hb_staked * 100 / fullstake;
+    // logNode("ConfirmLeaderRSP pers %ld",pers);
 
     if (pers > QUORUM)
     {
@@ -473,14 +476,11 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 
 REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t hbtime)
 {
-    
+    MUTEX_INSPECTOR;
     stage_is_working=iUtils->getNow();
-    // logNode("@@ %s",__FUNCTION__);
     l_blocks.clear();
-    block_meta_full.clear();
-    block_meta_validator.clear();
     c_blocks.clear();
-    auto mf=getMetaFull();
+    // auto mf=getMetaFull();
     // auto prev=prev_block;
     REF_getter<MsgData::HeartBeatREQ> hb_req =
         new MsgData::HeartBeatREQ(prev_root_hash_Z(),
@@ -491,14 +491,31 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t hbtime)
     REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),prev_block.valid()?prev_block->getBuffer():"");
     // logNode("broadcast heart beat");
     l_blocks[prev_root_hash_Z()].leader_info.leader_cert_2=hb_req;
-    auto mm=mf->full_broadcast;
-    std::string s;
-    for(auto & z:mm)
+    auto &cli=cli_leader_info[prev_root_hash_Z()][hb_req->block_timestamp];
+    if(!cli.nodes_hb_state.valid())
     {
-        s+=" "+z.container;
+        cli.nodes_hb_state=build_node_lists(hb_req->prev_root_hash_1,hb_req->block_timestamp);
     }
+    if(!cli.nodes_hb_state.valid())
+        throw CommonError("if(!cli.nodes_hb_state.valid())");
+    std::string from;
+    if(cli.get_node_leader().valid())
+    {
+        from=cli.get_node_leader()->node_leader.container;
+    }
+    // logNode("set node leader from %s to %s",from.c_str(),hb_req->node_leader.container.c_str());
+    cli.set_node_leader(hb_req);
+    auto hn=build_node_lists(hb_req->prev_root_hash_1,hb_req->block_timestamp);
+    cli.nodes_hb_state=hn;
+    cli.heart_beat_sent=iUtils->getNow();
+    // auto mm=mf->full_broadcast;
+    // std::string s;
+    // for(auto & z:mm)
+    // {
+    //     s+=" "+z.container;
+    // }
     // logErr2("validators %s",s.c_str());
-    broadcast_MsgEvent(lce.get(),mm);
+    broadcast_MsgEvent(lce.get(),cli.nodes_hb_state->allnodes);
 
     return hb_req;
 }

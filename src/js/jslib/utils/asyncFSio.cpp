@@ -630,7 +630,6 @@ struct filehandle_readFile: public async_task
     filehandle_readFile(ListenerBase* l):async_task(l) {}
     void execute()
     {
-        // logErr2("@@ %s",__FUNCTION__);
         int fd=open(path.c_str(),O_RDONLY);
         if(fd<0) {
 
@@ -663,7 +662,6 @@ struct filehandle_readFile: public async_task
     }
     void finalize(JSContext *ctx)
     {
-        // logErr2("@@ %s",__FUNCTION__);
         JSScope<10,10> scope(ctx);
         if(rv<0)
         {

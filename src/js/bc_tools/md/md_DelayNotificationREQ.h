@@ -1,3 +1,4 @@
+#ifdef KALL
 #pragma once
 #include "md_Base.h"
 
@@ -52,3 +53,4 @@ inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::DelayNotificatio
     s->unpack2(b);
     return b;
 }
+#endif

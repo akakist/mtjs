@@ -12,7 +12,7 @@
 #include "NODE_id.h"
 #include "DBH.h"
 
-#define BROADCAST_ACK_TIMEDOUT_SEC 0.2
+#define BROADCAST_ACK_TIMEDOUT_SEC 0.5
 
 enum timers
 {

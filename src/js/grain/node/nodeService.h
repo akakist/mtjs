@@ -42,6 +42,14 @@
 // #define HEART_BEAT_INTERVAL_SEC 5
 std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db);
 
+struct hb_nodes_state: public Refcountable
+{
+    hb_nodes_state():Refcountable("hb_nodes_state"){}
+    std::vector<NodeElement> allnodes;
+    std::map<NODE_id,size_t> position_in_allodes;
+
+};
+
 // enum State
 // {
 //     STATE_NORMAL,STATE_SYNCING
@@ -61,45 +69,45 @@ namespace Node
         TIMER_REPORT_MEM,
         TIMER_BROADCAST_ACK_TIMEDOUT,
     };
-    struct BlockMetaFull: public Refcountable
-    {
-        std::map<NODE_id,REF_getter<bc_node>> nodes;
-        std::set<NODE_id> full_broadcast;
-        std::map<NODE_id, uint64_t> node_stakes;
-        uint64_t total_full_stake=0;
-        REF_getter<bc_node> getNode(const NODE_id &n)
-        {
-            auto it=nodes.find(n);
-            if(it==nodes.end())
-                throw CommonError("if(n==nodes.end())");
-            return it->second;
-        }
-        uint64_t getStake(const NODE_id &n)        
-        {
-            auto it=node_stakes.find(n);
-            if(it==node_stakes.end())
-                throw CommonError("if(n==nodes.end())");
-            return it->second;
-        }
-        BlockMetaFull(): Refcountable("BlockMetaFull"){}
+    // struct BlockMetaFull: public Refcountable
+    // {
+    //     std::map<NODE_id,REF_getter<bc_node>> nodes;
+    //     std::set<NODE_id> full_broadcast;
+    //     std::map<NODE_id, uint64_t> node_stakes;
+    //     uint64_t total_full_stake=0;
+    //     REF_getter<bc_node> getNode(const NODE_id &n)
+    //     {
+    //         auto it=nodes.find(n);
+    //         if(it==nodes.end())
+    //             throw CommonError("if(n==nodes.end())");
+    //         return it->second;
+    //     }
+    //     uint64_t getStake(const NODE_id &n)        
+    //     {
+    //         auto it=node_stakes.find(n);
+    //         if(it==node_stakes.end())
+    //             throw CommonError("if(n==nodes.end())");
+    //         return it->second;
+    //     }
+    //     BlockMetaFull(): Refcountable("BlockMetaFull"){}
         
-    };
-    struct BlockMetaValidator: public Refcountable
-    {
-        std::set<NODE_id> validator_broadcast;
-        std::map<NODE_id, uint64_t> validator_stake;
-        uint64_t total_validator_stake=0;
-        uint64_t getStake(const NODE_id& n)
-        {
-            auto it=validator_stake.find(n);
-            if(it==validator_stake.end())
-                throw CommonError("if(it==validator_stake.end())");
-            return it->second;
+    // };
+    // struct BlockMetaValidator: public Refcountable
+    // {
+    //     std::set<NODE_id> validator_broadcast;
+    //     std::map<NODE_id, uint64_t> validator_stake;
+    //     uint64_t total_validator_stake=0;
+    //     uint64_t getStake(const NODE_id& n)
+    //     {
+    //         auto it=validator_stake.find(n);
+    //         if(it==validator_stake.end())
+    //             throw CommonError("if(it==validator_stake.end())");
+    //         return it->second;
             
-        }
-        BlockMetaValidator(): Refcountable("BlockMeta"){}
+    //     }
+    //     BlockMetaValidator(): Refcountable("BlockMeta"){}
         
-    };
+    // };
     struct heart_beat_node_info
     {
         heart_beat_node_info() : leader_cert_2(nullptr) {
@@ -158,6 +166,89 @@ namespace Node
 
 
     };
+        struct block_leader
+        {
+            std::map<THASH_id /*blockinfo hash*/,REF_getter<MsgData::BlockInfo> > blockInfo;
+            std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
+            int64_t block_accepted_sent=0;
+            // heart_beat_info    heart_beat_store;
+            heart_beat_node_info leader_info;
+            size_t size()
+            {
+                size_t sz=0;
+                for(auto& z: blockInfo)
+                {
+                    sz+=z.first.container.size();
+                    sz+=z.second->size();
+                }
+                for(auto& z: ValidateBlockRSP_m)
+                {
+                    sz+=z.first.container.size();
+                    for(auto& x: z.second)
+                    {
+                        sz+=x->size();
+
+                    }
+                }
+                sz+=sizeof(block_accepted_sent);
+                sz+=leader_info.size();
+                return sz;
+            }
+            void dump(nlohmann::json &j)
+            {
+                j["blockInfo_SZ"]=blockInfo.size();
+                j["responses"]=ValidateBlockRSP_m.size();
+
+            }
+
+        };
+        struct block_client
+        {
+            REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
+            REF_getter<MsgData::attachment_data> att_data= nullptr;
+
+            int64_t block_validated=0;
+            size_t size()
+            {
+                size_t sz=0;
+                if(blockDBStore.valid())
+                    sz+=blockDBStore->size();
+                if(att_data.valid())
+                    sz+=att_data->size();
+                sz+=sizeof(block_validated);
+
+                return sz;
+
+            }
+        };
+        struct client_leader_info
+        {
+            private:
+            REF_getter<MsgData::HeartBeatREQ> node_leader;
+            public:
+            void set_node_leader(const REF_getter<MsgData::HeartBeatREQ> & nl)
+            {
+                node_leader=nl;
+            }
+            REF_getter<MsgData::HeartBeatREQ> get_node_leader() const
+            {
+                return node_leader;
+            }
+            REF_getter<hb_nodes_state> nodes_hb_state;
+            // NODE_id node_leader;
+            int64_t heart_beat_sent;
+            int64_t confirm_leader_sent=0;
+            size_t size()
+            {
+                size_t sz=0;
+                if(node_leader.valid())
+                    sz+=node_leader->size();
+                sz+=sizeof(heart_beat_sent);
+                sz+=sizeof(confirm_leader_sent);
+                return sz;
+            }
+        };
+
     struct heart_beat_info
     {
     };
@@ -232,7 +323,7 @@ namespace Node
         // bool LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route);
         // bool LcRSP(const MsgData::LcRSP* m, const NODE_id & src_node, const route_t& route);
 
-        bool DelayNotificationREQ(const MsgData::DelayNotificationREQ* m, const NODE_id & src_node, const route_t& route);
+        // bool DelayNotificationREQ(const MsgData::DelayNotificationREQ* m, const NODE_id & src_node, const route_t& route);
         
 
         bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
@@ -243,107 +334,22 @@ namespace Node
 
 
         // void make_leader_certificate();
-        bool isNodeGreaterOrEqual(const NODE_id& nodeLeft, const NODE_id& nodeRight);
+        bool isNodeGreater(client_leader_info& cli, const NODE_id& nodeLeft, const NODE_id& nodeRight);
         int nodeDistanceToLeader(const NODE_id& node);
 
 
 
         void do_request_for_transactions( Node::heart_beat_node_info& li);
 
-        void broadcast_MsgEvent(const REF_getter<MsgData::Base>& p, const std::set<NODE_id>& nodes);
+        void broadcast_MsgEvent(const REF_getter<MsgData::Base>& p, const std::vector<NodeElement>& nodes);
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
 
 
 
-        struct block_leader
-        {
-            std::map<THASH_id /*blockinfo hash*/,REF_getter<MsgData::BlockInfo> > blockInfo;
-            std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
-            int64_t block_accepted_sent=0;
-            // heart_beat_info    heart_beat_store;
-            heart_beat_node_info leader_info;
-            size_t size()
-            {
-                size_t sz=0;
-                for(auto& z: blockInfo)
-                {
-                    sz+=z.first.container.size();
-                    sz+=z.second->size();
-                }
-                for(auto& z: ValidateBlockRSP_m)
-                {
-                    sz+=z.first.container.size();
-                    for(auto& x: z.second)
-                    {
-                        sz+=x->size();
-
-                    }
-                }
-                sz+=sizeof(block_accepted_sent);
-                sz+=leader_info.size();
-                return sz;
-            }
-            void dump(nlohmann::json &j)
-            {
-                j["blockInfo_SZ"]=blockInfo.size();
-                j["responses"]=ValidateBlockRSP_m.size();
-
-            }
-
-        };
         _db_to_save db_to_save_Z;
 
 
         
-
-        struct block_client
-        {
-            REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
-            REF_getter<MsgData::attachment_data> att_data= nullptr;
-
-            int64_t block_validated=0;
-            size_t size()
-            {
-                size_t sz=0;
-                if(blockDBStore.valid())
-                    sz+=blockDBStore->size();
-                if(att_data.valid())
-                    sz+=att_data->size();
-                sz+=sizeof(block_validated);
-
-                return sz;
-
-            }
-        };
-        struct client_leader_info
-        {
-            private:
-            REF_getter<MsgData::HeartBeatREQ> node_leader;
-            public:
-            void set_node_leader(const REF_getter<MsgData::HeartBeatREQ> & nl)
-            {
-                node_leader=nl;
-            }
-            REF_getter<MsgData::HeartBeatREQ> get_node_leader() const
-            {
-                return node_leader;
-            }
-            std::vector<NodeElement> allnodes;
-            std::map<NODE_id,size_t> position_in_allodes;
-
-            // NODE_id node_leader;
-            int64_t heart_beat_sent=0;
-            int64_t confirm_leader_sent=0;
-            size_t size()
-            {
-                size_t sz=0;
-                if(node_leader.valid())
-                    sz+=node_leader->size();
-                sz+=sizeof(heart_beat_sent);
-                sz+=sizeof(confirm_leader_sent);
-                return sz;
-            }
-        };
 
         struct _sync
         {
@@ -366,69 +372,11 @@ namespace Node
         };
         std::map<THASH_id, block_client> c_blocks;
         std::map<THASH_id,block_leader> l_blocks;
-        std::map<THASH_id, client_leader_info> cli_leader_info;
+        std::map<THASH_id, std::map<time_t, client_leader_info> > cli_leader_info;
         std::map<THASH_id,_sync> syncs;
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
-        std::map<THASH_id,REF_getter<BlockMetaFull>> block_meta_full;
-        std::map<THASH_id,REF_getter<BlockMetaValidator>> block_meta_validator;
-        REF_getter<BlockMetaFull> getMetaFull()
-        {
-            MUTEX_INSPECTOR;
-            auto b=prev_root_hash_Z();
-            auto it=block_meta_full.find(b);
-            if(it!=block_meta_full.end())
-            {
-            MUTEX_INSPECTOR;
-                if(it->second.valid())
-                return it->second;
-            }
-            REF_getter<BlockMetaFull> m=new BlockMetaFull();
-            auto nn=db_state->getNodeListNoCreate();
-            m->full_broadcast=nn->getList();
-            auto an=db_state->getAllNodes();
-
-            for(auto& z: an)
-            {
-            MUTEX_INSPECTOR;
-                auto name=z->getName();
-                m->nodes.insert_or_assign(name,z);
-                auto stake=z->get_full_stake();
-                m->node_stakes[name]=stake;
-                m->total_full_stake+=stake;
-            }
-            return m;
-        }
-        REF_getter<BlockMetaValidator> getMetaValidator(uint64_t block_timestamp)
-        {
-            auto b=prev_root_hash_Z();
-            auto it=block_meta_validator.find(b);
-            if(it!=block_meta_validator.end())
-            {
-                if(it->second.valid())
-                return it->second;
-            }
-            REF_getter<BlockMetaValidator> m=new BlockMetaValidator();
-            auto nn=db_state->getNodeListNoCreate();
-            m->validator_broadcast=getValidators(block_timestamp,db_state.get());
-            // auto nm=root->getAllNodes(db_state.get());
-            // m->full_broadcast=nn->getList();
-            auto an=db_state->getAllNodes();
-
-            for(auto& z: m->validator_broadcast)
-            {
-                auto n=db_state->getNodeNoCreate(z);
-                if(!n.valid())
-                throw CommonError("if(!n.valid())");
-                // auto name=z->getName();
-                // m->nodes.insert_or_assign(name,z);
-                auto stake=n->get_full_stake();
-                m->validator_stake[z]=stake;
-                m->total_validator_stake+=stake;
-            }
-            return m;
-        }
 
         THASH_id prev_root_hash_Z()
         {
@@ -455,14 +403,9 @@ namespace Node
         {
             c_blocks.clear();
             l_blocks.clear();
-            block_meta_full.clear();
-            block_meta_validator.clear();
             cli_leader_info.clear();
-            // lc_responses.clear();
             syncs.clear();
             transaction_pool_of_leader.clear();
-            // prev_root_hash_Z=THASH_id();
-            // state_Z=STATE_NORMAL;
             stage_is_working=false;
             last_activity_time=0;
             contracts.clear();
@@ -472,7 +415,7 @@ namespace Node
 
 
         void do_start_block();
-        void build_node_lists(const REF_getter<MsgData::HeartBeatREQ>& h);
+        REF_getter<hb_nodes_state> build_node_lists(const THASH_id& prev_block_hash, time_t block_timestamp);
 
 
         void collectTransactions();
