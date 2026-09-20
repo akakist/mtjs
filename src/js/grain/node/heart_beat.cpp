@@ -71,7 +71,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
             REF_getter<MsgData::ConfirmLeaderREQ> rt = new MsgData::ConfirmLeaderREQ();
             rt->hb = m->payload_heart_beat;
 
-                broadcast_MsgEvent(rt.get(), mf->full_broadcast);
+                broadcast_MsgEvent(rt.get());
         }
     }
     XPASS;
@@ -403,7 +403,8 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
         s+=" "+z.container;
     }
     // logErr2("validators %s",s.c_str());
-    broadcast_MsgEvent(lce.get(),mm);
+
+    broadcast_MsgEvent(lce.get());
 
     return hb_req;
 }

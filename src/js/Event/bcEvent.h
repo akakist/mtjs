@@ -288,7 +288,7 @@ namespace bcEvent
             return NULL;
         }
         BroadcastMessage(const SERVICE_id &dstService_, const NODE_id& _node_signer, int64_t _node_start_timestamp, 
-            const std::set<NODE_id> &_nodes,
+            const TreeNode &_nodes,
             int64_t _seqId,
             const std::string& _signature_pl,
             const std::string &m, const route_t &r)
@@ -299,10 +299,10 @@ namespace bcEvent
             signature_pl(_signature_pl),
             msg(m) {}
 
-        SERVICE_id dstService;
+        const SERVICE_id dstService;
         const NODE_id node_signer;
         const int64_t node_start_timestamp;
-        std::set<NODE_id> nodes;
+        const TreeNode nodes;
         const int64_t seqId;
         const std::string signature_pl;
         const std::string msg;

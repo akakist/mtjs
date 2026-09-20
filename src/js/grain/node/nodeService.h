@@ -250,7 +250,7 @@ namespace Node
 
         void do_request_for_transactions( Node::heart_beat_node_info& li);
 
-        void broadcast_MsgEvent(const REF_getter<MsgData::Base>& p, const std::set<NODE_id>& nodes);
+        void broadcast_MsgEvent(const REF_getter<MsgData::Base>& p);
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
 
 

@@ -179,9 +179,9 @@ void Node::Service::do_start_block()
         for (auto &z : transaction_pool_of_leader)
             b->transaction_bodies.push_back(z.second);
 #ifdef FULL_M
-        broadcast_MsgEvent(b.get(), mf->full_broadcast);
+        broadcast_MsgEvent(b.get());
 #else
-        broadcast_MsgEvent(b.get(), mv->validator_broadcast);
+        broadcast_MsgEvent(b.get());
 #endif
     }
 }
@@ -556,7 +556,7 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
     rt->lc = li.leader_cert_2;
     li.request_for_transactions_time = iUtils->getNow();
 
-    broadcast_MsgEvent(rt.get(),getMetaFull()->full_broadcast);
+    broadcast_MsgEvent(rt.get());
 }
 
 // #include "sql"
