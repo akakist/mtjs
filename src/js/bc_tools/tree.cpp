@@ -23,7 +23,7 @@ TreeNode buildTree(const std::map<NODE_id,NodeElement>& nodes, const NODE_id& ro
     if(nodes.empty())
         throw CommonError("if(nodes.empty())");
 
-    std::deque<TreeNode> ranked;
+    std::vector<TreeNode> ranked;
     for (auto& kv : nodes) {
         TreeNode n;
         n.node=kv.second;

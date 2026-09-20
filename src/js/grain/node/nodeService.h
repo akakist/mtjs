@@ -67,6 +67,7 @@ namespace Node
         std::set<NODE_id> full_broadcast;
         std::map<NODE_id, uint64_t> node_stakes;
         uint64_t total_full_stake=0;
+        TreeNode tree;
         REF_getter<bc_node> getNode(const NODE_id &n)
         {
             auto it=nodes.find(n);
@@ -332,87 +333,36 @@ namespace Node
             }
         };
 
-        struct _sync
-        {
-            bool do_you_have_sent=false;
-            std::set<NODE_id> havers;
-            size_t size()
-            {
-                size_t sz=0;
-                sz+=sizeof(do_you_have_sent);
-                for(auto &z: havers)
-                {
-                    sz+=z.container.size();
-                }
-                return sz;
-            }
-            void dump(nlohmann::json &j)
-            {
-                j["havers SZ"]=havers.size();
-            }
-        };
+        // struct _sync_
+        // {
+        //     bool do_you_have_sent=false;
+        //     std::set<NODE_id> havers;
+        //     size_t size()
+        //     {
+        //         size_t sz=0;
+        //         sz+=sizeof(do_you_have_sent);
+        //         for(auto &z: havers)
+        //         {
+        //             sz+=z.container.size();
+        //         }
+        //         return sz;
+        //     }
+        //     void dump(nlohmann::json &j)
+        //     {
+        //         j["havers SZ"]=havers.size();
+        //     }
+        // };
         std::map<THASH_id, block_client> c_blocks;
         std::map<THASH_id,block_leader> l_blocks;
         std::map<THASH_id, client_leader_info> cli_leader_info;
-        std::map<THASH_id,_sync> syncs;
+        // std::map<THASH_id,_sync_> syncs;
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         std::map<THASH_id,REF_getter<BlockMetaFull>> block_meta_full;
         std::map<THASH_id,REF_getter<BlockMetaValidator>> block_meta_validator;
-        REF_getter<BlockMetaFull> getMetaFull()
-        {
-            auto b=prev_root_hash_Z();
-            auto it=block_meta_full.find(b);
-            if(it!=block_meta_full.end())
-            {
-                if(it->second.valid())
-                return it->second;
-            }
-            REF_getter<BlockMetaFull> m=new BlockMetaFull();
-            auto nn=db_state->getNodeListNoCreate();
-            m->full_broadcast=nn->getList();
-            auto an=db_state->getAllNodes();
-
-            for(auto& z: an)
-            {
-                auto name=z->getName();
-                m->nodes.insert_or_assign(name,z);
-                auto stake=z->get_full_stake();
-                m->node_stakes[name]=stake;
-                m->total_full_stake+=stake;
-            }
-            return m;
-        }
-        REF_getter<BlockMetaValidator> getMetaValidator(uint64_t block_timestamp)
-        {
-            auto b=prev_root_hash_Z();
-            auto it=block_meta_validator.find(b);
-            if(it!=block_meta_validator.end())
-            {
-                if(it->second.valid())
-                return it->second;
-            }
-            REF_getter<BlockMetaValidator> m=new BlockMetaValidator();
-            auto nn=db_state->getNodeListNoCreate();
-            m->validator_broadcast=getValidators(block_timestamp,db_state.get());
-            // auto nm=root->getAllNodes(db_state.get());
-            // m->full_broadcast=nn->getList();
-            auto an=db_state->getAllNodes();
-
-            for(auto& z: m->validator_broadcast)
-            {
-                auto n=db_state->getNodeNoCreate(z);
-                if(!n.valid())
-                throw CommonError("if(!n.valid())");
-                // auto name=z->getName();
-                // m->nodes.insert_or_assign(name,z);
-                auto stake=n->get_full_stake();
-                m->validator_stake[z]=stake;
-                m->total_validator_stake+=stake;
-            }
-            return m;
-        }
+        REF_getter<BlockMetaFull> getMetaFull();
+        REF_getter<BlockMetaValidator> getMetaValidator(uint64_t block_timestamp);
 
         THASH_id prev_root_hash_Z()
         {
@@ -443,7 +393,7 @@ namespace Node
             block_meta_validator.clear();
             cli_leader_info.clear();
             // lc_responses.clear();
-            syncs.clear();
+            // syncs.clear();
             transaction_pool_of_leader.clear();
             // prev_root_hash_Z=THASH_id();
             // state_Z=STATE_NORMAL;
@@ -517,7 +467,7 @@ namespace Node
             j["c_blocks.size()"]=c_blocks.size();
             j["l_blocks.size()"]=l_blocks.size();
             j["cli_leader_info.size()"]=cli_leader_info.size();
-            j["syncs.size()"]=syncs.size();
+            // j["syncs.size()"]=syncs.size();
 
             size_t ft=0;
             for(auto &z: filter_NodeMsgREQ)

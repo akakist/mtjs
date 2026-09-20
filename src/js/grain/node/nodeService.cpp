@@ -212,11 +212,11 @@ void Node::Service::report_mem()
         sz+=z.first.container.size();
         sz+=z.second.size();
     }
-    for(auto &z : syncs)
-    {
-        sz+=z.first.container.size();
-        sz+=z.second.size();
-    }
+    // for(auto &z : syncs)
+    // {
+    //     sz+=z.first.container.size();
+    //     sz+=z.second.size();
+    // }
     for(auto &z : filter_NodeMsgREQ)
     {
         sz+=z.first.container.size();
@@ -1215,6 +1215,60 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
         return err;
 
     return std::nullopt;
+}
+REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull()
+{
+    auto b=prev_root_hash_Z();
+    auto it=block_meta_full.find(b);
+    if(it!=block_meta_full.end())
+    {
+        if(it->second.valid())
+        return it->second;
+    }
+    REF_getter<BlockMetaFull> m=new BlockMetaFull();
+    auto nn=db_state->getNodeListNoCreate();
+    m->full_broadcast=nn->getList();
+    auto an=db_state->getAllNodes();
+
+    for(auto& z: an)
+    {
+        auto name=z->getName();
+        m->nodes.insert_or_assign(name,z);
+        auto stake=z->get_full_stake();
+        m->node_stakes[name]=stake;
+        m->total_full_stake+=stake;
+    }
+    
+    return m;
+}
+REF_getter<Node::BlockMetaValidator> Node::Service::getMetaValidator(uint64_t block_timestamp)
+{
+    auto b=prev_root_hash_Z();
+    auto it=block_meta_validator.find(b);
+    if(it!=block_meta_validator.end())
+    {
+        if(it->second.valid())
+        return it->second;
+    }
+    REF_getter<BlockMetaValidator> m=new BlockMetaValidator();
+    auto nn=db_state->getNodeListNoCreate();
+    m->validator_broadcast=getValidators(block_timestamp,db_state.get());
+    // auto nm=root->getAllNodes(db_state.get());
+    // m->full_broadcast=nn->getList();
+    auto an=db_state->getAllNodes();
+
+    for(auto& z: m->validator_broadcast)
+    {
+        auto n=db_state->getNodeNoCreate(z);
+        if(!n.valid())
+        throw CommonError("if(!n.valid())");
+        // auto name=z->getName();
+        // m->nodes.insert_or_assign(name,z);
+        auto stake=n->get_full_stake();
+        m->validator_stake[z]=stake;
+        m->total_validator_stake+=stake;
+    }
+    return m;
 }
 
 void Node::Service::logNode(const char *fmt, ...)
