@@ -385,7 +385,7 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
     block_meta_full.clear();
     block_meta_validator.clear();
     c_blocks.clear();
-    auto mf=getMetaFull();
+    // auto mf=getMetaFull();
     // auto prev=prev_block;
     REF_getter<MsgData::HeartBeatREQ> hb_req =
         new MsgData::HeartBeatREQ(prev_root_hash_Z(),
@@ -396,12 +396,12 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
     REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),prev_block.valid()?prev_block->getBuffer():"");
     // logNode("broadcast heart beat");
     l_blocks[prev_root_hash_Z()].leader_info.leader_cert_2=hb_req;
-    auto mm=mf->full_broadcast;
-    std::string s;
-    for(auto & z:mm)
-    {
-        s+=" "+z.container;
-    }
+    // auto mm=mf->full_broadcast;
+    // std::string s;
+    // for(auto & z:mm)
+    // {
+    //     s+=" "+z.container;
+    // }
     // logErr2("validators %s",s.c_str());
 
     broadcast_MsgEvent(lce.get());
