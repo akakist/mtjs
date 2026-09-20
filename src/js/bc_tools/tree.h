@@ -5,29 +5,26 @@
 // #include "bigint.h"
 #include "NODE_id.h"
 #include "nodeElement.h"
-namespace BroadcasterTree
-{
 
-    class TreeNode {
-    public:
-        TreeNode(const NodeElement& b): node(b) {}
-        NodeElement node;
-        std::list<TreeNode> children; // стабильные адреса элементов
+class TreeNode {
+public:
+    TreeNode(const NodeElement& b): node(b) {}
+    NodeElement node;
+    std::list<TreeNode> children; // стабильные адреса элементов
 
-        TreeNode()  {}
+    TreeNode()  {}
 
-        void hash(Blake2bHasher&h)
+    void hash(Blake2bHasher&h)
+    {
+        node.hash(h);
+        for(auto& z: children)
         {
-            node.hash(h);
-            for(auto& z: children)
-            {
-                z.hash(h);
-            }
+            z.hash(h);
         }
-    };
-    TreeNode buildTree(const std::map<NODE_id,NodeElement>& nodes, const NODE_id& rootName);
+    }
+};
+TreeNode buildTree(const std::map<NODE_id,NodeElement>& nodes, const NODE_id& rootName);
 
-} // namespace BroadcasterTree
 inline outBuffer & operator<< (outBuffer& o,const NodeElement& t)
 {
     o<<t.name<<t.stake_A<<t.ip;
@@ -39,14 +36,14 @@ inline inBuffer & operator>> (inBuffer& o,NodeElement& t)
     return o;
 }
 
-inline outBuffer & operator<< (outBuffer& o,const BroadcasterTree::TreeNode& t)
+inline outBuffer & operator<< (outBuffer& o,const TreeNode& t)
 {
     o<<t.node<<t.children;
     return o;
 }
-inline inBuffer & operator>> (inBuffer& o,BroadcasterTree::TreeNode& t)
+inline inBuffer & operator>> (inBuffer& o,TreeNode& t)
 {
     o>>t.node>>t.children;
     return o;
 }
-void dump(const BroadcasterTree::TreeNode &t, int level, std::vector<std::pair<int,std::string>> & out);
+void dump(const TreeNode &t, int level, std::vector<std::pair<int,std::string>> & out);

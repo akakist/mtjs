@@ -1,13 +1,13 @@
 #include <bits/stdc++.h>
 #include "tree.h"
 #include "NODE_id.h"
-using namespace BroadcasterTree;
+// using namespace BroadcasterTree;
 
 
 
 // Построение дерева: root + map узлов
 
-void dump(const BroadcasterTree::TreeNode &t, int level, std::vector<std::pair<int,std::string>> & out)
+void dump(const TreeNode &t, int level, std::vector<std::pair<int,std::string>> & out)
 {
     MUTEX_INSPECTOR;
 
@@ -17,15 +17,15 @@ void dump(const BroadcasterTree::TreeNode &t, int level, std::vector<std::pair<i
         dump(c,level+1,out);
     }
 }
-BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,NodeElement>& nodes, const NODE_id& rootName_)
+TreeNode buildTree(const std::map<NODE_id,NodeElement>& nodes, const NODE_id& rootName_)
 {
     MUTEX_INSPECTOR;
     if(nodes.empty())
         throw CommonError("if(nodes.empty())");
 
-    std::deque<BroadcasterTree::TreeNode> ranked;
+    std::deque<TreeNode> ranked;
     for (auto& kv : nodes) {
-        BroadcasterTree::TreeNode n;
+        TreeNode n;
         n.node=kv.second;
         ranked.emplace_back(kv.second);
     }
@@ -36,16 +36,16 @@ BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,Node
 
     int idx_r=0;
 
-    std::queue<BroadcasterTree::TreeNode*> q;
+    std::queue<TreeNode*> q;
 
-    BroadcasterTree::TreeNode fake;
+    TreeNode fake;
     fake.node.name.container="fake";
-    BroadcasterTree::TreeNode root=fake;
+    TreeNode root=fake;
     q.push(&root);
 
     while (!q.empty() && idx_r<ranked.size()) {
         MUTEX_INSPECTOR;
-        BroadcasterTree::TreeNode* cur = q.front();
+        TreeNode* cur = q.front();
         q.pop();
 
 
@@ -57,7 +57,7 @@ BroadcasterTree::TreeNode BroadcasterTree::buildTree(const std::map<NODE_id,Node
 
             auto r=ranked[idx_r++];
             cur->children.emplace_back(r);   // копия в дерево
-            BroadcasterTree::TreeNode* childPtr = &cur->children.back(); // стабильный адрес
+            TreeNode* childPtr = &cur->children.back(); // стабильный адрес
             // nodes.erase(it);                          // удаляем из map
             q.push(childPtr);                         // добавляем в очередь
         }
@@ -87,7 +87,7 @@ int main() {
 
     const std::string rootIp = "10.0.0.1:8000";
 
-    BroadcasterTree::TreeNode root = BroadcasterTree::buildTree(nodes, rootIp);
+    TreeNode root = BroadcasterTree::buildTree(nodes, rootIp);
     nlohmann::json j = root.to_json();
     std::cout << j.dump(2) << std::endl;
 

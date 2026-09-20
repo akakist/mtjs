@@ -23,7 +23,7 @@ struct TIMER_BROADCAST_ACK_TIMEDOUT_cookie: public Refcountable
     TIMER_BROADCAST_ACK_TIMEDOUT_cookie(): Refcountable("TIMER_BROADCAST_ACK_TIMEDOUT_cookie") {}
     SERVICE_id dstService;
     NODE_id dstName_;
-    BroadcasterTree::TreeNode tree;
+    TreeNode tree;
     std::string msg;
     // REF_getter<root_data> root=NULL;
     route_t route;
@@ -60,8 +60,8 @@ namespace BroadcasterTree
         Service(const SERVICE_id&, const std::string&  nm, IInstance *ins);
         ~Service();
 
-        // void make_broadcast_message_to_tree(SERVICE_id dstService,const std::string & msg, const BroadcasterTree::TreeNode& root, const route_t& route);
-        void make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id& node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route);
+        // void make_broadcast_message_to_tree(SERVICE_id dstService,const std::string & msg, const TreeNode& root, const route_t& route);
+        void make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id& node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const TreeNode &root, const route_t &route);
 
 
     public:

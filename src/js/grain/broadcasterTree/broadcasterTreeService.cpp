@@ -174,12 +174,12 @@ bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage 
     }
     if (nodes.size() == 0)
         return true;
-    BroadcasterTree::TreeNode root = BroadcasterTree::buildTree(nodes, conf->this_node_name);
+    TreeNode root = buildTree(nodes, conf->this_node_name);
     // logErr2("BroadcastMessage tree built with root %s", root.node.name.container.c_str());
     make_broadcast_message_to_tree(e->dstService,e->node_signer, e->node_start_timestamp,e->seqId,e->signature_pl, e->msg, root, e->route);
     return true;
 }
-void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id & node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const BroadcasterTree::TreeNode &root, const route_t &route)
+void BroadcasterTree::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id & node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const TreeNode &root, const route_t &route)
 {
     MUTEX_INSPECTOR;
     auto &ch = root.children;
