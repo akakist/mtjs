@@ -154,7 +154,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     {
         /// отвечаем, поскольку это кейс старта с генезиса
         logNode("if(!remote_verified && !local_verified) ");
-        if(isNodeGreaterOrEqual(this_node_name,h->node_leader))
+        if(isNodeGreater(this_node_name,h->node_leader))
         {
             logNode("do_heart_beat();");
             auto hb=do_heart_beat();
@@ -256,7 +256,7 @@ if(prev_root_hash_Z!=h->prev_root_hash)
      
                 if(iUtils->getNow()-cli.heart_beat_sent > _1sec * HEART_BEAT_SENT_TIMEOUT)
                 {
-                    if(isNodeGreaterOrEqual(this_node_name, h->node_leader))
+                    if(isNodeGreater(this_node_name, h->node_leader))
                     {
                         // ci.node_leader=new MsgData::HeartBeatREQ(prev_root_hash_Z,);
                         auto hb=do_heart_beat();
@@ -268,7 +268,7 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 // if(ci.node_leader.container.empty())
                     // ci.node_leader=this_node_name;
 
-                if (!cli.node_leader.valid() || cli.node_leader->node_leader.container.empty() || isNodeGreaterOrEqual(h->node_leader, cli.node_leader->node_leader))
+                if (!cli.node_leader.valid() || cli.node_leader->node_leader.container.empty() || isNodeGreater(h->node_leader, cli.node_leader->node_leader))
                 {
     
                     cli.node_leader=h;

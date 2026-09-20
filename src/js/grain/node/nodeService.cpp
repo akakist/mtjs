@@ -710,11 +710,20 @@ int Node::Service::nodeDistanceToLeader(const NODE_id &node)
     }
     return abs(idx - npoz);
 }
-bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id &nodeRight)
+bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight)
 {
     if (nodeLeft == nodeRight)
         return true;
-
+#ifdef KALL
+    auto m=getMetaFull();
+    auto itL=m->position_of_node.find(nodeLeft);
+    if(itL == m->position_of_node.end())
+        throw CommonError("if(itL == m->position_of_node.end())");
+    auto itR=m->position_of_node.find(nodeRight);
+    if(itR == m->position_of_node.end())
+        throw CommonError("if(itR == m->position_of_node.end())");
+    return itL->second < itR->second;
+#endif    
     auto nv = db_state->getAllNodes();
     std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
     {
@@ -752,6 +761,7 @@ bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id 
     }
 
     return distLeft < distRight;
+// }
 }
 bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
 {
@@ -1216,6 +1226,18 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
 
     return std::nullopt;
 }
+
+inline uint64_t read_uint64(const uint8_t* data) {
+    return (static_cast<uint64_t>(data[0]) << 56) |
+           (static_cast<uint64_t>(data[1]) << 48) |
+           (static_cast<uint64_t>(data[2]) << 40) |
+           (static_cast<uint64_t>(data[3]) << 32) |
+           (static_cast<uint64_t>(data[4]) << 24) |
+           (static_cast<uint64_t>(data[5]) << 16) |
+           (static_cast<uint64_t>(data[6]) << 8)  |
+           (static_cast<uint64_t>(data[7]));
+}
+
 REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull()
 {
     auto b=prev_root_hash_Z();
@@ -1238,7 +1260,31 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull()
         m->node_stakes[name]=stake;
         m->total_full_stake+=stake;
     }
-    
+    std::vector<NodeElement> vne;
+    auto ll=db_state->getAllNodes();
+    std::map<uint64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
+
+    for(auto &x: ll)
+    {
+        std::string seed=x->getName().container+prev_root_hash_Z().container;
+        auto h=blake2b_hash(seed);
+        if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
+        auto w=read_uint64((uint8_t*)h.container.data());
+        auto fs=x->get_full_stake();
+        if(fs)
+            w/=x->get_full_stake();
+        result[w].insert_or_assign(x->getName(),x);
+    }
+    for(auto& x:result)
+    {
+        for(auto& z:x.second)
+        {
+            m->position_of_node[z.second->getName()]=vne.size();
+            vne.push_back(z.second->getElement());
+        }
+    }
+    m->tree=buildTree(vne);
+
     return m;
 }
 REF_getter<Node::BlockMetaValidator> Node::Service::getMetaValidator(uint64_t block_timestamp)

@@ -17,22 +17,22 @@ void dump(const TreeNode &t, int level, std::vector<std::pair<int,std::string>> 
         dump(c,level+1,out);
     }
 }
-TreeNode buildTree(const std::map<NODE_id,NodeElement>& nodes, const NODE_id& rootName_)
+TreeNode buildTree(const std::vector<NodeElement>& nodes)
 {
     MUTEX_INSPECTOR;
     if(nodes.empty())
         throw CommonError("if(nodes.empty())");
 
-    std::vector<TreeNode> ranked;
-    for (auto& kv : nodes) {
-        TreeNode n;
-        n.node=kv.second;
-        ranked.emplace_back(kv.second);
-    }
-    sort(ranked.begin(), ranked.end(),
-    [](const auto& a, const auto& b) {
-        return a.node.stake_A > b.node.stake_A;
-    });
+    auto &ranked=nodes;
+    // for (auto& kv : nodes) {
+    //     TreeNode n;
+    //     n.node=kv.second;
+    //     ranked.emplace_back(kv.second);
+    // }
+    // sort(ranked.begin(), ranked.end(),
+    // [](const auto& a, const auto& b) {
+    //     return a.node.stake_A > b.node.stake_A;
+    // });
 
     int idx_r=0;
 

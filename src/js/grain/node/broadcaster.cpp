@@ -16,13 +16,14 @@ void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b)
     {
         m[z->getName()]=z->getElement();
     }
-    auto tree=buildTree(m,this_node_name);
+    auto meta=getMetaFull();
+    // auto tree=buildTree(meta->tree,this_node_name);
     sendEvent(
         ServiceEnum::BroadcasterTree,
         // ServiceEnum::Node,
         
               new bcEvent::BroadcastMessage(ServiceEnum::Node,
-                                            this_node_name, node_start_timestamp, tree, seqId2++, signature,msg, ListenerBase::serviceId));
+                                            this_node_name, node_start_timestamp, meta->tree, seqId2++, signature,msg, ListenerBase::serviceId));
 
 }
 // #endif

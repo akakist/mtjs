@@ -68,6 +68,7 @@ namespace Node
         std::map<NODE_id, uint64_t> node_stakes;
         uint64_t total_full_stake=0;
         TreeNode tree;
+        std::map<NODE_id, size_t> position_of_node;
         REF_getter<bc_node> getNode(const NODE_id &n)
         {
             auto it=nodes.find(n);
@@ -199,16 +200,6 @@ namespace Node
 
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
         bool PutTransactionREQ(const bcEvent::PutTransactionREQ* e);
-        // bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
-        // bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
-        // bool SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork);
-
-
-        // bool on_TIMER_BROADCAST_ACK_TIMEDOUT(const timerEvent::TickAlarm *e);
-
-        
-        // void make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id& node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const TreeNode &root, const route_t &route);
-
 
         REF_getter<MsgData::HeartBeatREQ> do_heart_beat();
 
@@ -244,7 +235,7 @@ namespace Node
 
 
         // void make_leader_certificate();
-        bool isNodeGreaterOrEqual(const NODE_id& nodeLeft, const NODE_id& nodeRight);
+        bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight);
         int nodeDistanceToLeader(const NODE_id& node);
 
 
