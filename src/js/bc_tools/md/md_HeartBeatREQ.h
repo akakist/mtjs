@@ -40,21 +40,10 @@ namespace MsgData
         }
         bool equals(const REF_getter<HeartBeatREQ> &a)
         {
-            // assert(this!=NULL);
-            if(!a.valid()) throw CommonError("if(!a.valid())");
-            if(prev_root_hash_1 != a->prev_root_hash_1)
-                return false;
-            if(new_epoch != a->new_epoch)
-                return false;
-            if(node_leader != a->node_leader)
-                return false;
-            if(block_timestamp != a->block_timestamp)
-                return false;
-            return true;
-            // return prev_root_hash_1 == a->prev_root_hash_1 &&
-            //         new_epoch == a->new_epoch &&
-            //         node_leader == a->node_leader &&
-            //         block_timestamp == a->block_timestamp;
+            return prev_root_hash_1 == a->prev_root_hash_1 &&
+                    new_epoch == a->new_epoch &&
+                    node_leader == a->node_leader &&
+                    block_timestamp == a->block_timestamp;
         }
 
         void update(Blake2bHasher& h) const

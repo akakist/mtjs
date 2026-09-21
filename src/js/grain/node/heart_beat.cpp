@@ -13,57 +13,11 @@
 #include "route_t.h"
 #include <cstddef>
 #include <vector>
-inline uint64_t read_uint64(const uint8_t* data) {
-    return (static_cast<uint64_t>(data[0]) << 56) |
-           (static_cast<uint64_t>(data[1]) << 48) |
-           (static_cast<uint64_t>(data[2]) << 40) |
-           (static_cast<uint64_t>(data[3]) << 32) |
-           (static_cast<uint64_t>(data[4]) << 24) |
-           (static_cast<uint64_t>(data[5]) << 16) |
-           (static_cast<uint64_t>(data[6]) << 8)  |
-           (static_cast<uint64_t>(data[7]));
-}
-
-void Node::Service::build_node_lists(const REF_getter<MsgData::HeartBeatREQ>& h)
-{
-    // auto nl=db->getNodeListNoCreate();
-    // auto l=nl->getList();
-    // logNode("build_node_lists");
-    auto& cli=cli_leader_info[h->prev_root_hash_1];
-
-    cli.allnodes.clear();
-    cli.position_in_allodes.clear();
-    auto ll=db_state->getAllNodes();
-    std::map<uint64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
-    // std::vector<NodeElement> allnodes;
-    // std::map<NODE_id,size_t> position_in_allodes;
-
-    for(auto &x: ll)
-    {
-        // x->
-        std::string seed=x->getName().container+h->prev_root_hash_1.container+std::to_string(h->block_timestamp);
-        auto h=blake2b_hash(seed);
-        if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
-        auto w=read_uint64((uint8_t*)h.container.data());
-        auto fs=x->get_full_stake();
-        if(fs)
-            w/=x->get_full_stake();
-        result[w].insert_or_assign(x->getName(),x);
-    }
-    for(auto& x:result)
-    {
-        for(auto& z:x.second)
-        {
-            cli.position_in_allodes[z.second->getName()]=cli.allnodes.size();
-            cli.allnodes.push_back(z.second->getElement());
-        }
-    }
-}
-
 bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
     stage_is_working=iUtils->getNow();
+    
     auto prev_root_hash=prev_root_hash_Z();
     auto &li = l_blocks[prev_root_hash].leader_info;
     if (prev_root_hash != m->payload_heart_beat->prev_root_hash_1)
@@ -118,7 +72,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
             REF_getter<MsgData::ConfirmLeaderREQ> rt = new MsgData::ConfirmLeaderREQ();
             rt->hb = m->payload_heart_beat;
 
-                broadcast_MsgEvent(rt.get(), mf->full_broadcast);
+                broadcast_MsgEvent(rt.get());
         }
     }
     XPASS;
@@ -127,6 +81,8 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route)
 {
     stage_is_working=iUtils->getNow();
+        
+
     REF_getter<MsgData::HeartBeatRSP> hbr = new MsgData::HeartBeatRSP();
     hbr->payload_heart_beat = h;
     hbr->node_signer = this_node_name;
@@ -134,12 +90,13 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
     pass_NodeMsgRSP(hbr.get(),route);
 
 }
-
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
     
     stage_is_working=iUtils->getNow();
+        
+
 
     // logNode("HeartBeatREQ");
     if(!db_state->sync_empty)
@@ -152,37 +109,12 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     // {
     //     return true;
     // }
-    auto ct=time(NULL);
-    if(h->block_timestamp<ct-1 || h->block_timestamp>ct+1)
-    {
-        MUTEX_INSPECTOR;
-        logNode("hb block_timestamp invalid");
-        return true;
-    }
     auto& cli=cli_leader_info[h->prev_root_hash_1];
-    auto nl=cli.get_node_leader();
-
-    if(nl.valid())
-    {
-        MUTEX_INSPECTOR;
-        /// ignore if blocktimestamp changed
-        if(nl->block_timestamp!=h->block_timestamp)
-        {
-            logNode("ignore if blocktimestamp changed");
-            return true;
-        }
-    }
-    else
-    {
-        cli.set_node_leader(h);
-        build_node_lists(h);
-    }
-    if(iUtils->getNow()-cli.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT)
-    {
-        MUTEX_INSPECTOR;
-        logNode("if(iUtils->getNow()-ci.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT) return true");
-        return true;
-    }
+    // if(iUtils->getNow()-cli.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT)
+    // {
+    //     logNode("if(iUtils->getNow()-ci.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT) return true");
+    //     return true;
+    // }
 
     bool need_reply = false;
     auto local_prev_block=prev_block;
@@ -208,7 +140,6 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
 
     if(local_verified && !remote_verified)
     {
-        MUTEX_INSPECTOR;
         /// не отвечаем, поскольку ремоте нода не имеет сертификата
         logNode("if(local_verified && !remote_verified) return ");
         REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
@@ -226,22 +157,18 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
 
     if(!remote_verified && !local_verified)    /// block 0
     {
-        MUTEX_INSPECTOR;
         /// отвечаем, поскольку это кейс старта с генезиса
         logNode("if(!remote_verified && !local_verified) ");
-        if(isNodeGreaterOrEqual(this_node_name,h->node_leader))
+        if(isNodeGreater(this_node_name,h->node_leader))
         {
-        MUTEX_INSPECTOR;
             logNode("do_heart_beat();");
-            auto hb=do_heart_beat(h->block_timestamp);
-            cli.set_node_leader(hb);
-            build_node_lists(hb);
+            auto hb=do_heart_beat();
+            cli.node_leader=hb;
             cli.heart_beat_sent=iUtils->getNow();
             return true;
         }
         else
         {
-        MUTEX_INSPECTOR;
             logNode("reply_HeartBeatRSP(h,route);");
             reply_HeartBeatRSP(h,route);
             return true;
@@ -250,7 +177,6 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     
     if(remote_verified && !local_verified)
     {
-        MUTEX_INSPECTOR;
         /// если локально нет сертиката, нода стартанула с генезиса, а у удаленной есть сертификат
         /// то надо синхронизироваться, переходим в синк, не отвечаем
         logNode("if(remote_verified && !local_verified) do sync return");
@@ -265,11 +191,9 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     
     if(remote_verified && local_verified)
     {
-        MUTEX_INSPECTOR;
     
         if(remote_prev_lc->blockInfo->heart_beat->new_epoch < local_prev_block->blockInfo->heart_beat->new_epoch)
         {
-        MUTEX_INSPECTOR;
             logNode("if(remote_prev_lc->heart_beat->new_epoch (%s) < local_lc->heart_beat->new_epoch) return",src_node.container.c_str());
             REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
             d->lc=local_prev_block;
@@ -294,7 +218,6 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         }
         else if(remote_prev_lc->blockInfo->heart_beat->new_epoch == local_prev_block->blockInfo->heart_beat->new_epoch)
         {
-        MUTEX_INSPECTOR;
     
                 /// оба в одинаковой эпохе
                 
@@ -338,14 +261,11 @@ if(prev_root_hash_Z!=h->prev_root_hash)
      
                 if(iUtils->getNow()-cli.heart_beat_sent > _1sec * HEART_BEAT_SENT_TIMEOUT)
                 {
-        MUTEX_INSPECTOR;
-                    if(isNodeGreaterOrEqual(this_node_name, h->node_leader))
+                    if(isNodeGreater(this_node_name, h->node_leader))
                     {
-        MUTEX_INSPECTOR;
                         // ci.node_leader=new MsgData::HeartBeatREQ(prev_root_hash_Z,);
-                        auto hb=do_heart_beat(h->block_timestamp);
-                        cli.set_node_leader(hb);
-                        build_node_lists(hb);
+                        auto hb=do_heart_beat();
+                        cli.node_leader=hb;
                         cli.heart_beat_sent=iUtils->getNow();
                         return true;
                     }
@@ -353,14 +273,10 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 // if(ci.node_leader.container.empty())
                     // ci.node_leader=this_node_name;
 
-                auto nl=cli.get_node_leader();
-                if (!nl.valid() || nl->node_leader.container.empty() || isNodeGreaterOrEqual(h->node_leader, nl->node_leader))
+                if (!cli.node_leader.valid() || cli.node_leader->node_leader.container.empty() || isNodeGreater(h->node_leader, cli.node_leader->node_leader))
                 {
-        MUTEX_INSPECTOR;
     
-                    cli.set_node_leader(h);
-                    build_node_lists(h);
-
+                    cli.node_leader=h;
                     reply_HeartBeatRSP(h,route);
                     return true;
                 }
@@ -377,6 +293,8 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
         return true;
     }
     stage_is_working=iUtils->getNow();
+        
+
 
 
     bool need_replace = false;
@@ -389,15 +307,9 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
     }
     bool need_reply = false;
     auto &cli=cli_leader_info[h->hb->prev_root_hash_1];
-    auto nl=cli.get_node_leader();
-    if (!nl.valid())
-    {
-        cli.set_node_leader(h->hb);
-        build_node_lists(h->hb);
-    }
-    if(!h->hb.valid())
-        throw CommonError("if(!h->hb.valid())");
-    if (!h->hb->equals(nl))
+    if (!cli.node_leader.valid())
+        cli.node_leader = h->hb;
+    if (!h->hb->equals(cli.node_leader))
     {
         return true;
     }
@@ -427,6 +339,8 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         return true;
     }
     stage_is_working=iUtils->getNow();
+        
+
 
     auto prev_root_hash=prev_root_hash_Z();
     auto &li = l_blocks[prev_root_hash].leader_info;
@@ -471,34 +385,37 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     return true;
 }
 
-REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t hbtime)
+REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
 {
     
     stage_is_working=iUtils->getNow();
+        
+
     // logNode("@@ %s",__FUNCTION__);
     l_blocks.clear();
     block_meta_full.clear();
     block_meta_validator.clear();
     c_blocks.clear();
-    auto mf=getMetaFull();
+    // auto mf=getMetaFull();
     // auto prev=prev_block;
     REF_getter<MsgData::HeartBeatREQ> hb_req =
         new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                                     epoch_current(),
-                                    this_node_name,  hbtime);
+                                    this_node_name,  time(NULL));
 
     // auto prev_lc=prev_block;
     REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),prev_block.valid()?prev_block->getBuffer():"");
     // logNode("broadcast heart beat");
     l_blocks[prev_root_hash_Z()].leader_info.leader_cert_2=hb_req;
-    auto mm=mf->full_broadcast;
-    std::string s;
-    for(auto & z:mm)
-    {
-        s+=" "+z.container;
-    }
+    // auto mm=mf->full_broadcast;
+    // std::string s;
+    // for(auto & z:mm)
+    // {
+    //     s+=" "+z.container;
+    // }
     // logErr2("validators %s",s.c_str());
-    broadcast_MsgEvent(lce.get(),mm);
+
+    broadcast_MsgEvent(lce.get());
 
     return hb_req;
 }

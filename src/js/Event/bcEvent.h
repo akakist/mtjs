@@ -288,7 +288,7 @@ namespace bcEvent
             return NULL;
         }
         BroadcastMessage(const SERVICE_id &dstService_, const NODE_id& _node_signer, int64_t _node_start_timestamp, 
-            const std::set<NODE_id> &_nodes,
+            const TreeNode &_nodes,
             int64_t _seqId,
             const std::string& _signature_pl,
             const std::string &m, const route_t &r)
@@ -299,10 +299,10 @@ namespace bcEvent
             signature_pl(_signature_pl),
             msg(m) {}
 
-        SERVICE_id dstService;
+        const SERVICE_id dstService;
         const NODE_id node_signer;
         const int64_t node_start_timestamp;
-        std::set<NODE_id> nodes;
+        const TreeNode nodes;
         const int64_t seqId;
         const std::string signature_pl;
         const std::string msg;
@@ -315,7 +315,7 @@ namespace bcEvent
         {
             return new SendToChild(r);
         }
-        SendToChild(const NODE_id& _node_signer, int64_t _node_start_timestamp, int64_t _seqId, const std::string& signature_pld, const std::string &_payload, const BroadcasterTree::TreeNode &_bt, const SERVICE_id &_dstSvs, const NODE_id &_dstNodeName, const route_t &r)
+        SendToChild(const NODE_id& _node_signer, int64_t _node_start_timestamp, int64_t _seqId, const std::string& signature_pld, const std::string &_payload, const TreeNode &_bt, const SERVICE_id &_dstSvs, const NODE_id &_dstNodeName, const route_t &r)
             : Base(bcEventEnum::SendToChild, r), node_signer(_node_signer), node_start_timestamp(_node_start_timestamp), seqId2(_seqId), payload_signature(signature_pld), 
             payload(_payload), bt(_bt), dst_service(_dstSvs), dstNodeName(_dstNodeName) {}
 
@@ -336,7 +336,7 @@ namespace bcEvent
         int64_t seqId2;
         std::string payload_signature;
         std::string payload;
-        BroadcasterTree::TreeNode bt;
+        TreeNode bt;
         SERVICE_id dst_service;
         NODE_id dstNodeName;
 

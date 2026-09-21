@@ -179,9 +179,9 @@ void Node::Service::do_start_block()
         for (auto &z : transaction_pool_of_leader)
             b->transaction_bodies.push_back(z.second);
 #ifdef FULL_M
-        broadcast_MsgEvent(b.get(), mf->full_broadcast);
+        broadcast_MsgEvent(b.get());
 #else
-        broadcast_MsgEvent(b.get(), mv->validator_broadcast);
+        broadcast_MsgEvent(b.get());
 #endif
     }
 }
@@ -212,11 +212,11 @@ void Node::Service::report_mem()
         sz+=z.first.container.size();
         sz+=z.second.size();
     }
-    for(auto &z : syncs)
-    {
-        sz+=z.first.container.size();
-        sz+=z.second.size();
-    }
+    // for(auto &z : syncs)
+    // {
+    //     sz+=z.first.container.size();
+    //     sz+=z.second.size();
+    // }
     for(auto &z : filter_NodeMsgREQ)
     {
         sz+=z.first.container.size();
@@ -556,7 +556,7 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
     rt->lc = li.leader_cert_2;
     li.request_for_transactions_time = iUtils->getNow();
 
-    broadcast_MsgEvent(rt.get(),getMetaFull()->full_broadcast);
+    broadcast_MsgEvent(rt.get());
 }
 
 // #include "sql"
@@ -710,59 +710,65 @@ int Node::Service::nodeDistanceToLeader(const NODE_id &node)
     }
     return abs(idx - npoz);
 }
-bool Node::Service::isNodeGreaterOrEqual(const NODE_id &nodeLeft, const NODE_id &nodeRight)
+bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight)
 {
-    if (nodeLeft == nodeRight)
-        return true;
+    // if (nodeLeft == nodeRight)
+    //     return true;
+// #ifdef KALL
+    auto m=getMetaFull();
+    auto itL=m->position_of_node.find(nodeLeft);
+    if(itL == m->position_of_node.end())
+        throw CommonError("if(itL == m->position_of_node.end())");
+    auto itR=m->position_of_node.find(nodeRight);
+    if(itR == m->position_of_node.end())
+        throw CommonError("if(itR == m->position_of_node.end())");
+    // logNode("cmp %s %s %d %d",itL->first.container.c_str(), itR->first.container.c_str(), itL->second , itR->second);
+// #ifdef KALL
+    if(prev_root_hash_Z().container.size())
+        return itL->second < itR->second;
+// #endif
+// #endif    
+    // return nodeLeft.container < nodeRight.container;
+// #ifdef KALL
+    auto nv = db_state->getAllNodes();
+    std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
+    {
+        return a->getName() < b->getName();
+    });
 
-        
-    auto & cli=cli_leader_info[prev_root_hash_Z()];
-    if(cli.position_in_allodes.empty())
-        throw CommonError("if(cli.position_in_allodes.empty())");
-    auto itL=cli.position_in_allodes.find(nodeLeft);
-    auto itR=cli.position_in_allodes.find(nodeRight);
-    if(itL==cli.position_in_allodes.end())
-        throw CommonError("if(itL==cli.position_in_allodes.end())");
-    if(itR==cli.position_in_allodes.end())
-        throw CommonError("if(itR==cli.position_in_allodes.end())");
-    return itL->second < itR->second;
-    // auto nv = db_state->getAllNodes();
-    // std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
-    // {
-    //     return a->getName() < b->getName();
-    // });
+    // ФИКС 1: uint32_t вместо int, чтобы избежать отрицательного crc
+    auto prev_rh=prev_root_hash_Z();
+    uint32_t crc = __crc32(0, prev_rh.container.data(), prev_rh.container.size());
+    int idx = static_cast<int>(crc % nv.size());
 
-    // // ФИКС 1: uint32_t вместо int, чтобы избежать отрицательного crc
-    // auto prev_rh=prev_root_hash_Z();
-    // uint32_t crc = __crc32(0, prev_rh.container.data(), prev_rh.container.size());
-    // int idx = static_cast<int>(crc % nv.size());
+    int npoz = -1;
+    int tpoz = -1;
+    for (int i = 0; i < static_cast<int>(nv.size()); i++)
+    {
+        if (nodeLeft == nv[i]->getName())
+            npoz = i;
+        if (nodeRight == nv[i]->getName())
+            tpoz = i;
+    }
 
-    // int npoz = -1;
-    // int tpoz = -1;
-    // for (int i = 0; i < static_cast<int>(nv.size()); i++)
-    // {
-    //     if (nodeLeft == nv[i]->getName())
-    //         npoz = i;
-    //     if (nodeRight == nv[i]->getName())
-    //         tpoz = i;
-    // }
+    // ФИКС 2: защита от ненайденных нод
+    if (npoz == -1 || tpoz == -1)
+    {
+        return npoz != -1; // если nodeLeft найден, а nodeRight нет — nodeLeft лучше
+    }
 
-    // // ФИКС 2: защита от ненайденных нод
-    // if (npoz == -1 || tpoz == -1)
-    // {
-    //     return npoz != -1; // если nodeLeft найден, а nodeRight нет — nodeLeft лучше
-    // }
+    int distLeft  = abs(idx - npoz);
+    int distRight = abs(idx - tpoz);
 
-    // int distLeft  = abs(idx - npoz);
-    // int distRight = abs(idx - tpoz);
+    // ФИКС 3: TIE-BREAKER при равных расстояниях
+    if (distLeft == distRight)
+    {
+        return nodeLeft < nodeRight;  // побеждает нода с меньшим именем
+    }
 
-    // // ФИКС 3: TIE-BREAKER при равных расстояниях
-    // if (distLeft == distRight)
-    // {
-    //     return nodeLeft < nodeRight;  // побеждает нода с меньшим именем
-    // }
-
-    // return distLeft < distRight;
+    return distLeft < distRight;
+// #endif
+// }
 }
 bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
 {
@@ -831,9 +837,12 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     if(iUtils->getNow()-stage_is_working> STAGE_IS_WORKING_TIMEOUT* _1sec)
     {
         stage_is_working=iUtils->getNow();
-        auto hb=do_heart_beat(time(NULL));
-        cli_leader_info[prev_root_hash_Z()].set_node_leader(hb);
-        build_node_lists(hb);
+            
+
+        do_heart_beat();
+    }
+    else {
+        logNode("no heart beat timediff %ld",iUtils->getNow()-stage_is_working);
     }
     return true;
 }
@@ -1228,6 +1237,102 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
         return err;
 
     return std::nullopt;
+}
+
+inline uint64_t read_uint64(const uint8_t* data) {
+    return (static_cast<uint64_t>(data[0]) << 56) |
+           (static_cast<uint64_t>(data[1]) << 48) |
+           (static_cast<uint64_t>(data[2]) << 40) |
+           (static_cast<uint64_t>(data[3]) << 32) |
+           (static_cast<uint64_t>(data[4]) << 24) |
+           (static_cast<uint64_t>(data[5]) << 16) |
+           (static_cast<uint64_t>(data[6]) << 8)  |
+           (static_cast<uint64_t>(data[7]));
+}
+
+REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull()
+{
+    auto b=prev_root_hash_Z();
+    auto it=block_meta_full.find(b);
+    if(it!=block_meta_full.end())
+    {
+        if(it->second.valid())
+        return it->second;
+    }
+    REF_getter<BlockMetaFull> m=new BlockMetaFull();
+    auto nn=db_state->getNodeListNoCreate();
+    m->full_broadcast=nn->getList();
+    auto an=db_state->getAllNodes();
+
+    for(auto& z: an)
+    {
+        auto name=z->getName();
+        m->nodes.insert_or_assign(name,z);
+        auto stake=z->get_full_stake();
+        m->node_stakes[name]=stake;
+        m->total_full_stake+=stake;
+    }
+    std::vector<NodeElement> vne;
+    auto ll=db_state->getAllNodes();
+    std::map<uint64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
+
+    for(auto &x: ll)
+    {
+        std::string seed=x->getName().container+prev_root_hash_Z().container;
+        auto h=blake2b_hash(seed);
+        if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
+        auto w=read_uint64((uint8_t*)h.container.data());
+        auto fs=x->get_full_stake();
+        if(fs)
+            w/=x->get_full_stake();
+        result[w].insert_or_assign(x->getName(),x);
+    }
+    for(auto& x:result)
+    {
+        for(auto& z:x.second)
+        {
+            m->position_of_node[z.second->getName()]=vne.size();
+            vne.push_back(z.second->getElement());
+        }
+    }
+    // std::string st="NODES ";
+    // for(int i=0;i<vne.size();i++)
+    // {
+    //     st+=vne[i].name.container+" ";
+    // }
+    // logNode("NODES %s",st.c_str());
+    m->tree=buildTree(vne);
+
+    return m;
+}
+REF_getter<Node::BlockMetaValidator> Node::Service::getMetaValidator(uint64_t block_timestamp)
+{
+    auto b=prev_root_hash_Z();
+    auto it=block_meta_validator.find(b);
+    if(it!=block_meta_validator.end())
+    {
+        if(it->second.valid())
+        return it->second;
+    }
+    REF_getter<BlockMetaValidator> m=new BlockMetaValidator();
+    auto nn=db_state->getNodeListNoCreate();
+    m->validator_broadcast=getValidators(block_timestamp,db_state.get());
+    // auto nm=root->getAllNodes(db_state.get());
+    // m->full_broadcast=nn->getList();
+    auto an=db_state->getAllNodes();
+
+    for(auto& z: m->validator_broadcast)
+    {
+        auto n=db_state->getNodeNoCreate(z);
+        if(!n.valid())
+        throw CommonError("if(!n.valid())");
+        // auto name=z->getName();
+        // m->nodes.insert_or_assign(name,z);
+        auto stake=n->get_full_stake();
+        m->validator_stake[z]=stake;
+        m->total_validator_stake+=stake;
+    }
+    return m;
 }
 
 void Node::Service::logNode(const char *fmt, ...)
