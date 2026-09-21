@@ -712,9 +712,9 @@ int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 }
 bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight)
 {
-    if (nodeLeft == nodeRight)
-        return true;
-#ifdef KALL
+    // if (nodeLeft == nodeRight)
+    //     return true;
+// #ifdef KALL
     auto m=getMetaFull();
     auto itL=m->position_of_node.find(nodeLeft);
     if(itL == m->position_of_node.end())
@@ -722,8 +722,11 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
     auto itR=m->position_of_node.find(nodeRight);
     if(itR == m->position_of_node.end())
         throw CommonError("if(itR == m->position_of_node.end())");
-    return itL->second < itR->second;
-#endif    
+    // logNode("cmp %s %s %d %d",itL->first.container.c_str(), itR->first.container.c_str(), itL->second , itR->second);
+    if(prev_root_hash_Z().container.size())
+        return itL->second < itR->second;
+// #endif    
+    return nodeLeft.container < nodeRight.container;
     auto nv = db_state->getAllNodes();
     std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
     {
