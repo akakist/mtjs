@@ -162,21 +162,6 @@ bool BroadcasterTree::Service::ServiceInit(const bcEvent::ServiceInit *e)
 bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage *e)
 {
     MUTEX_INSPECTOR;
-    // std::map<NODE_id, NodeElement> nodes;
-    // auto ks = root->getAllNodes(db_state_4.get());
-    // std::map<NODE_id,NodeElement> m;
-    // for (auto &nd : e->nodes)
-    // {
-    //     auto n=conf->db->getNodeNoCreate(nd);
-    //     if(!n.valid())
-    //         throw CommonError("if(!n.valid())");
-    //     NodeElement ne=n->getElement();
-    //     nodes[nd] = ne;
-    // }
-    // if (nodes.size() == 0)
-    //     return true;
-    // TreeNode root = buildTree(nodes, conf->this_node_name);
-    // logErr2("BroadcastMessage tree built with root %s", root.node.name.container.c_str());
     make_broadcast_message_to_tree(e->dstService,e->node_signer, e->node_start_timestamp,e->seqId,e->signature_pl, e->msg, e->nodes, e->route);
     return true;
 }

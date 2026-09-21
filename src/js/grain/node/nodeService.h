@@ -232,6 +232,13 @@ namespace Node
 
         bool GetGranulesRSP(const bcEvent::GetGranulesRSP* m);
         bool GetGranulesREQ(const bcEvent::GetGranulesREQ*e);
+        bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
+        // bool SendToChild(const bcEvent::SendToChild*e);
+        bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
+        bool SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork);
+
+        void make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id & node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const TreeNode &root, const route_t &route);
+
 
 
         // void make_leader_certificate();

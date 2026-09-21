@@ -106,7 +106,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     //     prev_root_hash_Z.container = res;
     // }
 
-    logNode("do_heart_beat in startService");
+    // logNode("do_heart_beat in startService");
     // do_heart_beat();
 
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^ds$", "show current element dump", ListenerBase::serviceId));
@@ -257,6 +257,21 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     // case timers::TIMER_BROADCAST_ACK_TIMEDOUT:
     //     return on_TIMER_BROADCAST_ACK_TIMEDOUT(e);
     // break;
+    case TIMER_BROADCAST_ACK_TIMEDOUT:
+    {
+        MUTEX_INSPECTOR;
+        bcEvent::SendToChild *c = dynamic_cast<bcEvent::SendToChild *>(e->cookie.get());
+        if (!c)
+            throw CommonError("if(!c) 1222447");
+
+        logErr2("TIMER_BROADCAST_ACK_TIMEDOUT %s", c->dstNodeName.container.c_str());
+
+        make_broadcast_message_to_tree(c->dst_service,c->node_signer,c->node_start_timestamp,c->seqId2,c->payload_signature,  c->payload, c->bt, c->route);
+
+        return true;
+    }
+    break;
+
     case timers::TIMER_SYNC_TIMEDOUT:
         logNode("FAILED SYNC, NODE STOPPED---------------------------------------------------------------");
     break;
@@ -310,13 +325,13 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         auto &ID = e->id;
         switch (ID)
         {
-        // case bcEventEnum::SendToChild:
-        //     return SendToChild(static_cast<const bcEvent::SendToChild *>(e.get()), false);
-        // case bcEventEnum::SendToChildAck:
-        //     return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(e.get()), false);
+        case bcEventEnum::SendToChild:
+            return SendToChild(static_cast<const bcEvent::SendToChild *>(e.get()), false);
+        case bcEventEnum::SendToChildAck:
+            return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(e.get()), false);
 
-        // case bcEventEnum::BroadcastMessage:
-        //     return BroadcastMessage((const bcEvent::BroadcastMessage *)e.get());
+        case bcEventEnum::BroadcastMessage:
+            return BroadcastMessage((const bcEvent::BroadcastMessage *)e.get());
         case bcEventEnum::GetGranulesREQ:
             return GetGranulesREQ((const bcEvent::GetGranulesREQ *)e.get());
         case bcEventEnum::GetGranulesRSP:
@@ -349,11 +364,13 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
 
             switch (IDA)
             {
-            // case bcEventEnum::SendToChild:
-            //     return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
-            // case bcEventEnum::SendToChildAck:
-            //     return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
+            case bcEventEnum::SendToChild:
+                return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
+            case bcEventEnum::SendToChildAck:
+                return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
 
+            case bcEventEnum::BroadcastMessage:
+                return BroadcastMessage((const bcEvent::BroadcastMessage *)ev->e.get());
             case bcEventEnum::GetGranulesREQ:
                 return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
             case bcEventEnum::GetGranulesRSP:
@@ -373,10 +390,12 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             auto &IDC = ev->e->id;
             switch (IDC)
             {
-            // case bcEventEnum::SendToChild:
-            //     return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
-            // case bcEventEnum::SendToChildAck:
-            //     return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
+            case bcEventEnum::SendToChild:
+                return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
+            case bcEventEnum::SendToChildAck:
+                return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
+            case bcEventEnum::BroadcastMessage:
+                return BroadcastMessage((const bcEvent::BroadcastMessage *)ev->e.get());
             case bcEventEnum::GetGranulesREQ:
                 return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
             case bcEventEnum::GetGranulesRSP:
@@ -726,6 +745,7 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
 // #ifdef KALL
     if(prev_root_hash_Z().container.size())
         return itL->second < itR->second;
+    return nodeLeft.container<nodeRight.container;
 // #endif
 // #endif    
     // return nodeLeft.container < nodeRight.container;
@@ -939,6 +959,14 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
 bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 {
+    if (m->route.size())
+    {
+        passEvent(m);
+        return true;
+    }
+    // else
+    //     throw CommonError("if(e->route.size())");
+
     auto n = db_state->getNodeNoCreate(m->node_signer);
     if(!n.valid())
         throw CommonError("if(!n.valid())");
