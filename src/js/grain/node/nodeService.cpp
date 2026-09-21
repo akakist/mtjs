@@ -723,10 +723,13 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
     if(itR == m->position_of_node.end())
         throw CommonError("if(itR == m->position_of_node.end())");
     // logNode("cmp %s %s %d %d",itL->first.container.c_str(), itR->first.container.c_str(), itL->second , itR->second);
+// #ifdef KALL
     if(prev_root_hash_Z().container.size())
         return itL->second < itR->second;
+// #endif
 // #endif    
-    return nodeLeft.container < nodeRight.container;
+    // return nodeLeft.container < nodeRight.container;
+// #ifdef KALL
     auto nv = db_state->getAllNodes();
     std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
     {
@@ -764,6 +767,7 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
     }
 
     return distLeft < distRight;
+// #endif
 // }
 }
 bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
@@ -833,7 +837,12 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     if(iUtils->getNow()-stage_is_working> STAGE_IS_WORKING_TIMEOUT* _1sec)
     {
         stage_is_working=iUtils->getNow();
+            
+
         do_heart_beat();
+    }
+    else {
+        logNode("no heart beat timediff %ld",iUtils->getNow()-stage_is_working);
     }
     return true;
 }
@@ -1286,6 +1295,12 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull()
             vne.push_back(z.second->getElement());
         }
     }
+    // std::string st="NODES ";
+    // for(int i=0;i<vne.size();i++)
+    // {
+    //     st+=vne[i].name.container+" ";
+    // }
+    // logNode("NODES %s",st.c_str());
     m->tree=buildTree(vne);
 
     return m;

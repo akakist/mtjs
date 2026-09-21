@@ -4,20 +4,10 @@
 void Node::Service::broadcast_MsgEvent(const REF_getter<MsgData::Base>& b)
 {
     std::string msg;
-    // logErr2("b get %p",b.get());
     if(b.valid())
         msg=b->getBuffer();
-    // logErr2("KALL 1");
     auto signature=sign_ed(my_sk_ed,blake2b_hash(msg).container);
-    // auto nodes=buildTree()
-    auto nn=db_state->getAllNodes();
-    std::map<NODE_id,NodeElement> m;
-    for(auto &z: nn)
-    {
-        m[z->getName()]=z->getElement();
-    }
     auto meta=getMetaFull();
-    // auto tree=buildTree(meta->tree,this_node_name);
     sendEvent(
         ServiceEnum::BroadcasterTree,
         // ServiceEnum::Node,

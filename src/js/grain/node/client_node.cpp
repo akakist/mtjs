@@ -30,6 +30,8 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     }
     // if(state_Z==STATE_SYNCING)
      stage_is_working=iUtils->getNow();
+         
+
    MUTEX_INSPECTOR;
 
     XTRY;
@@ -170,6 +172,8 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     MUTEX_INSPECTOR;    
 
     stage_is_working=iUtils->getNow();
+        
+
     if(!db_state->sync_empty)
     {
         logNode("GetTransaction if(!db_state->sync_empty)");
@@ -216,6 +220,8 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 {
     MUTEX_INSPECTOR;
      stage_is_working=iUtils->getNow();
+         
+
     if(!db_state->sync_empty)
     {
         return true;

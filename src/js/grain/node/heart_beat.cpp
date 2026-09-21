@@ -17,6 +17,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 {
     XTRY;
     stage_is_working=iUtils->getNow();
+    
     auto prev_root_hash=prev_root_hash_Z();
     auto &li = l_blocks[prev_root_hash].leader_info;
     if (prev_root_hash != m->payload_heart_beat->prev_root_hash_1)
@@ -80,6 +81,8 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route)
 {
     stage_is_working=iUtils->getNow();
+        
+
     REF_getter<MsgData::HeartBeatRSP> hbr = new MsgData::HeartBeatRSP();
     hbr->payload_heart_beat = h;
     hbr->node_signer = this_node_name;
@@ -92,6 +95,8 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     MUTEX_INSPECTOR;
     
     stage_is_working=iUtils->getNow();
+        
+
 
     // logNode("HeartBeatREQ");
     if(!db_state->sync_empty)
@@ -105,11 +110,11 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     //     return true;
     // }
     auto& cli=cli_leader_info[h->prev_root_hash_1];
-    if(iUtils->getNow()-cli.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT)
-    {
-        logNode("if(iUtils->getNow()-ci.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT) return true");
-        return true;
-    }
+    // if(iUtils->getNow()-cli.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT)
+    // {
+    //     logNode("if(iUtils->getNow()-ci.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT) return true");
+    //     return true;
+    // }
 
     bool need_reply = false;
     auto local_prev_block=prev_block;
@@ -288,6 +293,8 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
         return true;
     }
     stage_is_working=iUtils->getNow();
+        
+
 
 
     bool need_replace = false;
@@ -332,6 +339,8 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         return true;
     }
     stage_is_working=iUtils->getNow();
+        
+
 
     auto prev_root_hash=prev_root_hash_Z();
     auto &li = l_blocks[prev_root_hash].leader_info;
@@ -380,6 +389,8 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
 {
     
     stage_is_working=iUtils->getNow();
+        
+
     // logNode("@@ %s",__FUNCTION__);
     l_blocks.clear();
     block_meta_full.clear();
