@@ -104,27 +104,11 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
-    // auto pn=db_state->getDbName()+".last_block";
     db_to_save_Z.add(".last_block",r->getBuffer());
-    // FILE *f=fopen(pn.c_str(),"w");
-    // if(f)
-    // {
-    //     auto lb=r->getBuffer();
-    //     fwrite(lb.data(),lb.size(),1,f);
-    //     fclose(f);
-
-    // }
     auto &hb=c.blockDBStore->validateBlockREQ->heart_beat;
     {
         MUTEX_INSPECTOR;
         XTRY;
-        // outBuffer o;
-        // o<<c.blockDBStore;
-        // db_state->writeBlock(hb->new_epoch, 
-        //                         hb->block_timestamp,
-        //                         hb->prev_root_hash_1.container,
-        //                         o.asString()->container
-        //                       );
         XPASS;
     }
     db_state->write_granules_batch(db_to_save_Z);

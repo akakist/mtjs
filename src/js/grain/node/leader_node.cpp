@@ -139,7 +139,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             return true;
         }
         
-        broadcast_MsgEvent(ba.get());
+        broadcast_MsgEvent_via_broadcaster(ba.get());
 
         logNode("validators %s",iUtils->join(" ",nnn).c_str());
 

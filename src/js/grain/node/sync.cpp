@@ -136,7 +136,6 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
 }
 void Node::Service::continue_sync()
 {
-    // std::vector<std::string> pathes;
     auto p=db_state->getPathes();
     sendEvent(db_state->getIp(),ServiceEnum::Node,new bcEvent::GetGranulesREQ(p,ListenerBase::serviceId));
 
@@ -149,8 +148,6 @@ void Node::Service::do_sync(const NODE_id &src_node, const THASH_id& prev_root_h
 
     logNode ("do_sync");
 
-    // std::vector<std::string> pathes;
-    // pathes.push_back("");
     db_state->add_sync_out("");
 
     auto n=db_state->getNodeNoCreate(src_node);
@@ -161,7 +158,6 @@ void Node::Service::do_sync(const NODE_id &src_node, const THASH_id& prev_root_h
     db_state->setIp(ip);
     continue_sync();
 
-    // sendEvent(db_state->getIp(),ServiceEnum::Node,new bcEvent::GetGranulesREQ(pathes,ListenerBase::serviceId));
 
 
 }
@@ -170,15 +166,12 @@ bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r,
     bool remote_verified=verify_block(r->lc);
     if(!remote_verified)
         return true;
-    // auto local_lc=prev_block;
     if(!prev_block.valid() || r->lc->blockInfo->heart_beat->new_epoch > prev_block->blockInfo->heart_beat->new_epoch)
     {
         MUTEX_INSPECTOR;
-        // state_Z=STATE_SYNCING;
         logNode("STATE_SYNCING");
         prev_block=r->lc;
         do_sync(src_node,r->lc->blockInfo->new_root_hash1);
-        // r->lc->blockInfo->heart_beat->prev_root_hash_1;
     }
 
 

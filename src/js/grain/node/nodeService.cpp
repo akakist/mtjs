@@ -170,16 +170,16 @@ void Node::Service::do_start_block()
     auto mv=getMetaValidator(li.leader_cert_2->block_timestamp);
 #endif
     {
-        REF_getter<MsgData::ValidateBlockREQ> b = new MsgData::ValidateBlockREQ();
-        b->heart_beat = li.leader_cert_2;
+        REF_getter<MsgData::ValidateBlockREQ> vb = new MsgData::ValidateBlockREQ();
+        vb->heart_beat = li.leader_cert_2;
 
         auto &bt = l_blocks[prev_root_hash_Z()];
         collectTransactions();
 
         for (auto &z : transaction_pool_of_leader)
-            b->transaction_bodies.push_back(z.second);
+            vb->transaction_bodies.push_back(z.second);
 #ifdef FULL_M
-        broadcast_MsgEvent(b.get());
+        broadcast_MsgEvent_via_broadcaster(vb.get());
 #else
         broadcast_MsgEvent(b.get());
 #endif
@@ -237,15 +237,6 @@ void Node::Service::report_mem()
         sz+=z.second->size();
     }
     logNode("REPORT_MEM NodeService %ld",sz);
-        //     std::map<THASH_id, block_client> c_blocks;
-        // std::map<THASH_id,block_leader> l_blocks;
-        // std::map<THASH_id, client_leader_info> cli_leader_info;
-        // std::map<THASH_id,_sync> syncs;
-        // std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
-        // std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
-                // std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
-
-    // return sz;
 
 }
 bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
@@ -254,9 +245,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     switch (e->tid)
     {
-    // case timers::TIMER_BROADCAST_ACK_TIMEDOUT:
-    //     return on_TIMER_BROADCAST_ACK_TIMEDOUT(e);
-    // break;
     case TIMER_BROADCAST_ACK_TIMEDOUT:
     {
         MUTEX_INSPECTOR;
@@ -288,14 +276,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         logNode("do_start_block();");
         li.transaction_responders.clear();
         return true;
-        /*
-                if (hbs.leader_info.leader_cert_2.valid() && hbs.leader_info.leader_cert_2->nodes.size() == li.transaction_responders.size())
-        {
-            do_start_block();
-            logNode("do_start_block();");
-            li.transaction_responders.clear();
-        }
-*/
     }
     case timers::TIMER_RESTART_BLOCK:
     {
@@ -330,8 +310,8 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         case bcEventEnum::SendToChildAck:
             return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(e.get()), false);
 
-        case bcEventEnum::BroadcastMessage:
-            return BroadcastMessage((const bcEvent::BroadcastMessage *)e.get());
+        // case bcEventEnum::BroadcastMessage:
+        //     return BroadcastMessage((const bcEvent::BroadcastMessage *)e.get());
         case bcEventEnum::GetGranulesREQ:
             return GetGranulesREQ((const bcEvent::GetGranulesREQ *)e.get());
         case bcEventEnum::GetGranulesRSP:
@@ -369,8 +349,8 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             case bcEventEnum::SendToChildAck:
                 return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
 
-            case bcEventEnum::BroadcastMessage:
-                return BroadcastMessage((const bcEvent::BroadcastMessage *)ev->e.get());
+            // case bcEventEnum::BroadcastMessage:
+            //     return BroadcastMessage((const bcEvent::BroadcastMessage *)ev->e.get());
             case bcEventEnum::GetGranulesREQ:
                 return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
             case bcEventEnum::GetGranulesRSP:
@@ -394,8 +374,8 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
             case bcEventEnum::SendToChildAck:
                 return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
-            case bcEventEnum::BroadcastMessage:
-                return BroadcastMessage((const bcEvent::BroadcastMessage *)ev->e.get());
+            // case bcEventEnum::BroadcastMessage:
+            //     return BroadcastMessage((const bcEvent::BroadcastMessage *)ev->e.get());
             case bcEventEnum::GetGranulesREQ:
                 return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
             case bcEventEnum::GetGranulesRSP:
@@ -450,11 +430,6 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 
     if (match(ds, e->command, tokens))
     {
-        // auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
-        // if (cc.valid())
-        // {
-        //     // sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, cc->dump() + "\n", this));
-        // }
     }
     if (match(go, e->command, tokens))
     {
@@ -464,30 +439,11 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
         {
             sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "if(tokens.size()==2)\n", this));
             telnet_data_path.push_back(tokens[1]);
-            // auto cc = getByPathNoCreate(root.get(), telnet_data_path, db_state.get());
-            // if (cc.valid())
-            // {
-            //     sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "OK, current path: " + cc->getDbId() + "\n", this));
-            // }
-            // else
-            // {
-            //     sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "FAILURE, cannot change path\n", this));
-            //     telnet_data_path.pop_back();
-            // }
         }
     }
     if (match(back, e->command, tokens))
     {
         telnet_data_path.pop_back();
-        // auto cc = db_state->getByPathNoCreate(db_state->root.get(), telnet_data_path, db_state.get());
-        // if (cc.valid())
-        // {
-        //     sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "OK, current path: " + cc->getDbId() + "\n", this));
-        // }
-        // else
-        // {
-        //     sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "FAILURE, cannot change path\n", this));
-        // }
     }
 
     sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "NodeService received command: " + e->command + "\n", this));
@@ -550,12 +506,6 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
     HTTP::Response r(e->req);
     auto uri = (std::string)e->req->url;
     auto da = iUtils->splitString("/", uri);
-    // auto c = getByPathNoCreate(root.get(), da, db_state.get());
-    // if (!c.valid())
-    // {
-    //     r.make_response("<pre> if(!c.valid()) </pre>");
-    //     return true;
-    // }
     nlohmann::json j;
     dump(j);
     // auto buf = c->dump();
@@ -575,7 +525,7 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
     rt->lc = li.leader_cert_2;
     li.request_for_transactions_time = iUtils->getNow();
 
-    broadcast_MsgEvent(rt.get());
+    broadcast_MsgEvent_via_broadcaster(rt.get());
 }
 
 // #include "sql"
@@ -835,7 +785,6 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
             logErr2("verify lc quorum failed");
             return false;
         }
-        // throw CommonError("if(stake.toDouble() < root->getValues(NULL)->total_staked.toDouble() * QUORUM)");
         if (!lc->agg_sig.verify(agg_pk, blake2b_hash(lc->blockInfo->getBuffer()).container))
         {
             logErr2("verify lc - sign invalid");
@@ -890,7 +839,7 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
     case msgid::HeartBeatREQ:
     
         // last_activity_time=iUtils->getNow();
-        return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()),lc.valid()?lc.get():NULL, src_node, route);
+        return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()),lc.valid()?lc.get():NULL, src_node, route, NULL);
 
     default:
         throw CommonError("2 MsgData %s", msgName(msg->type));
@@ -929,8 +878,6 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
     switch (msg->type)
     {
-    // case msgid::DoYouHaveBlockREQ:
-    //     return DoYouHaveBlockREQ(static_cast<const MsgData::DoYouHaveBlockREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::LcEnvelopeREQ:
         return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::GetTransactionREQ:
@@ -941,12 +888,8 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     case msgid::BlockAcceptedREQ:
         last_activity_time=iUtils->getNow();
         return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
-    // case msgid::GetSavedBlocksREQ:
-    //     return GetSavedBlocksREQ(static_cast<const MsgData::GetSavedBlocksREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderREQ:
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
-    // case msgid::LcREQ:
-    //     return LcREQ(static_cast<const MsgData::LcREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::DelayNotificationREQ:
         return DelayNotificationREQ(static_cast<const MsgData::DelayNotificationREQ *>(msg.get()), m->node_signer, m->route);
 
@@ -964,8 +907,6 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
         passEvent(m);
         return true;
     }
-    // else
-    //     throw CommonError("if(e->route.size())");
 
     auto n = db_state->getNodeNoCreate(m->node_signer);
     if(!n.valid())
@@ -983,8 +924,6 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     switch (id)
     {
-    // case msgid::DoYouHaveBlockRSP:
-    //     return DoYouHaveBlockRSP(static_cast<const MsgData::DoYouHaveBlockRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::HeartBeatRSP:
         return HeartBeatRSP(static_cast<const MsgData::HeartBeatRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderRSP:
@@ -993,10 +932,6 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
         return GetTransactionRSP(static_cast<const MsgData::GetTransactionRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ValidateBlockRSP:
         return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
-    // case msgid::GetSavedBlocksRSP:
-    //     return GetSavedBlocksRSP(static_cast<const MsgData::GetSavedBlocksRSP *>(ee.get()), m->node_signer, m->route);
-    // case msgid::LcRSP:
-    //     return LcRSP(static_cast<const MsgData::LcRSP *>(ee.get()), m->node_signer, m->route);
     default:
         throw CommonError("unhandled22 p020 %s", msgName(id));
         break;
@@ -1023,11 +958,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
         {
             MUTEX_INSPECTOR;
             bool err=false;
-            // yyjson::Value item = root[ii];
-            // auto contract = item/"contract";
-            // auto method = item/"method";
-            // auto params= item/"params";
-                   yyjson_val* contract = yyjson_obj_get(item, "contract");
+            yyjson_val* contract = yyjson_obj_get(item, "contract");
             yyjson_val* method = yyjson_obj_get(item, "method");
             yyjson_val* params = yyjson_obj_get(item, "params");
             if(contract==NULL)
@@ -1072,17 +1003,11 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 {
                     MUTEX_INSPECTOR;
                     return "unhandled method '"+method_str+"' for root contract";
-                    // b.emit_command(t.tx_id, index, "error", 
-                    //     R"({"error":"unhandled method %s for root contract"})", 
-                    //     method_str.c_str());
                 }
                 if (err)
                 {
                     MUTEX_INSPECTOR;
                     return err;
-                    // b.emit_command(t.tx_id, index, "error", 
-                    //     R"({"error":"%s"})", 
-                    //     err->c_str());                
                 }
 
             }
@@ -1092,8 +1017,6 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 CONTRACT_id c;
                 c.container=contract_str;
                 auto m=method;
-                // execute_contract(c,m,params);
-                /// exec js contract
                 
             }
 

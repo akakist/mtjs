@@ -435,7 +435,7 @@ REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcce
             }
             else{
                  logErr2("block hash not matched %s %s",base16::encode(pb->blockInfo->new_root_hash1.container).c_str(),base16::encode(h.container).c_str());
-                throw CommonError("block hash not matched");
+                // throw CommonError("block hash not matched");
                  return new Cellable(NULL,"");
             }
             

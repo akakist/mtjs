@@ -49,18 +49,9 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
             {
                 auto stake=mf->getStake(z.second->node_signer);
                 hb_staked+=stake;
-                // auto nn = root->getNode(z.second->node_signer,db_state.get());
-                // hb_staked += nn->get_full_stake();
             }
         }
     }
-    // double total_staked=0;
-    
-    // auto nn=root->getAllNodes(db_state.get());
-    // for(auto& z: nn)
-    // {
-    //     total_staked+=z->get_full_stake();
-    // }
     auto pers = (hb_staked * 100) / mf->total_full_stake;
 
     if (pers > QUORUM && (iUtils->getNow() > li.confirm_leader_sent+ _1sec))
@@ -72,7 +63,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
             REF_getter<MsgData::ConfirmLeaderREQ> rt = new MsgData::ConfirmLeaderREQ();
             rt->hb = m->payload_heart_beat;
 
-                broadcast_MsgEvent(rt.get());
+                broadcast_MsgEvent_via_broadcaster(rt.get());
         }
     }
     XPASS;
@@ -90,9 +81,15 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
     pass_NodeMsgRSP(hbr.get(),route);
 
 }
-bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route)
+bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
 {
     MUTEX_INSPECTOR;
+    if(!need_continue_broadcast)
+    {
+        logNode("if(!need_continue_broadcast)");
+        return true;
+    }
+    *need_continue_broadcast=true;
     
     stage_is_working=iUtils->getNow();
         
@@ -105,37 +102,15 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         return true;
     }
 
-    // if(state_Z==STATE_SYNCING)
-    // {
-    //     return true;
-    // }
     auto& cli=cli_leader_info[h->prev_root_hash_1];
-    // if(iUtils->getNow()-cli.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT)
-    // {
-    //     logNode("if(iUtils->getNow()-ci.confirm_leader_sent < _1sec * CONFIRM_LEADER_SENT_TIMEOUT) return true");
-    //     return true;
-    // }
 
     bool need_reply = false;
     auto local_prev_block=prev_block;
     
     bool remote_verified=false;
     bool local_verified=false;
-    // if(!remote_prev_lc)
-    // {
-    //     logNode("remote prev lc NULL from %s", src_node.container.c_str());
-    // }
-    
-    // if(remote_prev_lc)
-    // {
     remote_verified=verify_block(remote_prev_lc);
-    // }
-    // else logNode("!if(remote_lc.valid())");
-    // if(local_prev_block.valid())
-    // {
     local_verified=verify_block(local_prev_block);
-    // }
-    // else logNode("!if(local_lc.valid())");
     
 
     if(local_verified && !remote_verified)
@@ -150,7 +125,8 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             throw CommonError("if(!n.valid())");
         sendEvent(n->get_ip(), ServiceEnum::Node,
                 new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
-
+        *need_continue_broadcast=false;
+                        logNode("*need_continue_broadcast=false;");
         return true;
     }
     
@@ -165,12 +141,15 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             auto hb=do_heart_beat();
             cli.node_leader=hb;
             cli.heart_beat_sent=iUtils->getNow();
+            *need_continue_broadcast=false;
+                        logNode("*need_continue_broadcast=false;");
             return true;
         }
         else
         {
             logNode("reply_HeartBeatRSP(h,route);");
             reply_HeartBeatRSP(h,route);
+            *need_continue_broadcast=true;
             return true;
         }
     }
@@ -180,6 +159,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         /// если локально нет сертиката, нода стартанула с генезиса, а у удаленной есть сертификат
         /// то надо синхронизироваться, переходим в синк, не отвечаем
         logNode("if(remote_verified && !local_verified) do sync return");
+        *need_continue_broadcast=true;
         if(db_state->sync_empty){
             // state_Z = STATE_SYNCING;
             logNode("start SYNC");
@@ -204,7 +184,8 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
 
             sendEvent(n->get_ip(), ServiceEnum::Node,
                     new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
-
+            *need_continue_broadcast=false;
+                        logNode("*need_continue_broadcast=false;");
             return true;
         }
         else if(remote_prev_lc->blockInfo->heart_beat->new_epoch > local_prev_block->blockInfo->heart_beat->new_epoch)
@@ -214,6 +195,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             logNode("START SYNCING");
             prev_block=remote_prev_lc;
             do_sync(src_node,remote_prev_lc->blockInfo->new_root_hash1);
+            *need_continue_broadcast=true;
             return true;
         }
         else if(remote_prev_lc->blockInfo->heart_beat->new_epoch == local_prev_block->blockInfo->heart_beat->new_epoch)
@@ -224,11 +206,12 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
                 /// просто проверка на всякий случай.
                 if(remote_prev_lc->blockInfo->heart_beat->prev_root_hash_1!=local_prev_block->blockInfo->heart_beat->prev_root_hash_1)
                 {
-                        logNode(R"( --------------- SPLIT BRAIN DETECTED
+                    logNode(R"( --------------- SPLIT BRAIN DETECTED
 if(remote_prev_lc->blockInfo->heart_beat->prev_root_hash!=local_lc->blockInfo->heart_beat->prev_root_hash)
 remote_prev_lc->blockInfo->heart_beat->prev_root_hash %s local_lc->blockInfo->heart_beat->prev_root_hash %s)", 
                             remote_prev_lc->blockInfo->heart_beat->prev_root_hash_1.str().c_str(), local_prev_block->blockInfo->heart_beat->prev_root_hash_1.str().c_str());
-                        return true;
+                    *need_continue_broadcast=true;
+                    return true;
                 }
                 
                 if(prev_root_hash_Z()!=h->prev_root_hash_1)    
@@ -255,6 +238,9 @@ if(prev_root_hash_Z!=h->prev_root_hash)
             remote_prev_lc->blockInfo->heart_beat->new_epoch,
             local_prev_block->blockInfo->heart_beat->new_epoch,
             src_node.container.c_str());
+
+            *need_continue_broadcast=true;
+
                     return true;
                 }
                 
@@ -267,6 +253,8 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                         auto hb=do_heart_beat();
                         cli.node_leader=hb;
                         cli.heart_beat_sent=iUtils->getNow();
+                        *need_continue_broadcast=false;
+                        logNode("*need_continue_broadcast=false;");
                         return true;
                     }
                 }
@@ -278,6 +266,7 @@ if(prev_root_hash_Z!=h->prev_root_hash)
     
                     cli.node_leader=h;
                     reply_HeartBeatRSP(h,route);
+                    *need_continue_broadcast=true;
                     return true;
                 }
         }
@@ -396,8 +385,6 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
     block_meta_full.clear();
     block_meta_validator.clear();
     c_blocks.clear();
-    // auto mf=getMetaFull();
-    // auto prev=prev_block;
     REF_getter<MsgData::HeartBeatREQ> hb_req =
         new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                                     epoch_current(),
@@ -405,17 +392,9 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
 
     // auto prev_lc=prev_block;
     REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),prev_block.valid()?prev_block->getBuffer():"");
-    // logNode("broadcast heart beat");
     l_blocks[prev_root_hash_Z()].leader_info.leader_cert_2=hb_req;
-    // auto mm=mf->full_broadcast;
-    // std::string s;
-    // for(auto & z:mm)
-    // {
-    //     s+=" "+z.container;
-    // }
-    // logErr2("validators %s",s.c_str());
 
-    broadcast_MsgEvent(lce.get());
+    broadcast_MsgEvent_via_node(lce.get());
 
     return hb_req;
 }

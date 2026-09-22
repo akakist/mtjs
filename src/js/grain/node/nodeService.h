@@ -204,7 +204,7 @@ namespace Node
         REF_getter<MsgData::HeartBeatREQ> do_heart_beat();
 
         bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route);
-        bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route);
+        bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast);
         void reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route);
 
         bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
@@ -232,7 +232,7 @@ namespace Node
 
         bool GetGranulesRSP(const bcEvent::GetGranulesRSP* m);
         bool GetGranulesREQ(const bcEvent::GetGranulesREQ*e);
-        bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
+        // bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
         // bool SendToChild(const bcEvent::SendToChild*e);
         bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
         bool SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork);
@@ -249,8 +249,13 @@ namespace Node
 
         void do_request_for_transactions( Node::heart_beat_node_info& li);
 
-        void broadcast_MsgEvent(const REF_getter<MsgData::Base>& p);
+        void broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& p);
+        void broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>& p);
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
+
+        bool handle_send_to_child(const NODE_id &_node_signer, int64_t _node_start_timestamp, int64_t _seqId, const std::string &sig,
+                   const std::string &_msg,
+                   const route_t &r, bool *need_continue_broadcast);
 
 
 
