@@ -428,13 +428,14 @@ REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcce
         {
             MUTEX_INSPECTOR;
             auto h=blake2b_hash(lb);
-            if(pb->blockInfo->new_root_hash1!=h)
+            if(pb->blockInfo->new_root_hash1==h)
             {
                 inBuffer in(lb);
                 r->unpack_mx(in);
             }
             else{
-                 logErr2("block hash not matched");
+                 logErr2("block hash not matched %s %s",base16::encode(pb->blockInfo->new_root_hash1.container).c_str(),base16::encode(h.container).c_str());
+                throw CommonError("block hash not matched");
                  return new Cellable(NULL,"");
             }
             
