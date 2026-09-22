@@ -203,7 +203,7 @@ namespace Node
 
         REF_getter<MsgData::HeartBeatREQ> do_heart_beat();
 
-        bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route);
+        bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast);
         bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast);
         void reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route);
 

@@ -103,47 +103,7 @@ bool Node::Service::handle_send_to_child(const NODE_id &node_signer, int64_t nod
     switch (msgb->type)
     {
     case msgid::LcEnvelopeREQ:
-    {
-            MsgData::LcEnvelopeREQ *le=(MsgData::LcEnvelopeREQ *)msgb.get();
-            inBuffer in(le->msg);
-            auto id2 = in.get_PN();
-            REF_getter<MsgData::Base> msg = msgFactory.create(id2);
-            msg->unpack(in);
-            
-            REF_getter<MsgData::BlockAcceptedREQ> lc;
-            if(le->prev_lc.size())
-            {
-                lc=new MsgData::BlockAcceptedREQ;
-                inBuffer in2(le->prev_lc);
-                lc->unpack2(in2);
-
-            }
-    
-            switch (msg->type)
-            {
-            case msgid::HeartBeatREQ:
-            
-                // last_activity_time=iUtils->getNow();
-                return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()),lc.valid()?lc.get():NULL, node_signer, route, need_continue_broadcast);
-
-            default:
-                throw CommonError("2 MsgData %s", msgName(msg->type));
-            }
-
-    }
-        // return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msgb.get()), node_signer, route);
-    // case msgid::GetTransactionREQ:
-    //     return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
-    // case msgid::ValidateBlockREQ:
-    //     last_activity_time=iUtils->getNow();
-    //     return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
-    // case msgid::BlockAcceptedREQ:
-    //     last_activity_time=iUtils->getNow();
-    //     return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
-    // case msgid::ConfirmLeaderREQ:
-    //     return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
-    // case msgid::DelayNotificationREQ:
-    //     return DelayNotificationREQ(static_cast<const MsgData::DelayNotificationREQ *>(msg.get()), m->node_signer, m->route);
+    return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msgb.get()), node_signer, route,need_continue_broadcast);
 
     default:
         throw CommonError("unjandled323 MsgData %s", msgName(msgb->type));

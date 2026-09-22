@@ -815,7 +815,8 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     }
     return true;
 }
-bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id & src_node, const route_t& route)
+// #ifdef KALL
+bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast)
 {
     MUTEX_INSPECTOR;
     // logNode("LcEnvelopeREQ 33333dffffff");
@@ -833,21 +834,18 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
         lc->unpack2(in2);
 
     }
-    
+ 
     switch (msg->type)
     {
     case msgid::HeartBeatREQ:
-    
-        // last_activity_time=iUtils->getNow();
-        return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()),lc.valid()?lc.get():NULL, src_node, route, NULL);
-
+        return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()),lc.valid()?lc.get():NULL, src_node, route, need_continue_broadcast);
     default:
         throw CommonError("2 MsgData %s", msgName(msg->type));
     }
 
     return true;
 }
-
+// #endif
 
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 {
@@ -878,8 +876,6 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 
     switch (msg->type)
     {
-    case msgid::LcEnvelopeREQ:
-        return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::GetTransactionREQ:
         return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ValidateBlockREQ:
