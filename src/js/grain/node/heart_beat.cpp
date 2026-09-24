@@ -126,7 +126,6 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         sendEvent(n->get_ip(), ServiceEnum::Node,
                 new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
         *need_continue_broadcast=false;
-                        logNode("*need_continue_broadcast=false;");
         return true;
     }
     
@@ -142,7 +141,6 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             cli.node_leader=hb;
             cli.heart_beat_sent=iUtils->getNow();
             *need_continue_broadcast=false;
-                        logNode("*need_continue_broadcast=false;");
             return true;
         }
         else
@@ -185,7 +183,6 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             sendEvent(n->get_ip(), ServiceEnum::Node,
                     new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
             *need_continue_broadcast=false;
-                        logNode("*need_continue_broadcast=false;");
             return true;
         }
         else if(remote_prev_lc->blockInfo->heart_beat->new_epoch > local_prev_block->blockInfo->heart_beat->new_epoch)
@@ -254,7 +251,6 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                         cli.node_leader=hb;
                         cli.heart_beat_sent=iUtils->getNow();
                         *need_continue_broadcast=false;
-                        logNode("*need_continue_broadcast=false;");
                         return true;
                     }
                 }
@@ -371,6 +367,34 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         }
     }
     XPASS;
+    return true;
+}
+bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast)
+{
+    MUTEX_INSPECTOR;
+   
+    inBuffer in(m->msg);
+    auto id = in.get_PN();
+    REF_getter<MsgData::Base> msg = msgFactory.create(id);
+    msg->unpack(in);
+    
+    REF_getter<MsgData::BlockAcceptedREQ> lc;
+    if(m->prev_lc.size())
+    {
+        lc=new MsgData::BlockAcceptedREQ;
+        inBuffer in2(m->prev_lc);
+        lc->unpack2(in2);
+
+    }
+ 
+    switch (msg->type)
+    {
+    case msgid::HeartBeatREQ:
+        return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()),lc.valid()?lc.get():NULL, src_node, route, need_continue_broadcast);
+    default:
+        throw CommonError("2 MsgData %s", msgName(msg->type));
+    }
+
     return true;
 }
 

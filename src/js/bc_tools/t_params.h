@@ -1,5 +1,4 @@
 #pragma once
-#include "root_contract.h"
 #include "md/md_attachment_data.h"
 #include "md/md_ValidateBlockREQ.h"
 #include "IDatabase.h"

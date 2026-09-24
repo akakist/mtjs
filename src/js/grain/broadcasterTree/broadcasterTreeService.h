@@ -8,7 +8,6 @@
 #include "Events/System/Run/startServiceEvent.h"
 #include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
-#include "root_contract.h"
 #include "NODE_id.h"
 #include "DBH.h"
 
@@ -25,7 +24,6 @@ struct TIMER_BROADCAST_ACK_TIMEDOUT_cookie: public Refcountable
     NODE_id dstName_;
     TreeNode tree;
     std::string msg;
-    // REF_getter<root_data> root=NULL;
     route_t route;
 
 };
@@ -77,11 +75,7 @@ namespace BroadcasterTree
             XPASS;
         }
 
-        // REF_getter<root_data> root=NULL;
-
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
-        // REF_getter<IDatabase> db_state_4;
-
 
     };
 

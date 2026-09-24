@@ -8,7 +8,6 @@
 #include "msg.h"
 #include "md/md_TX.h"
 #include "md/md_BlockDBStore.h"
-#include "root_contract.h"
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));

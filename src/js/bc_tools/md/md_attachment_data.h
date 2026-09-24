@@ -3,6 +3,7 @@
 #include "md_TX.h"
 // #include "bigint.h"
 #include "ADDRESS_id.h"
+#include "NODE_id.h"
 struct EmitNode {
     std::vector<std::pair<std::string,std::string>> emits;                    // события на этом уровне
     std::map<std::string, EmitNode> children;          // дочерние узлы

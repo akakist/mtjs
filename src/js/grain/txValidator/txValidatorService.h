@@ -9,7 +9,6 @@
 #include "Events/System/Run/startServiceEvent.h"
 #include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
-#include "root_contract.h"
 #include "TRANSACTION_id.h"
 #include "THASH_id.h"
 

@@ -6,7 +6,6 @@
 #include "REF.h"
 #include "ADDRESS_id.h"
 #include "CONTRACT_id.h"
-#include "root_contract.h"
 #include "IDatabase.h"
 struct contract_rt: public Refcountable
 {

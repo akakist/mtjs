@@ -31,8 +31,6 @@
 #include "events_nodeService.hpp"
 #include "getenv2.h"
 #include "httpConnection.h"
-#include "execute_transaction.h"
-#include "root_contract.h"
 #include "listenerBase.h"
 #include "msg.h"
 #include "ioBuffer.h"
@@ -681,9 +679,6 @@ int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 }
 bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight)
 {
-    // if (nodeLeft == nodeRight)
-    //     return true;
-// #ifdef KALL
     auto m=getMetaFull();
     auto itL=m->position_of_node.find(nodeLeft);
     if(itL == m->position_of_node.end())
@@ -691,15 +686,10 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
     auto itR=m->position_of_node.find(nodeRight);
     if(itR == m->position_of_node.end())
         throw CommonError("if(itR == m->position_of_node.end())");
-    // logNode("cmp %s %s %d %d",itL->first.container.c_str(), itR->first.container.c_str(), itL->second , itR->second);
-// #ifdef KALL
     if(prev_root_hash_Z().container.size())
         return itL->second < itR->second;
     return nodeLeft.container<nodeRight.container;
-// #endif
-// #endif    
-    // return nodeLeft.container < nodeRight.container;
-// #ifdef KALL
+#ifdef KALL
     auto nv = db_state->getAllNodes();
     std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
     {
@@ -737,7 +727,7 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
     }
 
     return distLeft < distRight;
-// #endif
+#endif
 // }
 }
 bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
@@ -815,37 +805,6 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     }
     return true;
 }
-// #ifdef KALL
-bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast)
-{
-    MUTEX_INSPECTOR;
-    // logNode("LcEnvelopeREQ 33333dffffff");
-    
-    inBuffer in(m->msg);
-    auto id = in.get_PN();
-    REF_getter<MsgData::Base> msg = msgFactory.create(id);
-    msg->unpack(in);
-    
-    REF_getter<MsgData::BlockAcceptedREQ> lc;
-    if(m->prev_lc.size())
-    {
-        lc=new MsgData::BlockAcceptedREQ;
-        inBuffer in2(m->prev_lc);
-        lc->unpack2(in2);
-
-    }
- 
-    switch (msg->type)
-    {
-    case msgid::HeartBeatREQ:
-        return HeartBeatREQ(static_cast<const MsgData::HeartBeatREQ *>(msg.get()),lc.valid()?lc.get():NULL, src_node, route, need_continue_broadcast);
-    default:
-        throw CommonError("2 MsgData %s", msgName(msg->type));
-    }
-
-    return true;
-}
-// #endif
 
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 {

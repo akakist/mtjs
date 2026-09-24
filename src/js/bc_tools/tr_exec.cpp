@@ -4,7 +4,6 @@
 #include <string>
 #include "commonError.h"
 // #include "bigint.h"
-#include "root_contract.h"
 #include "tr_exec.h"
 #include "ADDRESS_id.h"
 #include "PK_id.h"

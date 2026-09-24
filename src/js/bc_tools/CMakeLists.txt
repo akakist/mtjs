@@ -14,10 +14,8 @@ add_library(bctools STATIC
     tree.cpp
     base16.cpp
     normalizeNick.cpp
-root_contract.cpp
 tr_exec.cpp
 cellable.cpp
-execute_transaction.cpp
 msg.cpp
 msgFactory.cpp
 init_root.cpp
@@ -27,7 +25,6 @@ THASH_id.h
 blst_cp.h
 cellable.h
 db_to_save.h
-execute_transaction.h
 getenv2.h
 hsh.h
 IDatabase.h
@@ -37,7 +34,6 @@ msgFactory.h
 NODE_id.h
 promiseCapability.h
 QUORUM.h
-root_contract.h
 s_ed.h
 t_params.h
 THASH_id.h

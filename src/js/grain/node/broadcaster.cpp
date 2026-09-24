@@ -1,8 +1,5 @@
 #include "nodeService.h"
 #include "tools_mt.h"
-// #ifdef KALL
-        // void broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& p);
-        // void (const REF_getter<MsgData::Base>& p);
 
 void Node::Service::broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& b)
 {
@@ -13,8 +10,6 @@ void Node::Service::broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData:
     auto meta=getMetaFull();
     sendEvent(
         ServiceEnum::BroadcasterTree,
-        // ServiceEnum::Node,
-        
               new bcEvent::BroadcastMessage(ServiceEnum::Node,
                                             this_node_name, node_start_timestamp, meta->tree, seqId2++, signature,msg, ListenerBase::serviceId));
 
@@ -26,19 +21,8 @@ void Node::Service::broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>&
         msg=b->getBuffer();
     auto signature=sign_ed(my_sk_ed,blake2b_hash(msg).container);
     auto meta=getMetaFull();
-    // sendEvent(
-        // ServiceEnum::BroadcasterTree,
-        // ServiceEnum::Node,
-        
-            //   new bcEvent::BroadcastMessage(ServiceEnum::Node,
-            //                                 this_node_name, node_start_timestamp, meta->tree, seqId2++, signature,msg, ListenerBase::serviceId));
         make_broadcast_message_to_tree(ServiceEnum::Node,this_node_name, node_start_timestamp,seqId2++,signature, msg, meta->tree, ListenerBase::serviceId);
 }
-// bool Node::Service::BroadcastMessage(const bcEvent::BroadcastMessage*e)
-// {
-//     make_broadcast_message_to_tree(e->dstService,e->node_signer, e->node_start_timestamp,e->seqId,e->signature_pl, e->msg, e->nodes, e->route);
-//     return true;
-// }
 void Node::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id & node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const TreeNode &root, const route_t &route)
 {
     MUTEX_INSPECTOR;
@@ -56,11 +40,9 @@ void Node::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const 
 }
 bool Node::Service::SendToChild(const bcEvent::SendToChild *e, bool fromNetwork)
 {
-    // logNode("SendToChild from %s to %s", e->node_signer.container.c_str(), e->dstNodeName.container.c_str());
     passEvent(new bcEvent::SendToChildAck(e->hash(), poppedFrontRoute(e->route)));
     bool need_continue_broadcast=true;
     handle_send_to_child(e->node_signer,e->node_start_timestamp,e->seqId2,e->payload_signature,e->payload,e->route, & need_continue_broadcast);
-    // sendEvent(e->dst_service, new bcEvent::NodeMsgREQ(e->node_signer, e->node_start_timestamp, e->seqId2, e->payload_signature, e->payload, e->route));
     if(need_continue_broadcast)
         make_broadcast_message_to_tree(e->dst_service, e->node_signer, e->node_start_timestamp,e->seqId2,e->payload_signature, e->payload, e->bt, e->route);
     return true;
@@ -113,4 +95,3 @@ bool Node::Service::handle_send_to_child(const NODE_id &node_signer, int64_t nod
 
 }
 
-// #endif

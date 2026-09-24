@@ -28,18 +28,12 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::ValidateBlockREQ, MsgData::ValidateBlockREQ::construct);
     registerMsg(msgid::ValidateBlockRSP, MsgData::ValidateBlockRSP::construct);
     registerMsg(msgid::BlockAcceptedREQ, MsgData::BlockAcceptedREQ::construct);
-    // registerMsg(msgid::GetSavedBlocksREQ, MsgData::GetSavedBlocksREQ::construct);
-    // registerMsg(msgid::GetSavedBlocksRSP, MsgData::GetSavedBlocksRSP::construct);
     registerMsg(msgid::ConfirmLeaderREQ, MsgData::ConfirmLeaderREQ::construct);
     registerMsg(msgid::ConfirmLeaderRSP, MsgData::ConfirmLeaderRSP::construct);
     registerMsg(msgid::TX, MsgData::TX::construct);
     registerMsg(msgid::GetUserNonceREQ, MsgData::GetUserNonceREQ::construct);
     registerMsg(msgid::GetUserNonceRSP, MsgData::GetUserNonceRSP::construct);
     registerMsg(msgid::LcEnvelopeREQ, MsgData::LcEnvelopeREQ::construct);
-    // registerMsg(msgid::LcREQ, MsgData::LcREQ::construct);
-    // registerMsg(msgid::LcRSP, MsgData::LcRSP::construct);
-    // registerMsg(msgid::DoYouHaveBlockREQ, MsgData::DoYouHaveBlockREQ::construct);
-    // registerMsg(msgid::DoYouHaveBlockRSP, MsgData::DoYouHaveBlockRSP::construct);
     registerMsg(msgid::DelayNotificationREQ, MsgData::DelayNotificationREQ::construct);
 
 }

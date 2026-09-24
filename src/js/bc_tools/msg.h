@@ -62,21 +62,15 @@ namespace msgid
     enum MSG_ID
     {
         HeartBeatREQ,HeartBeatRSP,
-        // LeaderCertificate, 
         ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockAcceptedREQ,
         GetTransactionREQ,GetTransactionRSP,
         BlockDBStore, 
-        // GetSavedBlocksREQ,GetSavedBlocksRSP, 
         DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP,
         TX,
         attachment_data,
         GetUserNonceREQ,
         GetUserNonceRSP,
         LcEnvelopeREQ,
-        // LcREQ,
-        // LcRSP,
-	// DoYouHaveBlockREQ,
-	// DoYouHaveBlockRSP,
     DelayNotificationREQ
     };
 

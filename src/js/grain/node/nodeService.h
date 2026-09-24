@@ -13,7 +13,6 @@
 #include "Events/System/timerEvent.h"
 #include "Events/System/Net/httpEvent.h"
 #include "Event/bcEvent.h"
-#include "root_contract.h"
 #include "THASH_id.h"
 #include "NODE_id.h"
 #include "db_to_save.h"
@@ -35,17 +34,11 @@
 
 #include "md/md_DelayNotificationREQ.h"
 #include "t_params.h"
-#include "cached_state.h"
 #include "contract_rt.h"
 #include "DBH.h"
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
-// #define HEART_BEAT_INTERVAL_SEC 5
 std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db);
 
-// enum State
-// {
-//     STATE_NORMAL,STATE_SYNCING
-// };
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 
 
@@ -214,15 +207,9 @@ namespace Node
         bool ValidateBlockRSP(const MsgData::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
         bool BlockAcceptedREQ(const MsgData::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route);
 
-        // bool GetSavedBlocksRSP(const MsgData::GetSavedBlocksRSP* r, const NODE_id & src_node, const route_t& route);
-        // bool GetSavedBlocksREQ(const MsgData::GetSavedBlocksREQ* r, const NODE_id & src_node, const route_t& route);
         bool ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
         bool ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
 
-        // bool DoYouHaveBlockREQ(const MsgData::DoYouHaveBlockREQ* m, const NODE_id & src_node, const route_t& route);
-        // bool DoYouHaveBlockRSP(const MsgData::DoYouHaveBlockRSP* m, const NODE_id & src_node, const route_t& route);
-        // bool LcREQ(const MsgData::LcREQ* m, const NODE_id & src_node, const route_t& route);
-        // bool LcRSP(const MsgData::LcRSP* m, const NODE_id & src_node, const route_t& route);
 
         bool DelayNotificationREQ(const MsgData::DelayNotificationREQ* m, const NODE_id & src_node, const route_t& route);
         
@@ -232,8 +219,6 @@ namespace Node
 
         bool GetGranulesRSP(const bcEvent::GetGranulesRSP* m);
         bool GetGranulesREQ(const bcEvent::GetGranulesREQ*e);
-        // bool BroadcastMessage(const bcEvent::BroadcastMessage*e);
-        // bool SendToChild(const bcEvent::SendToChild*e);
         bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
         bool SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork);
 
@@ -336,29 +321,9 @@ namespace Node
             }
         };
 
-        // struct _sync_
-        // {
-        //     bool do_you_have_sent=false;
-        //     std::set<NODE_id> havers;
-        //     size_t size()
-        //     {
-        //         size_t sz=0;
-        //         sz+=sizeof(do_you_have_sent);
-        //         for(auto &z: havers)
-        //         {
-        //             sz+=z.container.size();
-        //         }
-        //         return sz;
-        //     }
-        //     void dump(nlohmann::json &j)
-        //     {
-        //         j["havers SZ"]=havers.size();
-        //     }
-        // };
         std::map<THASH_id, block_client> c_blocks;
         std::map<THASH_id,block_leader> l_blocks;
         std::map<THASH_id, client_leader_info> cli_leader_info;
-        // std::map<THASH_id,_sync_> syncs;
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;

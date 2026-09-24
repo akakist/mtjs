@@ -1,4 +1,3 @@
-#include "root_contract.h"
 #include "IDatabase.h"
 uint64_t fnv1a_64(const void* buffer, size_t len) 
 {
