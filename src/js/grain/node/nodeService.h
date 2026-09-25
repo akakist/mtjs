@@ -40,6 +40,7 @@
 std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db);
 
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
+#define HB_TIME_WINDOW 10
 
 
 namespace Node
@@ -227,15 +228,15 @@ namespace Node
 
 
         // void make_leader_certificate();
-        bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight);
+        bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight, const REF_getter<Node::BlockMetaFull>& meta);
         int nodeDistanceToLeader(const NODE_id& node);
 
 
 
-        void do_request_for_transactions( Node::heart_beat_node_info& li);
+        void do_request_for_transactions( Node::heart_beat_node_info& li, const REF_getter<Node::BlockMetaFull>& meta);
 
-        void broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& p);
-        void broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>& p);
+        void broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& p, const REF_getter<Node::BlockMetaFull>& meta);
+        void broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>& p, const REF_getter<Node::BlockMetaFull>& meta);
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
 
         bool handle_send_to_child(const NODE_id &_node_signer, int64_t _node_start_timestamp, int64_t _seqId, const std::string &sig,
@@ -308,7 +309,7 @@ namespace Node
         {
             REF_getter<MsgData::HeartBeatREQ> node_leader;
             // NODE_id node_leader;
-            int64_t heart_beat_sent=0;
+            std::map<time_t /*time_window*/, int64_t> heart_beat_sent;
             int64_t confirm_leader_sent=0;
             size_t size()
             {
@@ -327,9 +328,9 @@ namespace Node
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
-        std::map<THASH_id,REF_getter<BlockMetaFull>> block_meta_full;
+        std::map<THASH_id, std::map< time_t,REF_getter<BlockMetaFull>>> block_meta_full;
         std::map<THASH_id,REF_getter<BlockMetaValidator>> block_meta_validator;
-        REF_getter<BlockMetaFull> getMetaFull();
+        REF_getter<BlockMetaFull> getMetaFull(time_t ti);
         REF_getter<BlockMetaValidator> getMetaValidator(uint64_t block_timestamp);
 
         THASH_id prev_root_hash_Z()

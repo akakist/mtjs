@@ -38,7 +38,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         return true;
     }
     li.transaction_responders.insert(src_node);
-    auto mf=getMetaFull();
+    auto mf=getMetaFull(li.leader_cert_2->block_timestamp);
     uint64_t stake = 0;
     for (auto &z : li.transaction_responders)
     {
@@ -93,7 +93,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     bt.ValidateBlockRSP_m[h].push_back(r);
     if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
         return true;
-    auto mf=getMetaFull();
+    auto mf=getMetaFull(r->blockInfo->heart_beat->block_timestamp);
     #ifndef FULL_M
     auto mv=getMetaValidator(bt.leader_info.leader_cert_2->block_timestamp);
     #endif
@@ -139,7 +139,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             return true;
         }
         
-        broadcast_MsgEvent_via_broadcaster(ba.get());
+        broadcast_MsgEvent_via_broadcaster(ba.get(),mf);
 
         logNode("validators %s",iUtils->join(" ",nnn).c_str());
 

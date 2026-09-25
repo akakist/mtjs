@@ -146,6 +146,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     if(transaction_pool_of_leader.size())
     {
+        // auto mf=getMetaFull(time(NULL));
         do_heart_beat();
     }
     XPASS;

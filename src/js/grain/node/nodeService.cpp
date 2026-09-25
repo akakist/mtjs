@@ -163,7 +163,7 @@ void Node::Service::do_start_block()
     }
     auto &li = l_blocks[prev_root_hash_Z()].leader_info;
 #ifdef FULL_M
-    auto mf=getMetaFull();
+    auto mf=getMetaFull(li.leader_cert_2->block_timestamp);
 #else
     auto mv=getMetaValidator(li.leader_cert_2->block_timestamp);
 #endif
@@ -177,7 +177,7 @@ void Node::Service::do_start_block()
         for (auto &z : transaction_pool_of_leader)
             vb->transaction_bodies.push_back(z.second);
 #ifdef FULL_M
-        broadcast_MsgEvent_via_broadcaster(vb.get());
+        broadcast_MsgEvent_via_broadcaster(vb.get(),mf);
 #else
         broadcast_MsgEvent(b.get());
 #endif
@@ -285,7 +285,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         auto &li = l_blocks[prev_root_hash_Z()].leader_info;
         // auto &li = hbs.leader_info;
         li.request_for_transactions_sent = true;
-        do_request_for_transactions(li);
+        auto meta=getMetaFull(li.leader_cert_2->block_timestamp);
+        do_request_for_transactions(li,meta);
         return true;
     }
     break;
@@ -511,7 +512,7 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
     return true;
 }
 
-void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
+void Node::Service::do_request_for_transactions( heart_beat_node_info& li, const REF_getter<Node::BlockMetaFull>& meta)
 {
     MUTEX_INSPECTOR;
 
@@ -523,7 +524,7 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li)
     rt->lc = li.leader_cert_2;
     li.request_for_transactions_time = iUtils->getNow();
 
-    broadcast_MsgEvent_via_broadcaster(rt.get());
+    broadcast_MsgEvent_via_broadcaster(rt.get(),meta);
 }
 
 // #include "sql"
@@ -677,9 +678,9 @@ int Node::Service::nodeDistanceToLeader(const NODE_id &node)
     }
     return abs(idx - npoz);
 }
-bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight)
+bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight, const REF_getter<Node::BlockMetaFull>& m)
 {
-    auto m=getMetaFull();
+    // auto m=getMetaFull();
     auto itL=m->position_of_node.find(nodeLeft);
     if(itL == m->position_of_node.end())
         throw CommonError("if(itL == m->position_of_node.end())");
@@ -737,7 +738,7 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
         return false;
     {
         MUTEX_INSPECTOR;
-        auto mf=getMetaFull();
+        auto mf=getMetaFull(lc->blockInfo->heart_beat->block_timestamp);
 #ifndef FULL_M
         auto vals=getValidators(root,lc->blockInfo->heart_beat->block_timestamp,db_state.get());
 #endif
@@ -797,7 +798,7 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     {
         stage_is_working=iUtils->getNow();
             
-
+        // auto mf=getMetaFull(time(NULL));
         do_heart_beat();
     }
     else {
@@ -1156,16 +1157,26 @@ inline uint64_t read_uint64(const uint8_t* data) {
            (static_cast<uint64_t>(data[7]));
 }
 
-REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull()
+REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 {
+    MUTEX_INSPECTOR;
     auto b=prev_root_hash_Z();
+    auto t_win=ti_ / HB_TIME_WINDOW;
     auto it=block_meta_full.find(b);
+
     if(it!=block_meta_full.end())
     {
-        if(it->second.valid())
-        return it->second;
+        auto ii=it->second.find(t_win);
+        if(ii!=it->second.end())
+        {
+            if(ii->second.valid())
+                return ii->second;
+
+        }
     }
+    logNode("create meta %ld",t_win);
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
+    block_meta_full[b][t_win]=m;
     auto nn=db_state->getNodeListNoCreate();
     m->full_broadcast=nn->getList();
     auto an=db_state->getAllNodes();
@@ -1185,6 +1196,7 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull()
     for(auto &x: ll)
     {
         std::string seed=x->getName().container+prev_root_hash_Z().container;
+        seed+=std::to_string(t_win);
         auto h=blake2b_hash(seed);
         if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
         auto w=read_uint64((uint8_t*)h.container.data());
