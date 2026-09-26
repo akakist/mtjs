@@ -42,6 +42,52 @@ std::string Cellable::getDbId() const
 }
 
 
+void Cellable::get_dirty_leaves(_db_to_save &db_dump)
+{
+    if (!is_dirty)
+        return;
+    MutexLockerDeferred lk(mx);
+    bool has_children=false;
+    lk.lock();
+    auto cptr_copy = children_ptrs_mx;
+    has_children=children_ptrs_mx.size()>0;
+    lk.unlock();
+
+    for (auto &zz : cptr_copy)
+    {
+        MUTEX_INSPECTOR;
+        auto cid = zz.first;
+        auto c = zz.second;
+        if (c->is_dirty)
+        {
+            MUTEX_INSPECTOR;
+            // lk.unlock();
+            c->get_dirty_leaves(db_dump);
+            // lk.lock();
+            // auto child_buf = c->getBuffer_mx();
+            // auto ch = blake2b_hash(child_buf);
+            // if (ch != children_hashes_mx[cid])
+            // {
+            //     MUTEX_INSPECTOR;
+            //     db_dump.add(c->getDbId(), child_buf);
+            //     // c->last_size = child_buf.size();
+            //     children_hashes_mx[cid] = ch;
+            // }
+            // lk.unlock();
+        }
+    }
+    if(!has_children)
+    {
+            lk.lock();
+            auto child_buf = getBuffer_mx();
+            db_dump.add(getDbId(), child_buf);
+            lk.unlock();
+
+
+    }
+    // is_dirty = false;
+
+}
 
 void Cellable::calc_tree_hash(_db_to_save &db_dump)
 {

@@ -195,7 +195,7 @@ namespace Node
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
         bool PutTransactionREQ(const bcEvent::PutTransactionREQ* e);
 
-        REF_getter<MsgData::HeartBeatREQ> do_heart_beat();
+        REF_getter<MsgData::HeartBeatREQ> do_heart_beat(time_t tnow);
 
         bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast);
         bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast);

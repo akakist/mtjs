@@ -799,7 +799,7 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
         stage_is_working=iUtils->getNow();
             
         // auto mf=getMetaFull(time(NULL));
-        do_heart_beat();
+        do_heart_beat(time(NULL));
     }
     else {
         logNode("no heart beat timediff %ld",iUtils->getNow()-stage_is_working);
@@ -1174,7 +1174,7 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 
         }
     }
-    logNode("create meta %ld",t_win);
+    // logNode("create meta %ld",t_win);
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
     block_meta_full[b][t_win]=m;
     auto nn=db_state->getNodeListNoCreate();

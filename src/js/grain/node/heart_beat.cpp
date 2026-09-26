@@ -71,7 +71,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 }
 void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route)
 {
-    logNode("@@ %s",__func__);
+    // logNode("@@ %s",__func__);
     stage_is_working=iUtils->getNow();
         
 
@@ -84,7 +84,7 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
 }
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
 {
-        logNode("@@ %s from %s",__func__,h->node_leader.container.c_str());
+        // logNode("@@ %s from %s",__func__,h->node_leader.container.c_str());
 
     MUTEX_INSPECTOR;
     if(!need_continue_broadcast)
@@ -98,7 +98,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
 
     if(h->node_leader==this_node_name)
     {
-        logNode("reply_HeartBeatRSP if(h->node_leader==this_node_name)");
+        // logNode("reply_HeartBeatRSP if(h->node_leader==this_node_name)");
             reply_HeartBeatRSP(h,route);
             *need_continue_broadcast=true;
             return true;
@@ -171,7 +171,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             if(iUtils->getNow()-cli.heart_beat_sent[h->block_timestamp / HB_TIME_WINDOW] > _1sec * HEART_BEAT_SENT_TIMEOUT)
             {
                 logNode("if(isNodeGreater(this_node_name,h->node_leader,mf))");
-                auto hb=do_heart_beat();
+                auto hb=do_heart_beat(h->block_timestamp);
                 // cli.node_leader=hb;
                 // cli.heart_beat_sent[h->block_timestamp/HB_TIME_WINDOW]=iUtils->getNow();
                 *need_continue_broadcast=false;
@@ -180,7 +180,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         }
         else
         {
-            logNode("reply_HeartBeatRSP(h,route);");
+            // logNode("reply_HeartBeatRSP(h,route);");
             reply_HeartBeatRSP(h,route);
             *need_continue_broadcast=true;
             return true;
@@ -284,29 +284,24 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 
                 if(cli.node_leader.valid())
                 {
-                    logNode("if(cli.node_leader.valid())");
-                    logNode("cli.node_leader->block_timestamp/HB_TIME_WINDOW == h->block_timestamp/HB_TIME_WINDOW %d %d",cli.node_leader->block_timestamp/HB_TIME_WINDOW,h->block_timestamp/HB_TIME_WINDOW);
+                    // logNode("if(cli.node_leader.valid())");
+                    // logNode("cli.node_leader->block_timestamp/HB_TIME_WINDOW == h->block_timestamp/HB_TIME_WINDOW %d %d",cli.node_leader->block_timestamp/HB_TIME_WINDOW,h->block_timestamp/HB_TIME_WINDOW);
                     if(cli.node_leader->block_timestamp/HB_TIME_WINDOW == h->block_timestamp/HB_TIME_WINDOW)
                     {
                         
                         auto mf=getMetaFull(h->block_timestamp);
                         if(isNodeGreater(h->node_leader, cli.node_leader->node_leader, mf) ) 
                         {
-                            logNode("h->node_leader > cli.node_leader->node_leader");
+                            // logNode("h->node_leader > cli.node_leader->node_leader");
                             cli.node_leader=h;
                             reply_HeartBeatRSP(h,route);
-                            logNode("reply_HeartBeatRSP");
+                            // logNode("reply_HeartBeatRSP");
                             *need_continue_broadcast=true;
                             return true;
                         }
                         else 
                         {
-                            logNode("h->node_leader < cli.node_leader->node_leader");
-                                // if(iUtils->getNow()-cli.heart_beat_sent[h->block_timestamp / HB_TIME_WINDOW] > _1sec * HEART_BEAT_SENT_TIMEOUT)
-                                // {
-                                //     auto hb=do_heart_beat();
-            
-                                // }
+                            // logNode("h->node_leader < cli.node_leader->node_leader");
                                 *need_continue_broadcast=false;
                         }
 
@@ -324,11 +319,9 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                    {
                         if(iUtils->getNow()-cli.heart_beat_sent[h->block_timestamp / HB_TIME_WINDOW] > _1sec * HEART_BEAT_SENT_TIMEOUT)
                         {
-                            do_heart_beat();
+                            do_heart_beat(h->block_timestamp);
                         }
                         return false;
-                        // need_do_heart_beat = true;
-                        // *need_continue_broadcast=false;
                    }
                    else
                    {
@@ -341,49 +334,6 @@ if(prev_root_hash_Z!=h->prev_root_hash)
 
                 }
      
-                // if(iUtils->getNow()-cli.heart_beat_sent[h->block_timestamp / HB_TIME_WINDOW] > _1sec * HEART_BEAT_SENT_TIMEOUT)
-                // {
-                //     logNode("if(iUtils->getNow()-cli.heart_beat_sent > _1sec * HEART_BEAT_SENT_TIMEOUT)");
-                    
-                //     if(isNodeGreater(this_node_name, h->node_leader, mf) 
-                //         || (cli.node_leader.valid() && isNodeGreater(this_node_name, cli.node_leader->node_leader, mf)))
-                //     {
-                //         logNode("@@ %s > %s",this_node_name.container.c_str(), h->node_leader.container.c_str());
-                //         // ci.node_leader=new MsgData::HeartBeatREQ(prev_root_hash_Z,);
-                //         auto hb=do_heart_beat(mf);
-                //         logNode("setup node leader do heart beat");
-                //         // cli.node_leader=hb;
-                //         // cli.heart_beat_sent[h->block_timestamp / HB_TIME_WINDOW]=iUtils->getNow();
-                //         *need_continue_broadcast=false;
-                //         return true;
-                //     }
-                //     else 
-                //     {
-                //         logNode("@@ %s <= %s",this_node_name.container.c_str(), h->node_leader.container.c_str());
-
-                //     }
-                // }
-                // if(!cli.node_leader.valid())
-                // {
-                //     logNode("setup NL if(!cli.node_leader.valid())");
-                //     cli.node_leader=h;
-                // }
-                // if(h->block_timestamp/HB_TIME_WINDOW > cli.node_leader->block_timestamp / HB_TIME_WINDOW)
-                // {
-                //     logNode("setup NL if(h->block_timestamp/HB_TIME_WINDOW > cli.node_leader->block_timestamp / HB_TIME_WINDOW)");
-                //     cli.node_leader=h;
-                // }
-                // // if(ci.node_leader.container.empty())
-                //     // ci.node_leader=this_node_name;
-                // auto mf=getMetaFull(h->block_timestamp);
-                // if (cli.node_leader->node_leader.container.empty() || isNodeGreater(h->node_leader, cli.node_leader->node_leader,mf))
-                // {
-                //     logNode("setup NL if (cli.node_leader->node_leader.container.empty() || isNodeGreater(h->node_leader, cli.node_leader->node_leader,mf)) and make reply_HeartBeatRSP");
-                //     cli.node_leader=h;
-                //     reply_HeartBeatRSP(h,route);
-                //     *need_continue_broadcast=true;
-                //     return true;
-                // }
         }
     }
     return true;
@@ -517,13 +467,13 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
     return true;
 }
 
-REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat()
+REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t tnow)
 {
-    logNode("@@ %s",__func__);
+    // logNode("@@ %s",__func__);
     
     stage_is_working=iUtils->getNow();
         
-    time_t tnow=time(NULL);
+    // time_t tnow=time(NULL);
     // logNode("@@ %s",__FUNCTION__);
     // l_blocks.clear();
     // block_meta_full.clear();
