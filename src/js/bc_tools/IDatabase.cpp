@@ -202,6 +202,10 @@ REF_getter<bc_nodelist> IDatabase::getNodeListOrCreate(Rollback* roll)
     cc->payload_ctor_idx = hsh::bc_nodelist;
     return u;
 }
+REF_getter<const bc_nodelist> IDatabase::getNodeListNoCreateConst()
+{
+    return dynamic_cast<const bc_nodelist*>(getNodeListNoCreate().get());
+}
 REF_getter<bc_nodelist> IDatabase::getNodeListNoCreate()
 {
     MUTEX_INSPECTOR;
@@ -278,6 +282,22 @@ REF_getter<bc_values> IDatabase::getValuesNoCreate()
         return dynamic_cast<bc_values *>(l->data.get());
     }
     return NULL;
+
+}
+REF_getter<const bc_values> IDatabase::getValuesNoCreateConst()
+{
+    MUTEX_INSPECTOR;
+    return dynamic_cast<const bc_values *> (getValuesNoCreate().get());
+    // auto r = this;
+    // MutexLockerDeferred lk(r->mx);
+    // auto l = getByPathNoCreate(root.get(), getPath("VALUES"));
+    // if(!l.valid())
+    //     return NULL;
+    // if (l->data.valid())
+    // {
+    //     return dynamic_cast<const bc_values *>(l->data.get());
+    // }
+    // return NULL;
 
 }
 
@@ -383,6 +403,10 @@ REF_getter<bc_node> IDatabase::addNode(const NODE_id &name, Rollback* roll)
     cc->payload_ctor_idx = hsh::bc_node;
     return n;
 }
+REF_getter<const bc_node> IDatabase::getNodeNoCreateConst(const NODE_id &name)
+{
+    return dynamic_cast<const bc_node*>(getNodeNoCreate(name).get());
+}
 
 REF_getter<bc_node> IDatabase::getNodeNoCreate(const NODE_id &name)
 {
@@ -445,4 +469,15 @@ REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcce
     }
 
     return r;
+}
+size_t getSize(data_base* p)
+{
+    size_t sz=p->size();
+    auto c=p->parent;
+    while(c)
+    {
+        sz+=c->size();
+        c=c->parent;
+    }
+    return sz;
 }

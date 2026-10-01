@@ -8,6 +8,11 @@ struct bc_contract:  public data_base
     std::string name_;
     ADDRESS_id  owner;
     std::string src;
+    size_t size() const
+    {
+        M_LOCK(parent->mx);
+        return size_() + name_.size()+ owner.addr.size() + src.size();
+    }
     void pack(outBuffer&b) const final
     {
         data_base::pack(b);

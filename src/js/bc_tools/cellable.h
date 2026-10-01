@@ -39,7 +39,12 @@ struct data_base : public Refcountable
     {
     }
     void setDirty(Rollback* roll);
-;
+;   
+    size_t size_() const
+    {
+        return sizeof(type)+sizeof(create_time)+sizeof(ttl);
+    }
+    virtual size_t size() const=0;
     virtual void pack(outBuffer& o) const
     {
         o<<1;
@@ -62,6 +67,14 @@ struct data_base : public Refcountable
     }
     // virtual std::string dump()=0;
 
+};
+struct Dirty
+{
+    std::set<REF_getter<data_base>> data;
+    void add(data_base* d)
+    {
+        data.insert(d);
+    }
 };
 
 extern std::vector< data_base* (*)(Cellable*)> db_constructors;
@@ -100,15 +113,24 @@ public:
     Cellable(Cellable* _parent, const std::string & id):Refcountable("cellable"),  parent(_parent), m_id(id)
     {
     }
+    size_t size()
+    {
+        size_t sz=0;
+        M_LOCK(mx);
+        sz+=m_id.size();
+        for(auto& z:children_hashes_mx)
+        {
+            sz+=z.first.size();
+            sz+=z.second.container.size();
+        }
+        return sz;
+    }
     void setDirty__(Rollback* r)
     {
-    MUTEX_INSPECTOR;
         {
-    MUTEX_INSPECTOR;
             M_LOCK(mx);
             if(r)
             {
-    MUTEX_INSPECTOR;
                 if(!r->data.count(this))
                     r->data[this]=getBuffer_mx();
             }

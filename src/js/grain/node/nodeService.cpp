@@ -1177,7 +1177,7 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
     // logNode("create meta %ld",t_win);
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
     block_meta_full[b][t_win]=m;
-    auto nn=db_state->getNodeListNoCreate();
+    auto nn=db_state->getNodeListNoCreateConst();
     m->full_broadcast=nn->getList();
     auto an=db_state->getAllNodes();
 
@@ -1233,7 +1233,7 @@ REF_getter<Node::BlockMetaValidator> Node::Service::getMetaValidator(uint64_t bl
         return it->second;
     }
     REF_getter<BlockMetaValidator> m=new BlockMetaValidator();
-    auto nn=db_state->getNodeListNoCreate();
+    auto nn=db_state->getNodeListNoCreateConst();
     m->validator_broadcast=getValidators(block_timestamp,db_state.get());
     // auto nm=root->getAllNodes(db_state.get());
     // m->full_broadcast=nn->getList();

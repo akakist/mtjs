@@ -8,7 +8,15 @@ struct bc_nodelist:  public data_base
     private:
     std::set<NODE_id> list;
     public:
-    std::set<NODE_id> getList()
+    size_t size() const 
+    {
+        M_LOCK(parent->mx);
+        size_t sz=size_();
+        for(auto &z: list)
+            sz+=z.container.size();
+        return sz;
+    }
+    std::set<NODE_id> getList() const
     {
         M_LOCK(parent->mx);
         return list;

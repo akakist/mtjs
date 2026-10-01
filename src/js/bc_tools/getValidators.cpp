@@ -13,10 +13,10 @@ uint64_t fnv1a_64(const void* buffer, size_t len)
 }
 std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db)
 {
-    auto ns=db->getNodeListNoCreate();
+    auto ns=db->getNodeListNoCreateConst();
     if(!ns.valid())
         throw CommonError("if(!ns.valid())");
-    auto v=db->getValuesNoCreate();
+    auto v=db->getValuesNoCreateConst();
     if(!v.valid())
         throw CommonError("if(!v.valid()");
     // auto n_validators=
@@ -27,7 +27,7 @@ std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db)
     {
         auto s=z.container+ts;
         auto h=fnv1a_64(s.data(),s.size());
-        auto node=db->getNodeNoCreate(z);
+        auto node=db->getNodeNoCreateConst(z);
         if(!node.valid())
             throw CommonError("if(!n.valid())");
 
@@ -36,13 +36,14 @@ std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db)
     }
     // int idx=0;
     std::set<NODE_id> out;
+    auto validator_count=v->getGas("validator_count");
     for(auto& z:res)
     {
-        if(out.size() > v->validator_count)
+        if(out.size() > validator_count)
             break;
         for(auto &x:z.second)
         {
-            if(out.size() > v->validator_count)
+            if(out.size() > validator_count)
                 break;
             out.insert(x);
 

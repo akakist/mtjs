@@ -102,6 +102,7 @@ struct IDatabase: public Refcountable
 
     REF_getter<bc_values> getValuesOrCreate(Rollback*);
     REF_getter<bc_values> getValuesNoCreate();
+    REF_getter<const bc_values> getValuesNoCreateConst();
 
 
     REF_getter<bc_address_state> getAddressStateOrCreate(const ADDRESS_id &pk,Rollback*);
@@ -114,9 +115,11 @@ struct IDatabase: public Refcountable
 
 
     REF_getter<bc_node> getNodeNoCreate(const NODE_id &name);
+    REF_getter<const bc_node> getNodeNoCreateConst(const NODE_id &name);
     REF_getter<bc_node> addNode(const NODE_id &name, Rollback*);
     REF_getter<bc_nodelist> getNodeListOrCreate(Rollback* roll);
     REF_getter<bc_nodelist> getNodeListNoCreate();
+    REF_getter<const bc_nodelist> getNodeListNoCreateConst();
 
     REF_getter<Cellable> getLeafNoCreate(const REF_getter<Cellable>&cur, const std::string& id, MutexLockerDeferred &l);
     REF_getter<Cellable> getLeafOrCreate(const REF_getter<Cellable>&cur, const std::string &id, MutexLockerDeferred &l, Rollback *roll);

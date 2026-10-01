@@ -14,7 +14,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
 {
         MUTEX_INSPECTOR;
 
-    auto v = b.db->getValuesNoCreate();
+    auto v = b.db->getValuesNoCreateConst();
     auto it = v->emitters_bin.find(t.senderAddress);
     if (it == v->emitters_bin.end())
     {
@@ -26,7 +26,7 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     if(err) return err;
 
 
-    auto u = t.getAddressState(t.senderAddress);
+    auto u = b.db->getAddressStateNoCreate(t.senderAddress);
     if (!u.valid())
     {
         return "mint: sender not found";
@@ -35,7 +35,9 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
         M_LOCK(u->parent->mx);
         u->balance+=amount;
     }
-    u->setDirty(t.roll);
+    t.markDirty(u.get());
+    // u->setDirty(t.roll);
+    // t.dirty.add(u.get());
 
     t.gasUsed+=v->getGas("mint");
 
@@ -49,7 +51,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = b.db->getValuesNoCreate();
+    auto v = b.db->getValuesNoCreateConst();
 
     uint64_t amount=0;
     auto err=yy_get_uint64_t(params,"amount",amount);
@@ -64,7 +66,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     if(to_addr.addr.size()!=t.senderAddress.addr.size())
         return "param to has invalid size";
 
-    auto u = t.getAddressState(t.senderAddress);
+    auto u = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!u.valid())
     {
         return "sender userstate invalid";
@@ -78,7 +80,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     {
         return "invalid destination address";
     }
-    auto to = t.getAddressState(to_addr);
+    auto to = b.db->getAddressStateNoCreate(to_addr);
     if (!to.valid())
     {
         return "destination user not found";
@@ -97,8 +99,13 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
         to->balance+=amount;
     }
     // to->addBalance(amount);
-    u->setDirty(t.roll);
-    to->setDirty(t.roll);
+    // t.markDirty(u.get());
+    t.markDirty(to.get());
+    // u->setDirty(t.roll);
+    // t.dirty.add(u.get());
+    // to->setDirty(t.roll);
+    // t.dirty.add(to.get());
+
     t.gasUsed+=v->getGas("transfer");
 
 
@@ -116,21 +123,21 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
 {
     MUTEX_INSPECTOR;
     // if(senderAddress!=)
-    auto v = b.db->getValuesNoCreate();
+    auto v = b.db->getValuesNoCreateConst();
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
 
 
 
-    auto nn = t.getNode(name);
+    auto nn = b.db->getNodeNoCreate(name);
     if (!nn.valid())
         return "Node not found";
     if(nn->get_owner()!=t.senderAddress)
     {
         return "only node owner can update node info";
     }
-    auto us = t.getAddressState(t.senderAddress);
+    auto us = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
 
@@ -145,9 +152,15 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
         
     }
 
+    t.markDirty(nn.get());
+    // t.markDirty(us.get());
 
-    nn->setDirty(t.roll);
-    us->setDirty(t.roll);
+    // nn->setDirty(t.roll);
+    //     t.dirty.add(nn.get());
+
+    // us->setDirty(t.roll);
+    //     t.dirty.add(us.get());
+
 
 
     t.gasUsed+=v->getGas("node_update");
@@ -160,7 +173,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = b.db->getValuesNoCreate();
+    auto v = b.db->getValuesNoCreateConst();
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
@@ -176,11 +189,11 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
         }
     }
 
-    auto nn = t.getNode(name);
+    auto nn = b.db->getNodeNoCreateConst(name);
     if (nn.valid())
         return "Node already registered with name";
 
-    auto us = t.getAddressState(t.senderAddress);
+    auto us = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
 
@@ -201,8 +214,15 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
         t.senderAddress, 
         bls, 
         base16::decode(pk_ed), ip);
-    n->setDirty(t.roll);
-    us->setDirty(t.roll);
+    
+    t.markDirty(n.get());
+    // t.markDirty(us.get());
+    // n->setDirty(t.roll);
+    //     t.dirty.add(n.get());
+
+    // us->setDirty(t.roll);
+    //     t.dirty.add(us.get());
+
 
 
 
@@ -217,7 +237,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = b.db->getValuesNoCreate();
+    auto v = b.db->getValuesNoCreateConst();
 
     uint64_t amount=0;
     auto err=yy_get_uint64_t(params,"amount",amount);
@@ -228,11 +248,11 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     if(err) return err;
 
 
-    auto us = t.getAddressState(t.senderAddress);
+    auto us = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
 
-    auto n=t.getNode(node);
+    auto n=b.db->getNodeNoCreate(node);
     if(!n.valid())
     {
         return "node not found";
@@ -252,8 +272,14 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
         std::to_string(amount).c_str(),
         base16::encode(t.senderAddress.addr).c_str()
     );
-    n->setDirty(t.roll);
-    us->setDirty(t.roll);
+    t.markDirty(n.get());
+    // t.markDirty(us.get());
+    // n->setDirty(t.roll);
+    //     t.dirty.add(n.get());
+
+    // us->setDirty(t.roll);
+    //     t.dirty.add(us.get());
+
 
     return std::nullopt;
 }
@@ -261,14 +287,14 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = b.db->getValuesNoCreate();
+    auto v = b.db->getValuesNoCreateConst();
     uint64_t amount=0;
     auto err=yy_get_uint64_t(params,"amount",amount);
     if(err) return err;
     NODE_id node;
     err=yy_get_string(params,"node",node.container);
     if(err) return err;
-    auto n = t.getNode(node);
+    auto n = b.db->getNodeNoCreate(node);
     if (!n.valid())
     {
         return "nodes not registered";
@@ -285,14 +311,23 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
         return "insufficient stake in node";
     }
 
-    auto u = t.getAddressState(t.senderAddress);
+    auto u = b.db->getAddressStateNoCreateConst(t.senderAddress);
     t.value+=amount;
 
     n->sub_stake(t.senderAddress, amount);
 
-    v->setDirty(t.roll);
-    n->setDirty(t.roll);
-    u->setDirty(t.roll);
+    // t.markDirty(v.get());
+    t.markDirty(n.get());
+    // t.markDirty(u.get());
+    // v->setDirty(t.roll);
+    //     t.dirty.add(v.get());
+
+    // n->setDirty(t.roll);
+    //     t.dirty.add(n.get());
+
+    // u->setDirty(t.roll);
+    //     t.dirty.add(u.get());
+
 
     t.gasUsed+=v->getGas("node_unstake");
 
@@ -309,12 +344,12 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = b.db->getValuesNoCreate();
+    auto v = b.db->getValuesNoCreateConst();
     NODE_id node;
     auto err=yy_get_string(params,"node",node.container);
     if(err)return err;
 
-    auto n = t.getNode(node);
+    auto n = b.db->getNodeNoCreate(node);
     if (!n.valid())
     {
         return "node not found";
@@ -323,7 +358,10 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     {
         return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(t.senderAddress.addr);
     }
-    n->setDirty(t.roll);
+    t.markDirty(n.get());
+    // n->setDirty(t.roll);
+    //     t.dirty.add(n.get());
+
 
     t.gasUsed+=v->getGas("node_enable");
 
@@ -340,7 +378,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = b.db->getValuesNoCreate();
+    auto v = b.db->getValuesNoCreateConst();
     std::string name;
     auto err=yy_get_string(params,"name",name);
     if(err) return err;
@@ -361,7 +399,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     if (nn.valid())
         return "Contract already registered with name";
 
-    auto us = t.getAddressState(t.senderAddress);
+    auto us = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
 
@@ -378,8 +416,14 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
         n->owner=t.senderAddress;
     }
 
-    n->setDirty(t.roll);
-    us->setDirty(t.roll);
+    t.markDirty(n.get());
+    // t.markDirty(us.get());
+    // n->setDirty(t.roll);
+    //     t.dirty.add(n.get());
+
+    // us->setDirty(t.roll);
+    //     t.dirty.add(us.get());
+
 
     t.gasUsed+=v->getGas("contract_deploy");
 
@@ -391,7 +435,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
      int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = b.db->getValuesNoCreate();
+    auto v = b.db->getValuesNoCreateConst();
     CONTRACT_id cn;
     auto err=yy_get_string(params,"name",cn.container);
     if(err)
@@ -405,7 +449,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     {
         return "sender is not contract owner";
     }
-    auto us = t.getAddressState(t.senderAddress);
+    auto us = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
     
@@ -420,9 +464,14 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
         M_LOCK(n->parent->mx);
         n->src=src;
     }
+    t.markDirty(n.get());
+    // t.markDirty(us.get());
+    // n->setDirty(t.roll);
+    //     t.dirty.add(n.get());
 
-    n->setDirty(t.roll);
-    us->setDirty(t.roll);
+    // us->setDirty(t.roll);
+    //     t.dirty.add(us.get());
+
 
     t.gasUsed+=v->getGas("contract_update");
 

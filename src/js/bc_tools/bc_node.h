@@ -18,6 +18,22 @@ struct bc_node: public data_base
     std::string ip;
     std::map<ADDRESS_id /*user*/, uint64_t> stakes;
     public:
+    size_t size() const
+    {
+        M_LOCK(parent->mx);
+        size_t r=size_();
+        r+=name_.container.size();
+        r+=owner_address.addr.size();
+        r+=48;
+        r+=ed_pk.size();
+        r+=ip.size();
+        for(auto& z: stakes)
+        {
+            r+=z.first.addr.size();
+            r+=sizeof(uint64_t);
+        }
+        return r;
+    }
     NodeElement getElement()
     {
         NodeElement n;
@@ -46,7 +62,7 @@ struct bc_node: public data_base
         M_LOCK(parent->mx);
         ip=_ip;
     }
-    ADDRESS_id get_owner()
+    ADDRESS_id get_owner() const
     {
         M_LOCK(parent->mx);
         return owner_address;
@@ -61,7 +77,7 @@ struct bc_node: public data_base
         M_LOCK(parent->mx);
         return name_;
     }
-    uint64_t get_full_stake()
+    uint64_t get_full_stake() const
     {
         uint64_t ret=0;
         M_LOCK(parent->mx);
@@ -71,7 +87,7 @@ struct bc_node: public data_base
         }
         return ret;
     }
-    uint64_t get_user_stake(const ADDRESS_id& user)
+    uint64_t get_user_stake(const ADDRESS_id& user) const
     {
         M_LOCK(parent->mx);
         auto it = stakes.find(user);

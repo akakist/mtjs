@@ -69,6 +69,12 @@ struct t_params
     uint64_t gasLimit=0;
     uint64_t value=0;
     Rollback *roll=NULL;
+    Dirty dirty;
+    void markDirty(data_base *p)
+    {
+        p->setDirty(roll);
+        dirty.add(p);
+    }
     void rollback()
     {
         for(auto &z: roll->data)
@@ -80,35 +86,40 @@ struct t_params
             }
         }
     }
-    std::map<NODE_id,REF_getter<bc_node>> nodes;
-    REF_getter<bc_node> getNode(const NODE_id& n)
-    {
-        auto it=nodes.find(n);
-        if(it!=nodes.end())
-            return it->second;
+    // std::map<NODE_id,REF_getter<bc_node>> nodes;
+    // REF_getter<bc_node> getNode_(const NODE_id& n)
+    // {
+    //     auto it=nodes.find(n);
+    //     if(it!=nodes.end())
+    //         return it->second;
 
-        auto nn=db->getNodeNoCreate(n);
+    //     auto nn=db->getNodeNoCreate(n);
 
-        if(nn.valid())
-        {
-            nodes[n]=nn;
-            nn->setDirty(roll);
-        }
-        return nn;
-    }
-    std::map<ADDRESS_id,REF_getter<bc_address_state>> addrs;
-    REF_getter<bc_address_state> getAddressState(const ADDRESS_id& n)
-    {
-        auto it=addrs.find(n);
-        if(it!=addrs.end())
-            return it->second;
+    //     if(nn.valid())
+    //     {
+    //         nodes[n]=nn;
+    //         markDirty(nn.get());
+    //         // nn->setDirty(roll);
+    //         // dirty.add(nn.get());
 
-        auto nn=db->getAddressStateOrCreate(n,roll);
-        if(nn.valid())
-        {
-            addrs[n]=nn;
-            nn->setDirty(roll);
-        }
-        return nn;
-    }
+    //     }
+    //     return nn;
+    // }
+    // std::map<ADDRESS_id,REF_getter<bc_address_state>> addrs;
+    // REF_getter<bc_address_state> getAddressState(const ADDRESS_id& n)
+    // {
+    //     auto it=addrs.find(n);
+    //     if(it!=addrs.end())
+    //         return it->second;
+
+    //     auto nn=db->getAddressStateOrCreate(n,roll);
+    //     if(nn.valid())
+    //     {
+    //         addrs[n]=nn;
+    //         markDirty(nn.get());
+    //         // nn->setDirty(roll);
+    //         // dirty.add(nn.get());
+    //     }
+    //     return nn;
+    // }
 };

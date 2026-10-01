@@ -131,3 +131,4 @@ void data_base::setDirty(Rollback* roll)
     // last_update_epoch=epoch;
     parent->setDirty__(roll);
 }
+

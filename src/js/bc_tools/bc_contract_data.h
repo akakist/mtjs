@@ -6,6 +6,12 @@ struct bc_contract_data:  public data_base
 
     bc_contract_data(Cellable *p):data_base(hsh::bc_contract_data,p, 0,-1) {}
     std::string container;
+    size_t size() const
+    {
+        M_LOCK(parent->mx);
+
+        return  size_()+container.size();
+    }
     void pack(outBuffer&b) const final
     {
         data_base::pack(b);

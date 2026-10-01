@@ -17,11 +17,30 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         fees["transfer"]=1000;
         fees["cashback"]=200;
         fees["validator_count"]=200;
+        fees["validator_mistake"]=100;
     }
     std::map<std::string,uint64_t> fees;
     std::set<ADDRESS_id> emitters_bin;
-    int validator_count=5;
-    uint64_t validator_minstake=100;
+    // int validator_count=5;
+    // uint64_t validator_minstake=100;
+
+    size_t size() const
+    {
+        M_LOCK(parent->mx);
+
+        size_t sz=size_();
+        for(auto &z: fees)
+        {
+            sz+=z.first.size();
+            sz+=sizeof(uint64_t);
+        }
+        for(auto& z: emitters_bin)
+        {
+            sz+=z.addr.size();
+        }
+        // sz+=sizoef(validator_count);
+        return sz;
+    }
 
     uint64_t getGas(const std::string &fee_type) const
     {
@@ -36,7 +55,7 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         data_base::pack(o);
         o<<1;
         o<<fees<<emitters_bin;
-        o<<validator_count<<validator_minstake;
+        // o<<validator_count<<validator_minstake;
     }
     void unpack(inBuffer& o) final
     {
@@ -44,7 +63,7 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         auto v=o.get_PN();
 
         o>>fees>>emitters_bin;
-        o>>validator_count>>validator_minstake;
+        // o>>validator_count>>validator_minstake;
     }
 
 };
