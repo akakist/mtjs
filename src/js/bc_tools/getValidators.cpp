@@ -11,6 +11,7 @@ uint64_t fnv1a_64(const void* buffer, size_t len)
     
     return hash;
 }
+#ifdef KALL
 std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db)
 {
     auto ns=db->getNodeListNoCreateConst();
@@ -52,3 +53,4 @@ std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db)
     return out;
 
 }
+#endif

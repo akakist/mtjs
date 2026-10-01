@@ -739,9 +739,6 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
     {
         MUTEX_INSPECTOR;
         auto mf=getMetaFull(lc->blockInfo->heart_beat->block_timestamp);
-#ifndef FULL_M
-        auto vals=getValidators(root,lc->blockInfo->heart_beat->block_timestamp,db_state.get());
-#endif
         std::vector<blst_cpp::PublicKey> agg_pk;
 
         uint64_t stake=0;
@@ -1014,7 +1011,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.roll=&roll;
     t.value=value;
     t.gasLimit=gasLimit;
-    auto uu=db_state->getAddressStateOrCreate(senderAddress,NULL);
+    auto uu=db_state->getAddressStateNoCreate(senderAddress);
     if(!uu.valid())
     throw CommonError("if(!uu.valid())");
     {
@@ -1037,9 +1034,9 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         if(gu>gasLimit)
             gu=gasLimit;
 
-        auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
-        M_LOCK(u->parent->mx);
-        u->balance-=gu*gasPrice;
+        // auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
+        M_LOCK(uu->parent->mx);
+        uu->balance-=gu*gasPrice;
         b.node_rewards+=gu*gasPrice;
         
         return err;
@@ -1050,9 +1047,9 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         t.gasUsed+=t.roll->size();
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
-        auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
-        M_LOCK(u->parent->mx);
-        u->balance-=t.gasUsed*gasPrice;
+        // auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
+        M_LOCK(uu->parent->mx);
+        uu->balance-=t.gasUsed*gasPrice;
         b.node_rewards+=t.gasUsed*gasPrice;
         return "value exceeds limit";
     }
@@ -1060,9 +1057,9 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
-        M_LOCK(u->parent->mx);
-        u->balance-=gasLimit*gasPrice;
+        // auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
+        M_LOCK(uu->parent->mx);
+        uu->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
         return "gas exceeds limit";
     }
@@ -1076,17 +1073,20 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
-        M_LOCK(u->parent->mx);
-        u->balance-=gasLimit*gasPrice;
+        // auto u=db_state->getAddressStateNoCreate(t.senderAddress);
+        // if(!u.valid())
+        //     throw CommonError("if(!u.valid()) AAA");
+
+        M_LOCK(uu->parent->mx);
+        uu->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
         return "gas exceeds limit";
     }
     // OK
-    auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
+    // auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
     {
-        M_LOCK(u->parent->mx);
-        u->balance-=t.gasUsed*gasPrice+value-t.value;
+        M_LOCK(uu->parent->mx);
+        uu->balance-=t.gasUsed*gasPrice+value-t.value;
     }
 
     db_state->root->calc_tree_hash(db_dump);
@@ -1195,7 +1195,11 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 
     for(auto &x: ll)
     {
-        std::string seed=x->getName().container+prev_root_hash_Z().container;
+        std::string seed=x->getName().container;
+        if(prev_block.valid())
+        {
+            seed+=prev_block->blockInfo->heart_beat->prev_root_hash_1.container;
+        }
         seed+=std::to_string(t_win);
         auto h=blake2b_hash(seed);
         if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
@@ -1223,6 +1227,7 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 
     return m;
 }
+#ifdef KALL
 REF_getter<Node::BlockMetaValidator> Node::Service::getMetaValidator(uint64_t block_timestamp)
 {
     auto b=prev_root_hash_Z();
@@ -1252,7 +1257,7 @@ REF_getter<Node::BlockMetaValidator> Node::Service::getMetaValidator(uint64_t bl
     }
     return m;
 }
-
+#endif
 void Node::Service::logNode(const char *fmt, ...)
 {
 

@@ -80,6 +80,7 @@ namespace Node
         BlockMetaFull(): Refcountable("BlockMetaFull"){}
         
     };
+#ifdef KALL
     struct BlockMetaValidator: public Refcountable
     {
         std::set<NODE_id> validator_broadcast;
@@ -96,6 +97,7 @@ namespace Node
         BlockMetaValidator(): Refcountable("BlockMeta"){}
         
     };
+#endif
     struct heart_beat_node_info
     {
         heart_beat_node_info() : leader_cert_2(nullptr) {
@@ -329,9 +331,9 @@ namespace Node
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         std::map<THASH_id, std::map< time_t,REF_getter<BlockMetaFull>>> block_meta_full;
-        std::map<THASH_id,REF_getter<BlockMetaValidator>> block_meta_validator;
+        // std::map<THASH_id,REF_getter<BlockMetaValidator>> block_meta_validator;
         REF_getter<BlockMetaFull> getMetaFull(time_t ti);
-        REF_getter<BlockMetaValidator> getMetaValidator(uint64_t block_timestamp);
+        // REF_getter<BlockMetaValidator> getMetaValidator(uint64_t block_timestamp);
 
         THASH_id prev_root_hash_Z()
         {
@@ -359,7 +361,7 @@ namespace Node
             c_blocks.clear();
             l_blocks.clear();
             block_meta_full.clear();
-            block_meta_validator.clear();
+            // block_meta_validator.clear();
             cli_leader_info.clear();
             // lc_responses.clear();
             // syncs.clear();

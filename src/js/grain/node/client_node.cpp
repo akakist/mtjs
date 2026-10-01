@@ -123,7 +123,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     prev_block=r;
     l_blocks.clear();
     block_meta_full.clear();
-    block_meta_validator.clear();
+    // block_meta_validator.clear();
     cli_leader_info.clear();
 
     for (auto &z : c.blockDBStore->validateBlockREQ->transaction_bodies)
