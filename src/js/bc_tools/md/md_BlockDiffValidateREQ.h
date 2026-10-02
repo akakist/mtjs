@@ -9,7 +9,7 @@ namespace MsgData
     struct BlockDiffValidateREQ: public Base
     {
 
-        BlockDiffValidateREQ(): Base(msgid::BlockDiffValidateREQ), blockInfo(new BlockInfo)
+        BlockDiffValidateREQ(): Base(msgid::BlockDiffValidateREQ), blockValidatedREQ(new BlockValidatedREQ)
         {
 
         }
@@ -17,13 +17,13 @@ namespace MsgData
         {
             return new BlockDiffValidateREQ();
         }
-        REF_getter<BlockInfo> blockInfo;
+        REF_getter<BlockValidatedREQ> blockValidatedREQ;
         std::map<std::string,std::string> diffs;
         // std::vector<NODE_id> node_validators;
         // blst_cpp::AggregateSignature agg_sig;
         void update(Blake2bHasher& h) const
         {
-            blockInfo->update(h);
+            blockValidatedREQ->update(h);
             for(auto& z: diffs)
             {
                 h.update(z.first);
@@ -33,20 +33,20 @@ namespace MsgData
         void pack(outBuffer& b) const final
         {
             Base::pack(b);
-            blockInfo->pack(b);
+            blockValidatedREQ->pack(b);
             b<<diffs;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
-            blockInfo->unpack(b);
+            blockValidatedREQ->unpack(b);
             b>>diffs;
         }
         size_t size()
         {
             size_t sz=0;
-            if(blockInfo.valid())
-                sz=+blockInfo->size();
+            if(blockValidatedREQ.valid())
+                sz+=blockValidatedREQ->size();
 
             for(auto& z: diffs)
             {
