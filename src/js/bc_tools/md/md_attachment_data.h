@@ -60,7 +60,6 @@ namespace MsgData
         EmitNode blockRoot;
         std::map<ADDRESS_id,uint64_t> fees;
         std::map<NODE_id,uint64_t> rewards;
-        // std::vector<std::string> emitted_events;
         size_t size()
         {
             size_t sz=0;

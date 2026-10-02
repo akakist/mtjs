@@ -1,14 +1,14 @@
 #include "msg.h"
 #include "blake2bHasher.h"
-#include "md/md_BlockAcceptedREQ.h"
+#include "md/md_BlockValidatedREQ.h"
 
 thread_local MsgFactory msgFactory;
-MsgData::BlockAcceptedREQ::BlockAcceptedREQ()
-    : Base(msgid::BlockAcceptedREQ),
+MsgData::BlockValidatedREQ::BlockValidatedREQ()
+    : Base(msgid::BlockValidatedREQ),
       blockInfo(new BlockInfo)
 {
 }
-void MsgData::BlockAcceptedREQ::pack(outBuffer &b) const
+void MsgData::BlockValidatedREQ::pack(outBuffer &b) const
 {
     XTRY;
     MUTEX_INSPECTOR;
@@ -17,7 +17,7 @@ void MsgData::BlockAcceptedREQ::pack(outBuffer &b) const
     b << node_validators << agg_sig;
     XPASS;
 }
-void MsgData::BlockAcceptedREQ::unpack(inBuffer &b)
+void MsgData::BlockValidatedREQ::unpack(inBuffer &b)
 {
     XTRY;
     MUTEX_INSPECTOR;
@@ -27,7 +27,7 @@ void MsgData::BlockAcceptedREQ::unpack(inBuffer &b)
     XPASS;
 }
 
-void MsgData::BlockAcceptedREQ::update(Blake2bHasher &h) const
+void MsgData::BlockValidatedREQ::update(Blake2bHasher &h) const
 {
     blockInfo->update(h);
     for (auto &z : node_validators)
@@ -50,8 +50,8 @@ const char *msgName(int id)
         return "ValidateBlockRSP";
     case msgid::BlockInfo:
         return "BlockInfo";
-    case msgid::BlockAcceptedREQ:
-        return "BlockAcceptedREQ";
+    case msgid::BlockValidatedREQ:
+        return "BlockValidatedREQ";
     case msgid::GetTransactionREQ:
         return "GetTransactionREQ";
     case msgid::GetTransactionRSP:
@@ -74,6 +74,8 @@ const char *msgName(int id)
         return "LcEnvelopeREQ";
     case msgid::DelayNotificationREQ:
         return "DelayNotificationREQ";
+    case msgid::BlockDiffValidateREQ:
+        return "BlockDiffValidateREQ";
         
 
     default:

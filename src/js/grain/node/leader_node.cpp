@@ -89,7 +89,9 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     }
 
     auto &bt = l_blocks[prev_root_hash_Z()];
+    // if(r->blockInfo->diff_hash!=bt.blockInfo)
     auto h=r->blockInfo->getHash();
+
     bt.ValidateBlockRSP_m[h].push_back(r);
     if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
         return true;
@@ -110,12 +112,12 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     {
         XTRY;
         logNode("Block stake finalized");
-        REF_getter<MsgData::BlockAcceptedREQ> ba = new MsgData::BlockAcceptedREQ();
-        if (!bt.blockInfo[h].valid())
+        REF_getter<MsgData::BlockValidatedREQ> ba = new MsgData::BlockValidatedREQ();
+        if (!bt.blockInfo_Z[h].valid())
         {
-            bt.blockInfo[h] = r->blockInfo;
+            bt.blockInfo_Z[h] = r->blockInfo;
         }
-        else if (bt.blockInfo[h]->getBuffer() != r->blockInfo->getBuffer())
+        else if (bt.blockInfo_Z[h]->getBuffer() != r->blockInfo->getBuffer())
             throw CommonError("else if(bh.block_payload!=r->payload_block)");
 
         ba->blockInfo = r->blockInfo;

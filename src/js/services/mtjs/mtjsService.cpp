@@ -644,7 +644,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     // inBuffer in(e->msg);
     // REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore();
     // pb->unpack2(in);
-    for (size_t ti = 0; ti < e->blockStore->validateBlockREQ->transaction_bodies.size(); ti++)
+    for (size_t ti = 0; ti < e->blockStore->tx_hashes.size(); ti++)
     {
         XTRY;
         if (opaque.tx_subscription_cb.has_value())
@@ -654,7 +654,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);
             
-            THASH_id tx_hash = e->blockStore->validateBlockREQ->transaction_bodies[ti]->getHash();
+            THASH_id tx_hash = e->blockStore->tx_hashes[ti];
             auto it=opaque.node_tx_cb.find(tx_hash.container);
             if(it!=opaque.node_tx_cb.end())
             {

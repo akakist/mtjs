@@ -1,7 +1,7 @@
 #pragma once
 #include "md_Base.h"
 
-#include "md_BlockAcceptedREQ.h"
+#include "md_BlockValidatedREQ.h"
 namespace MsgData
 {
     struct DelayNotificationREQ: public Base
@@ -15,7 +15,7 @@ namespace MsgData
         {
             return new DelayNotificationREQ();
         }
-        REF_getter<BlockAcceptedREQ> lc;
+        REF_getter<BlockValidatedREQ> lc;
         void update(Blake2bHasher& h) const
         {
             // h.update(epoch.toString());

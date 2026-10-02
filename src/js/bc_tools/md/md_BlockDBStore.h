@@ -1,7 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_attachment_data.h"
-#include "md_BlockAcceptedREQ.h"
+#include "md_BlockValidatedREQ.h"
 #include "md_ValidateBlockREQ.h"
 namespace MsgData
 {
@@ -9,25 +9,31 @@ namespace MsgData
     {
 
         BlockDBStore():Base(msgid::BlockDBStore),
-            validateBlockREQ(new ValidateBlockREQ),
-            blockAcceptedREQ(new BlockAcceptedREQ())
+            hb(new HeartBeatREQ()),
+            blockAcceptedREQ(new BlockValidatedREQ())
 
         {
 
         }
-        REF_getter<ValidateBlockREQ> validateBlockREQ;
-        REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
+        // REF_getter<ValidateBlockREQ> validateBlockREQ_Z;
+        std::vector<THASH_id> tx_hashes;
+        REF_getter<HeartBeatREQ> hb;
+        REF_getter<BlockValidatedREQ> blockAcceptedREQ;
         size_t size(){
             size_t sz=0;
-            if(validateBlockREQ.valid())
-                sz+=validateBlockREQ->size();
+            for(auto &z: tx_hashes)
+                sz+=z.container.size();
+            if(hb.valid())
+                sz+=hb->size();
             if(blockAcceptedREQ.valid())
                 sz+=blockAcceptedREQ->size();
             return sz;
         }
         void update(Blake2bHasher& h) const
         {
-            validateBlockREQ->update(h);
+            for(auto &z: tx_hashes)
+                h.update(z.container);
+            hb->update(h);
             blockAcceptedREQ->update(h);
         }
         void pack(outBuffer& b) const final
@@ -35,7 +41,8 @@ namespace MsgData
             XTRY;
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<validateBlockREQ;
+            b<<tx_hashes;
+            b<<hb;
             b<<blockAcceptedREQ;
             XPASS;
         }
@@ -44,7 +51,8 @@ namespace MsgData
             XTRY;
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>validateBlockREQ;
+            b>>tx_hashes;
+            b>>hb;
             b>>blockAcceptedREQ;
             XPASS;
         }

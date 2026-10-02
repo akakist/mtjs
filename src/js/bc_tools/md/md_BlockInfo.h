@@ -17,14 +17,16 @@ namespace MsgData
         }
         THASH_id new_root_hash1;
         THASH_id attachment_hash;
-        THASH_id tx_hash;
+        THASH_id tx_hash_Z;
+        THASH_id diff_hash;
         REF_getter<HeartBeatREQ> heart_beat;
         size_t size()
         {
             size_t sz=0;
             sz+=new_root_hash1.container.size();
             sz+=attachment_hash.container.size();
-            sz+=tx_hash.container.size();
+            sz+=tx_hash_Z.container.size();
+            sz+=diff_hash.container.size();
             if(heart_beat.valid())
             sz+=heart_beat->size();
             return sz;
@@ -33,7 +35,8 @@ namespace MsgData
         {
             j["new_root_hash1"]=new_root_hash1.str();
             j["attachment_hash"]=attachment_hash.str();
-            j["tx_hash"]=tx_hash.str();
+            j["tx_hash"]=tx_hash_Z.str();
+            j["diff_hash"]=diff_hash.str();
             
             if(heart_beat.valid())
                 heart_beat->dump(j["heart_beat"]);
@@ -43,7 +46,8 @@ namespace MsgData
         {
             h.update(new_root_hash1.container);
             h.update(attachment_hash.container);
-            h.update(tx_hash.container);
+            h.update(tx_hash_Z.container);
+            h.update(diff_hash.container);
             heart_beat->update(h);
         }
 
@@ -53,7 +57,8 @@ namespace MsgData
             Base::pack(b);
             b<<new_root_hash1;
             b<<attachment_hash;
-            b<<tx_hash;
+            b<<tx_hash_Z;
+            b<<diff_hash;
             b<<heart_beat;
         }
         void unpack(inBuffer& b) final
@@ -62,7 +67,8 @@ namespace MsgData
             Base::unpack(b);
             b>>new_root_hash1;
             b>>attachment_hash;
-            b>>tx_hash;
+            b>>tx_hash_Z;
+            b>>diff_hash;
             b>>heart_beat;
         }
 

@@ -20,7 +20,7 @@
 
 #include <vector>
 
-bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::BlockValidatedREQ(const MsgData::BlockValidatedREQ *r, const NODE_id &src_node, const route_t &route)
 {
         // logErr2("@@ %s",__func__);
 
@@ -47,16 +47,16 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         logNode("invalid leader 12");
         return true;
     }
-    auto& c=c_blocks[r->blockInfo->heart_beat->prev_root_hash_1];
+    auto& v=v_blocks[r->blockInfo->heart_beat->prev_root_hash_1];
 
-    if (!c.blockDBStore.valid())
+    if (!v.blockDBStore.valid())
     {
-        logNode("if (!c.blockDBStore.valid())");
+        logNode("if (!v.blockDBStore.valid())");
         return true;
 
     }
 
-    if (c.blockDBStore->validateBlockREQ->heart_beat->node_leader != src_node)
+    if (v.blockDBStore->hb->node_leader != src_node)
     {
         logNode("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
         return true;
@@ -67,9 +67,9 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         return true;
     }
 
-    if (! c.blockDBStore.valid())
+    if (! v.blockDBStore.valid())
         throw CommonError("if (!blockDBStore.valid())");
-    c.blockDBStore->blockAcceptedREQ = r;
+    v.blockDBStore->blockAcceptedREQ = r;
     std::vector<blst_cpp::PublicKey> agg_pk;
     for (auto &z : r->node_validators)
     {
@@ -95,7 +95,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         XPASS;
     }
-    if(this_node_name==c.blockDBStore->validateBlockREQ->heart_beat->node_leader)
+    if(this_node_name==v.blockDBStore->hb->node_leader)
     {
         size_t sz=0;
         for(auto& z:db_to_save_Z.cells)
@@ -105,12 +105,12 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
     db_to_save_Z.add(".last_block",r->getBuffer());
-    auto &hb=c.blockDBStore->validateBlockREQ->heart_beat;
-    {
-        MUTEX_INSPECTOR;
-        XTRY;
-        XPASS;
-    }
+    // auto &hb=v.blockDBStore->hb;
+    // {
+    //     MUTEX_INSPECTOR;
+    //     XTRY;
+    //     XPASS;
+    // }
     db_state->write_granules_batch(db_to_save_Z);
 
     // FILE *f= fopen("")
@@ -118,7 +118,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     db_to_save_Z.clear();
 
 
-    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(c.blockDBStore, c.att_data, this));
+    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(v.blockDBStore, v.att_data_Z, this));
 
     prev_block=r;
     l_blocks.clear();
@@ -126,21 +126,21 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     // block_meta_validator.clear();
     cli_leader_info.clear();
 
-    for (auto &z : c.blockDBStore->validateBlockREQ->transaction_bodies)
+    for (auto &z : v.blockDBStore->tx_hashes)
     {
 
         MUTEX_INSPECTOR;
         XTRY;
-        auto h = z->getHash();
-        auto it = transaction_pool_of_leader.find(h);
+        // auto h = z->getHash();
+        auto it = transaction_pool_of_leader.find(z);
         if (it != transaction_pool_of_leader.end())
         {
             transaction_pool_of_leader.erase(it);
-            logNode("removed tx %s", base16::encode(h.container).c_str());
+            logNode("removed tx %s", base16::encode(z.container).c_str());
         }
         XPASS;
     }
-    c_blocks.clear();
+    v_blocks.clear();
 
     stage_is_working=0;
 
@@ -212,7 +212,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         return true;
     }
     auto prev_root_hash=prev_root_hash_Z();
-    if(c_blocks[prev_root_hash].block_validated)
+    if(v_blocks[prev_root_hash].block_validated)
         return true;
     b_params t(db_state.get());
     bool err = false;
@@ -261,12 +261,24 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
         auto new_root_hash = execute_block(t, r->heart_beat);
 
-        auto &c = c_blocks[prev_root_hash_Z()];
-        if (!c.blockDBStore.valid())
-            c.blockDBStore = new MsgData::BlockDBStore;
-        c.blockDBStore->validateBlockREQ=r;
+        auto &v = v_blocks[prev_root_hash_Z()];
+        if (!v.blockDBStore.valid())
+            v.blockDBStore = new MsgData::BlockDBStore;
+        // v.blockDBStore->validateBlockREQ_Z=r;
+        v.blockDBStore->hb=r->heart_beat;
+        v.blockDBStore->tx_hashes.clear();
+        for(auto &z: r->transaction_bodies)
+        {
+            v.blockDBStore->tx_hashes.push_back(z->getHash());
+        }
         // blockDBStore = prepareBlockDBStore(t);
-        c.att_data=t.att_data;
+        v.att_data_Z=t.att_data;
+        v.diffs.clear();
+        for(auto& z:db_to_save_Z.cells)
+        {
+            if(z.first.size()==28)
+                v.diffs[z.first]=z.second;
+        }
 
         REF_getter<MsgData::BlockInfo> block = new MsgData::BlockInfo();
         // block->prev_root_hash = prev_root_hash_Z;
@@ -279,8 +291,15 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         {
             z->update(h);
         }
-        block->tx_hash.container=h.final();
-        
+        block->tx_hash_Z.container=h.final();
+
+        Blake2bHasher hh;
+        for(auto &z: v.diffs)
+        {
+            hh.update(z.first);
+            hh.update(z.second);
+        }
+        block->diff_hash.container=hh.final();
 
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
         rsp->node_validator = this_node_name;
@@ -298,6 +317,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     //     printf("calcer %s\n", z.c_str());
     // }
 #endif
-    c_blocks[prev_root_hash].block_validated = true;
+    v_blocks[prev_root_hash].block_validated = true;
     return true;
 }

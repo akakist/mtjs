@@ -12,7 +12,7 @@
 #include "bc_values.h"
 #include "CONTRACT_id.h"
 #include "CONTRACT_DATA_id.h"
-#include "md/md_BlockAcceptedREQ.h"
+#include "md/md_BlockValidatedREQ.h"
 
 struct IDatabase: public Refcountable
 {
@@ -133,5 +133,5 @@ struct IDatabase: public Refcountable
   
 };
 
-REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcceptedREQ>& pb);
-REF_getter<MsgData::BlockAcceptedREQ> load_last_block(IDatabase *db);
+REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockValidatedREQ>& pb);
+REF_getter<MsgData::BlockValidatedREQ> load_last_block(IDatabase *db);

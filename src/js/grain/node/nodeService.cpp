@@ -195,7 +195,7 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 void Node::Service::report_mem()
 {
     size_t sz=0;
-    for(auto&z: c_blocks)
+    for(auto&z: v_blocks)
     {
         sz+=z.first.container.size();
         sz+=z.second.size();
@@ -731,7 +731,7 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
 #endif
 // }
 }
-bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
+bool Node::Service::verify_block(const REF_getter<MsgData::BlockValidatedREQ> &lc)
 {
     /// проверка сертификата лидера
     if(!lc.valid())
@@ -838,9 +838,9 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     case msgid::ValidateBlockREQ:
         last_activity_time=iUtils->getNow();
         return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::BlockAcceptedREQ:
+    case msgid::BlockValidatedREQ:
         last_activity_time=iUtils->getNow();
-        return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
+        return BlockValidatedREQ(static_cast<const MsgData::BlockValidatedREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderREQ:
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::DelayNotificationREQ:
@@ -1092,7 +1092,6 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     db_state->root->calc_tree_hash(db_dump);
     db_to_save_Z.add(db_dump);
     
-    // logErr2("user sz %d",sz);
     return std::nullopt;
 }
 std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params)

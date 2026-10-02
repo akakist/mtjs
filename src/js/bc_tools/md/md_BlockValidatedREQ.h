@@ -5,13 +5,13 @@
 #include "blst_cp.h"
 namespace MsgData
 {
-    struct BlockAcceptedREQ: public Base
+    struct BlockValidatedREQ: public Base
     {
 
-        BlockAcceptedREQ();
+        BlockValidatedREQ();
         static Base* construct()
         {
-            return new BlockAcceptedREQ();
+            return new BlockValidatedREQ();
         }
         REF_getter<BlockInfo> blockInfo;
         std::vector<NODE_id> node_validators;
@@ -34,17 +34,17 @@ namespace MsgData
     };
 
 }
-inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::BlockAcceptedREQ> &s)
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::BlockValidatedREQ> &s)
 {
     b<<1;
     s->pack(b);
     return b;
 }
-inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::BlockAcceptedREQ> &s)
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::BlockValidatedREQ> &s)
 {
     auto ver=b.get_PN();
     if(!s.valid())
-        s=new MsgData::BlockAcceptedREQ();
+        s=new MsgData::BlockValidatedREQ();
     s->unpack2(b);
     return b;
 }

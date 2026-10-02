@@ -6,7 +6,7 @@
 #include "md/md_GetTransactionRSP.h"
 #include "md/md_ValidateBlockREQ.h"
 #include "md/md_ValidateBlockRSP.h"
-#include "md/md_BlockAcceptedREQ.h"
+#include "md/md_BlockValidatedREQ.h"
 
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
@@ -14,6 +14,7 @@
 #include "md/md_GetUserNonceREQ.h"
 #include "md/md_GetUserNonceRSP.h"
 #include "md/md_LcEnvelopeREQ.h"
+#include "md/md_BlockDiffValidateREQ.h"
 
 
 #include "md/md_DelayNotificationREQ.h"
@@ -27,7 +28,7 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetTransactionRSP, MsgData::GetTransactionRSP::construct);
     registerMsg(msgid::ValidateBlockREQ, MsgData::ValidateBlockREQ::construct);
     registerMsg(msgid::ValidateBlockRSP, MsgData::ValidateBlockRSP::construct);
-    registerMsg(msgid::BlockAcceptedREQ, MsgData::BlockAcceptedREQ::construct);
+    registerMsg(msgid::BlockValidatedREQ, MsgData::BlockValidatedREQ::construct);
     registerMsg(msgid::ConfirmLeaderREQ, MsgData::ConfirmLeaderREQ::construct);
     registerMsg(msgid::ConfirmLeaderRSP, MsgData::ConfirmLeaderRSP::construct);
     registerMsg(msgid::TX, MsgData::TX::construct);
@@ -35,5 +36,6 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetUserNonceRSP, MsgData::GetUserNonceRSP::construct);
     registerMsg(msgid::LcEnvelopeREQ, MsgData::LcEnvelopeREQ::construct);
     registerMsg(msgid::DelayNotificationREQ, MsgData::DelayNotificationREQ::construct);
+    registerMsg(msgid::BlockDiffValidateREQ, MsgData::BlockDiffValidateREQ::construct);
 
 }

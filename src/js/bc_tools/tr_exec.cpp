@@ -80,7 +80,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     {
         return "invalid destination address";
     }
-    auto to = b.db->getAddressStateNoCreate(to_addr);
+    auto to = b.db->getAddressStateOrCreate(to_addr,t.roll);
     if (!to.valid())
     {
         return "destination user not found";

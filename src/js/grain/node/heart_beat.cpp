@@ -6,7 +6,7 @@
 #include "mutexInspector.h"
 #include "nodeService.h"
 #include "md/md_DelayNotificationREQ.h"
-#include "md/md_BlockAcceptedREQ.h"
+#include "md/md_BlockValidatedREQ.h"
 #include "QUORUM.h"
 #include "blst_cp.h"
 #include "NODE_id.h"
@@ -82,7 +82,7 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
     pass_NodeMsgRSP(hbr.get(),route);
 
 }
-bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
+bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockValidatedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
 {
         // logNode("@@ %s from %s",__func__,h->node_leader.container.c_str());
 
@@ -447,10 +447,10 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
     REF_getter<MsgData::Base> msg = msgFactory.create(id);
     msg->unpack(in);
     
-    REF_getter<MsgData::BlockAcceptedREQ> lc;
+    REF_getter<MsgData::BlockValidatedREQ> lc;
     if(m->prev_lc.size())
     {
-        lc=new MsgData::BlockAcceptedREQ;
+        lc=new MsgData::BlockValidatedREQ;
         inBuffer in2(m->prev_lc);
         lc->unpack2(in2);
 
@@ -469,16 +469,9 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
 
 REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t tnow)
 {
-    // logNode("@@ %s",__func__);
     
     stage_is_working=iUtils->getNow();
         
-    // time_t tnow=time(NULL);
-    // logNode("@@ %s",__FUNCTION__);
-    // l_blocks.clear();
-    // block_meta_full.clear();
-    // block_meta_validator.clear();
-    // c_blocks.clear();
     auto meta=getMetaFull(tnow);
 
     REF_getter<MsgData::HeartBeatREQ> hb_req =

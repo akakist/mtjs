@@ -421,14 +421,14 @@ REF_getter<bc_node> IDatabase::getNodeNoCreate(const NODE_id &name)
         throw CommonError("if(cc->data.valid())");
 }
 
-REF_getter<MsgData::BlockAcceptedREQ> load_last_block(IDatabase *db)
+REF_getter<MsgData::BlockValidatedREQ> load_last_block(IDatabase *db)
 {
     std::string buf;
     auto r=db->getGranule(".last_block",&buf);
-    REF_getter<MsgData::BlockAcceptedREQ> last_block;
+    REF_getter<MsgData::BlockValidatedREQ> last_block;
     if(buf.size())
     {
-        last_block=new MsgData::BlockAcceptedREQ;
+        last_block=new MsgData::BlockValidatedREQ;
         inBuffer in(buf);
         // M_LOCK(r->mx);
         last_block->unpack2(in);
@@ -436,12 +436,12 @@ REF_getter<MsgData::BlockAcceptedREQ> load_last_block(IDatabase *db)
     }
     return last_block;
 }
-REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcceptedREQ>& pb)
+REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockValidatedREQ>& pb)
 {
     MUTEX_INSPECTOR;
 
     REF_getter<Cellable> r = new Cellable(NULL,"");
-    REF_getter<MsgData::BlockAcceptedREQ> last_block;
+    REF_getter<MsgData::BlockValidatedREQ> last_block;
     std::string root_cell;
     {
         MUTEX_INSPECTOR;
