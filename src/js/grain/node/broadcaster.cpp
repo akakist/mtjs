@@ -3,6 +3,8 @@
 
 void Node::Service::broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& b, const REF_getter<Node::BlockMetaFull>& meta)
 {
+    MUTEX_INSPECTOR;
+
     std::string msg;
     if(b.valid())
         msg=b->getBuffer();
@@ -16,6 +18,7 @@ void Node::Service::broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData:
 }
 void Node::Service::broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>& b, const REF_getter<Node::BlockMetaFull>& meta)
 {
+    MUTEX_INSPECTOR;
     std::string msg;
     if(b.valid())
         msg=b->getBuffer();
@@ -40,6 +43,7 @@ void Node::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const 
 }
 bool Node::Service::SendToChild(const bcEvent::SendToChild *e, bool fromNetwork)
 {
+    MUTEX_INSPECTOR;
     passEvent(new bcEvent::SendToChildAck(e->hash(), poppedFrontRoute(e->route)));
     bool need_continue_broadcast=true;
     handle_send_to_child(e->node_signer,e->node_start_timestamp,e->seqId2,e->payload_signature,e->payload,e->route, & need_continue_broadcast);
@@ -49,6 +53,7 @@ bool Node::Service::SendToChild(const bcEvent::SendToChild *e, bool fromNetwork)
 }
 bool Node::Service::SendToChildAck(const bcEvent::SendToChildAck *e, bool fromNetwork)
 {
+    MUTEX_INSPECTOR;
     sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(TIMER_BROADCAST_ACK_TIMEDOUT, toRef(e->hash), this));
     return true;
 }
@@ -57,6 +62,7 @@ bool Node::Service::handle_send_to_child(const NODE_id &node_signer, int64_t nod
             const std::string &msg,
             const route_t &route, bool *need_continue_broadcast)
 {
+    MUTEX_INSPECTOR;
     auto &s=filter_NodeMsgREQ[node_signer][node_start_timestamp];
     while(s.size()>100)
     {

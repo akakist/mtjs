@@ -137,10 +137,9 @@ REF_getter<Cellable> IDatabase::getByPathNoCreate(const REF_getter<Cellable>& _c
     }
     return cur;
 }
-std::vector<std::string> IDatabase::getPath(const std::string& name) 
+std::vector<std::string> IDatabase::getPathFromHash(const THASH_id& h) 
 {
     std::vector<std::string> out;
-    auto h = blake2b_hash(name);
     out.reserve(5);
     out.emplace_back(h.container, 0, 1);
     out.emplace_back(h.container, 1, 1);
@@ -148,6 +147,21 @@ std::vector<std::string> IDatabase::getPath(const std::string& name)
     out.emplace_back(h.container, 3, 1);
     out.emplace_back(h.container, 4, 28);
     return out;
+
+}
+
+std::vector<std::string> IDatabase::getPath(const std::string& name) 
+{
+    // std::vector<std::string> out;
+    auto h = blake2b_hash(name);
+    return getPathFromHash(h);
+    // out.reserve(5);
+    // out.emplace_back(h.container, 0, 1);
+    // out.emplace_back(h.container, 1, 1);
+    // out.emplace_back(h.container, 2, 1);
+    // out.emplace_back(h.container, 3, 1);
+    // out.emplace_back(h.container, 4, 28);
+    // return out;
 }
 
 std::vector<std::string> IDatabase::getContractPath(const CONTRACT_id &name)
@@ -159,6 +173,16 @@ std::vector<std::string> IDatabase::getContractDataPath(const CONTRACT_DATA_id &
     std::string key="CONTRACT_DATA_"+name.container;    
     return getPath(key);
 
+}
+REF_getter<data_base> IDatabase::getLeaf(const THASH_id &h, Rollback *roll)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathOrCreate(root.get(), getPathFromHash(h), roll);
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        throw CommonError("if(!cc->data.valid())");
+    return cc->data;
 }
 
 std::vector<std::string> IDatabase::getNodePath(const NODE_id &name)
@@ -421,14 +445,14 @@ REF_getter<bc_node> IDatabase::getNodeNoCreate(const NODE_id &name)
         throw CommonError("if(cc->data.valid())");
 }
 
-REF_getter<MsgData::BlockValidatedREQ> load_last_block(IDatabase *db)
+REF_getter<MsgData::BlockAcceptedREQ> load_last_block(IDatabase *db)
 {
     std::string buf;
-    auto r=db->getGranule(".last_block",&buf);
-    REF_getter<MsgData::BlockValidatedREQ> last_block;
+    auto r=db->getGranule("...last_block...",&buf);
+    REF_getter<MsgData::BlockAcceptedREQ> last_block;
     if(buf.size())
     {
-        last_block=new MsgData::BlockValidatedREQ;
+        last_block=new MsgData::BlockAcceptedREQ;
         inBuffer in(buf);
         // M_LOCK(r->mx);
         last_block->unpack2(in);
@@ -436,12 +460,12 @@ REF_getter<MsgData::BlockValidatedREQ> load_last_block(IDatabase *db)
     }
     return last_block;
 }
-REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockValidatedREQ>& pb)
+REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcceptedREQ>& pb)
 {
     MUTEX_INSPECTOR;
 
     REF_getter<Cellable> r = new Cellable(NULL,"");
-    REF_getter<MsgData::BlockValidatedREQ> last_block;
+    REF_getter<MsgData::BlockAcceptedREQ> last_block;
     std::string root_cell;
     {
         MUTEX_INSPECTOR;

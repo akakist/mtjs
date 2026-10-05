@@ -23,6 +23,8 @@ namespace MsgData
         time_t block_timestamp;
         size_t size()
         {
+            MUTEX_INSPECTOR;
+
             size_t sz=0;
             sz+=sizeof(prev_root_hash_1);
             sz+=sizeof(new_epoch);
@@ -32,6 +34,7 @@ namespace MsgData
         }
         void dump(nlohmann::json& j)
         {
+            MUTEX_INSPECTOR;
             j["prev_root_hash"]=prev_root_hash_1.str();
             j["new_epoch"]=new_epoch;
             j["block_timestamp"]=block_timestamp;
@@ -40,6 +43,7 @@ namespace MsgData
         }
         bool equals(const REF_getter<HeartBeatREQ> &a)
         {
+            MUTEX_INSPECTOR;
             return prev_root_hash_1 == a->prev_root_hash_1 &&
                     new_epoch == a->new_epoch &&
                     node_leader == a->node_leader &&
@@ -48,6 +52,7 @@ namespace MsgData
 
         void update(Blake2bHasher& h) const
         {
+            MUTEX_INSPECTOR;
             h.update(prev_root_hash_1.container);
             h.update(std::to_string(new_epoch));
             h.update(node_leader.container);

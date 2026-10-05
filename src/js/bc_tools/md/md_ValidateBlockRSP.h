@@ -39,6 +39,7 @@ namespace MsgData
         void update(Blake2bHasher& h) const
         {
             blockInfo->update(h);
+            h.update(sig.serialize());
             h.update(node_validator.container);
         }
         void pack(outBuffer& b) const final

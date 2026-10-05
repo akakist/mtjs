@@ -6,7 +6,7 @@
 #include "mutexInspector.h"
 #include "nodeService.h"
 #include "md/md_DelayNotificationREQ.h"
-#include "md/md_BlockValidatedREQ.h"
+#include "md/md_BlockAcceptedREQ.h"
 #include "QUORUM.h"
 #include "blst_cp.h"
 #include "NODE_id.h"
@@ -15,6 +15,7 @@
 #include <vector>
 bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &src_node, const route_t &route)
 {
+    MUTEX_INSPECTOR;
     XTRY;
     stage_is_working=iUtils->getNow();
     
@@ -71,6 +72,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 }
 void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route)
 {
+    MUTEX_INSPECTOR;
     // logNode("@@ %s",__func__);
     stage_is_working=iUtils->getNow();
         
@@ -82,7 +84,7 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
     pass_NodeMsgRSP(hbr.get(),route);
 
 }
-bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockValidatedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
+bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
 {
         // logNode("@@ %s from %s",__func__,h->node_leader.container.c_str());
 
@@ -110,6 +112,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
 
     if(tw_remote < tw_local-1 || tw_remote > tw_local+1)
     {
+    MUTEX_INSPECTOR;
         logNode("if(tw_remote < tw_local-1 || tw_remote > tw_local+1)");
         return true;
     }
@@ -128,6 +131,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     auto& cli=cli_leader_info[h->prev_root_hash_1];
     if(cli.node_leader.valid())
     {
+    MUTEX_INSPECTOR;
         if(cli.node_leader->block_timestamp / HB_TIME_WINDOW < h->block_timestamp / HB_TIME_WINDOW)
         {
             logNode("cli.node_leader=NULL; t_WIN not match");
@@ -146,6 +150,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
 
     if(local_verified && !remote_verified)
     {
+    MUTEX_INSPECTOR;
         /// не отвечаем, поскольку ремоте нода не имеет сертификата
         logNode("if(local_verified && !remote_verified) return send DelayNotificationREQ");
         REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
@@ -180,6 +185,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         }
         else
         {
+    MUTEX_INSPECTOR;
             // logNode("reply_HeartBeatRSP(h,route);");
             reply_HeartBeatRSP(h,route);
             *need_continue_broadcast=true;
@@ -193,7 +199,9 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         /// то надо синхронизироваться, переходим в синк, не отвечаем
         logNode("if(remote_verified && !local_verified) do sync return");
         *need_continue_broadcast=true;
-        if(db_state->sync_empty){
+        if(db_state->sync_empty)
+        {
+        MUTEX_INSPECTOR;
             // state_Z = STATE_SYNCING;
             logNode("start SYNC");
             prev_block=remote_prev_lc;
@@ -204,8 +212,10 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     
     if(remote_verified && local_verified)
     {
+    MUTEX_INSPECTOR;
         if(remote_prev_lc->blockInfo->heart_beat->new_epoch < local_prev_block->blockInfo->heart_beat->new_epoch)
         {
+    MUTEX_INSPECTOR;
         /// проверка на эпоху, если эпоха у ремоте меньше, то командуем ей обновиться.
             logNode("if(remote_prev_lc->heart_beat->new_epoch (%s) < local_lc->heart_beat->new_epoch) return",src_node.container.c_str());
             REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
@@ -233,6 +243,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         }
         else if(remote_prev_lc->blockInfo->heart_beat->new_epoch == local_prev_block->blockInfo->heart_beat->new_epoch)
         {
+    MUTEX_INSPECTOR;
     
                 /// оба в одинаковой эпохе
                 
@@ -385,6 +396,7 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
 
 bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const NODE_id &src_node, const route_t &route)
 {
+    MUTEX_INSPECTOR;
     XTRY;
         // logNode("@@ ConfirmLeaderRSP from %s",src_node.container.c_str());
 
@@ -447,10 +459,10 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
     REF_getter<MsgData::Base> msg = msgFactory.create(id);
     msg->unpack(in);
     
-    REF_getter<MsgData::BlockValidatedREQ> lc;
+    REF_getter<MsgData::BlockAcceptedREQ> lc;
     if(m->prev_lc.size())
     {
-        lc=new MsgData::BlockValidatedREQ;
+        lc=new MsgData::BlockAcceptedREQ;
         inBuffer in2(m->prev_lc);
         lc->unpack2(in2);
 
@@ -469,6 +481,7 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
 
 REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t tnow)
 {
+    MUTEX_INSPECTOR;
     
     stage_is_working=iUtils->getNow();
         

@@ -1,7 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_attachment_data.h"
-#include "md_BlockValidatedREQ.h"
+#include "md_BlockAcceptedREQ.h"
 #include "md_ValidateBlockREQ.h"
 namespace MsgData
 {
@@ -10,7 +10,7 @@ namespace MsgData
 
         BlockDBStore():Base(msgid::BlockDBStore),
             hb(new HeartBeatREQ()),
-            blockAcceptedREQ(new BlockValidatedREQ())
+            blockAcceptedREQ(new BlockAcceptedREQ())
 
         {
 
@@ -18,7 +18,7 @@ namespace MsgData
         // REF_getter<ValidateBlockREQ> validateBlockREQ_Z;
         std::vector<THASH_id> tx_hashes;
         REF_getter<HeartBeatREQ> hb;
-        REF_getter<BlockValidatedREQ> blockAcceptedREQ;
+        REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
         size_t size(){
             size_t sz=0;
             for(auto &z: tx_hashes)

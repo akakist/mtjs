@@ -2,14 +2,14 @@
 #include "md_Base.h"
 
 // #include "md_BlockInfo.h"
-#include "md_BlockValidatedREQ.h"
+#include "md_BlockAcceptedREQ.h"
 #include "blst_cp.h"
 namespace MsgData
 {
     struct BlockDiffValidateREQ: public Base
     {
 
-        BlockDiffValidateREQ(): Base(msgid::BlockDiffValidateREQ), blockValidatedREQ(new BlockValidatedREQ)
+        BlockDiffValidateREQ(): Base(msgid::BlockDiffValidateREQ), blockAcceptedREQ(new BlockAcceptedREQ)
         {
 
         }
@@ -17,13 +17,14 @@ namespace MsgData
         {
             return new BlockDiffValidateREQ();
         }
-        REF_getter<BlockValidatedREQ> blockValidatedREQ;
         std::map<std::string,std::string> diffs;
+        REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
         // std::vector<NODE_id> node_validators;
         // blst_cpp::AggregateSignature agg_sig;
         void update(Blake2bHasher& h) const
         {
-            blockValidatedREQ->update(h);
+    MUTEX_INSPECTOR;
+            blockAcceptedREQ->update(h);
             for(auto& z: diffs)
             {
                 h.update(z.first);
@@ -32,21 +33,23 @@ namespace MsgData
         }
         void pack(outBuffer& b) const final
         {
+    MUTEX_INSPECTOR;
             Base::pack(b);
-            blockValidatedREQ->pack(b);
             b<<diffs;
+            b<<blockAcceptedREQ;
         }
         void unpack(inBuffer& b) final
         {
+    MUTEX_INSPECTOR;
             Base::unpack(b);
-            blockValidatedREQ->unpack(b);
             b>>diffs;
+            b>>blockAcceptedREQ;
         }
         size_t size()
         {
             size_t sz=0;
-            if(blockValidatedREQ.valid())
-                sz+=blockValidatedREQ->size();
+            if(blockAcceptedREQ.valid())
+                sz+=blockAcceptedREQ->size();
 
             for(auto& z: diffs)
             {

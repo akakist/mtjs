@@ -338,6 +338,7 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             return RequestIncoming(static_cast<const httpEvent::RequestIncoming *>(e.get()));
         case rpcEventEnum::IncomingOnAcceptor:
         {
+            MUTEX_INSPECTOR;
             const rpcEvent::IncomingOnAcceptor *ev = static_cast<const rpcEvent::IncomingOnAcceptor *>(e.get());
             auto &IDA = ev->e->id;
 
@@ -365,6 +366,7 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         break;
         case rpcEventEnum::IncomingOnConnector:
         {
+        MUTEX_INSPECTOR;
             const rpcEvent::IncomingOnConnector *ev = static_cast<const rpcEvent::IncomingOnConnector *>(e.get());
             auto &IDC = ev->e->id;
             switch (IDC)
@@ -463,6 +465,7 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
       iInstance(ins),
       DBH_feature(ins)
 {
+    MUTEX_INSPECTOR;
     // rocksdb_path = ins->getConfig()->get_string("rockdb_path", "/db/r1", "Path to access to rocksdb");
     // sqlite_pn = ins->getConfig()->get_string("sqlite_pn", "/db/1", "Pathname to access to sqlite");
     rpc_addr = ins->getConfig()->get_tcpaddr("rpc_addr", "127.0.0.1:2345", "rpc address(es) of node ex: ip:port,ip2:port2");
@@ -478,6 +481,7 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
 
 bool Node::Service::on_RequestIncoming(const webHandlerEvent::RequestIncoming *)
 {
+    MUTEX_INSPECTOR;
     return true;
 }
 void registerNodeService(const char *pn)
@@ -666,6 +670,7 @@ THASH_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
 #include <stdlib.h>
 int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 {
+    MUTEX_INSPECTOR;
     auto nv = db_state->getAllNodes();
     auto rh=prev_root_hash_Z();
     int crc = __crc32(0, rh.container.data(), rh.container.size());
@@ -680,6 +685,7 @@ int Node::Service::nodeDistanceToLeader(const NODE_id &node)
 }
 bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight, const REF_getter<Node::BlockMetaFull>& m)
 {
+    MUTEX_INSPECTOR;
     // auto m=getMetaFull();
     auto itL=m->position_of_node.find(nodeLeft);
     if(itL == m->position_of_node.end())
@@ -731,7 +737,7 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
 #endif
 // }
 }
-bool Node::Service::verify_block(const REF_getter<MsgData::BlockValidatedREQ> &lc)
+bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
 {
     /// проверка сертификата лидера
     if(!lc.valid())
@@ -838,13 +844,18 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     case msgid::ValidateBlockREQ:
         last_activity_time=iUtils->getNow();
         return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::BlockValidatedREQ:
+    case msgid::BlockAcceptedREQ:
         last_activity_time=iUtils->getNow();
-        return BlockValidatedREQ(static_cast<const MsgData::BlockValidatedREQ *>(msg.get()), m->node_signer, m->route);
+        return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::BlockAccepted2REQ:
+        last_activity_time=iUtils->getNow();
+        return BlockAccepted2REQ(static_cast<const MsgData::BlockAccepted2REQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderREQ:
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::DelayNotificationREQ:
         return DelayNotificationREQ(static_cast<const MsgData::DelayNotificationREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::BlockDiffValidateREQ:
+        return BlockDiffValidateREQ(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
 
     default:
         throw CommonError("unjandled3 MsgData %s", msgName(msg->type));
@@ -885,6 +896,8 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
         return GetTransactionRSP(static_cast<const MsgData::GetTransactionRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ValidateBlockRSP:
         return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
+    case msgid::BlockDiffValidateRSP:
+        return BlockDiffValidateRSP(static_cast<const MsgData::BlockDiffValidateRSP *>(ee.get()), m->node_signer, m->route);
     default:
         throw CommonError("unhandled22 p020 %s", msgName(id));
         break;

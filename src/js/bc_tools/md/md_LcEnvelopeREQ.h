@@ -4,7 +4,7 @@
 #include "THASH_id.h"
 #include "NODE_id.h"
 #include "md_Base.h"
-#include "md/md_BlockValidatedREQ.h"
+#include "md/md_BlockAcceptedREQ.h"
 namespace MsgData
 {
     struct LcEnvelopeREQ: public Base

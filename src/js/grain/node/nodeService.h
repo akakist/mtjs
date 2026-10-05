@@ -20,12 +20,15 @@
 #include "md/md_ConfirmLeaderRSP.h"
 
 #include "md/md_HeartBeatRSP.h"
-#include "md/md_BlockValidatedREQ.h"
+#include "md/md_BlockAcceptedREQ.h"
+#include "md/md_BlockAccepted2REQ.h"
 #include "md/md_ValidateBlockRSP.h"
 #include "md/md_ValidateBlockREQ.h"
 #include "md/md_GetTransactionRSP.h"
 #include "md/md_GetTransactionREQ.h"
-#include "md/md_BlockValidatedREQ.h"
+#include "md/md_BlockAcceptedREQ.h"
+#include "md/md_BlockDiffValidateREQ.h"
+#include "md/md_BlockDiffValidateRSP.h"
 
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
@@ -80,24 +83,6 @@ namespace Node
         BlockMetaFull(): Refcountable("BlockMetaFull"){}
         
     };
-#ifdef KALL
-    struct BlockMetaValidator: public Refcountable
-    {
-        std::set<NODE_id> validator_broadcast;
-        std::map<NODE_id, uint64_t> validator_stake;
-        uint64_t total_validator_stake=0;
-        uint64_t getStake(const NODE_id& n)
-        {
-            auto it=validator_stake.find(n);
-            if(it==validator_stake.end())
-                throw CommonError("if(it==validator_stake.end())");
-            return it->second;
-            
-        }
-        BlockMetaValidator(): Refcountable("BlockMeta"){}
-        
-    };
-#endif
     struct heart_beat_node_info
     {
         heart_beat_node_info() : leader_cert_2(nullptr) {
@@ -146,13 +131,6 @@ namespace Node
             j["ConfirmLeaderRSP_m_SZ"]=ConfirmLeaderRSP_m.size();
             j["transaction_responders_SZ"]=transaction_responders.size();
         }
-        // void clear__1()
-        // {
-        //     request_for_transactions_sent=false;
-        //     leader_cert_2=nullptr;
-        //     HeartBeatRSP_m.clear();
-        //     transaction_responders.clear();
-        // }
 
 
     };
@@ -200,7 +178,7 @@ namespace Node
         REF_getter<MsgData::HeartBeatREQ> do_heart_beat(time_t tnow);
 
         bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast);
-        bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockValidatedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast);
+        bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast);
         void reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route);
 
         bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
@@ -208,7 +186,10 @@ namespace Node
         bool GetTransactionRSP(const MsgData::GetTransactionRSP* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockREQ(const MsgData::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockRSP(const MsgData::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
-        bool BlockValidatedREQ(const MsgData::BlockValidatedREQ* r, const NODE_id & src_node, const route_t& route);
+        bool BlockAcceptedREQ(const MsgData::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route);
+        bool BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const NODE_id & src_node, const route_t& route);
+        bool BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route);
+        bool BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r, const NODE_id & src_node, const route_t& route);
 
         bool ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
         bool ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
@@ -251,6 +232,7 @@ namespace Node
         {
             std::map<THASH_id /*blockinfo hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
             std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
+            std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
             int64_t block_accepted_sent=0;
             // heart_beat_info    heart_beat_store;
             heart_beat_node_info leader_info;
@@ -290,7 +272,8 @@ namespace Node
 
         struct block_validator
         {
-            REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
+            REF_getter<MsgData::BlockDBStore> 
+            blockDBStore=nullptr;
             REF_getter<MsgData::attachment_data> att_data_Z= nullptr;
             std::map<std::string, std::string> diffs;
 
@@ -328,6 +311,10 @@ namespace Node
                 sz+=sizeof(confirm_leader_sent);
                 return sz;
             }
+            REF_getter<MsgData::BlockDBStore> 
+            blockDBStore=nullptr;
+            REF_getter<MsgData::attachment_data> att_data_Z= nullptr;
+            std::map<std::string, std::string> diffs;
         };
 
         std::map<THASH_id, block_validator> v_blocks;
@@ -356,7 +343,7 @@ namespace Node
             return 0;
 
         }
-        REF_getter<MsgData::BlockValidatedREQ> prev_block;
+        REF_getter<MsgData::BlockAcceptedREQ> prev_block;
         // State state_Z=STATE_NORMAL;
         int64_t stage_is_working = 0;
         uint64_t last_activity_time=0;
@@ -398,7 +385,7 @@ namespace Node
 
         THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &r);
     
-        bool verify_block(const REF_getter<MsgData::BlockValidatedREQ>& lc);
+        bool verify_block(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
 
         std::optional<std::string> execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
                          const REF_getter<MsgData::TX> &tx, uint64_t epoch);

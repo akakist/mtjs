@@ -27,7 +27,7 @@ namespace MsgData
             MUTEX_INSPECTOR;
             auto t=b.get_PN();
             if(t!=type)
-                throw CommonError("if(type!=mtype) %d %d", t, type);
+                throw CommonError("if(type!=mtype) %s %s", msgName(t), msgName(type));
             unpack(b);
         }
         std::string getBuffer() const

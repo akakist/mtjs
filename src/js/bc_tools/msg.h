@@ -61,18 +61,25 @@ namespace msgid
 {
     enum MSG_ID
     {
-        HeartBeatREQ,HeartBeatRSP,
-        ValidateBlockREQ, ValidateBlockRSP, BlockInfo, BlockValidatedREQ,
-        GetTransactionREQ,GetTransactionRSP,
-        BlockDBStore, 
-        DoHeartBeatREQ, ConfirmLeaderREQ, ConfirmLeaderRSP,
-        TX,
-        attachment_data,
-        GetUserNonceREQ,
-        GetUserNonceRSP,
-        LcEnvelopeREQ,
-    DelayNotificationREQ,
-    BlockDiffValidateREQ
+        HeartBeatREQ=0,
+        HeartBeatRSP=1,
+        ValidateBlockREQ=2, 
+        ValidateBlockRSP=3, 
+        BlockInfo=4, 
+        BlockAcceptedREQ=5,
+        GetTransactionREQ=6,GetTransactionRSP=7,
+        BlockDBStore=8, 
+        DoHeartBeatREQ=9, 
+        ConfirmLeaderREQ=10, ConfirmLeaderRSP=11,
+        TX=12,
+        attachment_data=13,
+        GetUserNonceREQ=14, GetUserNonceRSP=15,
+
+        LcEnvelopeREQ=16,
+        DelayNotificationREQ=17,
+
+        BlockDiffValidateREQ=18, BlockDiffValidateRSP=19,
+        BlockAccepted2REQ = 20,
     };
 
 }

@@ -10,11 +10,12 @@ struct NODE_id
 {
     std::string container;
     NODE_id() {}
+#ifdef KALL
     std::string str() const
     {
         return base16::encode(container).substr(0,4);
     }
-
+#endif
 };
 inline int operator<(const NODE_id&a, const NODE_id&b)
 {

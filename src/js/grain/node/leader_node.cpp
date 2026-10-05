@@ -10,9 +10,11 @@
 #include "QUORUM.h"
 #include "route_t.h"
 #include <vector>
+#include "md/md_BlockDiffValidateREQ.h"
 
 bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const NODE_id &src_node, const route_t &route)
 {
+    MUTEX_INSPECTOR;
     // logNode("GetTransactionRSP %s",src_node.container.c_str());
 
     XTRY;
@@ -60,6 +62,115 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
 
     }
     XPASS;
+    return true;
+}
+bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r, const NODE_id & src_node, const route_t& route)
+{
+    MUTEX_INSPECTOR;
+    logNode("@@ %s",__func__);
+    if(!db_state->sync_empty)
+    {
+        logNode("ValidateBlockRSP if(!db_state->sync_empty)");
+        return true;
+    }
+
+    if (r->blockInfo->heart_beat->prev_root_hash_1 != prev_root_hash_Z())
+    {
+        logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
+        return true;
+    }
+    auto nnn=db_state->getNodeNoCreate(r->node_validator);
+    if(!nnn.valid())
+        throw CommonError("if(!nnn.valid())");
+    if (!r->verify(nnn->get_bls_pk()))
+    {
+        logNode("block response not validated");
+        return true;
+    }
+    logNode("verified OK %s",r->node_validator.container.c_str());
+    auto &bt = l_blocks[prev_root_hash_Z()];
+    // if(r->blockInfo->diff_hash!=bt.blockInfo)
+    auto h=r->blockInfo->getHash();
+    bt.BlockDiffValidateRSP_m[h].push_back(r);
+    // if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
+    //     return true;
+    auto mf=getMetaFull(r->blockInfo->heart_beat->block_timestamp);
+
+    uint64_t stakeVal = 0;
+    for (auto &z : bt.BlockDiffValidateRSP_m[h])
+    {
+        stakeVal += mf->getStake(z->node_validator);
+    }
+    logNode("stakeVal %lld",stakeVal);
+#ifdef FULL_M
+    if (stakeVal * 100 / mf->total_full_stake > QUORUM)
+#else
+    if (stakeVal * 100 / mv->total_validator_stake > QUORUM)
+#endif
+    // return true;
+    {
+    MUTEX_INSPECTOR;
+        XTRY;
+        logNode("Block stake finalized BlockDiffValidateRSP");
+        REF_getter<MsgData::BlockAcceptedREQ> ba = new MsgData::BlockAcceptedREQ();
+        if (!bt.blockInfo_Z[h].valid())
+        {
+            bt.blockInfo_Z[h] = r->blockInfo;
+        }
+        else if (bt.blockInfo_Z[h]->getBuffer() != r->blockInfo->getBuffer())
+            throw CommonError("else if(bh.block_payload!=r->payload_block)");
+
+        ba->blockInfo = r->blockInfo;
+        std::vector<blst_cpp::PublicKey> agg_pk;
+        std::set<std::string> nnn;
+        for (auto &z : bt.ValidateBlockRSP_m[h])
+        {
+            auto n = mf->getNode(z->node_validator);
+            agg_pk.push_back(n->get_bls_pk());
+            ba->agg_sig.add(z->sig);
+            ba->node_validators.push_back(z->node_validator);
+            nnn.insert(z->node_validator.container);
+        }
+        if (ba->agg_sig.verify(agg_pk, blake2b_hash(ba->blockInfo->getBuffer()).container))
+        {
+            logNode("BlockDiffValidateRSP block_accepted test verified OK !!!!!!!!!!!!!!!!!!!!!");
+        }
+        else
+        {
+            logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
+            return true;
+        }
+        // REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ;
+        // bdv->blockAcceptedREQ=ba;
+        // // bt.blockInfo_Z
+        // auto &bv=v_blocks[prev_root_hash_Z()];
+        // bdv->diffs=bv.diffs;
+
+        // {
+        //     /// TODO: test remove after
+        //     auto buf=bdv->getBuffer();
+        //     REF_getter<MsgData::BlockDiffValidateREQ> test=new MsgData::BlockDiffValidateREQ;
+        //     inBuffer in2(buf);
+        //     bdv->unpack2(in2);
+        //     logNode("TEST MsgData::BlockDiffValidateREQ OK");
+        // }
+        // logNode("Broadcast BlockDiffValidateREQ");
+        // broadcast_MsgEvent_via_broadcaster(bdv.get(),mf);
+
+        logNode("validators %s",iUtils->join(" ",nnn).c_str());
+
+        bt.block_accepted_sent = iUtils->getNow();
+
+        std::string nodelist;
+        for(auto &z: bt.leader_info.HeartBeatRSP_m)
+        {
+            nodelist+=z.first.container+" ";
+        }
+        logNode("hb list %s",nodelist.c_str());
+        XPASS;
+    }
+
+
     return true;
 }
 
@@ -112,7 +223,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     {
         XTRY;
         logNode("Block stake finalized");
-        REF_getter<MsgData::BlockValidatedREQ> ba = new MsgData::BlockValidatedREQ();
+        REF_getter<MsgData::BlockAcceptedREQ> ba = new MsgData::BlockAcceptedREQ();
         if (!bt.blockInfo_Z[h].valid())
         {
             bt.blockInfo_Z[h] = r->blockInfo;
@@ -140,8 +251,25 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
             return true;
         }
-        
-        broadcast_MsgEvent_via_broadcaster(ba.get(),mf);
+        logNode("Broadcasr BlockDiffValidateREQ 2");
+        REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ;
+        bdv->blockAcceptedREQ=ba;
+        logNode("bdv->blockAcceptedREQ.valid() %d",bdv->blockAcceptedREQ.valid());
+        // bt.blockInfo_Z
+        auto &bv=v_blocks[prev_root_hash_Z()];
+        bdv->diffs=bv.diffs;
+        if(0){
+            /// TODO: test remove after
+            auto buf=bdv->getBuffer();
+            REF_getter<MsgData::BlockDiffValidateREQ> test=new MsgData::BlockDiffValidateREQ;
+            inBuffer in2(buf);
+            in2 >> test;
+            // bdv->unpack2(in2);
+            logNode("TEST MsgData::BlockDiffValidateREQ OK");
+        }
+
+
+        broadcast_MsgEvent_via_broadcaster(bdv.get(),mf);
 
         logNode("validators %s",iUtils->join(" ",nnn).c_str());
 

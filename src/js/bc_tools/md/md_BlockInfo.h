@@ -22,6 +22,7 @@ namespace MsgData
         REF_getter<HeartBeatREQ> heart_beat;
         size_t size()
         {
+            MUTEX_INSPECTOR;
             size_t sz=0;
             sz+=new_root_hash1.container.size();
             sz+=attachment_hash.container.size();
@@ -33,6 +34,7 @@ namespace MsgData
         }
         void dump(nlohmann::json& j)
         {
+            MUTEX_INSPECTOR;
             j["new_root_hash1"]=new_root_hash1.str();
             j["attachment_hash"]=attachment_hash.str();
             j["tx_hash"]=tx_hash_Z.str();
@@ -44,6 +46,7 @@ namespace MsgData
         }
         void update(Blake2bHasher& h) const
         {
+            MUTEX_INSPECTOR;
             h.update(new_root_hash1.container);
             h.update(attachment_hash.container);
             h.update(tx_hash_Z.container);

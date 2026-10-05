@@ -19,9 +19,103 @@
 #include "QUORUM.h"
 
 #include <vector>
-
-bool Node::Service::BlockValidatedREQ(const MsgData::BlockValidatedREQ *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route)
 {
+    // logNode("@@ %s",__FUNCTION__);
+    MUTEX_INSPECTOR;
+    if(!db_state->sync_empty)
+    {
+        return true;
+    }
+    // if(state_Z==STATE_SYNCING)
+     stage_is_working=iUtils->getNow();
+    auto &cli = cli_leader_info[prev_root_hash_Z()];
+    if(!cli.node_leader.valid())
+    {
+        logNode("if(!cli.node_leader.valid())");
+        return true;
+    }
+
+    if(cli.node_leader->node_leader!=src_node)
+    {
+        logNode("invalid leader 12");
+        return true;
+    }
+    std::vector<blst_cpp::PublicKey> agg_pk;
+    for (auto &z : r->blockAcceptedREQ->node_validators)
+    {
+        XTRY;
+        auto n=db_state->getNodeNoCreate(z);
+        if(!n.valid())
+            throw CommonError("if(!n.valid())");
+
+        agg_pk.push_back(n->get_bls_pk());
+        XPASS;
+    }
+
+    {
+        MUTEX_INSPECTOR;
+        XTRY;
+        if (!r->blockAcceptedREQ->agg_sig.verify(agg_pk, blake2b_hash(r->blockAcceptedREQ->blockInfo->getBuffer()).container))
+        {
+            logNode("block aggsig not matched");
+            return true;
+        }
+        else
+        {
+        }
+        XPASS;
+    }
+    /// TODO: проверка стейка
+    uint64_t staked=0;
+    auto mf=getMetaFull(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+
+    for(auto &z: r->blockAcceptedREQ->node_validators)
+    {
+        staked+=mf->getStake(z);
+    }
+    if((staked*100)/mf->total_full_stake < QUORUM)
+    {
+        logNode("failed quorum check V");
+        return true;
+    }
+    Rollback roll;
+    for(auto& z: r->diffs)
+    {
+        if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
+        THASH_id h;
+        h.container=z.first;
+        auto leaf=db_state->getLeaf(h, &roll);
+        {
+            inBuffer in(z.second);
+            {
+                M_LOCK(leaf->parent->mx);
+                leaf->parent->unpack_mx(in);
+            }
+            leaf->setDirty(&roll);
+        }
+    }
+    auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(db_state->root);
+    if(r->blockAcceptedREQ->blockInfo->new_root_hash1!=new_root_hash)
+    {
+        logNode("@@ BlockDiffValidateREQ not matched root hash");
+        return true;
+    }
+    db_to_save_Z.add("...last_block...",r->getBuffer());
+    // logNode("BlockDiffValidateREQ ok");
+    REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
+    bdvrs->node_validator=this_node_name;
+    bdvrs->blockInfo=r->blockAcceptedREQ->blockInfo;
+    bdvrs->sign(my_sk_bls);
+    pass_NodeMsgRSP(bdvrs.get(),route);
+
+
+
+    return true;
+}
+bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const NODE_id & src_node, const route_t& route)
+{
+    MUTEX_INSPECTOR;
         // logErr2("@@ %s",__func__);
 
     if(!db_state->sync_empty)
@@ -32,7 +126,163 @@ bool Node::Service::BlockValidatedREQ(const MsgData::BlockValidatedREQ *r, const
      stage_is_working=iUtils->getNow();
          
 
-   MUTEX_INSPECTOR;
+
+    XTRY;
+    auto &cli = cli_leader_info[prev_root_hash_Z()];
+    if(!cli.node_leader.valid())
+    {
+        logNode("if(!cli.node_leader.valid())");
+        return true;
+    }
+
+    if(cli.node_leader->node_leader!=src_node)
+    {
+        logNode("invalid leader 12");
+        return true;
+    }
+    // auto& c=cli_leader_info[r->blockInfo->heart_beat->prev_root_hash_1];
+
+    if (!cli.blockDBStore.valid())
+    {
+        logNode("if (!v.blockDBStore.valid())");
+        return true;
+
+    }
+
+    if (cli.blockDBStore->hb->node_leader != src_node)
+    {
+        logNode("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
+        return true;
+    }
+    auto mf=getMetaFull(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+
+    if(!db_state->sync_empty)
+    {
+        return true;
+    }
+
+    // if (! v.blockDBStore.valid())
+    //     throw CommonError("if (!blockDBStore.valid())");
+    cli.blockDBStore->blockAcceptedREQ = r->blockAcceptedREQ;
+    uint64_t stake_val=0;
+    std::vector<blst_cpp::PublicKey> agg_pk_v;
+    for (auto &z : r->blockAcceptedREQ->node_validators)
+    {
+        XTRY;
+        auto n=db_state->getNodeNoCreate(z);
+        if(!n.valid())
+            throw CommonError("if(!n.valid())");
+
+        agg_pk_v.push_back(n->get_bls_pk());
+        stake_val+=n->get_full_stake();
+        XPASS;
+    }
+    if(stake_val*100/mf->total_full_stake < QUORUM)
+    {
+        logNode("validator quorum failed");
+        return true;
+    }
+    {
+        MUTEX_INSPECTOR;
+        XTRY;
+        if (!r->blockAcceptedREQ->agg_sig.verify(agg_pk_v, blake2b_hash(r->blockAcceptedREQ->blockInfo->getBuffer()).container))
+        {
+            logNode("block aggsig not matched");
+            return true;
+        }
+        XPASS;
+    }
+    uint64_t stake_n=0;
+    std::vector<blst_cpp::PublicKey> agg_pk_n;
+    for(auto & z: r->node_diff_validators)
+    {
+        stake_n+=mf->getStake(z);
+        agg_pk_n.push_back(mf->getNode(z)->get_bls_pk());
+    }
+    if(stake_n*100/mf->total_full_stake < QUORUM)
+    {
+        logNode("node diff quorum failed");
+        return true;
+    }
+    if (!r->agg_diff_sig.verify(agg_pk_n, blake2b_hash(r->blockAcceptedREQ->blockInfo->getBuffer()).container))
+    {
+        logNode("block diff aggsig not matched");
+        return true;
+    }
+
+    
+
+    if(this_node_name==r->blockAcceptedREQ->blockInfo->heart_beat->node_leader)
+    {
+        size_t sz=0;
+        for(auto& z:db_to_save_Z.cells)
+        {
+            sz+=z.second.size();
+        }
+        logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
+    }
+    db_to_save_Z.add("...last_block...",r->blockAcceptedREQ->getBuffer());
+    // auto &hb=v.blockDBStore->hb;
+    // {
+    //     MUTEX_INSPECTOR;
+    //     XTRY;
+    //     XPASS;
+    // }
+    db_state->write_granules_batch(db_to_save_Z);
+
+    // FILE *f= fopen("")
+    logErr2("written %d granules",db_to_save_Z.cells.size());
+    db_to_save_Z.clear();
+
+
+    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(cli.blockDBStore, cli.att_data_Z, this));
+
+    prev_block=r->blockAcceptedREQ;
+    l_blocks.clear();
+    block_meta_full.clear();
+    // block_meta_validator.clear();
+    cli_leader_info.clear();
+
+    for (auto &z : cli.blockDBStore->tx_hashes)
+    {
+
+        MUTEX_INSPECTOR;
+        XTRY;
+        // auto h = z->getHash();
+        auto it = transaction_pool_of_leader.find(z);
+        if (it != transaction_pool_of_leader.end())
+        {
+            transaction_pool_of_leader.erase(it);
+            logNode("removed tx %s", base16::encode(z.container).c_str());
+        }
+        XPASS;
+    }
+    v_blocks.clear();
+
+    stage_is_working=0;
+
+    if(transaction_pool_of_leader.size())
+    {
+        // auto mf=getMetaFull(time(NULL));
+        do_heart_beat(time(NULL));
+    }
+    XPASS;
+    return true;
+}
+
+bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
+{
+    MUTEX_INSPECTOR;
+        // logErr2("@@ %s",__func__);
+
+    if(!db_state->sync_empty)
+    {
+        return true;
+    }
+    // if(state_Z==STATE_SYNCING)
+     stage_is_working=iUtils->getNow();
+         
+
 
     XTRY;
     auto &cli = cli_leader_info[prev_root_hash_Z()];
@@ -104,7 +354,7 @@ bool Node::Service::BlockValidatedREQ(const MsgData::BlockValidatedREQ *r, const
         }
         logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
-    db_to_save_Z.add(".last_block",r->getBuffer());
+    db_to_save_Z.add("...last_block...",r->getBuffer());
     // auto &hb=v.blockDBStore->hb;
     // {
     //     MUTEX_INSPECTOR;
@@ -194,6 +444,7 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
 }
 void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
 {
+    MUTEX_INSPECTOR;
     auto buffer = e->getBuffer();
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
     passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
@@ -256,6 +507,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     if (!err)
     {
 
+    MUTEX_INSPECTOR;
         // auto new_root_hash =
         t.validateBlockREQ = r;
 
