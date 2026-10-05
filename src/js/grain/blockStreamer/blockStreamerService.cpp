@@ -147,7 +147,7 @@ bool BlockStreamer::Service::StreamBlock(const bcEvent::StreamBlock *e)
 {
     for (auto &z : clientTxSubscriptions)
     {
-        passEvent(new bcEvent::ClientTxSubscribeRSP(e->blockStore, e->att_data, poppedFrontRoute(z.first)));
+        passEvent(new bcEvent::ClientTxSubscribeRSP(e->blockStore,  poppedFrontRoute(z.first)));
     }
     return true;
 }

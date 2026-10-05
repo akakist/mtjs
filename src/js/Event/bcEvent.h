@@ -210,15 +210,13 @@ namespace bcEvent
             return new ClientTxSubscribeRSP(r);
         }
         REF_getter<MsgData::BlockDBStore> blockStore;
-        REF_getter<MsgData::attachment_data> att_data;
         
         // std::string msg;
 
         ClientTxSubscribeRSP(const REF_getter<MsgData::BlockDBStore> &_bs, 
-            REF_getter<MsgData::attachment_data> _att_data,
             const route_t &r)
             : Base(bcEventEnum::ClientTxSubscribeRSP, r),
-              blockStore(_bs),att_data(_att_data)
+              blockStore(_bs)
         {
         }
 
@@ -227,12 +225,12 @@ namespace bcEvent
         void unpack(inBuffer &o)
         {
 
-            o >> blockStore >> att_data;
+            o >> blockStore;
         }
         void pack(outBuffer &o) const
         {
 
-            o << blockStore<< att_data;
+            o << blockStore;
         }
     };
 
@@ -389,13 +387,11 @@ namespace bcEvent
             return NULL;
         }
         StreamBlock(const REF_getter<MsgData::BlockDBStore> &_bs,
-            const REF_getter<MsgData::attachment_data> & _ad,
              const route_t &r)
-            : NoPacked(bcEventEnum::StreamBlock, r), blockStore(_bs),att_data(_ad) {}
+            : NoPacked(bcEventEnum::StreamBlock, r), blockStore(_bs) {}
 
         // const std::string payload;
         REF_getter<MsgData::BlockDBStore> blockStore;
-        REF_getter<MsgData::attachment_data> att_data;
     };
     // struct NetworkBase: public Event::Base
     // {

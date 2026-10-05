@@ -658,8 +658,8 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
             auto it=opaque.node_tx_cb.find(tx_hash.container);
             if(it!=opaque.node_tx_cb.end())
             {
-                auto tx_it=e->att_data->blockRoot.children.find(base16::encode(tx_hash.container));
-                if(tx_it==e->att_data->blockRoot.children.end())
+                auto tx_it=e->blockStore->att_data_Z->blockRoot.children.find(base16::encode(tx_hash.container));
+                if(tx_it==e->blockStore->att_data_Z->blockRoot.children.end())
                     throw CommonError("if(tx_it==e->att_data->blockRoot.children.end())");
                 JSValue obj2=emit_node_to_js(js_ctx, tx_it->second);
                 scope.addValue(obj2);
@@ -676,7 +676,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
             {
                 throw CommonError("callback not a function");
             }
-            JSValue obj=emit_node_to_js(js_ctx, e->att_data->blockRoot);
+            JSValue obj=emit_node_to_js(js_ctx, e->blockStore->att_data_Z->blockRoot);
             scope.addValue(obj);
             // JSValue argv[1];
             // argv[0] = obj;

@@ -87,7 +87,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         logNode("block response not validated");
         return true;
     }
-    logNode("verified OK %s",r->node_validator.container.c_str());
+    // logNode("verified OK %s",r->node_validator.container.c_str());
     auto &bt = l_blocks[prev_root_hash_Z()];
     // if(r->blockInfo->diff_hash!=bt.blockInfo)
     auto h=r->blockInfo->getHash();
@@ -101,13 +101,8 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     {
         stakeVal += mf->getStake(z->node_validator);
     }
-    logNode("stakeVal %lld",stakeVal);
-#ifdef FULL_M
+    // logNode("stakeVal %lld",stakeVal);
     if (stakeVal * 100 / mf->total_full_stake > QUORUM)
-#else
-    if (stakeVal * 100 / mv->total_validator_stake > QUORUM)
-#endif
-    // return true;
     {
     MUTEX_INSPECTOR;
         XTRY;
@@ -140,24 +135,9 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
             logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
             return true;
         }
-        // REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ;
-        // bdv->blockAcceptedREQ=ba;
-        // // bt.blockInfo_Z
-        // auto &bv=v_blocks[prev_root_hash_Z()];
-        // bdv->diffs=bv.diffs;
 
-        // {
-        //     /// TODO: test remove after
-        //     auto buf=bdv->getBuffer();
-        //     REF_getter<MsgData::BlockDiffValidateREQ> test=new MsgData::BlockDiffValidateREQ;
-        //     inBuffer in2(buf);
-        //     bdv->unpack2(in2);
-        //     logNode("TEST MsgData::BlockDiffValidateREQ OK");
-        // }
-        // logNode("Broadcast BlockDiffValidateREQ");
-        // broadcast_MsgEvent_via_broadcaster(bdv.get(),mf);
-
-        logNode("validators %s",iUtils->join(" ",nnn).c_str());
+        if(src_node==r->blockInfo->heart_beat->node_leader)
+            logNode("validators %s",iUtils->join(" ",nnn).c_str());
 
         bt.block_accepted_sent = iUtils->getNow();
 
@@ -166,7 +146,8 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         {
             nodelist+=z.first.container+" ";
         }
-        logNode("hb list %s",nodelist.c_str());
+        if(src_node==r->blockInfo->heart_beat->node_leader)
+            logNode("hb list %s",nodelist.c_str());
         XPASS;
     }
 
@@ -207,19 +188,12 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
         return true;
     auto mf=getMetaFull(r->blockInfo->heart_beat->block_timestamp);
-    #ifndef FULL_M
-    auto mv=getMetaValidator(bt.leader_info.leader_cert_2->block_timestamp);
-    #endif
     uint64_t stakeVal = 0;
     for (auto &z : bt.ValidateBlockRSP_m[h])
     {
         stakeVal += mf->getStake(z->node_validator);
     }
-#ifdef FULL_M
     if (stakeVal * 100 / mf->total_full_stake > QUORUM)
-#else
-    if (stakeVal * 100 / mv->total_validator_stake > QUORUM)
-#endif
     {
         XTRY;
         logNode("Block stake finalized");

@@ -235,13 +235,12 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
     db_to_save_Z.clear();
 
 
-    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(cli.blockDBStore, cli.att_data_Z, this));
+    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(cli.blockDBStore,  this));
 
     prev_block=r->blockAcceptedREQ;
     l_blocks.clear();
     block_meta_full.clear();
     // block_meta_validator.clear();
-    cli_leader_info.clear();
 
     for (auto &z : cli.blockDBStore->tx_hashes)
     {
@@ -257,6 +256,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
         }
         XPASS;
     }
+    cli_leader_info.clear();
     v_blocks.clear();
 
     stage_is_working=0;
@@ -273,6 +273,8 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
 bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
+
+    throw CommonError("invalid call BlockAcceptedREQ");
         // logErr2("@@ %s",__func__);
 
     if(!db_state->sync_empty)
@@ -368,7 +370,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     db_to_save_Z.clear();
 
 
-    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(v.blockDBStore, v.att_data_Z, this));
+    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(v.blockDBStore, this));
 
     prev_block=r;
     l_blocks.clear();

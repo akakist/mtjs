@@ -162,11 +162,7 @@ void Node::Service::do_start_block()
         return;
     }
     auto &li = l_blocks[prev_root_hash_Z()].leader_info;
-#ifdef FULL_M
     auto mf=getMetaFull(li.leader_cert_2->block_timestamp);
-#else
-    auto mv=getMetaValidator(li.leader_cert_2->block_timestamp);
-#endif
     {
         REF_getter<MsgData::ValidateBlockREQ> vb = new MsgData::ValidateBlockREQ();
         vb->heart_beat = li.leader_cert_2;
@@ -176,11 +172,7 @@ void Node::Service::do_start_block()
 
         for (auto &z : transaction_pool_of_leader)
             vb->transaction_bodies.push_back(z.second);
-#ifdef FULL_M
         broadcast_MsgEvent_via_broadcaster(vb.get(),mf);
-#else
-        broadcast_MsgEvent(b.get());
-#endif
     }
 }
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
@@ -748,33 +740,14 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
         std::vector<blst_cpp::PublicKey> agg_pk;
 
         uint64_t stake=0;
-#ifndef FULL_M
-        uint64_t val_stake=0;
-#endif
         for (auto &z : lc->node_validators)
         {
-#ifndef FULL_M
-            if(!vals.count(z))
-                throw CommonError("if(!vals.count(z))");
-#endif
-
             auto n = mf->getNode(z);
             agg_pk.push_back(n->get_bls_pk());
             stake += mf->getStake(z);
         }
         
-        // auto nn=root->getAllNodes(db_state.get());
-#ifndef FULL_M
-        for(auto &z: vals)
-        {
-            val_stake+=mf->getStake(z);
-        }
-#endif
-#ifdef FULL_M
         if (stake * 100 / mf->total_full_stake < QUORUM)
-#else
-        if (stake * 100 / val_stake < QUORUM)
-#endif
         {
             logErr2("verify lc quorum failed");
             return false;

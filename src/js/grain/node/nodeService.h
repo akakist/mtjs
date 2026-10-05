@@ -3,7 +3,6 @@
 #include "broadcaster.h"
 
 // #include "signedBuffer.h"
-#define FULL_M 1
 #include "listenerBuffered1Thread.h"
 #include <map>
 #include "Events/System/Run/startServiceEvent.h"
@@ -313,8 +312,6 @@ namespace Node
             }
             REF_getter<MsgData::BlockDBStore> 
             blockDBStore=nullptr;
-            REF_getter<MsgData::attachment_data> att_data_Z= nullptr;
-            std::map<std::string, std::string> diffs;
         };
 
         std::map<THASH_id, block_validator> v_blocks;
