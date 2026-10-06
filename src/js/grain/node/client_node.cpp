@@ -136,7 +136,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
         logNode("if(!cli.node_leader.valid()) @2");
         return true;
     }
-    else logNode("cli.node_leader.valid() @2");
+    // else logNode("cli.node_leader.valid() @2");
 
     if(cli.node_leader->node_leader!=src_node)
     {
