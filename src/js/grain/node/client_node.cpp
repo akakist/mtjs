@@ -32,7 +32,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     auto &cli = cli_leader_info[prev_root_hash_Z()];
     if(!cli.node_leader.valid())
     {
-        logNode("if(!cli.node_leader.valid())");
+        logNode("if(!cli.node_leader.valid()) 1@");
         return true;
     }
 
@@ -133,9 +133,10 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
     auto &cli = cli_leader_info[prev_root_hash_Z()];
     if(!cli.node_leader.valid())
     {
-        logNode("if(!cli.node_leader.valid())");
+        logNode("if(!cli.node_leader.valid()) @2");
         return true;
     }
+    else logNode("cli.node_leader.valid() @2");
 
     if(cli.node_leader->node_leader!=src_node)
     {
@@ -292,7 +293,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
     auto &cli = cli_leader_info[prev_root_hash_Z()];
     if(!cli.node_leader.valid())
     {
-        logNode("if(!cli.node_leader.valid())");
+        logNode("if(!cli.node_leader.valid()) @4");
         return true;
     }
 
@@ -428,7 +429,7 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     auto & cli=cli_leader_info[prev_root_hash];
     if(!cli.node_leader.valid())
     {
-        logNode("if(!cli.node_leader.valid())");
+        logNode("if(!cli.node_leader.valid())##4");
         return true;
     }
 
@@ -475,7 +476,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     auto &cli=cli_leader_info[prev_root_hash];
     if(!cli.node_leader.valid())
     {
-        logNode("if(!cli.node_leader.valid())");
+        logNode("if(!cli.node_leader.valid())##7");
         return true;
     }
     if(cli.node_leader->node_leader!=src_node)

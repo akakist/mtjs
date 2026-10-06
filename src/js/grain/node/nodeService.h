@@ -41,7 +41,7 @@
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db);
 
-#define BROADCAST_ACK_TIMEDOUT_SEC 0.2
+// #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 #define HB_TIME_WINDOW 10
 
 
@@ -234,7 +234,9 @@ namespace Node
             
             std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
             std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
-            int64_t block_accepted_sent=0;
+            // int64_t block_accepted_sent=0;
+            int64_t blockDiffValidateREQ_sent=0;
+            int64_t blockAccepted2REQ_sent=0;
             // heart_beat_info    heart_beat_store;
             heart_beat_node_info leader_info;
             size_t size()
@@ -254,7 +256,8 @@ namespace Node
 
                     }
                 }
-                sz+=sizeof(block_accepted_sent);
+                sz+=sizeof(blockDiffValidateREQ_sent);
+                sz+=sizeof(blockAccepted2REQ_sent);
                 sz+=leader_info.size();
                 return sz;
             }

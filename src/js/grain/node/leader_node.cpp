@@ -90,11 +90,10 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     }
     // logNode("verified OK %s",r->node_validator.container.c_str());
     auto &bt = l_blocks[prev_root_hash_Z()];
+
     // if(r->blockInfo->diff_hash!=bt.blockInfo)
     auto h=r->payload_blockAcceptedREQ->getHash();
     bt.BlockDiffValidateRSP_m[h].push_back(r);
-    // if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
-    //     return true;
 
     uint64_t stakeVal = 0;
     for (auto &z : bt.BlockDiffValidateRSP_m[h])
@@ -102,10 +101,12 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         stakeVal += mf->getStake(z->node_validator);
     }
     // logNode("stakeVal %lld",stakeVal);
-    if (stakeVal * 100 / mf->total_full_stake > QUORUM)
+    logNode("iUtils->getNow()-bt.blockAccepted2REQ_sent %lld",iUtils->getNow()-bt.blockAccepted2REQ_sent);
+    if (stakeVal * 100 / mf->total_full_stake > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
     {
     MUTEX_INSPECTOR;
         XTRY;
+        bt.blockAccepted2REQ_sent=iUtils->getNow();
         logNode("Block stake finalized BlockDiffValidateRSP");
         REF_getter<MsgData::BlockAccepted2REQ> ba2 = new MsgData::BlockAccepted2REQ();
 
@@ -126,14 +127,14 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         }
         else
         {
-            logNode("BlockDiffValidateRSP verified FAIL !!!!!!!!!!!!!!!!!!!!!");
+            throw CommonError("BlockDiffValidateRSP verified FAIL !!!!!!!!!!!!!!!!!!!!!");
             return true;
         }
 
         if(src_node==r->payload_blockAcceptedREQ->blockInfo->heart_beat->node_leader)
             logNode("validators %s",iUtils->join(" ",nnn).c_str());
 
-        bt.block_accepted_sent = iUtils->getNow();
+        // bt.block_accepted_sent = iUtils->getNow();
 
         std::string nodelist;
         for(auto &z: bt.leader_info.HeartBeatRSP_m)
@@ -180,7 +181,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     auto h=r->payload_blockInfo->getHash();
 
     bt.ValidateBlockRSP_m[h].push_back(r);
-    if ( iUtils->getNow() < bt.block_accepted_sent +_1sec)
+    if ( iUtils->getNow() < bt.blockDiffValidateREQ_sent +_1sec)
         return true;
     auto mf=getMetaFull(r->payload_blockInfo->heart_beat->block_timestamp);
     uint64_t stakeVal = 0;
@@ -247,7 +248,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 
         logNode("validators %s",iUtils->join(" ",nnn).c_str());
 
-        bt.block_accepted_sent = iUtils->getNow();
+        bt.blockDiffValidateREQ_sent = iUtils->getNow();
 
         std::string nodelist;
         for(auto &z: bt.leader_info.HeartBeatRSP_m)
