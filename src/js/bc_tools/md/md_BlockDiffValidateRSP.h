@@ -9,7 +9,7 @@ namespace MsgData
     struct BlockDiffValidateRSP: public Base
     {
 
-        BlockDiffValidateRSP(): Base(msgid::BlockDiffValidateRSP), blockInfo(new BlockInfo)
+        BlockDiffValidateRSP(): Base(msgid::BlockDiffValidateRSP), payload_blockAcceptedREQ(new BlockAcceptedREQ)
         {
 
         }
@@ -17,7 +17,7 @@ namespace MsgData
         {
             return new BlockDiffValidateRSP();
         }
-        REF_getter<BlockInfo> blockInfo;
+        REF_getter<BlockAcceptedREQ> payload_blockAcceptedREQ;
         blst_cpp::Signature sig;
         NODE_id node_validator;
 
@@ -27,7 +27,7 @@ namespace MsgData
         // blst_cpp::AggregateSignature agg_sig;
         void update(Blake2bHasher& h) const
         {
-            blockInfo->update(h);
+            payload_blockAcceptedREQ->update(h);
             h.update(sig.serialize());
             h.update(node_validator.container);
 
@@ -35,22 +35,22 @@ namespace MsgData
         void pack(outBuffer& b) const final
         {
             Base::pack(b);
-            b<<blockInfo;
+            b<<payload_blockAcceptedREQ;
             b<<sig;
             b<<node_validator;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
-            b>>blockInfo;
+            b>>payload_blockAcceptedREQ;
             b>>sig;
             b>>node_validator;
         }
         size_t size()
         {
             size_t sz=0;
-            if(blockInfo.valid())
-                sz+=blockInfo->size();
+            if(payload_blockAcceptedREQ.valid())
+                sz+=payload_blockAcceptedREQ->size();
 
             sz+=sig.serialize().size();
             sz+=node_validator.container.size();
@@ -58,11 +58,11 @@ namespace MsgData
         }
         bool verify(const blst_cpp::PublicKey &pk) const
         {
-            return sig.verify(pk, blake2b_hash(blockInfo->getBuffer()).container);
+            return sig.verify(pk, blake2b_hash(payload_blockAcceptedREQ->getBuffer()).container);
         }
         void sign(const blst_cpp::SecretKey &sk)
         {
-            sig.sign(sk, blake2b_hash(blockInfo->getBuffer()).container);
+            sig.sign(sk, blake2b_hash(payload_blockAcceptedREQ->getBuffer()).container);
         }
 
     };

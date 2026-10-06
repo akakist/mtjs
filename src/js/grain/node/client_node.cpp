@@ -95,6 +95,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
             leaf->setDirty(&roll);
         }
     }
+    // cli.blockDBStore->blockAcceptedREQ
     auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(db_state->root);
     if(r->blockAcceptedREQ->blockInfo->new_root_hash1!=new_root_hash)
     {
@@ -105,7 +106,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     // logNode("BlockDiffValidateREQ ok");
     REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
     bdvrs->node_validator=this_node_name;
-    bdvrs->blockInfo=r->blockAcceptedREQ->blockInfo;
+    bdvrs->payload_blockAcceptedREQ=r->blockAcceptedREQ;
     bdvrs->sign(my_sk_bls);
     pass_NodeMsgRSP(bdvrs.get(),route);
 
@@ -149,7 +150,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
 
     }
 
-    if (cli.blockDBStore->hb->node_leader != src_node)
+    if (cli.blockDBStore->blockAcceptedREQ->blockInfo->heart_beat->node_leader != src_node)
     {
         logNode("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
         return true;
@@ -308,7 +309,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
 
     }
 
-    if (v.blockDBStore->hb->node_leader != src_node)
+    if (v.blockDBStore->blockAcceptedREQ->blockInfo->heart_beat->node_leader != src_node)
     {
         logNode("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
         return true;
@@ -347,7 +348,7 @@ bool Node::Service::BlockAcceptedREQ(const MsgData::BlockAcceptedREQ *r, const N
         }
         XPASS;
     }
-    if(this_node_name==v.blockDBStore->hb->node_leader)
+    if(this_node_name==v.blockDBStore->blockAcceptedREQ->blockInfo->heart_beat->node_leader)
     {
         size_t sz=0;
         for(auto& z:db_to_save_Z.cells)
@@ -519,45 +520,46 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         if (!v.blockDBStore.valid())
             v.blockDBStore = new MsgData::BlockDBStore;
         // v.blockDBStore->validateBlockREQ_Z=r;
-        v.blockDBStore->hb=r->heart_beat;
+        // v.blockDBStore->blockAcceptedREQ=r->heart_beat;
+        // v.blockDBStore->att_data_Z=t.att_data;
         v.blockDBStore->tx_hashes.clear();
         for(auto &z: r->transaction_bodies)
         {
             v.blockDBStore->tx_hashes.push_back(z->getHash());
         }
         // blockDBStore = prepareBlockDBStore(t);
-        v.att_data_Z=t.att_data;
-        v.diffs.clear();
+        v.blockDBStore->att_data_Z=t.att_data;
+        v.blockDBStore->diffs.clear();
         for(auto& z:db_to_save_Z.cells)
         {
             if(z.first.size()==28)
-                v.diffs[z.first]=z.second;
+                v.blockDBStore->diffs[z.first]=z.second;
         }
 
-        REF_getter<MsgData::BlockInfo> block = new MsgData::BlockInfo();
+        REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo();
         // block->prev_root_hash = prev_root_hash_Z;
-        block->new_root_hash1 = new_root_hash;
+        blockInfo->new_root_hash1 = new_root_hash;
 
-        block->attachment_hash = t.att_data->getHash();
-        block->heart_beat = r->heart_beat;
+        blockInfo->attachment_hash = t.att_data->getHash();
+        blockInfo->heart_beat = r->heart_beat;
         Blake2bHasher h;
         for(auto & z:r->transaction_bodies)
         {
             z->update(h);
         }
-        block->tx_hash_Z.container=h.final();
+        blockInfo->tx_hash_Z.container=h.final();
 
         Blake2bHasher hh;
-        for(auto &z: v.diffs)
+        for(auto &z: v.blockDBStore->diffs)
         {
             hh.update(z.first);
             hh.update(z.second);
         }
-        block->diff_hash.container=hh.final();
+        blockInfo->diff_hash.container=hh.final();
 
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
         rsp->node_validator = this_node_name;
-        rsp->blockInfo = block;
+        rsp->payload_blockInfo = blockInfo;
         rsp->sign(my_sk_bls);
 
         pass_NodeMsgRSP(rsp.get(), route);

@@ -4,6 +4,8 @@
 // #include "md_BlockInfo.h"
 #include "md_BlockAcceptedREQ.h"
 #include "blst_cp.h"
+#include "md_attachment_data.h"
+#include "md_BlockDBStore.h"
 namespace MsgData
 {
     struct BlockDiffValidateREQ: public Base
@@ -17,8 +19,12 @@ namespace MsgData
         {
             return new BlockDiffValidateREQ();
         }
+        // REFBlockStore
         std::map<std::string,std::string> diffs;
         REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
+        std::vector<THASH_id> tx_hashes;
+        REF_getter<attachment_data> att_data;
+
         // std::vector<NODE_id> node_validators;
         // blst_cpp::AggregateSignature agg_sig;
         void update(Blake2bHasher& h) const
@@ -30,6 +36,11 @@ namespace MsgData
                 h.update(z.first);
                 h.update(z.second);
             }
+            for(auto& z: tx_hashes)
+            {
+                h.update(z.container);
+            }
+            att_data->update(h);
         }
         void pack(outBuffer& b) const final
         {
@@ -37,6 +48,8 @@ namespace MsgData
             Base::pack(b);
             b<<diffs;
             b<<blockAcceptedREQ;
+            b<<tx_hashes;
+            b<<att_data;
         }
         void unpack(inBuffer& b) final
         {
@@ -44,6 +57,8 @@ namespace MsgData
             Base::unpack(b);
             b>>diffs;
             b>>blockAcceptedREQ;
+            b>>tx_hashes;
+            b>>att_data;
         }
         size_t size()
         {
@@ -56,9 +71,11 @@ namespace MsgData
                 sz+=z.first.size();
                 sz+=z.second.size();
             }
-            // for(auto &z: node_validators)
-            //     sz+=z.container.size();
-            // sz+=agg_sig.serialize().size();
+            for(auto& z: tx_hashes)
+            {
+                sz+=z.container.size();
+            }
+            sz+=att_data->size();
 
             return sz;
         }

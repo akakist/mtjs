@@ -229,9 +229,11 @@ namespace Node
 
         struct block_leader
         {
-            std::map<THASH_id /*blockinfo hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
-            std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
-            std::map<THASH_id /*blockinfo hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
+            std::map<THASH_id /*payload hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
+            std::map<THASH_id /*payload hash*/,REF_getter<MsgData::BlockAcceptedREQ> > blockAcceptedREQ_Z;
+            
+            std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
+            std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
             int64_t block_accepted_sent=0;
             // heart_beat_info    heart_beat_store;
             heart_beat_node_info leader_info;
@@ -271,10 +273,7 @@ namespace Node
 
         struct block_validator
         {
-            REF_getter<MsgData::BlockDBStore> 
-            blockDBStore=nullptr;
-            REF_getter<MsgData::attachment_data> att_data_Z= nullptr;
-            std::map<std::string, std::string> diffs;
+            REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
 
             int64_t block_validated=0;
             size_t size()
@@ -282,15 +281,15 @@ namespace Node
                 size_t sz=0;
                 if(blockDBStore.valid())
                     sz+=blockDBStore->size();
-                if(att_data_Z.valid())
-                    sz+=att_data_Z->size();
+                // if(att_data_Z.valid())
+                //     sz+=att_data_Z->size();
                 sz+=sizeof(block_validated);
 
-                for(auto&z:  diffs)
-                {
-                    sz+=z.first.size();
-                    sz+=z.second.size();
-                }
+                // for(auto&z:  diffs)
+                // {
+                //     sz+=z.first.size();
+                //     sz+=z.second.size();
+                // }
                 return sz;
 
             }
