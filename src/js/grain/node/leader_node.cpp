@@ -67,7 +67,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
 bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
-    logNode("@@ %s",__func__);
+    // logNode("@@ %s",__func__);
     if(!db_state->sync_empty)
     {
         logNode("ValidateBlockRSP if(!db_state->sync_empty)");
@@ -222,23 +222,25 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         }
         logNode("Broadcasr BlockDiffValidateREQ 2");
         REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ;
-        bdv->blockAcceptedREQ=ba;
+        // bdv->blockAcceptedREQ=v_blocks[prev_root_hash_Z()].blockDBStore;
         // bt.
-        logNode("bdv->blockAcceptedREQ.valid() %d",bdv->blockAcceptedREQ.valid());
+        // logNode("bdv->blockAcceptedREQ.valid() %d",bdv->blockAcceptedREQ.valid());
         // bt.blockInfo_Z
         auto &bv=v_blocks[prev_root_hash_Z()];
-        bdv->diffs=bv.blockDBStore->diffs;
-        bdv->att_data=bv.blockDBStore->att_data_Z;
-        bdv->tx_hashes=bv.blockDBStore->tx_hashes;
-        if(0){
-            /// TODO: test remove after
-            auto buf=bdv->getBuffer();
-            REF_getter<MsgData::BlockDiffValidateREQ> test=new MsgData::BlockDiffValidateREQ;
-            inBuffer in2(buf);
-            in2 >> test;
-            // bdv->unpack2(in2);
-            logNode("TEST MsgData::BlockDiffValidateREQ OK");
-        }
+        bv.blockDBStore->blockAcceptedREQ=ba;
+        bdv->blockDBStore=bv.blockDBStore;
+        // bdv->diffs=bv.blockDBStore->diffs;
+        // bdv->att_data=bv.blockDBStore->att_data_Z;
+        // bdv->tx_hashes=bv.blockDBStore->tx_hashes;
+        // if(0){
+        //     /// TODO: test remove after
+        //     auto buf=bdv->getBuffer();
+        //     REF_getter<MsgData::BlockDiffValidateREQ> test=new MsgData::BlockDiffValidateREQ;
+        //     inBuffer in2(buf);
+        //     in2 >> test;
+        //     // bdv->unpack2(in2);
+        //     logNode("TEST MsgData::BlockDiffValidateREQ OK");
+        // }
 
 
         broadcast_MsgEvent_via_broadcaster(bdv.get(),mf);

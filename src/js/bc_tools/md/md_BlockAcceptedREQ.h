@@ -8,7 +8,12 @@ namespace MsgData
     struct BlockAcceptedREQ: public Base
     {
 
-        BlockAcceptedREQ();
+        BlockAcceptedREQ()
+            : Base(msgid::BlockAcceptedREQ),
+            blockInfo(new BlockInfo)
+        {
+        }
+
         static Base* construct()
         {
             return new BlockAcceptedREQ();
@@ -34,6 +39,34 @@ namespace MsgData
     };
 
 }
+inline void MsgData::BlockAcceptedREQ::pack(outBuffer &b) const
+{
+    XTRY;
+    MUTEX_INSPECTOR;
+    Base::pack(b);
+    b << blockInfo;
+    b << node_validators << agg_sig;
+    XPASS;
+}
+inline void MsgData::BlockAcceptedREQ::unpack(inBuffer &b)
+{
+    XTRY;
+    MUTEX_INSPECTOR;
+    Base::unpack(b);
+    b >> blockInfo;
+    b >> node_validators >> agg_sig;
+    XPASS;
+}
+
+inline void MsgData::BlockAcceptedREQ::update(Blake2bHasher &h) const
+{
+    blockInfo->update(h);
+    for (auto &z : node_validators)
+    {
+        h.update(z.container);
+    }
+}
+
 inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::BlockAcceptedREQ> &s)
 {
     MUTEX_INSPECTOR;

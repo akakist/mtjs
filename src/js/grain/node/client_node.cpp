@@ -42,7 +42,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         return true;
     }
     std::vector<blst_cpp::PublicKey> agg_pk;
-    for (auto &z : r->blockAcceptedREQ->node_validators)
+    for (auto &z : r->blockDBStore->blockAcceptedREQ->node_validators)
     {
         XTRY;
         auto n=db_state->getNodeNoCreate(z);
@@ -56,7 +56,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     {
         MUTEX_INSPECTOR;
         XTRY;
-        if (!r->blockAcceptedREQ->agg_sig.verify(agg_pk, blake2b_hash(r->blockAcceptedREQ->blockInfo->getBuffer()).container))
+        if (!r->blockDBStore->blockAcceptedREQ->agg_sig.verify(agg_pk, blake2b_hash(r->blockDBStore->blockAcceptedREQ->blockInfo->getBuffer()).container))
         {
             logNode("block aggsig not matched");
             return true;
@@ -68,9 +68,9 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     }
     /// TODO: проверка стейка
     uint64_t staked=0;
-    auto mf=getMetaFull(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+    auto mf=getMetaFull(r->blockDBStore->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
 
-    for(auto &z: r->blockAcceptedREQ->node_validators)
+    for(auto &z: r->blockDBStore->blockAcceptedREQ->node_validators)
     {
         staked+=mf->getStake(z);
     }
@@ -80,7 +80,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         return true;
     }
     Rollback roll;
-    for(auto& z: r->diffs)
+    for(auto& z: r->blockDBStore->diffs)
     {
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
         THASH_id h;
@@ -97,7 +97,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     }
     // cli.blockDBStore->blockAcceptedREQ
     auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(db_state->root);
-    if(r->blockAcceptedREQ->blockInfo->new_root_hash1!=new_root_hash)
+    if(r->blockDBStore->blockAcceptedREQ->blockInfo->new_root_hash1!=new_root_hash)
     {
         logNode("@@ BlockDiffValidateREQ not matched root hash");
         return true;
@@ -106,9 +106,10 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     // logNode("BlockDiffValidateREQ ok");
     REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
     bdvrs->node_validator=this_node_name;
-    bdvrs->payload_blockAcceptedREQ=r->blockAcceptedREQ;
+    bdvrs->payload_blockAcceptedREQ=r->blockDBStore->blockAcceptedREQ;
     bdvrs->sign(my_sk_bls);
     pass_NodeMsgRSP(bdvrs.get(),route);
+    cli.blockDBStore=r->blockDBStore;
 
 
 
@@ -205,7 +206,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
         logNode("node diff quorum failed");
         return true;
     }
-    if (!r->agg_diff_sig.verify(agg_pk_n, blake2b_hash(r->blockAcceptedREQ->blockInfo->getBuffer()).container))
+    if (!r->agg_diff_sig.verify(agg_pk_n, blake2b_hash(r->blockAcceptedREQ->getBuffer()).container))
     {
         logNode("block diff aggsig not matched");
         return true;

@@ -11,7 +11,7 @@ namespace MsgData
     struct BlockDiffValidateREQ: public Base
     {
 
-        BlockDiffValidateREQ(): Base(msgid::BlockDiffValidateREQ), blockAcceptedREQ(new BlockAcceptedREQ)
+        BlockDiffValidateREQ(): Base(msgid::BlockDiffValidateREQ), blockDBStore(new BlockDBStore)
         {
 
         }
@@ -20,62 +20,65 @@ namespace MsgData
             return new BlockDiffValidateREQ();
         }
         // REFBlockStore
-        std::map<std::string,std::string> diffs;
-        REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
-        std::vector<THASH_id> tx_hashes;
-        REF_getter<attachment_data> att_data;
+        REF_getter<BlockDBStore> blockDBStore;
+        // std::map<std::string,std::string> diffs;
+        // REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
+        // std::vector<THASH_id> tx_hashes;
+        // REF_getter<attachment_data> att_data;
 
         // std::vector<NODE_id> node_validators;
         // blst_cpp::AggregateSignature agg_sig;
         void update(Blake2bHasher& h) const
         {
     MUTEX_INSPECTOR;
-            blockAcceptedREQ->update(h);
-            for(auto& z: diffs)
-            {
-                h.update(z.first);
-                h.update(z.second);
-            }
-            for(auto& z: tx_hashes)
-            {
-                h.update(z.container);
-            }
-            att_data->update(h);
+            blockDBStore->update(h);
+            // for(auto& z: diffs)
+            // {
+            //     h.update(z.first);
+            //     h.update(z.second);
+            // }
+            // for(auto& z: tx_hashes)
+            // {
+            //     h.update(z.container);
+            // }
+            // att_data->update(h);
         }
         void pack(outBuffer& b) const final
         {
     MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<diffs;
-            b<<blockAcceptedREQ;
-            b<<tx_hashes;
-            b<<att_data;
+            b<<blockDBStore;
+            // b<<diffs;
+            // b<<blockAcceptedREQ;
+            // b<<tx_hashes;
+            // b<<att_data;
         }
         void unpack(inBuffer& b) final
         {
     MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>diffs;
-            b>>blockAcceptedREQ;
-            b>>tx_hashes;
-            b>>att_data;
+            b>>blockDBStore;
+            // b>>diffs;
+            // b>>blockAcceptedREQ;
+            // b>>tx_hashes;
+            // b>>att_data;
         }
         size_t size()
         {
             size_t sz=0;
-            if(blockAcceptedREQ.valid())
-                sz+=blockAcceptedREQ->size();
+            if(blockDBStore.valid())
+                sz+=blockDBStore->size();
 
-            for(auto& z: diffs)
-            {
-                sz+=z.first.size();
-                sz+=z.second.size();
-            }
-            for(auto& z: tx_hashes)
-            {
-                sz+=z.container.size();
-            }
-            sz+=att_data->size();
+            // for(auto& z: diffs)
+            // {
+            //     sz+=z.first.size();
+            //     sz+=z.second.size();
+            // }
+            // for(auto& z: tx_hashes)
+            // {
+            //     sz+=z.container.size();
+            // }
+            // sz+=att_data->size();
 
             return sz;
         }

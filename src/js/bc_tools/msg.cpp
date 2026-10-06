@@ -4,38 +4,11 @@
 
 
 thread_local MsgFactory msgFactory;
-MsgData::BlockAcceptedREQ::BlockAcceptedREQ()
-    : Base(msgid::BlockAcceptedREQ),
-      blockInfo(new BlockInfo)
-{
-}
-void MsgData::BlockAcceptedREQ::pack(outBuffer &b) const
-{
-    XTRY;
-    MUTEX_INSPECTOR;
-    Base::pack(b);
-    b << blockInfo;
-    b << node_validators << agg_sig;
-    XPASS;
-}
-void MsgData::BlockAcceptedREQ::unpack(inBuffer &b)
-{
-    XTRY;
-    MUTEX_INSPECTOR;
-    Base::unpack(b);
-    b >> blockInfo;
-    b >> node_validators >> agg_sig;
-    XPASS;
-}
-
-void MsgData::BlockAcceptedREQ::update(Blake2bHasher &h) const
-{
-    blockInfo->update(h);
-    for (auto &z : node_validators)
-    {
-        h.update(z.container);
-    }
-}
+// MsgData::BlockAcceptedREQ::BlockAcceptedREQ()
+//     : Base(msgid::BlockAcceptedREQ),
+//       blockInfo(new BlockInfo)
+// {
+// }
 
 const char *msgName(int id)
 {
