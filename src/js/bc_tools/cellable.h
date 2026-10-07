@@ -257,7 +257,7 @@ public:
     }
 
 
-    // REF_getter<Cellable> getLeafOrCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
+    // REF_getter<Cellable> replaceLeafOrCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
 
     void calc_tree_hash(_db_to_save &db_dump);
     void get_dirty_leaves(_db_to_save &db_dump);

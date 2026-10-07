@@ -8,6 +8,7 @@
 #include "msg.h"
 #include "md/md_TX.h"
 #include "md/md_BlockDBStore.h"
+#include "md/md_BlockAccepted2REQ.h"
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
@@ -209,14 +210,14 @@ namespace bcEvent
         {
             return new ClientTxSubscribeRSP(r);
         }
-        REF_getter<MsgData::BlockDBStore> blockStore;
+        REF_getter<MsgData::BlockAccepted2REQ> blockAccepted2REQ;
         
         // std::string msg;
 
-        ClientTxSubscribeRSP(const REF_getter<MsgData::BlockDBStore> &_bs, 
+        ClientTxSubscribeRSP(const REF_getter<MsgData::BlockAccepted2REQ> &_bs, 
             const route_t &r)
             : Base(bcEventEnum::ClientTxSubscribeRSP, r),
-              blockStore(_bs)
+              blockAccepted2REQ(_bs)
         {
         }
 
@@ -225,12 +226,12 @@ namespace bcEvent
         void unpack(inBuffer &o)
         {
 
-            o >> blockStore;
+            o >> blockAccepted2REQ;
         }
         void pack(outBuffer &o) const
         {
 
-            o << blockStore;
+            o << blockAccepted2REQ;
         }
     };
 
@@ -386,12 +387,12 @@ namespace bcEvent
         {
             return NULL;
         }
-        StreamBlock(const REF_getter<MsgData::BlockDBStore> &_bs,
+        StreamBlock(const REF_getter<MsgData::BlockAccepted2REQ> &_bs,
              const route_t &r)
-            : NoPacked(bcEventEnum::StreamBlock, r), blockStore(_bs) {}
+            : NoPacked(bcEventEnum::StreamBlock, r), blockAccepted2REQ(_bs) {}
 
         // const std::string payload;
-        REF_getter<MsgData::BlockDBStore> blockStore;
+        REF_getter<MsgData::BlockAccepted2REQ> blockAccepted2REQ;
     };
     // struct NetworkBase: public Event::Base
     // {

@@ -39,7 +39,6 @@ struct CDatabaseMysql: public IDatabase
     {
         st_TRANSACTION tr(dbh);
         for (const auto& [key, value] : v.cells) {
-            // auto hash = blake2b_hash(key);
             tr.dbh->execSimple((QUERY) R"(
                 REPLACE INTO ?.granule_storage (path, granule_data)
                 VALUES (UNHEX('?'), UNHEX('?'));
@@ -51,7 +50,6 @@ struct CDatabaseMysql: public IDatabase
 
     int getGranule(const std::string& k, std::string* v)
     {
-        // auto h=blake2b_hash(k);
         auto res=dbh->exec((QUERY)"select granule_data from ?.granule_storage where path = UNHEX('?')"<<db_name<<base16::encode(k));
         if(res->size()!=1)
             return 1;

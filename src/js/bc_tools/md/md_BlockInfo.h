@@ -1,6 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_HeartBeatREQ.h"
+#include "md_attachment_data.h"
 #include <nlohmann/json.hpp>
 namespace MsgData
 {
@@ -16,18 +17,15 @@ namespace MsgData
 
         }
         THASH_id new_root_hash1;
-        THASH_id attachment_hash;
-        THASH_id tx_hash_Z;
-        THASH_id diff_hash;
+        std::vector<THASH_id> tx_hashes;
+        std::map<std::string,std::string> diffs;
+        REF_getter<attachment_data> att_data;
         REF_getter<HeartBeatREQ> heart_beat;
         size_t size()
         {
             MUTEX_INSPECTOR;
             size_t sz=0;
             sz+=new_root_hash1.container.size();
-            sz+=attachment_hash.container.size();
-            sz+=tx_hash_Z.container.size();
-            sz+=diff_hash.container.size();
             if(heart_beat.valid())
             sz+=heart_beat->size();
             return sz;
@@ -36,9 +34,9 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             j["new_root_hash1"]=new_root_hash1.str();
-            j["attachment_hash"]=attachment_hash.str();
-            j["tx_hash"]=tx_hash_Z.str();
-            j["diff_hash"]=diff_hash.str();
+            // j["attachment_hash"]=attachment_hash.str();
+            // j["tx_hash"]=tx_hash_Z.str();
+            // j["diff_hash"]=diff_hash.str();
             
             if(heart_beat.valid())
                 heart_beat->dump(j["heart_beat"]);
@@ -48,9 +46,17 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             h.update(new_root_hash1.container);
-            h.update(attachment_hash.container);
-            h.update(tx_hash_Z.container);
-            h.update(diff_hash.container);
+            att_data->update(h);
+            for(auto& z: tx_hashes)
+            {
+                h.update(z.container);
+            }
+            for(auto& z: diffs)
+            {
+                h.update(z.first);
+                h.update(z.second);
+            }
+            
             heart_beat->update(h);
         }
 
@@ -59,9 +65,10 @@ namespace MsgData
             MUTEX_INSPECTOR;
             Base::pack(b);
             b<<new_root_hash1;
-            b<<attachment_hash;
-            b<<tx_hash_Z;
-            b<<diff_hash;
+            if(!att_data.valid()) throw CommonError("if(!att_data.valid())");
+            b<<att_data;
+            b<<tx_hashes;
+            b<<diffs;
             b<<heart_beat;
         }
         void unpack(inBuffer& b) final
@@ -69,9 +76,9 @@ namespace MsgData
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>new_root_hash1;
-            b>>attachment_hash;
-            b>>tx_hash_Z;
-            b>>diff_hash;
+            b>>att_data;
+            b>>tx_hashes;
+            b>>diffs;
             b>>heart_beat;
         }
 

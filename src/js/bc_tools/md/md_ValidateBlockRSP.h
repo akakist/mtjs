@@ -6,6 +6,8 @@
 #include "md_TX.h"
 #include "blst_cp.h"
 #include "NODE_id.h"
+#include "md_BlockDBStore.h"
+#include "md_attachment_data.h"
 namespace MsgData
 {
     struct ValidateBlockRSP: public Base
@@ -15,11 +17,14 @@ namespace MsgData
         {
             return new ValidateBlockRSP();
         }
-        ValidateBlockRSP(): Base(msgid::ValidateBlockRSP), payload_blockInfo(new BlockInfo())
+        ValidateBlockRSP(): Base(msgid::ValidateBlockRSP), blockInfo(new BlockInfo())
         {
 
         }
-        REF_getter<BlockInfo> payload_blockInfo;
+        REF_getter<BlockInfo> blockInfo;
+        // std::vector<THASH_id> tx_hashes;
+        // REF_getter<attachment_data> att_data;
+        // std::map<std::string,std::string> diffs;
         blst_cpp::Signature sig;
         NODE_id node_validator;
         size_t size()
@@ -27,8 +32,19 @@ namespace MsgData
             size_t sz=0;
             sz+=node_validator.container.size();
             sz+=sig.serialize().size();
-            if(payload_blockInfo.valid())
-                sz+=payload_blockInfo->size();
+            if(blockInfo.valid())
+                sz+=blockInfo->size();
+            
+            // for(auto &z : tx_hashes)
+            // {
+            //     sz+=z.container.size();
+            // }
+            // sz+=att_data->size();
+            // for(auto &z :diffs)
+            // {
+            //     sz+=z.first.size();
+            //     sz+=z.second.size();
+            // }
             return sz;
         }
         void dump(nlohmann::json& j)
@@ -39,7 +55,7 @@ namespace MsgData
         }
         void update(Blake2bHasher& h) const
         {
-            payload_blockInfo->update(h);
+            blockInfo->update(h);
             h.update(sig.serialize());
             h.update(node_validator.container);
         }
@@ -48,25 +64,27 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<payload_blockInfo;
+            b<<blockInfo;
             b<<sig;
             b<<node_validator;
+            // b<<tx_hashes<<att_data<<diffs;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>payload_blockInfo;
+            b>>blockInfo;
             b>>sig;
             b>>node_validator;
+            // b>>tx_hashes>>att_data>>diffs;
         }
         void sign(const blst_cpp::SecretKey &sk)
         {
-            sig.sign(sk, blake2b_hash(payload_blockInfo->getBuffer()).container);
+            sig.sign(sk, blockInfo->getHash().container);
         }
         bool verify(const blst_cpp::PublicKey &pk) const
         {
-            return sig.verify(pk, blake2b_hash(payload_blockInfo->getBuffer()).container);
+            return sig.verify(pk, blockInfo->getHash().container);
         }
 
     };

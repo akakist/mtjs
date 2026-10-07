@@ -58,11 +58,11 @@ namespace MsgData
         }
         bool verify(const blst_cpp::PublicKey &pk) const
         {
-            return sig.verify(pk, blake2b_hash(payload_blockAcceptedREQ->getBuffer()).container);
+            return sig.verify(pk, payload_blockAcceptedREQ->getHash().container);
         }
         void sign(const blst_cpp::SecretKey &sk)
         {
-            sig.sign(sk, blake2b_hash(payload_blockAcceptedREQ->getBuffer()).container);
+            sig.sign(sk, payload_blockAcceptedREQ->getHash().container);
         }
 
     };

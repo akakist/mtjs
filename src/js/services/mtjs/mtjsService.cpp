@@ -644,7 +644,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     // inBuffer in(e->msg);
     // REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore();
     // pb->unpack2(in);
-    for (size_t ti = 0; ti < e->blockStore->tx_hashes.size(); ti++)
+    for (size_t ti = 0; ti < e->blockAccepted2REQ->blockAcceptedREQ->blockInfo->tx_hashes.size(); ti++)
     {
         XTRY;
         if (opaque.tx_subscription_cb.has_value())
@@ -654,12 +654,12 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
             JSValue global_obj = JS_GetGlobalObject(js_ctx);
             scope.addValue(global_obj);
             
-            THASH_id tx_hash = e->blockStore->tx_hashes[ti];
+            THASH_id tx_hash = e->blockAccepted2REQ->blockAcceptedREQ->blockInfo->tx_hashes[ti];
             auto it=opaque.node_tx_cb.find(tx_hash.container);
             if(it!=opaque.node_tx_cb.end())
             {
-                auto tx_it=e->blockStore->att_data_Z->blockRoot.children.find(base16::encode(tx_hash.container));
-                if(tx_it==e->blockStore->att_data_Z->blockRoot.children.end())
+                auto tx_it=e->blockAccepted2REQ->blockAcceptedREQ->blockInfo->att_data->blockRoot.children.find(base16::encode(tx_hash.container));
+                if(tx_it==e->blockAccepted2REQ->blockAcceptedREQ->blockInfo->att_data->blockRoot.children.end())
                     throw CommonError("if(tx_it==e->att_data->blockRoot.children.end())");
                 JSValue obj2=emit_node_to_js(js_ctx, tx_it->second);
                 scope.addValue(obj2);
@@ -676,7 +676,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
             {
                 throw CommonError("callback not a function");
             }
-            JSValue obj=emit_node_to_js(js_ctx, e->blockStore->att_data_Z->blockRoot);
+            JSValue obj=emit_node_to_js(js_ctx, e->blockAccepted2REQ->blockAcceptedREQ->blockInfo->att_data->blockRoot);
             scope.addValue(obj);
             // JSValue argv[1];
             // argv[0] = obj;

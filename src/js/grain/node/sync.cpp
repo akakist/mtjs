@@ -75,7 +75,7 @@ bool Node::Service::GetGranulesREQ(const bcEvent::GetGranulesREQ*e)
 bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
 {
 
-    // root->getLeafNoCreate()
+    // root->replaceLeafNoCreate()
     // getByPathNoCreate()
 
     

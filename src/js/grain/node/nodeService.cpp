@@ -172,7 +172,7 @@ void Node::Service::do_start_block()
 
         for (auto &z : transaction_pool_of_leader)
             vb->transaction_bodies.push_back(z.second);
-        broadcast_MsgEvent_via_broadcaster(vb.get(),mf);
+        broadcast_MsgEvent_via_broadcaster(vb.get(), mf->tree_committe);
     }
 }
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
@@ -520,7 +520,7 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li, const
     rt->lc = li.leader_cert_2;
     li.request_for_transactions_time = iUtils->getNow();
 
-    broadcast_MsgEvent_via_broadcaster(rt.get(),meta);
+    broadcast_MsgEvent_via_broadcaster(rt.get(),meta->tree_all_nodes);
 }
 
 // #include "sql"
@@ -660,21 +660,6 @@ THASH_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
     return ret;
 }
 #include <stdlib.h>
-int Node::Service::nodeDistanceToLeader(const NODE_id &node)
-{
-    MUTEX_INSPECTOR;
-    auto nv = db_state->getAllNodes();
-    auto rh=prev_root_hash_Z();
-    int crc = __crc32(0, rh.container.data(), rh.container.size());
-    int idx = crc % nv.size();
-    int npoz = -1;
-    for (int i = 0; i < nv.size(); i++)
-    {
-        if (node == nv[i]->getName())
-            npoz = i;
-    }
-    return abs(idx - npoz);
-}
 bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight, const REF_getter<Node::BlockMetaFull>& m)
 {
     MUTEX_INSPECTOR;
@@ -707,12 +692,12 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
             stake += mf->getStake(z);
         }
         
-        if (stake * 100 / mf->all_nodes_full_stake < QUORUM)
+        if (stake * 100 / mf->committe_full_stake < QUORUM)
         {
             logErr2("verify lc quorum failed");
             return false;
         }
-        if (!lc->agg_sig.verify(agg_pk, blake2b_hash(lc->blockInfo->getBuffer()).container))
+        if (!lc->agg_sig.verify(agg_pk, lc->blockInfo->getHash().container))
         {
             logErr2("verify lc - sign invalid");
             ;
@@ -1172,13 +1157,24 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
     if(validator_count>=vne.size())
         throw CommonError("if(validator_count>=vne.size())");
     std::vector<NodeElement> vne_committe;
+
+    std::string vne_list;
+    for(auto& z: vne)
+    {
+        vne_list+=z.name.container+ " ";
+    }
+    logNode("vne %s",vne_list.c_str());
+    std::string comlist;
     for(size_t i=0;i<validator_count;i++)
     {
         auto n=vne[i].name;
+        comlist+=n.container+" ";
+        // logNode("commitee %s",n.container.c_str());
         vne_committe.push_back(vne[i]);
         m->committe_full_stake+=vne[i].stake_A;
 
     }
+    logNode("committee %s",comlist.c_str());
     m->tree_committe=buildTree(vne_committe);
 
     return m;

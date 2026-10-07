@@ -64,7 +64,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
             REF_getter<MsgData::ConfirmLeaderREQ> rt = new MsgData::ConfirmLeaderREQ();
             rt->hb = m->payload_heart_beat;
 
-                broadcast_MsgEvent_via_broadcaster(rt.get(),mf);
+                broadcast_MsgEvent_via_broadcaster(rt.get(),mf->tree_all_nodes);
         }
     }
     XPASS;
@@ -386,7 +386,6 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
         REF_getter<MsgData::ConfirmLeaderRSP> hbr = new MsgData::ConfirmLeaderRSP();
         hbr->hb = h->hb;
         hbr->node_signer = this_node_name;
-        // hbr->sig.sign(my_sk_bls, blake2b_hash(h->hb->getBuffer()).container);
 
         pass_NodeMsgRSP(hbr.get(),route);
         cli.confirm_leader_sent=iUtils->getNow();
@@ -498,7 +497,7 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t tnow)
     cli_leader_info[prev_root_hash_Z()].node_leader=hb_req;
     cli_leader_info[prev_root_hash_Z()].heart_beat_sent[tnow/HB_TIME_WINDOW]=iUtils->getNow();
 
-    broadcast_MsgEvent_via_node(lce.get(),meta);
+    broadcast_MsgEvent_via_node(lce.get(),meta->tree_all_nodes);
 
     return hb_req;
 }

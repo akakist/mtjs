@@ -213,14 +213,13 @@ namespace Node
 
         // void make_leader_certificate();
         bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight, const REF_getter<Node::BlockMetaFull>& meta);
-        int nodeDistanceToLeader(const NODE_id& node);
 
 
 
         void do_request_for_transactions( Node::heart_beat_node_info& li, const REF_getter<Node::BlockMetaFull>& meta);
 
-        void broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& p, const REF_getter<Node::BlockMetaFull>& meta);
-        void broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>& p, const REF_getter<Node::BlockMetaFull>& meta);
+        void broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& p,  const TreeNode &tree);
+        void broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>& p,  const TreeNode &tree);
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
 
         bool handle_send_to_child(const NODE_id &_node_signer, int64_t _node_start_timestamp, int64_t _seqId, const std::string &sig,
@@ -278,14 +277,14 @@ namespace Node
 
         struct block_validator
         {
-            REF_getter<MsgData::BlockDBStore> blockDBStore=nullptr;
+            // REF_getter<MsgData::BlockDBStore> blockDBStore_V=nullptr;
 
             int64_t block_validated=0;
             size_t size()
             {
                 size_t sz=0;
-                if(blockDBStore.valid())
-                    sz+=blockDBStore->size();
+                // if(blockDBStore_V.valid())
+                //     sz+=blockDBStore_V->size();
                 // if(att_data_Z.valid())
                 //     sz+=att_data_Z->size();
                 sz+=sizeof(block_validated);
@@ -314,8 +313,8 @@ namespace Node
                 sz+=sizeof(confirm_leader_sent);
                 return sz;
             }
-            REF_getter<MsgData::BlockDBStore> 
-            blockDBStore=nullptr;
+            // REF_getter<MsgData::BlockDBStore> 
+            // blockDBStore=nullptr;
         };
 
         std::map<THASH_id, block_validator> v_blocks;

@@ -1,7 +1,7 @@
 #include "cellable.h"
 #include "IDatabase.h"
 
-REF_getter<Cellable> IDatabase::getLeafOrCreate(const REF_getter<Cellable>& _cur, const std::string &id, MutexLockerDeferred &l, Rollback* roll)
+REF_getter<Cellable> IDatabase::replaceLeafOrCreate(const REF_getter<Cellable>& _cur, const std::string &id, MutexLockerDeferred &l, Rollback* roll)
 {
     MUTEX_INSPECTOR;
     auto cur=_cur;
@@ -11,7 +11,7 @@ REF_getter<Cellable> IDatabase::getLeafOrCreate(const REF_getter<Cellable>& _cur
     {
         MUTEX_INSPECTOR;
         l.unlock();
-        return getLeafNoCreate(cur, id, l);
+        return replaceLeafNoCreate(cur, id, l);
     }
     // lk.unlock();
     if(roll)
@@ -33,7 +33,7 @@ REF_getter<Cellable> IDatabase::getLeafOrCreate(const REF_getter<Cellable>& _cur
     return c;
 }
 
-REF_getter<Cellable> IDatabase::getLeafNoCreate(const REF_getter<Cellable>&  _cur, const std::string &id, MutexLockerDeferred &l)
+REF_getter<Cellable> IDatabase::replaceLeafNoCreate(const REF_getter<Cellable>&  _cur, const std::string &id, MutexLockerDeferred &l)
 {
     MUTEX_INSPECTOR;
     auto cur=_cur;
@@ -110,7 +110,7 @@ REF_getter<Cellable> IDatabase::getByPathOrCreate(const REF_getter<Cellable>& _c
     for (auto &z : v)
     {
         MutexLockerDeferred l(cur->mx);
-        cur = getLeafOrCreate(cur,z, l,roll);
+        cur = replaceLeafOrCreate(cur,z, l,roll);
     }
     return cur;
 }
@@ -120,7 +120,7 @@ REF_getter<Cellable> IDatabase::getByPathOrCreate(const REF_getter<Cellable>& _c
     for (auto &z : v)
     {
         MutexLockerDeferred l(cur->mx);
-        cur = getLeafOrCreate(cur,z, l,roll);
+        cur = replaceLeafOrCreate(cur,z, l,roll);
     }
     return cur;
 }
@@ -131,7 +131,7 @@ REF_getter<Cellable> IDatabase::getByPathNoCreate(const REF_getter<Cellable>& _c
     for (auto &z : v)
     {
         MutexLockerDeferred l(cur->mx);
-        cur = getLeafNoCreate(cur,z, l);
+        cur = replaceLeafNoCreate(cur,z, l);
         if (!cur.valid())
             return NULL;
     }
@@ -152,16 +152,8 @@ std::vector<std::string> IDatabase::getPathFromHash(const THASH_id& h)
 
 std::vector<std::string> IDatabase::getPath(const std::string& name) 
 {
-    // std::vector<std::string> out;
     auto h = blake2b_hash(name);
     return getPathFromHash(h);
-    // out.reserve(5);
-    // out.emplace_back(h.container, 0, 1);
-    // out.emplace_back(h.container, 1, 1);
-    // out.emplace_back(h.container, 2, 1);
-    // out.emplace_back(h.container, 3, 1);
-    // out.emplace_back(h.container, 4, 28);
-    // return out;
 }
 
 std::vector<std::string> IDatabase::getContractPath(const CONTRACT_id &name)
@@ -174,14 +166,24 @@ std::vector<std::string> IDatabase::getContractDataPath(const CONTRACT_DATA_id &
     return getPath(key);
 
 }
-REF_getter<data_base> IDatabase::getLeaf(const THASH_id &h, Rollback *roll)
+REF_getter<data_base> IDatabase::replaceLeaf(const THASH_id &h, Rollback *roll, const std::string & buffer)
 {
     MUTEX_INSPECTOR;
     auto cc = getByPathOrCreate(root.get(), getPathFromHash(h), roll);
     if (!cc.valid())
-        return NULL;
-    if (!cc->data.valid())
+        throw CommonError("if (!cc.valid()) 4");
+    {
+        M_LOCK(cc->mx);
+        inBuffer in(buffer);
+        cc->unpack_mx(in);
+        
+    }
+    if(!cc->data.valid())
         throw CommonError("if(!cc->data.valid())");
+    cc->data->setDirty(roll);
+        // return NULL;
+    // if (!cc->data.valid())
+    //     throw CommonError("if(!cc->data.valid())");
     return cc->data;
 }
 

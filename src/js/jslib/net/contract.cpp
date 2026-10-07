@@ -168,16 +168,12 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
                 return JS_ThrowInternalError(ctx, "error parsing nonce: %s", e.what());
     }
 
-    // auto hash=blake2b_hash(msg);
-
     REF_getter<MsgData::TX> t = new MsgData::TX;
     t->tx_body = msg;
     t->pk_ed_bin = pk;
     // t->nonce = nonce;
     auto hash = t->getHash();
     t->sig_ed_bin = sign_ed(sk, hash.container);
-    // auto hash = blake2b_hash(t->tx_body+t->nonce.toString());
-    // logErr2("op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(t, op->listener_->serviceId));");
     op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(t, op->listener_->serviceId));
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, timeout, op->listener_));
