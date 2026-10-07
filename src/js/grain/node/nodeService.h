@@ -100,39 +100,6 @@ namespace Node
         std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > ConfirmLeaderRSP_m;
         std::set<NODE_id> transaction_responders;
         uint64_t request_for_transactions_time=0;
-        size_t size()
-        {
-            size_t sz=0;
-            sz+=sizeof(TIMER_VALIDATE_BLOCK_DELAY_set);
-            sz+=sizeof(request_for_transactions_sent);
-            sz+=sizeof(confirm_leader_sent);
-            sz+=sizeof(request_for_transactions_time);
-            if(leader_cert_2.valid())
-                sz+=leader_cert_2->size();
-            for(auto &z: HeartBeatRSP_m)
-            {
-                sz+=z.first.container.size();
-                sz+=z.second->size();
-            }
-            for(auto &z: ConfirmLeaderRSP_m)
-            {
-                sz+=z.first.container.size();
-                sz+=z.second->size();
-            }
-            for(auto &z: transaction_responders)
-            {
-                sz+=z.container.size();
-            }
-            
-            return sz;
-        }
-        void dump(nlohmann::json& j)
-        {
-            j["HeartBeatRSP_m_SZ"]=HeartBeatRSP_m.size();
-            j["ConfirmLeaderRSP_m_SZ"]=ConfirmLeaderRSP_m.size();
-            j["transaction_responders_SZ"]=transaction_responders.size();
-        }
-
 
     };
     struct heart_beat_info
@@ -187,8 +154,6 @@ namespace Node
         bool GetTransactionRSP(const MsgData::GetTransactionRSP* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockREQ(const MsgData::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockRSP(const MsgData::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
-        bool BlockAcceptedREQ(const MsgData::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route);
-        // bool BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const NODE_id & src_node, const route_t& route);
         bool BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route);
 
         bool BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route);
@@ -213,7 +178,6 @@ namespace Node
 
 
 
-        // void make_leader_certificate();
         bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight, const REF_getter<Node::BlockMetaFull>& meta);
 
 
@@ -233,44 +197,13 @@ namespace Node
         struct block_leader
         {
             std::map<THASH_id /*payload hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
-            std::map<THASH_id /*payload hash*/,REF_getter<MsgData::BlockAcceptedREQ> > blockAcceptedREQ_Z;
             
             std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
             std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
-            // int64_t block_accepted_sent=0;
             REF_getter<MsgData::BlockDiffValidateREQ> blockDiffValidateREQ=nullptr;
             int64_t blockDiffValidateREQ_sent=0;
             int64_t blockAccepted2REQ_sent=0;
-            // heart_beat_info    heart_beat_store;
             heart_beat_node_info leader_info;
-            size_t size()
-            {
-                size_t sz=0;
-                for(auto& z: blockInfo_Z)
-                {
-                    sz+=z.first.container.size();
-                    sz+=z.second->size();
-                }
-                for(auto& z: ValidateBlockRSP_m)
-                {
-                    sz+=z.first.container.size();
-                    for(auto& x: z.second)
-                    {
-                        sz+=x->size();
-
-                    }
-                }
-                sz+=sizeof(blockDiffValidateREQ_sent);
-                sz+=sizeof(blockAccepted2REQ_sent);
-                sz+=leader_info.size();
-                return sz;
-            }
-            void dump(nlohmann::json &j)
-            {
-                j["blockInfo_SZ"]=blockInfo_Z.size();
-                j["responses"]=ValidateBlockRSP_m.size();
-
-            }
 
         };
         _db_to_save db_to_save_Z;
@@ -304,20 +237,8 @@ namespace Node
         struct client_leader_info
         {
             REF_getter<MsgData::HeartBeatREQ> node_leader;
-            // NODE_id node_leader;
             std::map<time_t /*time_window*/, int64_t> heart_beat_sent;
             int64_t confirm_leader_sent=0;
-            size_t size()
-            {
-                size_t sz=0;
-                if(node_leader.valid())
-                    sz+=node_leader->size();
-                sz+=sizeof(heart_beat_sent);
-                sz+=sizeof(confirm_leader_sent);
-                return sz;
-            }
-            // REF_getter<MsgData::BlockDBStore> 
-            // blockDBStore=nullptr;
         };
 
         std::map<THASH_id, block_validator> v_blocks;
@@ -327,9 +248,7 @@ namespace Node
         std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         std::map<THASH_id, std::map< time_t,REF_getter<BlockMetaFull>>> block_meta_full;
-        // std::map<THASH_id,REF_getter<BlockMetaValidator>> block_meta_validator;
         REF_getter<BlockMetaFull> getMetaFull(time_t ti);
-        // REF_getter<BlockMetaValidator> getMetaValidator(uint64_t block_timestamp);
 
         THASH_id prev_root_hash_Z()
         {
@@ -357,13 +276,8 @@ namespace Node
             v_blocks.clear();
             l_blocks.clear();
             block_meta_full.clear();
-            // block_meta_validator.clear();
             cli_leader_info.clear();
-            // lc_responses.clear();
-            // syncs.clear();
             transaction_pool_of_leader.clear();
-            // prev_root_hash_Z=THASH_id();
-            // state_Z=STATE_NORMAL;
             stage_is_working=false;
             last_activity_time=0;
             contracts.clear();
@@ -382,7 +296,6 @@ namespace Node
         void continue_sync();
 
 
-        // bool CheckState(const MsgData::HeartBeatREQ *r, const NODE_id & src_node);
 
         void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::HeartBeatREQ> &lc);
 
@@ -395,15 +308,10 @@ namespace Node
 
         std::optional<std::string> execute_tx_commands(b_params &b, t_params& t, 
              yyjson_val * j_tx);
-        void report_mem();
 
-        // REF_getter<root_data> root=nullptr;
         REF_getter<IDatabase> db_state=nullptr;
-        // REF_getter<DB_history> db_history=nullptr;
 
 
-        // std::string sqlite_pn;
-        // std::string rocksdb_path;
         std::set<msockaddr_in> rpc_addr;
         void logNode(const char* fmt, ...);
         IInstance *iInstance=NULL;
@@ -428,30 +336,6 @@ namespace Node
 
         JSRuntime *contract_runtime=NULL;
 
-        void dump(nlohmann::json &j)
-        {
-            j["msgFactory.registry.size()"]=msgFactory.registry.size();
-            j["v_blocks.size()"]=v_blocks.size();
-            j["l_blocks.size()"]=l_blocks.size();
-            j["cli_leader_info.size()"]=cli_leader_info.size();
-            // j["syncs.size()"]=syncs.size();
-
-            size_t ft=0;
-            for(auto &z: filter_NodeMsgREQ)
-            {
-                for(auto& x:z.second)
-                {
-                    for(auto& y:x.second)
-                    {
-                        ft++;
-                    }
-                }
-            }
-            j["filter_NodeMsgREQ"]=ft;
-            j["contracts size"]=contracts.size();
-
-        }
-            // std::set<std::string> front_sync;
     };
 
 }

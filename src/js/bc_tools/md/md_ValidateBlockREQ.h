@@ -17,25 +17,10 @@ namespace MsgData
 
         REF_getter<MsgData::HeartBeatREQ>  heart_beat;
         std::vector<REF_getter<MsgData::TX> > transaction_bodies;
-        size_t size()
-        {
-            size_t sz=0;
-            if(heart_beat.valid())
-                sz+=heart_beat->size();
-            for(auto& z: transaction_bodies)
-            {
-                if(z.valid())
-                    sz+=z->size();
-                    
-            }
-            return sz;
-        }
         void update(Blake2bHasher& h) const
         {
-            // leader_cert->update(h);
             for(auto& z: transaction_bodies)
             {
-                // z->update(h);
                 heart_beat->update(h);
                 
                 h.update(z->tx_body);

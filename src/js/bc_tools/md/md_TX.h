@@ -22,21 +22,11 @@ namespace MsgData
             if(doc)
                 yyjson_doc_free(doc);
         }
-    private:
-        // yyjson::Document j;
     public:
         std::string tx_body;
         std::string pk_ed_bin;
         std::string sig_ed_bin;
         yyjson_doc *doc=nullptr;
-        size_t size()
-        {
-            size_t sz=0;
-            sz+=tx_body.size();
-            sz+=pk_ed_bin.size();
-            sz+=sig_ed_bin.size();
-            return sz;
-        }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;

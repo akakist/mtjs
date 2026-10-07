@@ -9,7 +9,6 @@ namespace MsgData
     {
 
         BlockDBStore():Base(msgid::BlockDBStore),
-            // hb(new HeartBeatREQ()),
             blockAccepted2REQ(new BlockAccepted2REQ())
 
         {
@@ -20,36 +19,14 @@ namespace MsgData
             return new BlockDBStore();
         }
 
-        // REF_getter<ValidateBlockREQ> validateBlockREQ_Z;
-        // REF_getter<HeartBeatREQ> hb;
         REF_getter<BlockAccepted2REQ> blockAccepted2REQ;
 
         std::vector<THASH_id> tx_hashes;
         std::map<std::string, std::string> diffs;
         REF_getter<MsgData::attachment_data> att_data= nullptr;
 
-        size_t size(){
-            size_t sz=0;
-            // for(auto &z: tx_hashes)
-            //     sz+=z.container.size();
-            // if(hb.valid())
-            //     sz+=hb->size();
-            if(blockAccepted2REQ.valid())
-                sz+=blockAccepted2REQ->size();
-            // if(att_data_Z.valid())
-            //     sz+=att_data_Z->size();
-            // for(auto &z: diffs_Z)
-            // {
-            //     sz+=z.first.size();
-            //     sz+=z.second.size();
-            // }
-            return sz;
-        }
         void update(Blake2bHasher& h) const
         {
-            // for(auto &z: tx_hashes)
-            //     h.update(z.container);
-            // hb->update(h);
             blockAccepted2REQ->update(h);
             for(auto& z: tx_hashes)
             {
@@ -67,7 +44,6 @@ namespace MsgData
             XTRY;
             MUTEX_INSPECTOR;
             Base::pack(b);
-            // b<<hb;
             b<<blockAccepted2REQ;
             b<<tx_hashes;
             b<<diffs;

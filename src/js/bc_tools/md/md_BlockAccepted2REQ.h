@@ -43,18 +43,6 @@ namespace MsgData
             b>>node_diff_validators;
             b>>agg_diff_sig;
         }
-        size_t size()
-        {
-            size_t sz=0;
-            if(blockAcceptedREQ.valid())
-                sz+=blockAcceptedREQ->size();
-            
-            for(auto &z: node_diff_validators)
-                sz+=z.container.size();
-            sz+=agg_diff_sig.serialize().size();
-
-            return sz;
-        }
     };
 
 }

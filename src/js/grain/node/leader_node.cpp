@@ -186,7 +186,6 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     }
 
     auto &bt = l_blocks[prev_root_hash_Z()];
-    // if(r->blockInfo->diff_hash!=bt.blockInfo)
     auto h=r->blockInfo->getHash();
 
     bt.ValidateBlockRSP_m[h].push_back(r);
@@ -200,10 +199,11 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         stakeVal += mf->getStake(z->node_validator);
     }
     //&& v_blocks[prev_root_hash_Z()].blockDBStore_V.valid()
-    if (stakeVal * 100 / mf->committe_full_stake > QUORUM )
+    
+    if ((stakeVal * 100) / mf->committe_full_stake > QUORUM )
     {
         XTRY;
-        logNode("Block stake finalized");
+        logNode("Block stake finalized %lld ",(stakeVal * 100) / mf->committe_full_stake);
         REF_getter<MsgData::BlockAcceptedREQ> ba = new MsgData::BlockAcceptedREQ();
         if (!bt.blockInfo_Z[h].valid())
         {
@@ -234,10 +234,6 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         }
         logNode("Broadcasr BlockDiffValidateREQ 2");
         REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(ba,r->tx_hashes,r->diffs,r->att_data);
-        // bdv->blockAcceptedREQ=ba;
-        // bdv->diffs=r->diffs;
-        // bdv->tx_hashes=r->tx_hashes;
-        // bdv->att_data=r->att_data;
 
         bt.blockDiffValidateREQ=bdv;
 

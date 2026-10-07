@@ -180,54 +180,9 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
     MUTEX_INSPECTOR;
     if(e->tid==timers::TIMER_REPORT_MEM)
     {
-        report_mem();
+        // report_mem();
     }
     return true;
-}
-void Node::Service::report_mem()
-{
-    size_t sz=0;
-    for(auto&z: v_blocks)
-    {
-        sz+=z.first.container.size();
-        sz+=z.second.size();
-    }
-    for(auto& z: l_blocks)
-    {
-        sz+=z.first.container.size();
-        sz+=z.second.size();
-    }
-    for(auto &z : cli_leader_info)
-    {
-        sz+=z.first.container.size();
-        sz+=z.second.size();
-    }
-    // for(auto &z : syncs)
-    // {
-    //     sz+=z.first.container.size();
-    //     sz+=z.second.size();
-    // }
-    for(auto &z : filter_NodeMsgREQ)
-    {
-        sz+=z.first.container.size();
-        for(auto x: z.second)
-        {
-            sz+=sizeof(x.first);
-            for(auto y: x.second)
-            {
-                sz+=sizeof(y);
-            }
-        }
-
-        // sz+=z.second.size();
-    }
-    for(auto& z: transaction_pool_of_leader)
-    {
-        sz+=z.first.container.size();
-        sz+=z.second->size();
-    }
-    logNode("REPORT_MEM NodeService %ld",sz);
-
 }
 bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 {
@@ -501,10 +456,8 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
     HTTP::Response r(e->req);
     auto uri = (std::string)e->req->url;
     auto da = iUtils->splitString("/", uri);
-    nlohmann::json j;
-    dump(j);
     // auto buf = c->dump();
-    r.make_response("<pre>" + j.dump(2) + "</pre>");
+    // r.make_response("<pre>" + j.dump(2) + "</pre>");
     return true;
 }
 
@@ -692,8 +645,9 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
             stake += mf->getStake(z);
         }
         
-        if (stake * 100 / mf->committe_full_stake < QUORUM)
+        if ((stake * 100) / mf->committe_full_stake < QUORUM)
         {
+            logNode("this quorum %lld",(stake * 100) / mf->committe_full_stake);
             logErr2("verify lc quorum failed %lld %lld",stake,mf->committe_full_stake);
             return false;
         }

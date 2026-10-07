@@ -62,15 +62,6 @@ namespace MsgData
             b >> blockAcceptedREQ;
             b >> tx_hashes >> diffs >> att_data;
         }
-        size_t size()
-        {
-            size_t sz=0;
-            if(blockAcceptedREQ.valid())
-                sz+=blockAcceptedREQ->size();
-
-
-            return sz;
-        }
     };
 
 }

@@ -39,22 +39,6 @@ namespace MsgData
             b>>sig;
             b>>node_validator;
         }
-        size_t size()
-        {
-            size_t sz=0;
-
-            sz+=sig.serialize().size();
-            sz+=node_validator.container.size();
-            return sz;
-        }
-        // bool verify(const blst_cpp::PublicKey &pk) const
-        // {
-        //     return sig.verify(pk, blockAcceptedREQ->getHash().container);
-        // }
-        // void sign(const blst_cpp::SecretKey &sk)
-        // {
-        //     sig.sign(sk, blockAcceptedREQ->getHash().container);
-        // }
 
     };
 

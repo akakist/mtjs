@@ -690,7 +690,3 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     XPASS;
     return true;
 }
-void MTJS::Service::report_mem()
-{
-
-}

@@ -21,27 +21,6 @@ namespace MsgData
         THASH_id diffs_hash;
         THASH_id att_data_hash;
         REF_getter<HeartBeatREQ> heart_beat;
-        size_t size()
-        {
-            MUTEX_INSPECTOR;
-            size_t sz=0;
-            sz+=new_root_hash1.container.size();
-            if(heart_beat.valid())
-            sz+=heart_beat->size();
-            return sz;
-        }
-        void dump(nlohmann::json& j)
-        {
-            MUTEX_INSPECTOR;
-            j["new_root_hash1"]=new_root_hash1.str();
-            // j["attachment_hash"]=attachment_hash.str();
-            // j["tx_hash"]=tx_hash_Z.str();
-            // j["diff_hash"]=diff_hash.str();
-            
-            if(heart_beat.valid())
-                heart_beat->dump(j["heart_beat"]);
-            
-        }
         void update(Blake2bHasher& h) const
         {
             MUTEX_INSPECTOR;

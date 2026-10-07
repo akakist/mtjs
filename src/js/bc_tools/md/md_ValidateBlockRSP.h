@@ -27,32 +27,6 @@ namespace MsgData
         std::map<std::string,std::string> diffs;
         blst_cpp::Signature sig;
         NODE_id node_validator;
-        size_t size()
-        {
-            size_t sz=0;
-            sz+=node_validator.container.size();
-            sz+=sig.serialize().size();
-            if(blockInfo.valid())
-                sz+=blockInfo->size();
-            
-            // for(auto &z : tx_hashes)
-            // {
-            //     sz+=z.container.size();
-            // }
-            // sz+=att_data->size();
-            // for(auto &z :diffs)
-            // {
-            //     sz+=z.first.size();
-            //     sz+=z.second.size();
-            // }
-            return sz;
-        }
-        void dump(nlohmann::json& j)
-        {
-            j["sig"]=base16::encode(sig.serialize());
-            j["node_validator"]=node_validator.container;
-            // blockAcceptedREQ->dump(j["blockAcceptedREQ"]);
-        }
         void update(Blake2bHasher& h) const
         {
             blockInfo->update(h);

@@ -21,26 +21,6 @@ namespace MsgData
         uint64_t new_epoch;
         NODE_id node_leader;
         time_t block_timestamp;
-        size_t size()
-        {
-            MUTEX_INSPECTOR;
-
-            size_t sz=0;
-            sz+=sizeof(prev_root_hash_1);
-            sz+=sizeof(new_epoch);
-            sz+=sizeof(node_leader);
-            sz+=sizeof(block_timestamp);
-            return sz;
-        }
-        void dump(nlohmann::json& j)
-        {
-            MUTEX_INSPECTOR;
-            j["prev_root_hash"]=prev_root_hash_1.str();
-            j["new_epoch"]=new_epoch;
-            j["block_timestamp"]=block_timestamp;
-            j["node_leader"]=node_leader.container;
-            
-        }
         bool equals(const REF_getter<HeartBeatREQ> &a)
         {
             MUTEX_INSPECTOR;
