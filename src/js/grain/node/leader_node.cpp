@@ -51,7 +51,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
 
         stake += mf->getStake(z);
     }
-    auto pers=(stake*100)/mf->total_full_stake;
+    auto pers=(stake*100)/mf->all_nodes_full_stake;
 
     if (pers >  QUORUM)
     {
@@ -102,7 +102,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     }
     // logNode("stakeVal %lld",stakeVal);
     // logNode("iUtils->getNow()-bt.blockAccepted2REQ_sent %lld",iUtils->getNow()-bt.blockAccepted2REQ_sent);
-    if (stakeVal * 100 / mf->total_full_stake > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
+    if (stakeVal * 100 / mf->all_nodes_full_stake > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
     {
     MUTEX_INSPECTOR;
         XTRY;
@@ -189,7 +189,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     {
         stakeVal += mf->getStake(z->node_validator);
     }
-    if (stakeVal * 100 / mf->total_full_stake > QUORUM)
+    if (stakeVal * 100 / mf->all_nodes_full_stake > QUORUM)
     {
         XTRY;
         logNode("Block stake finalized");

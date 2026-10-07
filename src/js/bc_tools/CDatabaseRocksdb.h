@@ -15,16 +15,6 @@ struct CDatabaseRocksdb: public IDatabase
     {
 
         rocksdb::Options options;
-        #ifdef KALL
-        options.create_if_missing = true;
-
-        // Оптимизации для твоего кейса (мелкие записи, SSD)
-        options.write_buffer_size = 64 * 1024 * 1024; // 64 MB memtable
-        options.max_write_buffer_number = 3;
-        options.target_file_size_base = 64 * 1024 * 1024;
-        // options.level_zero_file_num_compaction_trigger = 4;
-        options.compression = rocksdb::kLZ4Compression;
-        #endif
         options.create_if_missing = true;
         // rocksdb::Options options;
 

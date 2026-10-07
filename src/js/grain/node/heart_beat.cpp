@@ -53,7 +53,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
             }
         }
     }
-    auto pers = (hb_staked * 100) / mf->total_full_stake;
+    auto pers = (hb_staked * 100) / mf->all_nodes_full_stake;
 
     if (pers > QUORUM && (iUtils->getNow() > li.confirm_leader_sent+ _1sec))
     {
@@ -433,7 +433,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
             hb_staked += stake;
         }
     }
-    auto pers = hb_staked * 100 / mf->total_full_stake;
+    auto pers = hb_staked * 100 / mf->all_nodes_full_stake;
 
     if (pers > QUORUM)
     {

@@ -15,14 +15,11 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         fees["node_stake"]=2000;
         fees["mint"]=95;
         fees["transfer"]=1000;
-        fees["cashback"]=200;
-        fees["validator_count"]=200;
-        fees["validator_mistake"]=100;
+        fees["cashback_percent"]=200;
+        fees["validator_count_percent"]=50;
     }
     std::map<std::string,uint64_t> fees;
     std::set<ADDRESS_id> emitters_bin;
-    // int validator_count=5;
-    // uint64_t validator_minstake=100;
 
     size_t size() const
     {

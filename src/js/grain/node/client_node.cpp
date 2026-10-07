@@ -74,7 +74,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     {
         staked+=mf->getStake(z);
     }
-    if((staked*100)/mf->total_full_stake < QUORUM)
+    if((staked*100)/mf->all_nodes_full_stake < QUORUM)
     {
         logNode("failed quorum check V");
         return true;
@@ -180,7 +180,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
         stake_val+=n->get_full_stake();
         XPASS;
     }
-    if(stake_val*100/mf->total_full_stake < QUORUM)
+    if(stake_val*100/mf->all_nodes_full_stake < QUORUM)
     {
         logNode("validator quorum failed");
         return true;
@@ -202,7 +202,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
         stake_n+=mf->getStake(z);
         agg_pk_n.push_back(mf->getNode(z)->get_bls_pk());
     }
-    if(stake_n*100/mf->total_full_stake < QUORUM)
+    if(stake_n*100/mf->all_nodes_full_stake < QUORUM)
     {
         logNode("node diff quorum failed");
         return true;

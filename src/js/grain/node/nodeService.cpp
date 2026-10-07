@@ -688,46 +688,6 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
     if(prev_root_hash_Z().container.size())
         return itL->second < itR->second;
     return nodeLeft.container<nodeRight.container;
-#ifdef KALL
-    auto nv = db_state->getAllNodes();
-    std::sort(nv.begin(), nv.end(), [](const REF_getter<bc_node>& a, const REF_getter<bc_node>& b)
-    {
-        return a->getName() < b->getName();
-    });
-
-    // ФИКС 1: uint32_t вместо int, чтобы избежать отрицательного crc
-    auto prev_rh=prev_root_hash_Z();
-    uint32_t crc = __crc32(0, prev_rh.container.data(), prev_rh.container.size());
-    int idx = static_cast<int>(crc % nv.size());
-
-    int npoz = -1;
-    int tpoz = -1;
-    for (int i = 0; i < static_cast<int>(nv.size()); i++)
-    {
-        if (nodeLeft == nv[i]->getName())
-            npoz = i;
-        if (nodeRight == nv[i]->getName())
-            tpoz = i;
-    }
-
-    // ФИКС 2: защита от ненайденных нод
-    if (npoz == -1 || tpoz == -1)
-    {
-        return npoz != -1; // если nodeLeft найден, а nodeRight нет — nodeLeft лучше
-    }
-
-    int distLeft  = abs(idx - npoz);
-    int distRight = abs(idx - tpoz);
-
-    // ФИКС 3: TIE-BREAKER при равных расстояниях
-    if (distLeft == distRight)
-    {
-        return nodeLeft < nodeRight;  // побеждает нода с меньшим именем
-    }
-
-    return distLeft < distRight;
-#endif
-// }
 }
 bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
 {
@@ -747,7 +707,7 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
             stake += mf->getStake(z);
         }
         
-        if (stake * 100 / mf->total_full_stake < QUORUM)
+        if (stake * 100 / mf->all_nodes_full_stake < QUORUM)
         {
             logErr2("verify lc quorum failed");
             return false;
@@ -1159,26 +1119,31 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 
         }
     }
-    // logNode("create meta %ld",t_win);
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
     block_meta_full[b][t_win]=m;
-    auto nn=db_state->getNodeListNoCreateConst();
-    m->full_broadcast=nn->getList();
+    auto nodeList=db_state->getNodeListNoCreateConst();
+    // m->full_broadcast=nn->getList();
     auto an=db_state->getAllNodes();
+
+    auto v=db_state->getValuesNoCreateConst();
+    
+    auto validators_percent=v->getGas("validator_count_percent");
+
+    size_t validator_count=(an.size()*validators_percent)/100;
 
     for(auto& z: an)
     {
         auto name=z->getName();
-        m->nodes.insert_or_assign(name,z);
+        m->all_nodes.insert_or_assign(name,z);
         auto stake=z->get_full_stake();
         m->node_stakes[name]=stake;
-        m->total_full_stake+=stake;
+        m->all_nodes_full_stake+=stake;
     }
     std::vector<NodeElement> vne;
-    auto ll=db_state->getAllNodes();
+    auto allNodes=db_state->getAllNodes();
     std::map<uint64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
 
-    for(auto &x: ll)
+    for(auto &x: allNodes)
     {
         std::string seed=x->getName().container;
         if(prev_block.valid())
@@ -1202,51 +1167,25 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
             vne.push_back(z.second->getElement());
         }
     }
-    // std::string st="NODES ";
-    // for(int i=0;i<vne.size();i++)
-    // {
-    //     st+=vne[i].name.container+" ";
-    // }
-    // logNode("NODES %s",st.c_str());
-    m->tree=buildTree(vne);
+    m->tree_all_nodes=buildTree(vne);
+
+    if(validator_count>=vne.size())
+        throw CommonError("if(validator_count>=vne.size())");
+    std::vector<NodeElement> vne_committe;
+    for(size_t i=0;i<validator_count;i++)
+    {
+        auto n=vne[i].name;
+        vne_committe.push_back(vne[i]);
+        m->committe_full_stake+=vne[i].stake_A;
+
+    }
+    m->tree_committe=buildTree(vne_committe);
 
     return m;
 }
-#ifdef KALL
-REF_getter<Node::BlockMetaValidator> Node::Service::getMetaValidator(uint64_t block_timestamp)
-{
-    auto b=prev_root_hash_Z();
-    auto it=block_meta_validator.find(b);
-    if(it!=block_meta_validator.end())
-    {
-        if(it->second.valid())
-        return it->second;
-    }
-    REF_getter<BlockMetaValidator> m=new BlockMetaValidator();
-    auto nn=db_state->getNodeListNoCreateConst();
-    m->validator_broadcast=getValidators(block_timestamp,db_state.get());
-    // auto nm=root->getAllNodes(db_state.get());
-    // m->full_broadcast=nn->getList();
-    auto an=db_state->getAllNodes();
-
-    for(auto& z: m->validator_broadcast)
-    {
-        auto n=db_state->getNodeNoCreate(z);
-        if(!n.valid())
-        throw CommonError("if(!n.valid())");
-        // auto name=z->getName();
-        // m->nodes.insert_or_assign(name,z);
-        auto stake=n->get_full_stake();
-        m->validator_stake[z]=stake;
-        m->total_validator_stake+=stake;
-    }
-    return m;
-}
-#endif
 void Node::Service::logNode(const char *fmt, ...)
 {
 
-    // auto prev=root->getEpoch(NULL,db_state.get())->prev_block;
     uint64_t ep=epoch_current();
     {
         va_list ap;
