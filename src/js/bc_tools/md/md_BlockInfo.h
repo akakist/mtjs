@@ -17,9 +17,9 @@ namespace MsgData
 
         }
         THASH_id new_root_hash1;
-        std::vector<THASH_id> tx_hashes;
-        std::map<std::string,std::string> diffs;
-        REF_getter<attachment_data> att_data;
+        THASH_id tx_hash;
+        THASH_id diffs_hash;
+        THASH_id att_data_hash;
         REF_getter<HeartBeatREQ> heart_beat;
         size_t size()
         {
@@ -46,17 +46,10 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             h.update(new_root_hash1.container);
-            att_data->update(h);
-            for(auto& z: tx_hashes)
-            {
-                h.update(z.container);
-            }
-            for(auto& z: diffs)
-            {
-                h.update(z.first);
-                h.update(z.second);
-            }
-            
+            h.update(tx_hash.container);
+            h.update(diffs_hash.container);
+            h.update(att_data_hash.container);
+           
             heart_beat->update(h);
         }
 
@@ -65,10 +58,9 @@ namespace MsgData
             MUTEX_INSPECTOR;
             Base::pack(b);
             b<<new_root_hash1;
-            if(!att_data.valid()) throw CommonError("if(!att_data.valid())");
-            b<<att_data;
-            b<<tx_hashes;
-            b<<diffs;
+            b<<att_data_hash;
+            b<<tx_hash;
+            b<<diffs_hash;
             b<<heart_beat;
         }
         void unpack(inBuffer& b) final
@@ -76,9 +68,9 @@ namespace MsgData
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>new_root_hash1;
-            b>>att_data;
-            b>>tx_hashes;
-            b>>diffs;
+            b>>att_data_hash;
+            b>>tx_hash;
+            b>>diffs_hash;
             b>>heart_beat;
         }
 

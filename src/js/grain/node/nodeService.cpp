@@ -694,7 +694,7 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
         
         if (stake * 100 / mf->committe_full_stake < QUORUM)
         {
-            logErr2("verify lc quorum failed");
+            logErr2("verify lc quorum failed %lld %lld",stake,mf->committe_full_stake);
             return false;
         }
         if (!lc->agg_sig.verify(agg_pk, lc->blockInfo->getHash().container))
@@ -762,18 +762,17 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     case msgid::ValidateBlockREQ:
         last_activity_time=iUtils->getNow();
         return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::BlockAcceptedREQ:
-        last_activity_time=iUtils->getNow();
-        return BlockAcceptedREQ(static_cast<const MsgData::BlockAcceptedREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::BlockAccepted2REQ:
         last_activity_time=iUtils->getNow();
-        return BlockAccepted2REQ(static_cast<const MsgData::BlockAccepted2REQ *>(msg.get()), m->node_signer, m->route);
+        return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderREQ:
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::DelayNotificationREQ:
         return DelayNotificationREQ(static_cast<const MsgData::DelayNotificationREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::BlockDiffValidateREQ:
         return BlockDiffValidateREQ(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
+    case msgid::BlockDBStore:
+        return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
 
     default:
         throw CommonError("unjandled3 MsgData %s", msgName(msg->type));

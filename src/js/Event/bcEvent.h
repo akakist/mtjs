@@ -9,6 +9,7 @@
 #include "md/md_TX.h"
 #include "md/md_BlockDBStore.h"
 #include "md/md_BlockAccepted2REQ.h"
+#include "md/md_attachment_data.h"
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
@@ -211,13 +212,21 @@ namespace bcEvent
             return new ClientTxSubscribeRSP(r);
         }
         REF_getter<MsgData::BlockAccepted2REQ> blockAccepted2REQ;
+        std::vector<THASH_id> tx_hashes;
+        std::map<std::string,std::string> diffs;
+        REF_getter<MsgData::attachment_data> att_data;
         
         // std::string msg;
 
-        ClientTxSubscribeRSP(const REF_getter<MsgData::BlockAccepted2REQ> &_bs, 
+        ClientTxSubscribeRSP(const REF_getter<MsgData::BlockAccepted2REQ> &_bs, const std::vector<THASH_id> &_tx_hashes,
+            const std::map<std::string,std::string> &_diffs, const REF_getter<MsgData::attachment_data> _att,
+
             const route_t &r)
             : Base(bcEventEnum::ClientTxSubscribeRSP, r),
-              blockAccepted2REQ(_bs)
+              blockAccepted2REQ(_bs),
+              tx_hashes(_tx_hashes),
+              diffs(_diffs),
+              att_data(_att)
         {
         }
 
@@ -227,11 +236,13 @@ namespace bcEvent
         {
 
             o >> blockAccepted2REQ;
+            o >> tx_hashes >> diffs >> att_data;
         }
         void pack(outBuffer &o) const
         {
 
             o << blockAccepted2REQ;
+            o << tx_hashes << diffs << att_data;
         }
     };
 
@@ -387,12 +398,18 @@ namespace bcEvent
         {
             return NULL;
         }
-        StreamBlock(const REF_getter<MsgData::BlockAccepted2REQ> &_bs,
+        StreamBlock(const REF_getter<MsgData::BlockAccepted2REQ> &_bs, const std::vector<THASH_id>& _tx_hashes,
+            const std::map<std::string,std::string>& _diffs,
+            const REF_getter<MsgData::attachment_data> _att,
              const route_t &r)
-            : NoPacked(bcEventEnum::StreamBlock, r), blockAccepted2REQ(_bs) {}
+            : NoPacked(bcEventEnum::StreamBlock, r), blockAccepted2REQ(_bs),
+            tx_hashes(_tx_hashes),diffs(_diffs),att_data(_att) {}
 
         // const std::string payload;
         REF_getter<MsgData::BlockAccepted2REQ> blockAccepted2REQ;
+        std::vector<THASH_id> tx_hashes;
+        std::map<std::string,std::string> diffs;
+        REF_getter<MsgData::attachment_data> att_data;
     };
     // struct NetworkBase: public Event::Base
     // {

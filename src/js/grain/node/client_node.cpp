@@ -81,7 +81,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     }
     Rollback roll;
     // logNode("r->blockDBStore->diffs size %d",r->blockAcceptedREQ->blockInfo->diffs.size());
-    for(auto& z: r->blockAcceptedREQ->blockInfo->diffs)
+    for(auto& z: r->diffs)
     {
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
         THASH_id h;
@@ -108,8 +108,9 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     // logNode("BlockDiffValidateREQ ok");
     REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
     bdvrs->node_validator=this_node_name;
-    bdvrs->payload_blockAcceptedREQ=r->blockAcceptedREQ;
-    bdvrs->sign(my_sk_bls);
+    // bdvrs->blockAcceptedREQ=r->blockAcceptedREQ;
+    bdvrs->sig.sign(my_sk_bls,r->blockAcceptedREQ->getHash().container);
+    // bdvrs->sign(my_sk_bls);
     pass_NodeMsgRSP(bdvrs.get(),route);
     // cli.blockDBStore=r->blockDBStore;
 
@@ -117,7 +118,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
 
     return true;
 }
-bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const NODE_id & src_node, const route_t& route)
+bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
         // logErr2("@@ %s",__func__);
@@ -154,12 +155,12 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
 
     // }
 
-    if (r->blockAcceptedREQ->blockInfo->heart_beat->node_leader != src_node)
+    if (r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->node_leader != src_node)
     {
         logNode("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
         return true;
     }
-    auto mf=getMetaFull(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+    auto mf=getMetaFull(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
 
     if(!db_state->sync_empty)
     {
@@ -171,7 +172,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
     // cli.blockDBStore->blockAcceptedREQ = r->blockAcceptedREQ;
     uint64_t stake_val=0;
     std::vector<blst_cpp::PublicKey> agg_pk_v;
-    for (auto &z : r->blockAcceptedREQ->node_validators)
+    for (auto &z : r->blockAccepted2REQ->blockAcceptedREQ->node_validators)
     {
         XTRY;
         auto n=db_state->getNodeNoCreate(z);
@@ -190,7 +191,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
     {
         MUTEX_INSPECTOR;
         XTRY;
-        if (!r->blockAcceptedREQ->agg_sig.verify(agg_pk_v, r->blockAcceptedREQ->blockInfo->getHash().container))
+        if (!r->blockAccepted2REQ->blockAcceptedREQ->agg_sig.verify(agg_pk_v, r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->getHash().container))
         {
             logNode("block aggsig not matched");
             return true;
@@ -199,7 +200,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
     }
     uint64_t stake_n=0;
     std::vector<blst_cpp::PublicKey> agg_pk_n;
-    for(auto & z: r->node_diff_validators)
+    for(auto & z: r->blockAccepted2REQ->node_diff_validators)
     {
         stake_n+=mf->getStake(z);
         agg_pk_n.push_back(mf->getNode(z)->get_bls_pk());
@@ -209,7 +210,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
         logNode("node diff quorum failed");
         return true;
     }
-    if (!r->agg_diff_sig.verify(agg_pk_n, r->blockAcceptedREQ->getHash().container))
+    if (!r->blockAccepted2REQ->agg_diff_sig.verify(agg_pk_n, r->blockAccepted2REQ->blockAcceptedREQ->getHash().container))
     {
         logNode("block diff aggsig not matched");
         return true;
@@ -217,7 +218,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
 
     
 
-    if(this_node_name==r->blockAcceptedREQ->blockInfo->heart_beat->node_leader)
+    if(this_node_name==r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->node_leader)
     {
         size_t sz=0;
         for(auto& z:db_to_save_Z.cells)
@@ -226,7 +227,7 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
         }
         logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
-    db_to_save_Z.add("...last_block...",r->blockAcceptedREQ->getBuffer());
+    db_to_save_Z.add("...last_block...",r->blockAccepted2REQ->blockAcceptedREQ->getBuffer());
     // auto &hb=v.blockDBStore->hb;
     // {
     //     MUTEX_INSPECTOR;
@@ -240,14 +241,14 @@ bool Node::Service::BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const
     db_to_save_Z.clear();
 
 
-    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r,  this));
+    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
 
-    prev_block=r->blockAcceptedREQ;
+    prev_block=r->blockAccepted2REQ->blockAcceptedREQ;
     l_blocks.clear();
     block_meta_full.clear();
     // block_meta_validator.clear();
 
-    for (auto &z : r->blockAcceptedREQ->blockInfo->tx_hashes)
+    for (auto &z : r->tx_hashes)
     {
 
         MUTEX_INSPECTOR;
@@ -521,21 +522,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
         auto new_root_hash = execute_block(t, r->heart_beat);
 
-        // auto &v = v_blocks[prev_root_hash_Z()];
-        // if (!v.blockDBStore_V.valid())
-        //     v.blockDBStore_V = new MsgData::BlockDBStore;
-        // v.blockDBStore->validateBlockREQ_Z=r;
-        // v.blockDBStore->blockAcceptedREQ=r->heart_beat;
-        // v.blockDBStore->att_data_Z=t.att_data;
-        // v.blockDBStore_V->tx_hashes.clear();
-        // std::vector<THASH_id> tx_hashes;
-        // for(auto &z: r->transaction_bodies)
-        // {
-        //     tx_hashes.push_back(z->getHash());
-        // }
-        // blockDBStore = prepareBlockDBStore(t);
-        // v.blockDBStore_V->att_data_Z=t.att_data;
-        // v.blockDBStore_V->diffs_Z.clear();
         std::map<std::string, std::string> diffs;
         for(auto& z:db_to_save_Z.cells)
         {
@@ -552,8 +538,8 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         // REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo();
         // block->prev_root_hash = prev_root_hash_Z;
         rsp->blockInfo->new_root_hash1 = new_root_hash;
-        rsp->blockInfo->diffs=diffs;
-        rsp->blockInfo->att_data = t.att_data;
+        rsp->diffs=diffs;
+        rsp->att_data = t.att_data;
         rsp->blockInfo->heart_beat = r->heart_beat;
 
         // logNode("rsp->payload_blockInfo->att_data valid %d",rsp->blockInfo->att_data.valid());
@@ -561,7 +547,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         Blake2bHasher h;
         for(auto & z:r->transaction_bodies)
         {
-            rsp->blockInfo->tx_hashes.push_back(z->getHash());
+            rsp->tx_hashes.push_back(z->getHash());
         }
         // blockInfo->tx_hash_Z.container=h.final();
         rsp->node_validator = this_node_name;

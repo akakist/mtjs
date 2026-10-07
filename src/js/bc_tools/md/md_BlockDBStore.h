@@ -1,7 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_attachment_data.h"
-#include "md_BlockAcceptedREQ.h"
+#include "md_BlockAccepted2REQ.h"
 #include "md_ValidateBlockREQ.h"
 namespace MsgData
 {
@@ -10,17 +10,23 @@ namespace MsgData
 
         BlockDBStore():Base(msgid::BlockDBStore),
             // hb(new HeartBeatREQ()),
-            blockAcceptedREQ(new BlockAcceptedREQ())
+            blockAccepted2REQ(new BlockAccepted2REQ())
 
         {
 
         }
+        static Base* construct()
+        {
+            return new BlockDBStore();
+        }
+
         // REF_getter<ValidateBlockREQ> validateBlockREQ_Z;
-        // std::vector<THASH_id> tx_hashes;
         // REF_getter<HeartBeatREQ> hb;
-        REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
-        // REF_getter<MsgData::attachment_data> att_data_Z= nullptr;
-        // std::map<std::string, std::string> diffs_Z;
+        REF_getter<BlockAccepted2REQ> blockAccepted2REQ;
+
+        std::vector<THASH_id> tx_hashes;
+        std::map<std::string, std::string> diffs;
+        REF_getter<MsgData::attachment_data> att_data= nullptr;
 
         size_t size(){
             size_t sz=0;
@@ -28,8 +34,8 @@ namespace MsgData
             //     sz+=z.container.size();
             // if(hb.valid())
             //     sz+=hb->size();
-            if(blockAcceptedREQ.valid())
-                sz+=blockAcceptedREQ->size();
+            if(blockAccepted2REQ.valid())
+                sz+=blockAccepted2REQ->size();
             // if(att_data_Z.valid())
             //     sz+=att_data_Z->size();
             // for(auto &z: diffs_Z)
@@ -44,24 +50,28 @@ namespace MsgData
             // for(auto &z: tx_hashes)
             //     h.update(z.container);
             // hb->update(h);
-            blockAcceptedREQ->update(h);
-            // att_data_Z->update(h);
-            // for(auto& z: diffs_Z)
-            // {
-            //     h.update(z.first);
-            //     h.update(z.second);
-            // }
+            blockAccepted2REQ->update(h);
+            for(auto& z: tx_hashes)
+            {
+                h.update(z.container);
+            }
+            for(auto& z: diffs)
+            {
+                h.update(z.first);
+                h.update(z.second);
+            }
+            att_data->update(h);
         }
         void pack(outBuffer& b) const final
         {
             XTRY;
             MUTEX_INSPECTOR;
             Base::pack(b);
-            // b<<tx_hashes;
             // b<<hb;
-            b<<blockAcceptedREQ;
-            // b<<att_data_Z;
-            // b<<diffs_Z;
+            b<<blockAccepted2REQ;
+            b<<tx_hashes;
+            b<<diffs;
+            b<<att_data;
             XPASS;
         }
         void unpack(inBuffer& b) final
@@ -69,11 +79,11 @@ namespace MsgData
             XTRY;
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            // b>>tx_hashes;
             // b>>hb;
-            b>>blockAcceptedREQ;
-            // b>>att_data_Z;
-            // b>>diffs_Z;
+            b>>blockAccepted2REQ;
+            b>>tx_hashes;
+            b>>diffs;
+            b>>att_data;
             XPASS;
         }
 

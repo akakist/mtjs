@@ -17,6 +17,7 @@
 #include "md/md_BlockDiffValidateREQ.h"
 #include "md/md_BlockDiffValidateRSP.h"
 #include "md/md_BlockAccepted2REQ.h"
+#include "md/md_BlockDBStore.h"
 
 
 #include "md/md_DelayNotificationREQ.h"
@@ -42,5 +43,6 @@ MsgFactory::MsgFactory()
 
     registerMsg(msgid::BlockDiffValidateREQ, MsgData::BlockDiffValidateREQ::construct);
     registerMsg(msgid::BlockDiffValidateRSP, MsgData::BlockDiffValidateRSP::construct);
+    registerMsg(msgid::BlockDBStore, MsgData::BlockDBStore::construct);
 
 }

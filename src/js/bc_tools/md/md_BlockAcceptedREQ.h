@@ -24,6 +24,7 @@ namespace MsgData
         void update(Blake2bHasher& h) const;
         void pack(outBuffer& b) const final;
         void unpack(inBuffer& b) final;
+        
         size_t size()
         {
             size_t sz=0;

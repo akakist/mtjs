@@ -22,9 +22,9 @@ namespace MsgData
 
         }
         REF_getter<BlockInfo> blockInfo;
-        // std::vector<THASH_id> tx_hashes;
-        // REF_getter<attachment_data> att_data;
-        // std::map<std::string,std::string> diffs;
+        std::vector<THASH_id> tx_hashes;
+        REF_getter<attachment_data> att_data;
+        std::map<std::string,std::string> diffs;
         blst_cpp::Signature sig;
         NODE_id node_validator;
         size_t size()
@@ -58,6 +58,17 @@ namespace MsgData
             blockInfo->update(h);
             h.update(sig.serialize());
             h.update(node_validator.container);
+            for(auto& t: tx_hashes)
+            {
+                h.update(t.container);
+            }
+            for(auto& t:diffs)
+            {
+                h.update(t.first);
+                h.update(t.second);
+
+            }
+            att_data->update(h);
         }
         void pack(outBuffer& b) const final
         {
@@ -67,7 +78,7 @@ namespace MsgData
             b<<blockInfo;
             b<<sig;
             b<<node_validator;
-            // b<<tx_hashes<<att_data<<diffs;
+            b<<tx_hashes<<att_data<<diffs;
         }
         void unpack(inBuffer& b) final
         {
@@ -76,7 +87,7 @@ namespace MsgData
             b>>blockInfo;
             b>>sig;
             b>>node_validator;
-            // b>>tx_hashes>>att_data>>diffs;
+            b>>tx_hashes>>att_data>>diffs;
         }
         void sign(const blst_cpp::SecretKey &sk)
         {

@@ -9,7 +9,8 @@ namespace MsgData
     struct BlockDiffValidateRSP: public Base
     {
 
-        BlockDiffValidateRSP(): Base(msgid::BlockDiffValidateRSP), payload_blockAcceptedREQ(new BlockAcceptedREQ)
+        BlockDiffValidateRSP(): Base(msgid::BlockDiffValidateRSP)
+        // , blockAcceptedREQ(new BlockAcceptedREQ)
         {
 
         }
@@ -17,17 +18,11 @@ namespace MsgData
         {
             return new BlockDiffValidateRSP();
         }
-        REF_getter<BlockAcceptedREQ> payload_blockAcceptedREQ;
         blst_cpp::Signature sig;
         NODE_id node_validator;
 
-        // REF_getter<BlockAcceptedREQ> blockValidatedREQ;
-        // std::map<std::string,std::string> diffs;
-        // std::vector<NODE_id> node_validators;
-        // blst_cpp::AggregateSignature agg_sig;
         void update(Blake2bHasher& h) const
         {
-            payload_blockAcceptedREQ->update(h);
             h.update(sig.serialize());
             h.update(node_validator.container);
 
@@ -35,35 +30,31 @@ namespace MsgData
         void pack(outBuffer& b) const final
         {
             Base::pack(b);
-            b<<payload_blockAcceptedREQ;
             b<<sig;
             b<<node_validator;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
-            b>>payload_blockAcceptedREQ;
             b>>sig;
             b>>node_validator;
         }
         size_t size()
         {
             size_t sz=0;
-            if(payload_blockAcceptedREQ.valid())
-                sz+=payload_blockAcceptedREQ->size();
 
             sz+=sig.serialize().size();
             sz+=node_validator.container.size();
             return sz;
         }
-        bool verify(const blst_cpp::PublicKey &pk) const
-        {
-            return sig.verify(pk, payload_blockAcceptedREQ->getHash().container);
-        }
-        void sign(const blst_cpp::SecretKey &sk)
-        {
-            sig.sign(sk, payload_blockAcceptedREQ->getHash().container);
-        }
+        // bool verify(const blst_cpp::PublicKey &pk) const
+        // {
+        //     return sig.verify(pk, blockAcceptedREQ->getHash().container);
+        // }
+        // void sign(const blst_cpp::SecretKey &sk)
+        // {
+        //     sig.sign(sk, blockAcceptedREQ->getHash().container);
+        // }
 
     };
 

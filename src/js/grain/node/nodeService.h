@@ -188,7 +188,9 @@ namespace Node
         bool ValidateBlockREQ(const MsgData::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockRSP(const MsgData::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
         bool BlockAcceptedREQ(const MsgData::BlockAcceptedREQ* r, const NODE_id & src_node, const route_t& route);
-        bool BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const NODE_id & src_node, const route_t& route);
+        // bool BlockAccepted2REQ(const MsgData::BlockAccepted2REQ* r, const NODE_id & src_node, const route_t& route);
+        bool BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route);
+
         bool BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route);
         bool BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r, const NODE_id & src_node, const route_t& route);
 
@@ -236,6 +238,7 @@ namespace Node
             std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
             std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
             // int64_t block_accepted_sent=0;
+            REF_getter<MsgData::BlockDiffValidateREQ> blockDiffValidateREQ=nullptr;
             int64_t blockDiffValidateREQ_sent=0;
             int64_t blockAccepted2REQ_sent=0;
             // heart_beat_info    heart_beat_store;
