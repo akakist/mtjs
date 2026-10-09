@@ -36,8 +36,7 @@ namespace BroadcasterTree
     class Service:
         public UnknownBase,
         public ListenerBuffered1Thread,
-        public Broadcaster,
-        public DBH_feature
+        public Broadcaster
     {
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP*);
         bool on_startService(const systemEvent::startService*);

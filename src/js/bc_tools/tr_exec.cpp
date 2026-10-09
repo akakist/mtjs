@@ -128,7 +128,9 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
 
-
+    
+    // if(b.meta->committe_members.count(name))
+    //     return (std::string)"cannot execute_node_update on member committe " + __FUNCTION__;
 
     auto nn = b.db->getNodeNoCreate(name);
     if (!nn.valid())
@@ -247,6 +249,8 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     err=yy_get_string(params,"node",node.container);
     if(err) return err;
 
+    // if(b.meta->committe_members.count(node))
+    //     return (std::string)"cannot execute_node_update on member committe " + __FUNCTION__;
 
     auto us = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!us.valid())
@@ -279,6 +283,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
 
     // us->setDirty(t.roll);
     //     t.dirty.add(us.get());
+    // t.node_stake_changes[node]['+']+=amount;
 
 
     return std::nullopt;
@@ -294,6 +299,10 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     NODE_id node;
     err=yy_get_string(params,"node",node.container);
     if(err) return err;
+    
+    // if(b.meta->committe_members.count(node))
+    //     return (std::string)"cannot execute_node_update on member committe " + __FUNCTION__;
+
     auto n = b.db->getNodeNoCreate(node);
     if (!n.valid())
     {
@@ -316,19 +325,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
 
     n->sub_stake(t.senderAddress, amount);
 
-    // t.markDirty(v.get());
     t.markDirty(n.get());
-    // t.markDirty(u.get());
-    // v->setDirty(t.roll);
-    //     t.dirty.add(v.get());
-
-    // n->setDirty(t.roll);
-    //     t.dirty.add(n.get());
-
-    // u->setDirty(t.roll);
-    //     t.dirty.add(u.get());
-
-
     t.gasUsed+=v->getGas("node_unstake");
 
     b.emit_command(t.tx_id, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
@@ -336,7 +333,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
         base16::encode(t.senderAddress.addr).c_str(),
         std::to_string(amount).c_str()
     );
-
+    // t.node_stake_changes[node]['-']+=amount;
     return std::nullopt;
 }
 
@@ -358,19 +355,54 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     {
         return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(t.senderAddress.addr);
     }
+    if(n->isEnabled())
+        return "node already enabled";
+    
+    n->setEnabled(1);
     t.markDirty(n.get());
-    // n->setDirty(t.roll);
-    //     t.dirty.add(n.get());
-
 
     t.gasUsed+=v->getGas("node_enable");
 
-    // t.logMsg(txid, seqId, "node %s enabled", node.container.c_str());
     b.emit_command(t.tx_id, seqId, "node_enable",R"({"node":"%s"})", node.container.c_str());
-
+    
+    // t.node_enables[node]=1;
+    
     return std::nullopt;
 }
 
+std::optional<std::string> TR::execute_node_disable(yyjson_val *params, b_params & b,t_params &t,
+     int seqId)
+{
+    MUTEX_INSPECTOR;
+    auto v = b.db->getValuesNoCreateConst();
+    NODE_id node;
+    auto err=yy_get_string(params,"node",node.container);
+    if(err)return err;
+
+    auto n = b.db->getNodeNoCreate(node);
+    if (!n.valid())
+    {
+        return "node not found";
+    }
+    if (n->get_owner() != t.senderAddress)
+    {
+        return "only node owner can enable node owner "+base16::encode(n->get_owner().addr)+" " + base16::encode(t.senderAddress.addr);
+    }
+    if(!n->isEnabled())
+        return "node already disabled";
+    
+    n->setEnabled(0);
+    t.markDirty(n.get());
+
+    t.gasUsed+=v->getGas("node_enable");
+
+    b.emit_command(t.tx_id, seqId, "node_disable",R"({"node":"%s"})", node.container.c_str());
+    
+    // t.node_enables[node]=0;
+
+    
+    return std::nullopt;
+}
 
 
 

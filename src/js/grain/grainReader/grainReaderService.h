@@ -18,8 +18,7 @@ namespace GrainReader
     class Service:
         public UnknownBase,
         public ListenerBuffered1Thread,
-        public Broadcaster,
-        public DBH_feature
+        public Broadcaster
     {
         bool on_startService(const systemEvent::startService*);
         bool on_timer(const timerEvent::TickTimer*);

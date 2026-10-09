@@ -17,6 +17,7 @@ struct bc_node: public data_base
     std::string ed_pk;
     std::string ip;
     std::map<ADDRESS_id /*user*/, uint64_t> stakes;
+    bool enabled=true;
     public:
     size_t size() const
     {
@@ -33,6 +34,16 @@ struct bc_node: public data_base
             r+=sizeof(uint64_t);
         }
         return r;
+    }
+    void setEnabled(bool _enabled)
+    {
+        M_LOCK(parent->mx);
+        enabled=_enabled;
+    }
+    bool isEnabled()
+    {
+        M_LOCK(parent->mx);
+        return enabled;
     }
     NodeElement getElement()
     {
@@ -97,7 +108,7 @@ struct bc_node: public data_base
         }
         return 0;
     }
-    blst_cpp::PublicKey get_bls_pk()
+    blst_cpp::PublicKey get_bls_pk() const
     {
         M_LOCK(parent->mx);
         return bls_pk;
@@ -128,14 +139,14 @@ struct bc_node: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes;
+        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<enabled;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes;
+        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>enabled;
     }
 
 };

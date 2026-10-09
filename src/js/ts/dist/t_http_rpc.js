@@ -46,7 +46,6 @@ try {
         serv.stop();
         rpc.stop();
     });
-    sleep(1000000);
 }
 catch (r) {
     console.log("error in server " + r);

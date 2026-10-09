@@ -9,7 +9,6 @@ void Node::Service::broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData:
     if(b.valid())
         msg=b->getBuffer();
     auto signature=sign_ed(my_sk_ed,blake2b_hash(msg).container);
-    // auto meta=getMetaFull();
     sendEvent(
         ServiceEnum::BroadcasterTree,
               new bcEvent::BroadcastMessage(ServiceEnum::Node,
@@ -23,7 +22,6 @@ void Node::Service::broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>&
     if(b.valid())
         msg=b->getBuffer();
     auto signature=sign_ed(my_sk_ed,blake2b_hash(msg).container);
-    // auto meta=getMetaFull();
         make_broadcast_message_to_tree(ServiceEnum::Node,this_node_name, node_start_timestamp,seqId2++,signature, msg, tree, ListenerBase::serviceId);
 }
 void Node::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id & node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const TreeNode &root, const route_t &route)

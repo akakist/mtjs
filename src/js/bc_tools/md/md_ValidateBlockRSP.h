@@ -27,6 +27,7 @@ namespace MsgData
         std::map<std::string,std::string> diffs;
         blst_cpp::Signature sig;
         NODE_id node_validator;
+
         void update(Blake2bHasher& h) const
         {
             blockInfo->update(h);

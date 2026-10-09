@@ -67,14 +67,19 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         XPASS;
     }
     /// TODO: проверка стейка
-    uint64_t staked=0;
     auto mf=getMetaFull(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
 
+    uint64_t staked=0;
     for(auto &z: r->blockAcceptedREQ->node_validators)
     {
-        staked+=mf->getStake(z);
+        staked+=db_state->getNodeNoCreateConst(z)->get_full_stake();
     }
-    if((staked*100)/mf->committe_full_stake < QUORUM)
+    uint64_t fullstake=0;
+    for(auto &z: mf->committe_members)
+    {
+        staked+=db_state->getNodeNoCreateConst(z)->get_full_stake();
+    }
+    if((staked*100)/fullstake < QUORUM)
     {
         logNode("failed quorum check V");
         return true;
@@ -175,7 +180,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     for (auto &z : r->blockAccepted2REQ->blockAcceptedREQ->node_validators)
     {
         XTRY;
-        auto n=db_state->getNodeNoCreate(z);
+        auto n=db_state->getNodeNoCreateConst(z);
         if(!n.valid())
             throw CommonError("if(!n.valid())");
 
@@ -183,7 +188,13 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         stake_val+=n->get_full_stake();
         XPASS;
     }
-    if(stake_val*100/mf->committe_full_stake < QUORUM)
+    uint64_t full_stake_val=0;
+    for(auto& z: mf->committe_members)
+    {
+        full_stake_val+=db_state->getNodeNoCreateConst(z)->get_full_stake();
+    }
+
+    if((stake_val*100)/full_stake_val < QUORUM)
     {
         logNode("validator quorum failed");
         return true;
@@ -202,10 +213,17 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     std::vector<blst_cpp::PublicKey> agg_pk_n;
     for(auto & z: r->blockAccepted2REQ->node_diff_validators)
     {
-        stake_n+=mf->getStake(z);
-        agg_pk_n.push_back(mf->getNode(z)->get_bls_pk());
+        auto n=db_state->getNodeNoCreateConst(z);
+        stake_n+=n->get_full_stake();
+        agg_pk_n.push_back(n->get_bls_pk());
     }
-    if(stake_n*100/mf->all_nodes_full_stake < QUORUM)
+    uint64_t full_stake=0;
+    auto ls=db_state->getAllNodes();
+    for(auto &z: ls)
+    {
+        full_stake+=z->get_full_stake();
+    }
+    if((stake_n*100)/full_stake < QUORUM)
     {
         logNode("node diff quorum failed");
         return true;
@@ -243,7 +261,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 
     sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
 
-    prev_block=r->blockAccepted2REQ->blockAcceptedREQ;
+    prev_block=r->blockAccepted2REQ;
     l_blocks.clear();
     block_meta_full.clear();
     // block_meta_validator.clear();
@@ -253,7 +271,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 
         MUTEX_INSPECTOR;
         XTRY;
-        // auto h = z->getHash();
         auto it = transaction_pool_of_leader.find(z);
         if (it != transaction_pool_of_leader.end())
         {
@@ -269,7 +286,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 
     if(transaction_pool_of_leader.size())
     {
-        // auto mf=getMetaFull(time(NULL));
         do_heart_beat(time(NULL));
     }
     XPASS;
@@ -340,6 +356,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     if(v_blocks[prev_root_hash].block_validated)
         return true;
     b_params t(db_state.get());
+    t.meta=getMetaFull(r->heart_beat->block_timestamp);
     bool err = false;
     
     auto &cli=cli_leader_info[prev_root_hash];
@@ -398,22 +415,45 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
             }
         }
+
+        std::vector<THASH_id> tx_hashes;
+        THASH_id tx_hash;
+        Blake2bHasher th;
+        for(auto & z:r->transaction_bodies)
+        {
+            auto h=z->getHash();
+            tx_hashes.push_back(h);
+            th.update(h.container);
+        }
+        tx_hash.container=th.final();
+
+        THASH_id diff_hash;
+        Blake2bHasher dh;
+        for(auto &z: diffs)
+        {
+            dh.update(z.first);
+            dh.update(z.second);
+        }
+        diff_hash.container=dh.final();
+
+
+        REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo(new_root_hash,tx_hash,diff_hash,t.att_data->getHash(),r->heart_beat);
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
 
-        // REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo();
+        // 
         // block->prev_root_hash = prev_root_hash_Z;
-        rsp->blockInfo->new_root_hash1 = new_root_hash;
+        rsp->blockInfo = blockInfo;
         rsp->diffs=diffs;
+        rsp->tx_hashes=tx_hashes;
         rsp->att_data = t.att_data;
-        rsp->blockInfo->heart_beat = r->heart_beat;
 
         // logNode("rsp->payload_blockInfo->att_data valid %d",rsp->blockInfo->att_data.valid());
 
-        Blake2bHasher h;
-        for(auto & z:r->transaction_bodies)
-        {
-            rsp->tx_hashes.push_back(z->getHash());
-        }
+        // Blake2bHasher h;
+        // for(auto & z:r->transaction_bodies)
+        // {
+        //     rsp->tx_hashes.push_back(z->getHash());
+        // }
         // blockInfo->tx_hash_Z.container=h.final();
         rsp->node_validator = this_node_name;
         // rsp->payload_blockInfo = blockInfo;

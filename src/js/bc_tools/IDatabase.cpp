@@ -1,5 +1,6 @@
 #include "cellable.h"
 #include "IDatabase.h"
+#include "md_BlockAccepted2REQ.h"
 
 REF_getter<Cellable> IDatabase::replaceLeafOrCreate(const REF_getter<Cellable>& _cur, const std::string &id, MutexLockerDeferred &l, Rollback* roll)
 {
@@ -447,14 +448,14 @@ REF_getter<bc_node> IDatabase::getNodeNoCreate(const NODE_id &name)
         throw CommonError("if(cc->data.valid())");
 }
 
-REF_getter<MsgData::BlockAcceptedREQ> load_last_block(IDatabase *db)
+REF_getter<MsgData::BlockAccepted2REQ> load_last_block(IDatabase *db)
 {
     std::string buf;
     auto r=db->getGranule("...last_block...",&buf);
-    REF_getter<MsgData::BlockAcceptedREQ> last_block;
+    REF_getter<MsgData::BlockAccepted2REQ> last_block;
     if(buf.size())
     {
-        last_block=new MsgData::BlockAcceptedREQ;
+        last_block=new MsgData::BlockAccepted2REQ;
         inBuffer in(buf);
         // M_LOCK(r->mx);
         last_block->unpack2(in);
@@ -462,7 +463,7 @@ REF_getter<MsgData::BlockAcceptedREQ> load_last_block(IDatabase *db)
     }
     return last_block;
 }
-REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcceptedREQ>& pb)
+REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAccepted2REQ>& pb)
 {
     MUTEX_INSPECTOR;
 
@@ -478,13 +479,13 @@ REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcce
         {
             MUTEX_INSPECTOR;
             auto h=blake2b_hash(lb);
-            if(pb->blockInfo->new_root_hash1==h)
+            if(pb->blockAcceptedREQ->blockInfo->new_root_hash1==h)
             {
                 inBuffer in(lb);
                 r->unpack_mx(in);
             }
             else{
-                 logErr2("block hash not matched %s %s",base16::encode(pb->blockInfo->new_root_hash1.container).c_str(),base16::encode(h.container).c_str());
+                 logErr2("block hash not matched %s %s",base16::encode(pb->blockAcceptedREQ->blockInfo->new_root_hash1.container).c_str(),base16::encode(h.container).c_str());
                 // throw CommonError("block hash not matched");
                  return new Cellable(NULL,"");
             }

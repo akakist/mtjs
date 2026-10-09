@@ -15,7 +15,7 @@ namespace MsgData
         {
             return new DelayNotificationREQ();
         }
-        REF_getter<BlockAcceptedREQ> lc;
+        REF_getter<BlockAccepted2REQ> lc;
         void update(Blake2bHasher& h) const
         {
             // h.update(epoch.toString());

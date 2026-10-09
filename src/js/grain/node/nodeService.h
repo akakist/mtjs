@@ -33,11 +33,12 @@
 #include "md/md_ConfirmLeaderRSP.h"
 #include "md/md_LcEnvelopeREQ.h"
 
+#include "blockMeta.h"
+
 
 #include "md/md_DelayNotificationREQ.h"
 #include "t_params.h"
 #include "contract_rt.h"
-#include "DBH.h"
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db);
 
@@ -57,39 +58,10 @@ namespace Node
         TIMER_REPORT_MEM,
         TIMER_BROADCAST_ACK_TIMEDOUT,
     };
-    struct BlockMetaFull: public Refcountable
-    {
-        std::map<NODE_id,REF_getter<bc_node>> all_nodes;
-        // std::set<NODE_id> full_broadcast;
-        std::map<NODE_id, uint64_t> node_stakes;
-        uint64_t all_nodes_full_stake=0;
-        uint64_t committe_full_stake=0;
-        TreeNode tree_all_nodes;
-        TreeNode tree_committe;
-        std::map<NODE_id, size_t> position_of_node;
-        REF_getter<bc_node> getNode(const NODE_id &n)
-        {
-            auto it=all_nodes.find(n);
-            if(it==all_nodes.end())
-                throw CommonError("if(n==nodes.end())");
-            return it->second;
-        }
-        uint64_t getStake(const NODE_id &n)        
-        {
-            auto it=node_stakes.find(n);
-            if(it==node_stakes.end())
-                throw CommonError("if(n==nodes.end())");
-            return it->second;
-        }
-        BlockMetaFull(): Refcountable("BlockMetaFull"){}
-        
-    };
     struct heart_beat_node_info
     {
         heart_beat_node_info() : leader_cert_2(nullptr) {
 
-            // responses.clear();
-            // clear();
 
         }
         int64_t TIMER_VALIDATE_BLOCK_DELAY_set=0;
@@ -108,8 +80,7 @@ namespace Node
     class Service:
         public UnknownBase,
         public ListenerBuffered1Thread,
-        public Broadcaster,
-        public DBH_feature
+        public Broadcaster
     {
         bool on_startService(const systemEvent::startService*);
         bool on_timer(const timerEvent::TickTimer*);
@@ -146,7 +117,7 @@ namespace Node
         REF_getter<MsgData::HeartBeatREQ> do_heart_beat(time_t tnow);
 
         bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast);
-        bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast);
+        bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAccepted2REQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast);
         void reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route);
 
         bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
@@ -178,11 +149,11 @@ namespace Node
 
 
 
-        bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight, const REF_getter<Node::BlockMetaFull>& meta);
+        bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight, const REF_getter<BlockMetaFull>& meta);
 
 
 
-        void do_request_for_transactions( Node::heart_beat_node_info& li, const REF_getter<Node::BlockMetaFull>& meta);
+        void do_request_for_transactions( Node::heart_beat_node_info& li, const REF_getter<BlockMetaFull>& meta);
 
         void broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& p,  const TreeNode &tree);
         void broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>& p,  const TreeNode &tree);
@@ -253,7 +224,7 @@ namespace Node
         THASH_id prev_root_hash_Z()
         {
             if(prev_block.valid())
-            return prev_block->blockInfo->new_root_hash1;
+            return prev_block->blockAcceptedREQ->blockInfo->new_root_hash1;
             THASH_id r;
             r.container="";
             return r;
@@ -261,11 +232,11 @@ namespace Node
         uint64_t epoch_current()
         {
             if(prev_block.valid())
-            return prev_block->blockInfo->heart_beat->new_epoch+1;
+            return prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch+1;
             return 0;
 
         }
-        REF_getter<MsgData::BlockAcceptedREQ> prev_block;
+        REF_getter<MsgData::BlockAccepted2REQ> prev_block;
         // State state_Z=STATE_NORMAL;
         int64_t stage_is_working = 0;
         uint64_t last_activity_time=0;
@@ -301,7 +272,8 @@ namespace Node
 
         THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &r);
     
-        bool verify_block(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
+        bool verify_block_committee(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
+        bool verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ>& lc);
 
         std::optional<std::string> execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
                          const REF_getter<MsgData::TX> &tx, uint64_t epoch);

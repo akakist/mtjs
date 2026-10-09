@@ -147,8 +147,7 @@ BroadcasterTree::Service::~Service()
 BroadcasterTree::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *ins)
     : UnknownBase(nm),
       ListenerBuffered1Thread(nm, id),
-      Broadcaster(ins),
-      DBH_feature(ins)
+      Broadcaster(ins)
 {
 }
 

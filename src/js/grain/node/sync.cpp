@@ -163,15 +163,15 @@ void Node::Service::do_sync(const NODE_id &src_node, const THASH_id& prev_root_h
 }
 bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r, const NODE_id &src_node, const route_t &route)
 {
-    bool remote_verified=verify_block(r->lc);
+    bool remote_verified=verify_block_all(r->lc);
     if(!remote_verified)
         return true;
-    if(!prev_block.valid() || r->lc->blockInfo->heart_beat->new_epoch > prev_block->blockInfo->heart_beat->new_epoch)
+    if(!prev_block.valid() || r->lc->blockAcceptedREQ->blockInfo->heart_beat->new_epoch > prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch)
     {
         MUTEX_INSPECTOR;
         logNode("STATE_SYNCING");
         prev_block=r->lc;
-        do_sync(src_node,r->lc->blockInfo->new_root_hash1);
+        do_sync(src_node,r->lc->blockAcceptedREQ->blockInfo->new_root_hash1);
     }
 
 

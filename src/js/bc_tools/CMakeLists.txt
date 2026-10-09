@@ -47,6 +47,7 @@ yyjson_to_quickjs.cpp
 yyjson_to_quickjs.h
 getValidators.cpp
 IDatabase.cpp
+blockMeta.h
 )
 
 

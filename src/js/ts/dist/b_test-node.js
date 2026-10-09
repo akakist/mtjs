@@ -1,7 +1,7 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 import { sleep } from "os";
-const node = "127.0.0.1:2300";
+const node = "127.0.0.1:2301";
 let sk = std.getenv('k_root_ed_sk');
 let root_pk = std.getenv('k_root_ed_pk');
 // let u0 = std.getenv('k_u0_ed_pk');
@@ -23,7 +23,6 @@ for (let i = 0; i < 10; i++) {
 async function exec() {
     let i = 0;
     while (true) {
-    try{
         mtjs.tx_subscribe(node, (params) => {
             // console.log("tx report from js:", JSON.stringify(params));
         });
@@ -34,7 +33,7 @@ async function exec() {
             {
                 contract: "root",
                 method: "mint",
-                params: { amount: "10000000" }
+                params: { amount: "100000" }
             }
         ];
         for (let i = 0; i < users.length; i++) {
@@ -61,13 +60,12 @@ async function exec() {
         // const m=mtjs.tx_sign(tx, sk!);
         // console.log("signed tx:", m);
         i++;
-        let req = { tx: tx, nonce: nonce, value: 1000000, gasLimit: 100000, gasPrice: 100 };
+        let req = { tx: tx, nonce: nonce, value: 1000000, gasLimit: 100000, gasPrice: 10 };
         const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce, (obj) => {
             console.log("TX REPORT " + JSON.stringify(obj));
         });
         console.log(rsp);
-        sleep(150);
-    } catch(e){}
+        sleep(200);
     }
 }
 console.log(std.getenv("PATH"));
@@ -98,18 +96,21 @@ try {
                 Node_my_sk_ed_env_key=k_node${i}_ed_sk
                 Node_this_node_name=n${i}
                 Node_sqlite_pn=db/s${i}
+#                db_user=root
+ #               db_password=gaga123
+  #              db_socket=/run/mysqld/mysqld.sock
                 db_name=db${i}
                 mysql_max_connections=20
                  mysql_host=NULL
-                 mysql_user=bsr
-                 mysql_passwd=
+                 mysql_user=root
+                 mysql_passwd=gaga123
                  mysql_database=md
                  mysql_port=0
                  mysql_sock=/run/mysqld/mysqld.sock
-		 mysql_flag=
+
         `);
     }
-    sleep(100);
+    sleep(200);
     console.log("Start");
     try {
         const sk = std.getenv('u_root_ed_sk');
@@ -124,4 +125,3 @@ try {
 catch (e) {
     console.log(e);
 }
-

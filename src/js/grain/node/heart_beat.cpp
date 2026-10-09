@@ -38,6 +38,13 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     }
     auto mf=getMetaFull(m->payload_heart_beat->block_timestamp);
 
+    uint64_t fullstake=0;
+    auto ls=db_state->getAllNodes();
+    for(auto& z: ls)
+    {
+        fullstake+=z->get_full_stake();
+    }
+
     uint64_t hb_staked = 0;
     if (iUtils->getNow() > li.confirm_leader_sent + _1sec)
     {
@@ -48,12 +55,12 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         {
             for (auto &z : li.HeartBeatRSP_m)
             {
-                auto stake=mf->getStake(z.second->node_signer);
-                hb_staked+=stake;
+                auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
+                hb_staked+=n->get_full_stake();
             }
         }
     }
-    auto pers = (hb_staked * 100) / mf->all_nodes_full_stake;
+    auto pers = (hb_staked * 100) / fullstake;
 
     if (pers > QUORUM && (iUtils->getNow() > li.confirm_leader_sent+ _1sec))
     {
@@ -84,7 +91,7 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
     pass_NodeMsgRSP(hbr.get(),route);
 
 }
-bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAcceptedREQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
+bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAccepted2REQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
 {
         // logNode("@@ %s from %s",__func__,h->node_leader.container.c_str());
 
@@ -144,8 +151,8 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     
     bool remote_verified=false;
     bool local_verified=false;
-    remote_verified=verify_block(remote_prev_lc);
-    local_verified=verify_block(local_prev_block);
+    remote_verified=verify_block_all(remote_prev_lc);
+    local_verified=verify_block_all(local_prev_block);
     
 
     if(local_verified && !remote_verified)
@@ -205,7 +212,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             // state_Z = STATE_SYNCING;
             logNode("start SYNC");
             prev_block=remote_prev_lc;
-            do_sync(src_node, remote_prev_lc->blockInfo->new_root_hash1);
+            do_sync(src_node, remote_prev_lc->blockAcceptedREQ->blockInfo->new_root_hash1);
         }
         return true;
     }
@@ -213,7 +220,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     if(remote_verified && local_verified)
     {
     MUTEX_INSPECTOR;
-        if(remote_prev_lc->blockInfo->heart_beat->new_epoch < local_prev_block->blockInfo->heart_beat->new_epoch)
+        if(remote_prev_lc->blockAcceptedREQ->blockInfo->heart_beat->new_epoch < local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch)
         {
     MUTEX_INSPECTOR;
         /// проверка на эпоху, если эпоха у ремоте меньше, то командуем ей обновиться.
@@ -230,31 +237,31 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             *need_continue_broadcast=false;
             return true;
         }
-        else if(remote_prev_lc->blockInfo->heart_beat->new_epoch > local_prev_block->blockInfo->heart_beat->new_epoch)
+        else if(remote_prev_lc->blockAcceptedREQ->blockInfo->heart_beat->new_epoch > local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch)
         {
             /// если наша эпоха меньше , то сами делаем догон
             MUTEX_INSPECTOR;
             // state_Z = STATE_SYNCING;
             logNode("START SYNCING");
             prev_block=remote_prev_lc;
-            do_sync(src_node,remote_prev_lc->blockInfo->new_root_hash1);
+            do_sync(src_node,remote_prev_lc->blockAcceptedREQ->blockInfo->new_root_hash1);
             *need_continue_broadcast=true;
             return true;
         }
-        else if(remote_prev_lc->blockInfo->heart_beat->new_epoch == local_prev_block->blockInfo->heart_beat->new_epoch)
+        else if(remote_prev_lc->blockAcceptedREQ->blockInfo->heart_beat->new_epoch == local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch)
         {
     MUTEX_INSPECTOR;
     
                 /// оба в одинаковой эпохе
                 
                 /// просто проверка на всякий случай.
-                if(remote_prev_lc->blockInfo->heart_beat->prev_root_hash_1!=local_prev_block->blockInfo->heart_beat->prev_root_hash_1)
+                if(remote_prev_lc->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1!=local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1)
                 {
                     /// сплит брейн. в сохраненных блоках
                     logNode(R"( --------------- SPLIT BRAIN DETECTED
 if(remote_prev_lc->blockInfo->heart_beat->prev_root_hash!=local_lc->blockInfo->heart_beat->prev_root_hash)
 remote_prev_lc->blockInfo->heart_beat->prev_root_hash %s local_lc->blockInfo->heart_beat->prev_root_hash %s)", 
-                            remote_prev_lc->blockInfo->heart_beat->prev_root_hash_1.str().c_str(), local_prev_block->blockInfo->heart_beat->prev_root_hash_1.str().c_str());
+                            remote_prev_lc->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str(), local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str());
                     *need_continue_broadcast=true;
                     return true;
                 }
@@ -280,9 +287,9 @@ if(prev_root_hash_Z!=h->prev_root_hash)
         from node %s )", 
             prev_root_hash_Z().str().c_str(), 
             h->prev_root_hash_1.str().c_str(),
-            local_prev_block->blockInfo->heart_beat->prev_root_hash_1.str().c_str(),
-            remote_prev_lc->blockInfo->heart_beat->new_epoch,
-            local_prev_block->blockInfo->heart_beat->new_epoch,
+            local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str(),
+            remote_prev_lc->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
+            local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
             src_node.container.c_str());
 
             *need_continue_broadcast=true;
@@ -428,11 +435,19 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 
         for (auto &z : li.ConfirmLeaderRSP_m)
         {
-            auto stake = mf->getStake(z.second->node_signer);
+            auto stake = db_state->getNodeNoCreateConst(z.second->node_signer)->get_full_stake();
             hb_staked += stake;
         }
     }
-    auto pers = hb_staked * 100 / mf->all_nodes_full_stake;
+    uint64_t fullstake=0;
+    auto ls = db_state->getAllNodes();
+    for(auto &z:ls)
+    {
+        if(z->isEnabled())
+            fullstake+=z->get_full_stake();
+    }
+
+    auto pers = (hb_staked * 100) / fullstake;
 
     if (pers > QUORUM)
     {
@@ -458,10 +473,10 @@ bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id
     REF_getter<MsgData::Base> msg = msgFactory.create(id);
     msg->unpack(in);
     
-    REF_getter<MsgData::BlockAcceptedREQ> lc;
+    REF_getter<MsgData::BlockAccepted2REQ> lc;
     if(m->prev_lc.size())
     {
-        lc=new MsgData::BlockAcceptedREQ;
+        lc=new MsgData::BlockAccepted2REQ;
         inBuffer in2(m->prev_lc);
         lc->unpack2(in2);
 

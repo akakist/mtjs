@@ -2,7 +2,7 @@
 #include "md/md_attachment_data.h"
 #include "md/md_ValidateBlockREQ.h"
 #include "IDatabase.h"
-
+#include "blockMeta.h"
 struct b_params
 {
     b_params(IDatabase* _db): att_data(new MsgData::attachment_data()),db(_db) {}
@@ -10,6 +10,9 @@ struct b_params
     REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
     REF_getter<MsgData::attachment_data> att_data;
     uint64_t node_rewards;
+    REF_getter<BlockMetaFull> meta;
+    // std::map<NODE_id, std::map<char,uint64_t>> _node_stake_changes;
+    // std::map<NODE_id, int> _node_enables;
 
     void emit_command(const THASH_id& txId, int seqId, const std::string& command, const char* fmt, ...)
     {
@@ -70,6 +73,9 @@ struct t_params
     uint64_t value=0;
     Rollback *roll=NULL;
     Dirty dirty;
+    // std::map<NODE_id, std::map<char,uint64_t>> node_stake_changes;
+    // std::map<NODE_id, int> node_enables;
+
     void markDirty(data_base *p)
     {
         p->setDirty(roll);

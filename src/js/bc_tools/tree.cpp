@@ -24,15 +24,6 @@ TreeNode buildTree(const std::vector<NodeElement>& nodes)
         throw CommonError("if(nodes.empty())");
 
     auto &ranked=nodes;
-    // for (auto& kv : nodes) {
-    //     TreeNode n;
-    //     n.node=kv.second;
-    //     ranked.emplace_back(kv.second);
-    // }
-    // sort(ranked.begin(), ranked.end(),
-    // [](const auto& a, const auto& b) {
-    //     return a.node.stake_A > b.node.stake_A;
-    // });
 
     int idx_r=0;
 

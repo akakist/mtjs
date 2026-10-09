@@ -41,6 +41,15 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     }
     li.transaction_responders.insert(src_node);
     auto mf=getMetaFull(li.leader_cert_2->block_timestamp);
+
+    uint64_t fullstake = 0;
+
+    auto ls=db_state->getAllNodes();
+    for(auto& z: ls)
+    {
+        if(z->isEnabled())
+            fullstake+=z->get_full_stake();
+    }
     uint64_t stake = 0;
     for (auto &z : li.transaction_responders)
     {
@@ -49,9 +58,9 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         if(!n.valid())
             throw CommonError("if(!n.valid())");
 
-        stake += mf->getStake(z);
+        stake += n->get_full_stake();
     }
-    auto pers=(stake*100)/mf->all_nodes_full_stake;
+    auto pers=(stake*100)/fullstake;
 
     if (pers >  QUORUM)
     {
@@ -81,7 +90,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
         return true;
     }
-    auto nnn=mf->getNode(r->node_validator);
+    auto nnn=db_state->getNodeNoCreateConst(r->node_validator);
     if(!nnn.valid())
         throw CommonError("if(!nnn.valid())");
     if (!r->sig.verify(nnn->get_bls_pk(),bt.blockDiffValidateREQ->blockAcceptedREQ->getHash().container))
@@ -96,14 +105,22 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     auto h=bt.blockDiffValidateREQ->blockAcceptedREQ->getHash();
     bt.BlockDiffValidateRSP_m[h].push_back(r);
 
+
+    uint64_t fullstakeVal = 0;
+    for (auto &z : mf->committe_members)
+    {
+        fullstakeVal += db_state->getNodeNoCreateConst(z)->get_full_stake();
+    }
+    
+
     uint64_t stakeVal = 0;
     for (auto &z : bt.BlockDiffValidateRSP_m[h])
     {
-        stakeVal += mf->getStake(z->node_validator);
+        stakeVal += db_state->getNodeNoCreateConst(z->node_validator)->get_full_stake();
     }
     // logNode("stakeVal %lld",stakeVal);
     // logNode("iUtils->getNow()-bt.blockAccepted2REQ_sent %lld",iUtils->getNow()-bt.blockAccepted2REQ_sent);
-    if (stakeVal * 100 / mf->all_nodes_full_stake > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
+    if ((stakeVal * 100) / fullstakeVal > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
     {
     MUTEX_INSPECTOR;
         XTRY;
@@ -116,7 +133,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         std::set<std::string> nnn;
         for (auto &z : bt.BlockDiffValidateRSP_m[h])
         {
-            auto n = mf->getNode(z->node_validator);
+            auto n = db_state->getNodeNoCreateConst(z->node_validator);
             agg_pk.push_back(n->get_bls_pk());
             ba2->agg_diff_sig.add(z->sig);
             ba2->node_diff_validators.push_back(z->node_validator);
@@ -196,14 +213,20 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     logErr2("val node %s", src_node.container.c_str());
     for (auto &z : bt.ValidateBlockRSP_m[h])
     {
-        stakeVal += mf->getStake(z->node_validator);
+        stakeVal += db_state->getNodeNoCreateConst(z->node_validator)->get_full_stake();
+    }
+    uint64_t fullstake=0;
+    for(auto &z: mf->committe_members)
+    {
+        fullstake += db_state->getNodeNoCreateConst(z)->get_full_stake();
+
     }
     //&& v_blocks[prev_root_hash_Z()].blockDBStore_V.valid()
     
-    if ((stakeVal * 100) / mf->committe_full_stake > QUORUM )
+    if ((stakeVal * 100) / fullstake > QUORUM )
     {
         XTRY;
-        logNode("Block stake finalized %lld ",(stakeVal * 100) / mf->committe_full_stake);
+        logNode("Block stake finalized %lld ",(stakeVal * 100) / fullstake);
         REF_getter<MsgData::BlockAcceptedREQ> ba = new MsgData::BlockAcceptedREQ();
         if (!bt.blockInfo_Z[h].valid())
         {
@@ -215,14 +238,20 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         ba->blockInfo = r->blockInfo;
         std::vector<blst_cpp::PublicKey> agg_pk;
         std::set<std::string> nnn;
+        std::string nv_;
         for (auto &z : bt.ValidateBlockRSP_m[h])
         {
-            auto n = mf->getNode(z->node_validator);
+            nv_+=z->node_validator.container+" ";
+            auto n = db_state->getNodeNoCreateConst(z->node_validator);
+            auto st=n->get_full_stake();
+            nv_+=std::to_string(st)+" ";
             agg_pk.push_back(n->get_bls_pk());
             ba->agg_sig.add(z->sig);
             ba->node_validators.push_back(z->node_validator);
+
             nnn.insert(z->node_validator.container);
         }
+        logNode("VALIDATORS %s",nv_.c_str());
         if (ba->agg_sig.verify(agg_pk, ba->blockInfo->getHash().container))
         {
             logNode("ValidateBlockRSP block_accepted test verified OK !!!!!!!!!!!!!!!!!!!!!");

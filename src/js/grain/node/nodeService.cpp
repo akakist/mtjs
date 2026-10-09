@@ -60,7 +60,6 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     for (auto &z : web_addr)
         sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
 
-    auto db=getDB();
     db_state = new CDatabaseRocksdb(db_name);
 
     prev_block=load_last_block(db_state.get());
@@ -73,7 +72,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 
     if(prev_block.valid())
     {
-            if(!verify_block(prev_block))
+            if(!verify_block_all(prev_block))
                 prev_block=NULL;
                 // throw CommonError("last_block not verified");
 
@@ -409,8 +408,7 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
     : UnknownBase(nm),
       ListenerBuffered1Thread(nm, id),
       Broadcaster(ins),
-      iInstance(ins),
-      DBH_feature(ins)
+      iInstance(ins)
 {
     MUTEX_INSPECTOR;
     // rocksdb_path = ins->getConfig()->get_string("rockdb_path", "/db/r1", "Path to access to rocksdb");
@@ -461,7 +459,7 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
     return true;
 }
 
-void Node::Service::do_request_for_transactions( heart_beat_node_info& li, const REF_getter<Node::BlockMetaFull>& meta)
+void Node::Service::do_request_for_transactions( heart_beat_node_info& li, const REF_getter<BlockMetaFull>& meta)
 {
     MUTEX_INSPECTOR;
 
@@ -562,7 +560,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     std::set<NODE_id> ns;
     if(local_prev_block.valid())
     {
-        for(auto& z:local_prev_block->node_validators)
+        for(auto& z:local_prev_block->blockAcceptedREQ->node_validators)
         {
             ns.insert(z);
             auto n=db_state->getNodeNoCreate(z);
@@ -571,7 +569,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
 
             total_staked+=n->get_full_stake();
         }
-        for(auto& z:local_prev_block->node_validators)
+        for(auto& z:local_prev_block->blockAcceptedREQ->node_validators)
         {
             auto n=db_state->getNodeNoCreate(z);
             if(!n.valid())
@@ -613,21 +611,21 @@ THASH_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_get
     return ret;
 }
 #include <stdlib.h>
-bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight, const REF_getter<Node::BlockMetaFull>& m)
+bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight, const REF_getter<BlockMetaFull>& m)
 {
     MUTEX_INSPECTOR;
-    // auto m=getMetaFull();
     auto itL=m->position_of_node.find(nodeLeft);
     if(itL == m->position_of_node.end())
         throw CommonError("if(itL == m->position_of_node.end())");
     auto itR=m->position_of_node.find(nodeRight);
     if(itR == m->position_of_node.end())
         throw CommonError("if(itR == m->position_of_node.end())");
-    if(prev_root_hash_Z().container.size())
+        /// TODO
+    // if(prev_root_hash_Z().container.size())
         return itL->second < itR->second;
     return nodeLeft.container<nodeRight.container;
 }
-bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
+bool Node::Service::verify_block_committee(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
 {
     /// проверка сертификата лидера
     if(!lc.valid())
@@ -640,18 +638,65 @@ bool Node::Service::verify_block(const REF_getter<MsgData::BlockAcceptedREQ> &lc
         uint64_t stake=0;
         for (auto &z : lc->node_validators)
         {
-            auto n = mf->getNode(z);
+            auto n = db_state->getNodeNoCreateConst(z);
             agg_pk.push_back(n->get_bls_pk());
-            stake += mf->getStake(z);
+            stake += n->get_full_stake();
         }
-        
-        if ((stake * 100) / mf->committe_full_stake < QUORUM)
+        uint64_t fullstake=0;
+        for(auto& z: mf->committe_members)
         {
-            logNode("this quorum %lld",(stake * 100) / mf->committe_full_stake);
-            logErr2("verify lc quorum failed %lld %lld",stake,mf->committe_full_stake);
+            fullstake=db_state->getNodeNoCreateConst(z)->get_full_stake();
+        }
+        if ((stake * 100) / fullstake < QUORUM)
+        {
+            logNode("this quorum %lld",(stake * 100) / fullstake);
+            logErr2("verify lc quorum failed %lld %lld",stake,fullstake);
             return false;
         }
         if (!lc->agg_sig.verify(agg_pk, lc->blockInfo->getHash().container))
+        {
+            logErr2("verify lc - signature invalid");
+            ;
+            return false;
+        }
+    }
+
+    return true;
+}
+bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ> &lc)
+{
+    /// проверка сертификата лидера
+    if(!lc.valid())
+        return false;
+    {
+        MUTEX_INSPECTOR;
+        auto mf=getMetaFull(lc->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+        std::vector<blst_cpp::PublicKey> agg_pk;
+
+        uint64_t stake=0;
+        for (auto &z : lc->node_diff_validators)
+        {
+            auto n = db_state->getNodeNoCreateConst(z);
+            agg_pk.push_back(n->get_bls_pk());
+            stake += n->get_full_stake();
+        }
+        uint64_t full_stake=0;
+        auto ls=db_state->getAllNodes();
+        for(auto& z:ls )
+        {
+            if(z->isEnabled())
+            {
+                full_stake+=z->get_full_stake();
+            }
+        }
+        
+        if ((stake * 100) / full_stake < QUORUM)
+        {
+            logNode("this quorum %lld",(stake * 100) / full_stake);
+            logErr2("verify lc quorum failed %lld %lld",stake,full_stake);
+            return false;
+        }
+        if (!lc->agg_diff_sig.verify(agg_pk, lc->blockAcceptedREQ->blockInfo->getHash().container))
         {
             logErr2("verify lc - sign invalid");
             ;
@@ -673,7 +718,6 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     {
         stage_is_working=iUtils->getNow();
             
-        // auto mf=getMetaFull(time(NULL));
         do_heart_beat(time(NULL));
     }
     else {
@@ -832,6 +876,8 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                     err = TR::execute_unstake_node(params, b,t,  index);
                 else if (meth == "node_enable")
                     err = TR::execute_node_enable(params, b,t,  index);
+                else if (meth == "node_disable")
+                    err = TR::execute_node_disable(params, b,t,  index);
                 else if (meth == "contract_deploy")
                     err = TR::execute_contract_deploy(params,b, t,  index);
                 else if (meth == "contract_update")
@@ -972,6 +1018,18 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         M_LOCK(uu->parent->mx);
         uu->balance-=t.gasUsed*gasPrice+value-t.value;
     }
+    // for(auto& z:t.node_enables)
+    // {
+    //     b._node_enables.insert_or_assign(z.first,z.second);
+    // }
+    // for(auto& z: t.node_stake_changes)
+    // {
+    //     for(auto& y: z.second)
+    //     {
+    //         b._node_stake_changes[z.first][y.first]+=y.second;    
+    //     }
+        
+    // }
 
     db_state->root->calc_tree_hash(db_dump);
     db_to_save_Z.add(db_dump);
@@ -1040,7 +1098,7 @@ inline uint64_t read_uint64(const uint8_t* data) {
            (static_cast<uint64_t>(data[7]));
 }
 
-REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
+REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 {
     MUTEX_INSPECTOR;
     auto b=prev_root_hash_Z();
@@ -1059,34 +1117,42 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
     }
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
     block_meta_full[b][t_win]=m;
-    auto nodeList=db_state->getNodeListNoCreateConst();
+    // auto nodeList=db_state->getNodeListNoCreateConst();
     // m->full_broadcast=nn->getList();
     auto an=db_state->getAllNodes();
+    int live_nodes=0;
+    for(auto& z: an)
+    {
+        if(z->isEnabled())
+            live_nodes++;
+    }
 
     auto v=db_state->getValuesNoCreateConst();
     
     auto validators_percent=v->getGas("validator_count_percent");
 
-    size_t validator_count=(an.size()*validators_percent)/100;
+    size_t validator_count=(live_nodes * validators_percent)/100;
 
-    for(auto& z: an)
-    {
-        auto name=z->getName();
-        m->all_nodes.insert_or_assign(name,z);
-        auto stake=z->get_full_stake();
-        m->node_stakes[name]=stake;
-        m->all_nodes_full_stake+=stake;
-    }
+    // for(auto& z: an)
+    // {
+    //     auto name=z->getName();
+    //     m->all_nodes.insert_or_assign(name,z);
+    //     auto stake=z->get_full_stake();
+    //     m->node_stakes[name]=stake;
+    //     m->all_nodes_full_stake+=stake;
+    // }
     std::vector<NodeElement> vne;
-    auto allNodes=db_state->getAllNodes();
+    // auto allNodes=db_state->getAllNodes();
     std::map<uint64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
 
-    for(auto &x: allNodes)
+    for(auto &x: an)
     {
+        if(!x->isEnabled())
+            continue;
         std::string seed=x->getName().container;
         if(prev_block.valid())
         {
-            seed+=prev_block->blockInfo->heart_beat->prev_root_hash_1.container;
+            seed+=prev_block->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.container;
         }
         seed+=std::to_string(t_win);
         auto h=blake2b_hash(seed);
@@ -1118,14 +1184,15 @@ REF_getter<Node::BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
     }
     logNode("vne %s",vne_list.c_str());
     std::string comlist;
+    // logNode("validator_count %d",validator_count);
     for(size_t i=0;i<validator_count;i++)
     {
         auto n=vne[i].name;
         comlist+=n.container+" ";
         // logNode("commitee %s",n.container.c_str());
         vne_committe.push_back(vne[i]);
-        m->committe_full_stake+=vne[i].stake_A;
-
+        // m->committe_full_stake+=vne[i].stake_A;
+        m->committe_members.insert(n);
     }
     logNode("committee %s",comlist.c_str());
     m->tree_committe=buildTree(vne_committe);
