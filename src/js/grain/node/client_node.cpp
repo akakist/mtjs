@@ -230,7 +230,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     if((stake_n*100)/full_stake < QUORUM)
     {
         logNode("node diff quorum failed %lld",(stake_n*100)/full_stake);
-        // return true;
+        return true;
     }
     logNode("BlockDBStore quorum ok !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! %lld",(stake_n*100)/full_stake);
     if (!r->blockAccepted2REQ->agg_diff_sig.verify(agg_pk_n, r->blockAccepted2REQ->blockAcceptedREQ->getHash().container))

@@ -272,7 +272,7 @@ namespace Node
 
         THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &r);
     
-        bool verify_block_committee(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
+        // bool verify_block_committee(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
         bool verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ>& lc);
 
         std::optional<std::string> execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,

@@ -82,7 +82,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         return true;
     }
     auto& bt=l_blocks[prev_root_hash_Z()];
-    auto mf=getMetaFull(bt.blockDiffValidateREQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+    // auto mf=getMetaFull(bt.blockDiffValidateREQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
 
     if (bt.blockDiffValidateREQ->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1 != prev_root_hash_Z())
     {
@@ -106,9 +106,11 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
 
 
     uint64_t fullstakeVal = 0;
-    for (auto &z : mf->committe_members)
+    auto ls=db_state->getAllNodes();
+    for (auto &z : ls)
     {
-        fullstakeVal += db_state->getNodeNoCreateConst(z)->get_full_stake();
+        if(z->isEnabled())
+            fullstakeVal += z->get_full_stake();
     }
     
 
@@ -128,11 +130,11 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     {
         diffreplied.insert(z->node_validator);
     }
-    if(hb_live==diffreplied)
+    // if(hb_live==diffreplied)
 
     // logNode("stakeVal %lld",stakeVal);
     // logNode("iUtils->getNow()-bt.blockAccepted2REQ_sent %lld",iUtils->getNow()-bt.blockAccepted2REQ_sent);
-    // if ((stakeVal * 100) / fullstakeVal > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
+    if ((stakeVal * 100) / fullstakeVal > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
     {
     MUTEX_INSPECTOR;
         XTRY;
@@ -181,11 +183,13 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         bds->diffs=bt.blockDiffValidateREQ->diffs;
         bds->att_data=bt.blockDiffValidateREQ->att_data;
         logNode("broadcast MsgData::BlockDBStore");
+        auto mf=getMetaFull(bt.blockDiffValidateREQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+        // auto mf=getMetaFull(r->);
         broadcast_MsgEvent_via_broadcaster(bds.get(),mf->tree_all_nodes);
         XPASS;
     }
 
-
+    
     return true;
 }
 

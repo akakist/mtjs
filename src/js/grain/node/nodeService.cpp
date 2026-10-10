@@ -620,6 +620,7 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
         return itL->second < itR->second;
     return nodeLeft.container<nodeRight.container;
 }
+#ifdef KALL
 bool Node::Service::verify_block_committee(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
 {
     /// проверка сертификата лидера
@@ -648,7 +649,7 @@ bool Node::Service::verify_block_committee(const REF_getter<MsgData::BlockAccept
             logErr2("verify lc quorum failed %lld %lld",stake,fullstake);
             return false;
         }
-        if (!lc->agg_sig.verify(agg_pk, lc->blockInfo->getHash().container))
+        if (!lc->agg_sig.verify(agg_pk, lc->getHash().container))
         {
             logErr2("verify lc - signature invalid");
             ;
@@ -658,6 +659,7 @@ bool Node::Service::verify_block_committee(const REF_getter<MsgData::BlockAccept
 
     return true;
 }
+#endif
 bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ> &lc)
 {
     /// проверка сертификата лидера
@@ -688,13 +690,12 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
         if ((stake * 100) / full_stake < QUORUM)
         {
             logNode("this quorum %lld",(stake * 100) / full_stake);
-            logErr2("verify lc quorum failed %lld %lld",stake,full_stake);
+            logNode("verify lc quorum failed %lld %lld",stake,full_stake);
             return false;
         }
-        if (!lc->agg_diff_sig.verify(agg_pk, lc->blockAcceptedREQ->blockInfo->getHash().container))
+        if (!lc->agg_diff_sig.verify(agg_pk, lc->blockAcceptedREQ->getHash().container))
         {
-            logErr2("verify lc - sign invalid");
-            ;
+            logNode("verify lc - sign invalid");
             return false;
         }
     }
