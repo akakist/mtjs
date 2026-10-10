@@ -39,10 +39,10 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     auto mf=getMetaFull(m->payload_heart_beat->block_timestamp);
 
     uint64_t fullstake=0;
-    auto ls=db_state->getAllNodes();
-    for(auto& z: ls)
+    // auto ls=db_state->getAllNodes();
+    for(auto& z: mf->all_nodes_enabled)
     {
-        fullstake+=z->get_full_stake();
+        fullstake+=mf->getPrevStake(z);
     }
 
     uint64_t hb_staked = 0;
@@ -55,8 +55,8 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         {
             for (auto &z : li.HeartBeatRSP_m)
             {
-                auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
-                hb_staked+=n->get_full_stake();
+                // auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
+                hb_staked+=mf->getPrevStake(z.second->node_signer);
             }
         }
     }
@@ -93,7 +93,7 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
 }
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAccepted2REQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
 {
-        logNode("HeartBeatREQ from %s",h->node_leader.container.c_str());
+        // logNode("HeartBeatREQ from %s",h->node_leader.container.c_str());
 
     MUTEX_INSPECTOR;
     if(!need_continue_broadcast)
@@ -178,26 +178,60 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         /// отвечаем, поскольку это кейс старта с генезиса
         logNode("if(!remote_verified && !local_verified) ");
         auto mf=getMetaFull(h->block_timestamp);
-        if(isNodeGreater(this_node_name,h->node_leader,mf))
+        // NODE_id localLeader=this_node_name;
+        // if(cli.node_leader.valid())
+        // localLeader=cli.node_leader->node_leader;
+
+        if(cli.node_leader.valid())
         {
-            if(iUtils->getNow()-cli.heart_beat_sent[h->block_timestamp / HB_TIME_WINDOW] > _1sec * HEART_BEAT_SENT_TIMEOUT)
+            if(isNodeGreater(cli.node_leader->node_leader,h->node_leader,mf))
             {
-                logNode("if(isNodeGreater(this_node_name,h->node_leader,mf))");
-                auto hb=do_heart_beat(h->block_timestamp);
-                // cli.node_leader=hb;
-                // cli.heart_beat_sent[h->block_timestamp/HB_TIME_WINDOW]=iUtils->getNow();
                 *need_continue_broadcast=false;
+                // if(iUtils->getNow()-cli.heart_beat_sent[h->block_timestamp / HB_TIME_WINDOW] > _1sec * HEART_BEAT_SENT_TIMEOUT)
+                // {
+                //     logNode("if(isNodeGreater(this_node_name,h->node_leader,mf))");
+                //     auto hb=do_heart_beat(h->block_timestamp);
+                //     // cli.node_leader=hb;
+                //     // cli.heart_beat_sent[h->block_timestamp/HB_TIME_WINDOW]=iUtils->getNow();
+                //     *need_continue_broadcast=false;
+                //     return true;
+                // }
+            }
+            else
+            {
+        MUTEX_INSPECTOR;
+                // logNode("reply_HeartBeatRSP(h,route); leader %s", h->node_leader.container.c_str());
+                reply_HeartBeatRSP(h,route);
+                *need_continue_broadcast=true;
+                cli.node_leader=h;
                 return true;
             }
+
         }
         else
         {
-    MUTEX_INSPECTOR;
-            // logNode("reply_HeartBeatRSP(h,route); leader %s", h->node_leader.container.c_str());
-            reply_HeartBeatRSP(h,route);
-            *need_continue_broadcast=true;
-            cli.node_leader=h;
-            return true;
+            if(isNodeGreater(this_node_name,h->node_leader,mf))
+            {
+                if(iUtils->getNow()-cli.heart_beat_sent[h->block_timestamp / HB_TIME_WINDOW] > _1sec * HEART_BEAT_SENT_TIMEOUT)
+                {
+                    logNode("if(isNodeGreater(this_node_name,h->node_leader,mf))");
+                    auto hb=do_heart_beat(h->block_timestamp);
+                    // cli.node_leader=hb;
+                    // cli.heart_beat_sent[h->block_timestamp/HB_TIME_WINDOW]=iUtils->getNow();
+                    *need_continue_broadcast=false;
+                    return true;
+                }
+            }
+            else
+            {
+        MUTEX_INSPECTOR;
+                // logNode("reply_HeartBeatRSP(h,route); leader %s", h->node_leader.container.c_str());
+                reply_HeartBeatRSP(h,route);
+                *need_continue_broadcast=true;
+                cli.node_leader=h;
+                return true;
+            }
+
         }
     }
     
@@ -436,16 +470,15 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 
         for (auto &z : li.ConfirmLeaderRSP_m)
         {
-            auto stake = db_state->getNodeNoCreateConst(z.second->node_signer)->get_full_stake();
+            auto stake = mf->getPrevStake(z.second->node_signer);
             hb_staked += stake;
         }
     }
     uint64_t fullstake=0;
-    auto ls = db_state->getAllNodes();
-    for(auto &z:ls)
+    // auto ls = db_state->getAllNodes();
+    for(auto &z:mf->all_nodes_enabled)
     {
-        if(z->isEnabled())
-            fullstake+=z->get_full_stake();
+        fullstake+=mf->getPrevStake(z);
     }
 
     auto pers = (hb_staked * 100) / fullstake;

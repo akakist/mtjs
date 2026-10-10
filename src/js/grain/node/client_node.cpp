@@ -72,12 +72,12 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     uint64_t staked=0;
     for(auto &z: r->blockAcceptedREQ->node_validators)
     {
-        staked+=db_state->getNodeNoCreateConst(z)->get_full_stake();
+        staked+=mf->getPrevStake(z);
     }
     uint64_t fullstake=0;
     for(auto &z: mf->committe_members)
     {
-        fullstake+=db_state->getNodeNoCreateConst(z)->get_full_stake();
+        fullstake+=mf->getPrevStake(z);
     }
     if((staked*100)/fullstake < QUORUM)
     {
@@ -109,7 +109,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         logNode("@@ BlockDiffValidateREQ not matched root hash remote %s local %s",r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str(),new_root_hash.str().c_str());
         return true;
     }
-    db_to_save_Z.add("...last_block...",r->getBuffer());
+    // db_to_save_Z.add("...last_block...",r->getBuffer());
     // logNode("BlockDiffValidateREQ ok");
     REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
     bdvrs->node_validator=this_node_name;
@@ -126,7 +126,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
 bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
-        // logErr2("@@ %s",__func__);
+        logErr2("@@ %s",__func__);
 
     if(!db_state->sync_empty)
     {
@@ -148,7 +148,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 
     if(cli.node_leader->node_leader!=src_node)
     {
-        logNode("invalid leader 12");
+        logNode("invalid leader #12");
         return true;
     }
     // auto& c=cli_leader_info[r->blockInfo->heart_beat->prev_root_hash_1];
@@ -169,6 +169,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 
     if(!db_state->sync_empty)
     {
+        logNode("if(!db_state->sync_empty)");
         return true;
     }
 
@@ -185,13 +186,13 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
             throw CommonError("if(!n.valid())");
 
         agg_pk_v.push_back(n->get_bls_pk());
-        stake_val+=n->get_full_stake();
+        stake_val+=mf->getPrevStake(z);
         XPASS;
     }
     uint64_t full_stake_val=0;
     for(auto& z: mf->committe_members)
     {
-        full_stake_val+=db_state->getNodeNoCreateConst(z)->get_full_stake();
+        full_stake_val+=mf->getPrevStake(z);
     }
 
     if((stake_val*100)/full_stake_val < QUORUM)
@@ -199,6 +200,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         logNode("validator quorum failed");
         return true;
     }
+    logNode("validator quorum OK");
     {
         MUTEX_INSPECTOR;
         XTRY;
@@ -221,14 +223,16 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     auto ls=db_state->getAllNodes();
     for(auto &z: ls)
     {
+        if(!z->isEnabled()) continue;
+
         full_stake+=z->get_full_stake();
     }
     if((stake_n*100)/full_stake < QUORUM)
     {
-        // logNode("node diff quorum failed");
-        return true;
+        logNode("node diff quorum failed %lld",(stake_n*100)/full_stake);
+        // return true;
     }
-    logNode("BlockDBStore quorum ok !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    logNode("BlockDBStore quorum ok !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! %lld",(stake_n*100)/full_stake);
     if (!r->blockAccepted2REQ->agg_diff_sig.verify(agg_pk_n, r->blockAccepted2REQ->blockAcceptedREQ->getHash().container))
     {
         logNode("block diff aggsig not matched");
@@ -246,7 +250,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         }
         logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
-    db_to_save_Z.add("...last_block...",r->blockAccepted2REQ->blockAcceptedREQ->getBuffer());
+    db_to_save_Z.add("...last_block...",r->blockAccepted2REQ->getBuffer());
     // auto &hb=v.blockDBStore->hb;
     // {
     //     MUTEX_INSPECTOR;

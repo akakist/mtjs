@@ -552,10 +552,6 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
 
     double total_staked=0;
     auto nn=db_state->getAllNodes();
-    for(auto& n:nn)
-    {
-        // total_staked+=n->get_full_stake();
-    }
     auto local_prev_block=prev_block;
     std::set<NODE_id> ns;
     if(local_prev_block.valid())
@@ -575,7 +571,6 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
             if(!n.valid())
                 throw CommonError("if(!n.valid())");
 
-            // n->get_full_stake();
             auto portion=n->get_full_stake()*b.node_rewards/total_staked;
             auto u = db_state->getAddressStateOrCreate(n->get_owner(),NULL);
             {
@@ -640,12 +635,12 @@ bool Node::Service::verify_block_committee(const REF_getter<MsgData::BlockAccept
         {
             auto n = db_state->getNodeNoCreateConst(z);
             agg_pk.push_back(n->get_bls_pk());
-            stake += n->get_full_stake();
+            stake += mf->getPrevStake(z);
         }
         uint64_t fullstake=0;
         for(auto& z: mf->committe_members)
         {
-            fullstake=db_state->getNodeNoCreateConst(z)->get_full_stake();
+            fullstake=mf->getPrevStake(z);
         }
         if ((stake * 100) / fullstake < QUORUM)
         {
@@ -670,7 +665,7 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
         return false;
     {
         MUTEX_INSPECTOR;
-        auto mf=getMetaFull(lc->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+        // auto mf=getMetaFull(lc->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
         std::vector<blst_cpp::PublicKey> agg_pk;
 
         uint64_t stake=0;
@@ -1124,8 +1119,11 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
     for(auto& z: an)
     {
         if(z->isEnabled())
+        {
             live_nodes++;
+        }
     }
+            
 
     auto v=db_state->getValuesNoCreateConst();
     
@@ -1133,22 +1131,15 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 
     size_t validator_count=(live_nodes * validators_percent)/100;
 
-    // for(auto& z: an)
-    // {
-    //     auto name=z->getName();
-    //     m->all_nodes.insert_or_assign(name,z);
-    //     auto stake=z->get_full_stake();
-    //     m->node_stakes[name]=stake;
-    //     m->all_nodes_full_stake+=stake;
-    // }
     std::vector<NodeElement> vne;
-    // auto allNodes=db_state->getAllNodes();
     std::map<uint64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
 
     for(auto &x: an)
     {
         if(!x->isEnabled())
             continue;
+        m->all_nodes_enabled.push_back(x->getName());
+        m->prev_stakes[x->getName()]=x->get_full_stake();
         std::string seed=x->getName().container;
         if(prev_block.valid())
         {
@@ -1178,24 +1169,24 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
         throw CommonError("if(validator_count>=vne.size())");
     std::vector<NodeElement> vne_committe;
 
-    std::string vne_list;
-    for(auto& z: vne)
-    {
-        vne_list+=z.name.container+ " ";
-    }
-    logNode("vne %s",vne_list.c_str());
-    std::string comlist;
+    // std::string vne_list;
+    // for(auto& z: vne)
+    // {
+    //     vne_list+=z.name.container+ " ";
+    // }
+    // logNode("vne %s",vne_list.c_str());
+    // std::string comlist;
     // logNode("validator_count %d",validator_count);
     for(size_t i=0;i<validator_count;i++)
     {
         auto n=vne[i].name;
-        comlist+=n.container+" ";
+        // comlist+=n.container+" ";
         // logNode("commitee %s",n.container.c_str());
         vne_committe.push_back(vne[i]);
         // m->committe_full_stake+=vne[i].stake_A;
         m->committe_members.insert(n);
     }
-    logNode("committee %s",comlist.c_str());
+    // logNode("committee %s",comlist.c_str());
     m->tree_committe=buildTree(vne_committe);
 
     return m;

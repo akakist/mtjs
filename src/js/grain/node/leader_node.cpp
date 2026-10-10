@@ -44,11 +44,10 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
 
     uint64_t fullstake = 0;
 
-    auto ls=db_state->getAllNodes();
-    for(auto& z: ls)
+    // auto ls=mf-db_state->getAllNodes();
+    for(auto& z: mf->all_nodes_enabled)
     {
-        if(z->isEnabled())
-            fullstake+=z->get_full_stake();
+        fullstake+=mf->getPrevStake(z);
     }
     uint64_t stake = 0;
     for (auto &z : li.transaction_responders)
@@ -118,9 +117,22 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     {
         stakeVal += db_state->getNodeNoCreateConst(z->node_validator)->get_full_stake();
     }
+    std::set<NODE_id> hb_live;
+    for(auto& z: bt.leader_info.HeartBeatRSP_m)
+    {
+        hb_live.insert(z.first);
+    }
+    std::set<NODE_id> diffreplied;
+
+    for(auto& z: bt.BlockDiffValidateRSP_m[h])
+    {
+        diffreplied.insert(z->node_validator);
+    }
+    if(hb_live==diffreplied)
+
     // logNode("stakeVal %lld",stakeVal);
     // logNode("iUtils->getNow()-bt.blockAccepted2REQ_sent %lld",iUtils->getNow()-bt.blockAccepted2REQ_sent);
-    if ((stakeVal * 100) / fullstakeVal > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
+    // if ((stakeVal * 100) / fullstakeVal > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
     {
     MUTEX_INSPECTOR;
         XTRY;
@@ -168,7 +180,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         bds->tx_hashes=bt.blockDiffValidateREQ->tx_hashes;
         bds->diffs=bt.blockDiffValidateREQ->diffs;
         bds->att_data=bt.blockDiffValidateREQ->att_data;
-
+        logNode("broadcast MsgData::BlockDBStore");
         broadcast_MsgEvent_via_broadcaster(bds.get(),mf->tree_all_nodes);
         XPASS;
     }
@@ -213,12 +225,12 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     logErr2("val node %s", src_node.container.c_str());
     for (auto &z : bt.ValidateBlockRSP_m[h])
     {
-        stakeVal += db_state->getNodeNoCreateConst(z->node_validator)->get_full_stake();
+        stakeVal += mf->getPrevStake(z->node_validator);;
     }
     uint64_t fullstake=0;
     for(auto &z: mf->committe_members)
     {
-        fullstake += db_state->getNodeNoCreateConst(z)->get_full_stake();
+        fullstake += mf->getPrevStake(z);
 
     }
     //&& v_blocks[prev_root_hash_Z()].blockDBStore_V.valid()
@@ -243,7 +255,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         {
             nv_+=z->node_validator.container+" ";
             auto n = db_state->getNodeNoCreateConst(z->node_validator);
-            auto st=n->get_full_stake();
+            auto st=mf->getPrevStake(z->node_validator);
             nv_+=std::to_string(st)+" ";
             agg_pk.push_back(n->get_bls_pk());
             ba->agg_sig.add(z->sig);
