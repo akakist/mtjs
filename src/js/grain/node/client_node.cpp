@@ -77,7 +77,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     uint64_t fullstake=0;
     for(auto &z: mf->committe_members)
     {
-        staked+=db_state->getNodeNoCreateConst(z)->get_full_stake();
+        fullstake+=db_state->getNodeNoCreateConst(z)->get_full_stake();
     }
     if((staked*100)/fullstake < QUORUM)
     {
@@ -225,9 +225,10 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     }
     if((stake_n*100)/full_stake < QUORUM)
     {
-        logNode("node diff quorum failed");
+        // logNode("node diff quorum failed");
         return true;
     }
+    logNode("BlockDBStore quorum ok !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     if (!r->blockAccepted2REQ->agg_diff_sig.verify(agg_pk_n, r->blockAccepted2REQ->blockAcceptedREQ->getHash().container))
     {
         logNode("block diff aggsig not matched");

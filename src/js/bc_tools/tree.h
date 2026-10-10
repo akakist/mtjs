@@ -5,6 +5,7 @@
 // #include "bigint.h"
 #include "NODE_id.h"
 #include "nodeElement.h"
+#include <nlohmann/json.hpp>
 
 class TreeNode {
 public:
@@ -21,6 +22,16 @@ public:
         {
             z.hash(h);
         }
+    }
+    nlohmann::json jdump()
+    {
+        nlohmann::json j;
+        j["node"]=node.name.container;
+        for(auto &z: children)
+        {
+            j["children"].push_back(z.jdump());
+        }
+        return j;
     }
 };
 TreeNode buildTree(const std::vector<NodeElement>& nodes);

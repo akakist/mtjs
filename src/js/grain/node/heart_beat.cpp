@@ -93,7 +93,7 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
 }
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAccepted2REQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
 {
-        // logNode("@@ %s from %s",__func__,h->node_leader.container.c_str());
+        logNode("HeartBeatREQ from %s",h->node_leader.container.c_str());
 
     MUTEX_INSPECTOR;
     if(!need_continue_broadcast)
@@ -193,9 +193,10 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         else
         {
     MUTEX_INSPECTOR;
-            // logNode("reply_HeartBeatRSP(h,route);");
+            // logNode("reply_HeartBeatRSP(h,route); leader %s", h->node_leader.container.c_str());
             reply_HeartBeatRSP(h,route);
             *need_continue_broadcast=true;
+            cli.node_leader=h;
             return true;
         }
     }

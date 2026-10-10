@@ -1172,6 +1172,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
         }
     }
     m->tree_all_nodes=buildTree(vne);
+    // logNode("tree_all_nodes %s",m->tree_all_nodes.jdump().dump(2).c_str());
 
     if(validator_count>=vne.size())
         throw CommonError("if(validator_count>=vne.size())");

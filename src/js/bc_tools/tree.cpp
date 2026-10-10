@@ -31,9 +31,9 @@ TreeNode buildTree(const std::vector<NodeElement>& nodes)
 
     TreeNode fake;
     fake.node.name.container="fake";
-    TreeNode root=fake;
+    TreeNode root(fake);
     q.push(&root);
-
+    // idx_r++;
     while (!q.empty() && idx_r<ranked.size()) {
         MUTEX_INSPECTOR;
         TreeNode* cur = q.front();
