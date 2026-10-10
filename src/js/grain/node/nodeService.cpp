@@ -63,19 +63,13 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     db_state = new CDatabaseRocksdb(db_name);
 
     prev_block=load_last_block(db_state.get());
-    // if (!root.valid())
-    {
-        db_state->root=getRoot(db_state.get(),prev_block);
-        // prev_block=rrt.second;
-    }
+    db_state->root=getRoot(db_state.get(),prev_block);
     init_root(db_state.get());
 
     if(prev_block.valid())
     {
-            if(!verify_block_all(prev_block))
-                prev_block=NULL;
-                // throw CommonError("last_block not verified");
-
+        if(!verify_block_all(prev_block))
+            prev_block=NULL;
     }
 
     my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
@@ -96,27 +90,10 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_REPORT_MEM, NULL, NULL, 30., this));
 
     std::string res;
-    // int err = db_state->getGranule("#root_hash#", &res);
-    // if (!err)
-    // {
-    //     // logNode("prev_root_hash_Z.container = res;");
-    //     prev_root_hash_Z.container = res;
-    // }
-
-    // logNode("do_heart_beat in startService");
-    // do_heart_beat();
 
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^ds$", "show current element dump", ListenerBase::serviceId));
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^go\\s+(.+)$", "go to child element", ListenerBase::serviceId));
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^back$", "go to parent", ListenerBase::serviceId));
-
-
-    // do_heart_beat();
-
-    // REF_getter<MsgData::LcREQ> lr=new MsgData::LcREQ();
-    // broadcast_MsgEvent(lr.get());
-    // sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(timers::TIMER_LC_REQ_TIMEDOUT,NULL,NULL,1.,this));
-    // state_Z=State::STATE_NORMAL;
 
 
     return true;
@@ -255,8 +232,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         case bcEventEnum::SendToChildAck:
             return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(e.get()), false);
 
-        // case bcEventEnum::BroadcastMessage:
-        //     return BroadcastMessage((const bcEvent::BroadcastMessage *)e.get());
         case bcEventEnum::GetGranulesREQ:
             return GetGranulesREQ((const bcEvent::GetGranulesREQ *)e.get());
         case bcEventEnum::GetGranulesRSP:
@@ -295,8 +270,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             case bcEventEnum::SendToChildAck:
                 return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
 
-            // case bcEventEnum::BroadcastMessage:
-            //     return BroadcastMessage((const bcEvent::BroadcastMessage *)ev->e.get());
             case bcEventEnum::GetGranulesREQ:
                 return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
             case bcEventEnum::GetGranulesRSP:
@@ -321,8 +294,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
             case bcEventEnum::SendToChildAck:
                 return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
-            // case bcEventEnum::BroadcastMessage:
-            //     return BroadcastMessage((const bcEvent::BroadcastMessage *)ev->e.get());
             case bcEventEnum::GetGranulesREQ:
                 return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
             case bcEventEnum::GetGranulesRSP:
@@ -411,8 +382,6 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
       iInstance(ins)
 {
     MUTEX_INSPECTOR;
-    // rocksdb_path = ins->getConfig()->get_string("rockdb_path", "/db/r1", "Path to access to rocksdb");
-    // sqlite_pn = ins->getConfig()->get_string("sqlite_pn", "/db/1", "Pathname to access to sqlite");
     rpc_addr = ins->getConfig()->get_tcpaddr("rpc_addr", "127.0.0.1:2345", "rpc address(es) of node ex: ip:port,ip2:port2");
     web_addr = ins->getConfig()->get_tcpaddr("web_addr", "127.0.0.1:2347", "web address(es) of node ex: ip:port,ip2:port2");
     my_sk_bls_env_key = ins->getConfig()->get_string("my_sk_bls_env_key", "sk_bls_env_key", "env key of bls key");
@@ -454,8 +423,6 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
     HTTP::Response r(e->req);
     auto uri = (std::string)e->req->url;
     auto da = iUtils->splitString("/", uri);
-    // auto buf = c->dump();
-    // r.make_response("<pre>" + j.dump(2) + "</pre>");
     return true;
 }
 
@@ -474,12 +441,9 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li, const
     broadcast_MsgEvent_via_broadcaster(rt.get(),meta->tree_all_nodes);
 }
 
-// #include "sql"
 THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
 {
     MUTEX_INSPECTOR;
-    // M_LOCK(root->state_mutex);
-    // outBuffer o;
     for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
     {
         MUTEX_INSPECTOR;
@@ -615,51 +579,8 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
     auto itR=m->position_of_node.find(nodeRight);
     if(itR == m->position_of_node.end())
         throw CommonError("if(itR == m->position_of_node.end())");
-        /// TODO
-    // if(prev_root_hash_Z().container.size())
-        return itL->second < itR->second;
-    return nodeLeft.container<nodeRight.container;
+    return itL->second < itR->second;
 }
-#ifdef KALL
-bool Node::Service::verify_block_committee(const REF_getter<MsgData::BlockAcceptedREQ> &lc)
-{
-    /// проверка сертификата лидера
-    if(!lc.valid())
-        return false;
-    {
-        MUTEX_INSPECTOR;
-        auto mf=getMetaFull(lc->blockInfo->heart_beat->block_timestamp);
-        std::vector<blst_cpp::PublicKey> agg_pk;
-
-        uint64_t stake=0;
-        for (auto &z : lc->node_validators)
-        {
-            auto n = db_state->getNodeNoCreateConst(z);
-            agg_pk.push_back(n->get_bls_pk());
-            stake += mf->getPrevStake(z);
-        }
-        uint64_t fullstake=0;
-        for(auto& z: mf->committe_members)
-        {
-            fullstake=mf->getPrevStake(z);
-        }
-        if ((stake * 100) / fullstake < QUORUM)
-        {
-            logNode("this quorum %lld",(stake * 100) / fullstake);
-            logErr2("verify lc quorum failed %lld %lld",stake,fullstake);
-            return false;
-        }
-        if (!lc->agg_sig.verify(agg_pk, lc->getHash().container))
-        {
-            logErr2("verify lc - signature invalid");
-            ;
-            return false;
-        }
-    }
-
-    return true;
-}
-#endif
 bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ> &lc)
 {
     /// проверка сертификата лидера
@@ -709,7 +630,6 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     logNode("@@ %s",__FUNCTION__);
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
-    logNode("stage_is_working %ld",stage_is_working);
     if(iUtils->getNow()-stage_is_working> STAGE_IS_WORKING_TIMEOUT* _1sec)
     {
         stage_is_working=iUtils->getNow();
@@ -857,7 +777,6 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 MUTEX_INSPECTOR;
                 std::optional<std::string> err;
                 auto meth=method_str;
-                // logErr2("method %s",meth.c_str());
                 if (meth == "mint")
                     err = TR::execute_mint(params, b, t,  index);
                 else if (meth == "transfer")
@@ -946,7 +865,6 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
             return "not enough funds to reserve gasLimit*gasPrice+value";
     }
     /// сбрасываем все изменения состояния перед транзакцией
-    // _db_to_save db_dump0;
     db_state->root->calc_tree_hash(db_to_save_Z);
 
     err=execute_tx_commands(b,t,j_tx);
@@ -973,7 +891,6 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         t.gasUsed+=t.roll->size();
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
-        // auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
         M_LOCK(uu->parent->mx);
         uu->balance-=t.gasUsed*gasPrice;
         b.node_rewards+=t.gasUsed*gasPrice;
@@ -983,7 +900,6 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        // auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
         M_LOCK(uu->parent->mx);
         uu->balance-=gasLimit*gasPrice;
         b.node_rewards+=gasLimit*gasPrice;
@@ -999,9 +915,6 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        // auto u=db_state->getAddressStateNoCreate(t.senderAddress);
-        // if(!u.valid())
-        //     throw CommonError("if(!u.valid()) AAA");
 
         M_LOCK(uu->parent->mx);
         uu->balance-=gasLimit*gasPrice;
@@ -1009,23 +922,10 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         return "gas exceeds limit";
     }
     // OK
-    // auto u=db_state->getAddressStateOrCreate(t.senderAddress,NULL);
     {
         M_LOCK(uu->parent->mx);
         uu->balance-=t.gasUsed*gasPrice+value-t.value;
     }
-    // for(auto& z:t.node_enables)
-    // {
-    //     b._node_enables.insert_or_assign(z.first,z.second);
-    // }
-    // for(auto& z: t.node_stake_changes)
-    // {
-    //     for(auto& y: z.second)
-    //     {
-    //         b._node_stake_changes[z.first][y.first]+=y.second;    
-    //     }
-        
-    // }
 
     db_state->root->calc_tree_hash(db_dump);
     db_to_save_Z.add(db_dump);
@@ -1113,8 +1013,6 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
     }
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
     block_meta_full[b][t_win]=m;
-    // auto nodeList=db_state->getNodeListNoCreateConst();
-    // m->full_broadcast=nn->getList();
     auto an=db_state->getAllNodes();
     int live_nodes=0;
     for(auto& z: an)
@@ -1164,30 +1062,17 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
         }
     }
     m->tree_all_nodes=buildTree(vne);
-    // logNode("tree_all_nodes %s",m->tree_all_nodes.jdump().dump(2).c_str());
 
     if(validator_count>=vne.size())
         throw CommonError("if(validator_count>=vne.size())");
     std::vector<NodeElement> vne_committe;
 
-    // std::string vne_list;
-    // for(auto& z: vne)
-    // {
-    //     vne_list+=z.name.container+ " ";
-    // }
-    // logNode("vne %s",vne_list.c_str());
-    // std::string comlist;
-    // logNode("validator_count %d",validator_count);
     for(size_t i=0;i<validator_count;i++)
     {
         auto n=vne[i].name;
-        // comlist+=n.container+" ";
-        // logNode("commitee %s",n.container.c_str());
         vne_committe.push_back(vne[i]);
-        // m->committe_full_stake+=vne[i].stake_A;
         m->committe_members.insert(n);
     }
-    // logNode("committee %s",comlist.c_str());
     m->tree_committe=buildTree(vne_committe);
 
     return m;

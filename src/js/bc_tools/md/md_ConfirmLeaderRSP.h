@@ -17,6 +17,8 @@ namespace MsgData
         }
         REF_getter<HeartBeatREQ> hb;
         NODE_id node_signer;
+        blst_cpp::Signature signature;
+
         void update(Blake2bHasher& h) const
         {
             throw CommonError("unimp");
@@ -28,6 +30,7 @@ namespace MsgData
             Base::pack(b);
             b<<hb;
             b<<node_signer;
+            b<<signature;
         }
         void unpack(inBuffer& b) final
         {
@@ -35,6 +38,7 @@ namespace MsgData
             Base::unpack(b);
             b>>hb;
             b>>node_signer;
+            b>>signature;
         }
     };
 

@@ -69,7 +69,9 @@ namespace Node
         int64_t confirm_leader_sent=0;
         REF_getter< MsgData::HeartBeatREQ> leader_cert_2;
         std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > HeartBeatRSP_m;
-        std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > ConfirmLeaderRSP_m;
+        // std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > ConfirmLeaderRSP_m;
+
+        std::map<THASH_id /*payload hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m;
         std::set<NODE_id> transaction_responders;
         uint64_t request_for_transactions_time=0;
 

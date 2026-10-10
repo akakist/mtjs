@@ -12,10 +12,12 @@ namespace MsgData
         }
         REF_getter<HeartBeatREQ> payload_heart_beat;
         NODE_id node_signer;
+        // blst_cpp::Signature signature;
         void update(Blake2bHasher& h) const
         {
             payload_heart_beat->update(h);
             h.update(node_signer.container);
+            // h.update(signature.serialize());
         }
         static Base* construct()
         {

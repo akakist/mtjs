@@ -21,14 +21,12 @@
 #include <vector>
 bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route)
 {
-    // logNode("@@ %s",__FUNCTION__);
     MUTEX_INSPECTOR;
     if(!db_state->sync_empty)
     {
         return true;
     }
-    // if(state_Z==STATE_SYNCING)
-     stage_is_working=iUtils->getNow();
+    stage_is_working=iUtils->getNow();
     auto &cli = cli_leader_info[prev_root_hash_Z()];
     if(!cli.node_leader.valid())
     {
@@ -85,54 +83,33 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         return true;
     }
     Rollback roll;
-    // logNode("r->blockDBStore->diffs size %d",r->blockAcceptedREQ->blockInfo->diffs.size());
     for(auto& z: r->diffs)
     {
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
         THASH_id h;
         h.container=z.first;
         auto leaf=db_state->replaceLeaf(h, &roll,z.second);
-        // {
-        //     inBuffer in(z.second);
-        //     {
-        //         M_LOCK(leaf->parent->mx);
-        //         leaf->parent->unpack_mx(in);
-        //     }
-        //     leaf->setDirty(&roll);
-        // }
     }
-    // cli.blockDBStore->blockAcceptedREQ
     auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(db_state->root);
-    // logNode("prev RH  %s new RH %s",prev_root_hash_Z().str().c_str(),new_root_hash.str().c_str());
     if(r->blockAcceptedREQ->blockInfo->new_root_hash1!=new_root_hash)
     {
         logNode("@@ BlockDiffValidateREQ not matched root hash remote %s local %s",r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str(),new_root_hash.str().c_str());
         return true;
     }
-    // db_to_save_Z.add("...last_block...",r->getBuffer());
-    // logNode("BlockDiffValidateREQ ok");
     REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
     bdvrs->node_validator=this_node_name;
-    // bdvrs->blockAcceptedREQ=r->blockAcceptedREQ;
     bdvrs->sig.sign(my_sk_bls,r->blockAcceptedREQ->getHash().container);
-    // bdvrs->sign(my_sk_bls);
     pass_NodeMsgRSP(bdvrs.get(),route);
-    // cli.blockDBStore=r->blockDBStore;
-
-
-
     return true;
 }
 bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
-        logErr2("@@ %s",__func__);
 
     if(!db_state->sync_empty)
     {
         return true;
     }
-    // if(state_Z==STATE_SYNCING)
      stage_is_working=iUtils->getNow();
          
 
@@ -144,21 +121,12 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         logNode("if(!cli.node_leader.valid()) @2");
         return true;
     }
-    // else logNode("cli.node_leader.valid() @2");
 
     if(cli.node_leader->node_leader!=src_node)
     {
         logNode("invalid leader #12");
         return true;
     }
-    // auto& c=cli_leader_info[r->blockInfo->heart_beat->prev_root_hash_1];
-
-    // if (!cli.blockDBStore.valid())
-    // {
-    //     logNode("if (!v.blockDBStore.valid())");
-    //     return true;
-
-    // }
 
     if (r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->node_leader != src_node)
     {
@@ -173,9 +141,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         return true;
     }
 
-    // if (! v.blockDBStore.valid())
-    //     throw CommonError("if (!blockDBStore.valid())");
-    // cli.blockDBStore->blockAcceptedREQ = r->blockAcceptedREQ;
     uint64_t stake_val=0;
     std::vector<blst_cpp::PublicKey> agg_pk_v;
     for (auto &z : r->blockAccepted2REQ->blockAcceptedREQ->node_validators)
@@ -200,7 +165,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         logNode("validator quorum failed");
         return true;
     }
-    logNode("validator quorum OK");
     {
         MUTEX_INSPECTOR;
         XTRY;
@@ -232,7 +196,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         logNode("node diff quorum failed %lld",(stake_n*100)/full_stake);
         return true;
     }
-    logNode("BlockDBStore quorum ok !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! %lld",(stake_n*100)/full_stake);
     if (!r->blockAccepted2REQ->agg_diff_sig.verify(agg_pk_n, r->blockAccepted2REQ->blockAcceptedREQ->getHash().container))
     {
         logNode("block diff aggsig not matched");
@@ -251,16 +214,8 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
     db_to_save_Z.add("...last_block...",r->blockAccepted2REQ->getBuffer());
-    // auto &hb=v.blockDBStore->hb;
-    // {
-    //     MUTEX_INSPECTOR;
-    //     XTRY;
-    //     XPASS;
-    // }
     db_state->write_granules_batch(db_to_save_Z);
 
-    // FILE *f= fopen("")
-    logErr2("written %d granules",db_to_save_Z.cells.size());
     db_to_save_Z.clear();
 
 
@@ -269,7 +224,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     prev_block=r->blockAccepted2REQ;
     l_blocks.clear();
     block_meta_full.clear();
-    // block_meta_validator.clear();
 
     for (auto &z : r->tx_hashes)
     {
@@ -310,11 +264,6 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
         return true;
     }
 
-//    if(state_Z==STATE_SYNCING)
-//     {
-//         
-//         return true;
-//     }
     auto prev_root_hash=prev_root_hash_Z();
     auto & cli=cli_leader_info[prev_root_hash];
     if(!cli.node_leader.valid())
@@ -395,8 +344,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             t.emit_block("error", R"({"code":-32602,"error":"epoch invalid"})");
             err = true;
             logNode("if (epoch_current() != r->heart_beat->new_epoch)");
-            // setBlockId(r->leader_cert->heart_beat->prev_root_hash);
-            // return true;
         }
         logNode("ERROR: ValidateBlock block %s, nextblock %s", r->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z().str().c_str());
     }
@@ -412,12 +359,9 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         std::map<std::string, std::string> diffs;
         for(auto& z:db_to_save_Z.cells)
         {
-            // logNode("z.first,size*() %d",z.first.size());
             if(z.first.size()==32)
             {
                 diffs[z.first]=z.second;
-                // logNode("v.blockDBStore->diffs_Z[z.first]=z.second;");
-
             }
         }
 
@@ -445,32 +389,13 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo(new_root_hash,tx_hash,diff_hash,t.att_data->getHash(),r->heart_beat);
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
 
-        // 
-        // block->prev_root_hash = prev_root_hash_Z;
         rsp->blockInfo = blockInfo;
         rsp->diffs=diffs;
         rsp->tx_hashes=tx_hashes;
         rsp->att_data = t.att_data;
 
-        // logNode("rsp->payload_blockInfo->att_data valid %d",rsp->blockInfo->att_data.valid());
-
-        // Blake2bHasher h;
-        // for(auto & z:r->transaction_bodies)
-        // {
-        //     rsp->tx_hashes.push_back(z->getHash());
-        // }
-        // blockInfo->tx_hash_Z.container=h.final();
         rsp->node_validator = this_node_name;
-        // rsp->payload_blockInfo = blockInfo;
         rsp->sign(my_sk_bls);
-
-        // Blake2bHasher hh;
-        // for(auto &z: v.blockDBStore_V->diffs_Z)
-        // {
-        //     hh.update(z.first);
-        //     hh.update(z.second);
-        // }
-        // blockInfo->diff_hash.container=hh.final();
 
 
         pass_NodeMsgRSP(rsp.get(), route);
