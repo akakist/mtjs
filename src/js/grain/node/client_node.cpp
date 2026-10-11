@@ -43,7 +43,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     for (auto &z : r->blockAcceptedREQ->node_validators)
     {
         XTRY;
-        auto n=db_state->getNodeNoCreate(z);
+        auto n=db_state->getNodeNoCreateConst(z);
         if(!n.valid())
             throw CommonError("if(!n.valid())");
 
@@ -82,6 +82,8 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         logNode("failed quorum check V");
         return true;
     }
+    
+/// применяем диффы
     Rollback roll;
     for(auto& z: r->diffs)
     {
@@ -90,6 +92,29 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         h.container=z.first;
         auto leaf=db_state->replaceLeaf(h, &roll,z.second);
     }
+/// проверка сертификата лидера
+    std::vector<blst_cpp::PublicKey> agg_pk_lc;
+    uint64_t stake_lc=0;
+    for(auto &z: r->lc->node_validators)
+    {
+        auto n=db_state->getNodeNoCreateConst(z);
+        agg_pk_lc.push_back(n->get_bls_pk());
+        stake_lc+=mf->getPrevStake(z);
+    }
+    if (!r->lc->agg_sig.verify(agg_pk_lc, r->lc->hb->getHash().container))
+    {
+        logNode("hb aggsig not matched");
+        return true;
+    }
+    if((stake_lc*100)/mf->fullStake()< QUORUM)
+    {
+        logNode("QUORUM LC failed");
+        return true;
+    }
+
+    
+
+
     auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(db_state->root);
     if(r->blockAcceptedREQ->blockInfo->new_root_hash1!=new_root_hash)
     {

@@ -15,6 +15,15 @@ struct BlockMetaFull: public Refcountable
             throw CommonError("if(it==prev_stakes.end())");
         return it->second;
     }
+    uint64_t fullStake()
+    {
+        uint64_t r=0;
+        for(auto& z: prev_stakes)
+        {
+            r+=z.second;
+        }
+        return r;
+    }
     std::vector<NODE_id> all_nodes_enabled;
     TreeNode tree_all_nodes;
     TreeNode tree_committe;

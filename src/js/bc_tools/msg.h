@@ -80,6 +80,7 @@ namespace msgid
 
         BlockDiffValidateREQ=18, BlockDiffValidateRSP=19,
         BlockAccepted2REQ = 20,
+        LeaderCert = 21
     };
 
 }

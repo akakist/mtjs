@@ -6,6 +6,7 @@
 #include "blst_cp.h"
 #include "md_attachment_data.h"
 #include "md_BlockDBStore.h"
+#include "md_LeaderCert.h"
 namespace MsgData
 {
     struct BlockDiffValidateREQ: public Base
@@ -14,12 +15,15 @@ namespace MsgData
         BlockDiffValidateREQ(const REF_getter<BlockAcceptedREQ> & ba,
         const std::vector<THASH_id> & _tx,
         const std::map<std::string, std::string> &_diffs,
-        const REF_getter<MsgData::attachment_data> &_att_data
+        const REF_getter<MsgData::attachment_data> &_att_data,
+        const REF_getter<MsgData::LeaderCert> _cert
+
     ): Base(msgid::BlockDiffValidateREQ), 
             blockAcceptedREQ(ba),
             tx_hashes(_tx),
             diffs(_diffs),
-            att_data(_att_data)
+            att_data(_att_data),
+            lc(_cert)
         {
 
         }
@@ -33,6 +37,7 @@ namespace MsgData
         std::vector<THASH_id> tx_hashes;
         std::map<std::string, std::string> diffs;
         REF_getter<MsgData::attachment_data> att_data;
+        REF_getter<MsgData::LeaderCert> lc;
         void update(Blake2bHasher& h) const
         {
     MUTEX_INSPECTOR;
@@ -47,20 +52,21 @@ namespace MsgData
                 h.update(t.second);
             }
             att_data->update(h);
+            lc->update(h);
         }
         void pack(outBuffer& b) const final
         {
     MUTEX_INSPECTOR;
             Base::pack(b);
             b << blockAcceptedREQ;
-            b << tx_hashes << diffs << att_data;
+            b << tx_hashes << diffs << att_data << lc;
         }
         void unpack(inBuffer& b) final
         {
     MUTEX_INSPECTOR;
             Base::unpack(b);
             b >> blockAcceptedREQ;
-            b >> tx_hashes >> diffs >> att_data;
+            b >> tx_hashes >> diffs >> att_data >> lc;
         }
     };
 
