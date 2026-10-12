@@ -283,6 +283,9 @@ namespace Node
         std::optional<std::string> execute_tx_commands(b_params &b, t_params& t, 
              yyjson_val * j_tx);
 
+        REF_getter<MsgData::LeaderCert> makeLeaderCert(const MsgData::HeartBeatREQ* hb, const BlockMetaFull* mf);
+
+
         REF_getter<IDatabase> db_state=nullptr;
 
 

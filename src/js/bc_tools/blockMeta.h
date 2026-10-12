@@ -8,14 +8,14 @@ struct BlockMetaFull: public Refcountable
     std::map<NODE_id, uint64_t> prev_stakes;
     // std::map<NODE_id, blst_cpp::PublicKey> prevpks;
     // blst_cpp::PublicKey bls_pk;
-    uint64_t getPrevStake(const NODE_id& n)
+    uint64_t getPrevStake(const NODE_id& n) const
     {
         auto it=prev_stakes.find(n);
         if(it==prev_stakes.end())
             throw CommonError("if(it==prev_stakes.end())");
         return it->second;
     }
-    uint64_t fullStake()
+    uint64_t fullStake() const
     {
         uint64_t r=0;
         for(auto& z: prev_stakes)
