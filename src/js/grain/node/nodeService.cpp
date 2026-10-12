@@ -142,6 +142,7 @@ void Node::Service::do_start_block()
     {
         REF_getter<MsgData::ValidateBlockREQ> vb = new MsgData::ValidateBlockREQ();
         vb->heart_beat = li.leader_cert_2;
+        vb->lc=makeLeaderCert(li.leader_cert_2.get(),mf.get());
 
         auto &bt = l_blocks[prev_root_hash_Z()];
         collectTransactions();

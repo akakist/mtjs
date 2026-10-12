@@ -172,31 +172,55 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     return true;
 }
 
+bool Node::Service::verifyLeaderCert(const MsgData::LeaderCert* lc, const BlockMetaFull* mf)
+{
+    std::vector<blst_cpp::PublicKey> agg_pk_lc;
+    uint64_t stake_lc=0;
+    for(auto &z: lc->node_validators)
+    {
+        auto n=db_state->getNodeNoCreateConst(z);
+        agg_pk_lc.push_back(n->get_bls_pk());
+        stake_lc+=mf->getPrevStake(z);
+    }
+    if (!lc->agg_sig.verify(agg_pk_lc, lc->hb->getHash().container))
+    {
+        logNode("hb aggsig not matched");
+        return false;
+    }
+    if((stake_lc*100)/mf->fullStake()< QUORUM)
+    {
+        logNode("QUORUM LC failed");
+        return false;
+    }
+
+    return true;    
+}
+
 REF_getter<MsgData::LeaderCert> Node::Service::makeLeaderCert(const MsgData::HeartBeatREQ* hb, const BlockMetaFull* mf)
 {
-        auto &bt = l_blocks[prev_root_hash_Z()];
-        REF_getter<MsgData::LeaderCert> lc=new MsgData::LeaderCert;
-        lc->hb=hb;
-        auto hb_hash=hb->getHash();
-        std::vector<blst_cpp::PublicKey> agg_pk_lc;
-        uint64_t stake_lc=0;
-        for(auto& z:bt.leader_info.ConfirmLeaderRSP_m[hb_hash])
-        {
-            auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
-            agg_pk_lc.push_back(n->get_bls_pk());
-            lc->agg_sig.add(z.second->signature);
-            lc->node_validators.push_back(z.second->node_signer);
-            stake_lc+=mf->getPrevStake(z.second->node_signer);
+    auto &bt = l_blocks[prev_root_hash_Z()];
+    REF_getter<MsgData::LeaderCert> lc=new MsgData::LeaderCert;
+    lc->hb=hb;
+    auto hb_hash=hb->getHash();
+    std::vector<blst_cpp::PublicKey> agg_pk_lc;
+    uint64_t stake_lc=0;
+    for(auto& z:bt.leader_info.ConfirmLeaderRSP_m[hb_hash])
+    {
+        auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
+        agg_pk_lc.push_back(n->get_bls_pk());
+        lc->agg_sig.add(z.second->signature);
+        lc->node_validators.push_back(z.second->node_signer);
+        stake_lc+=mf->getPrevStake(z.second->node_signer);
 
-        }
-        if(!lc->agg_sig.verify(agg_pk_lc,hb_hash.container))
-        {
-            throw CommonError("lc verify failed");
-        }
-        if((stake_lc* 100)/mf->fullStake() < QUORUM)
-            throw CommonError("if((stake_lc* 100)/mf->fullStake() < QUORUM) %lld",(stake_lc * 100)/mf->fullStake());
-        
-            return lc;
+    }
+    if(!lc->agg_sig.verify(agg_pk_lc,hb_hash.container))
+    {
+        throw CommonError("lc verify failed");
+    }
+    if((stake_lc* 100)/mf->fullStake() < QUORUM)
+        throw CommonError("if((stake_lc* 100)/mf->fullStake() < QUORUM) %lld",(stake_lc * 100)/mf->fullStake());
+    
+    return lc;
 
 }
 bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
@@ -301,7 +325,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             throw CommonError("if((stake_lc* 100)/mf->fullStake() < QUORUM) %lld",(stake_lc * 100)/mf->fullStake());
 
 
-        REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(ba,r->tx_hashes,r->diffs,r->att_data, lc);
+        REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(ba,r->tx_hashes,r->diffs,r->att_data);
 
         bt.blockDiffValidateREQ=bdv;
 

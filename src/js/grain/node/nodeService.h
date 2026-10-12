@@ -284,6 +284,7 @@ namespace Node
              yyjson_val * j_tx);
 
         REF_getter<MsgData::LeaderCert> makeLeaderCert(const MsgData::HeartBeatREQ* hb, const BlockMetaFull* mf);
+        bool verifyLeaderCert(const MsgData::LeaderCert* lc, const BlockMetaFull* mf);
 
 
         REF_getter<IDatabase> db_state=nullptr;
