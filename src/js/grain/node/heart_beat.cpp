@@ -55,7 +55,6 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         {
             for (auto &z : li.HeartBeatRSP_m)
             {
-                // auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
                 hb_staked+=mf->getPrevStake(z.second->node_signer);
             }
         }
@@ -107,7 +106,6 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
 
     if(h->node_leader==this_node_name)
     {
-        // logNode("reply_HeartBeatRSP if(h->node_leader==this_node_name)");
             reply_HeartBeatRSP(h,route);
             *need_continue_broadcast=true;
             return true;

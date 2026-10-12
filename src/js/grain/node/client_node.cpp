@@ -300,11 +300,6 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
 void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators)
 {
     return;
-    // std::set<NODE_id> lc_nodes;
-    // for(auto& z: node_validators)
-    // {
-    //     lc_nodes.insert(z);
-    // }
     auto ls=db_state->getAllNodes();
     for(auto &z: ls)
     {

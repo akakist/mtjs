@@ -303,28 +303,6 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
             return true;
         }
-#ifdef KALL        
-        REF_getter<MsgData::LeaderCert> lc=new MsgData::LeaderCert;
-        lc->hb=r->blockInfo->heart_beat;
-        auto hb_hash=r->blockInfo->heart_beat->getHash();
-        std::vector<blst_cpp::PublicKey> agg_pk_lc;
-        uint64_t stake_lc=0;
-        for(auto& z:bt.leader_info.ConfirmLeaderRSP_m[hb_hash])
-        {
-            auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
-            agg_pk_lc.push_back(n->get_bls_pk());
-            lc->agg_sig.add(z.second->signature);
-            lc->node_validators.insert(z.second->node_signer);
-            stake_lc+=mf->getPrevStake(z.second->node_signer);
-
-        }
-        if(!lc->agg_sig.verify(agg_pk_lc,hb_hash.container))
-        {
-            throw CommonError("lc verify failed");
-        }
-        if((stake_lc* 100)/mf->fullStake() < QUORUM)
-            throw CommonError("if((stake_lc* 100)/mf->fullStake() < QUORUM) %lld",(stake_lc * 100)/mf->fullStake());
-#endif
 
         REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(ba,r->tx_hashes,r->diffs,r->att_data);
 

@@ -589,7 +589,6 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
         return false;
     {
         MUTEX_INSPECTOR;
-        // auto mf=getMetaFull(lc->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
         std::vector<blst_cpp::PublicKey> agg_pk;
 
         uint64_t stake=0;
