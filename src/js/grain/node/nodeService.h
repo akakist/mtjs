@@ -153,6 +153,7 @@ namespace Node
 
         bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight, const REF_getter<BlockMetaFull>& meta);
 
+        void fix_missed_rounds(const std::set<NODE_id>& node_validators);
 
 
         void do_request_for_transactions( Node::heart_beat_node_info& li, const REF_getter<BlockMetaFull>& meta);

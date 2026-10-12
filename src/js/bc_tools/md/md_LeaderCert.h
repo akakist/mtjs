@@ -19,7 +19,7 @@ namespace MsgData
             return new LeaderCert();
         }
         REF_getter<HeartBeatREQ> hb;
-        std::vector<NODE_id> node_validators;
+        std::set<NODE_id> node_validators;
         blst_cpp::AggregateSignature agg_sig;
         void update(Blake2bHasher& h) const;
         void pack(outBuffer& b) const final;

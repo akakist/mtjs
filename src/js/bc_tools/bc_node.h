@@ -19,6 +19,7 @@ struct bc_node: public data_base
     std::map<ADDRESS_id /*user*/, uint64_t> stakes;
     bool enabled=true;
     public:
+    int missed_rounds=0;
     size_t size() const
     {
         M_LOCK(parent->mx);
@@ -139,14 +140,14 @@ struct bc_node: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<enabled;
+        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<enabled<<missed_rounds;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>enabled;
+        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>enabled>>missed_rounds;
     }
 
 };

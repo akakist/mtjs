@@ -297,7 +297,49 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
     passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
 }
+void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators)
+{
+    return;
+    // std::set<NODE_id> lc_nodes;
+    // for(auto& z: node_validators)
+    // {
+    //     lc_nodes.insert(z);
+    // }
+    auto ls=db_state->getAllNodes();
+    for(auto &z: ls)
+    {
+        if(!z->isEnabled())
+            continue;
+        if(!node_validators.count(z->getName()))
+        {
+            int missed=0;
+            {
+                M_LOCK(z->parent->mx);
+                z->missed_rounds++;
+                missed=z->missed_rounds;
+                logNode("missed ++");
+            }
+            if(missed>100)
+            {
+                logNode("disable node");
+                z->setEnabled(false);
+            }
+            z->setDirty(NULL);
+        }
+        else
+        {
+            MutexLockerDeferred lk(z->parent->mx);
+            lk.lock();
+            if(z->missed_rounds)
+            {
+                z->missed_rounds=0;
+                lk.unlock();
+                z->setDirty(NULL);
+            }
+        }
+    }
 
+}
 int get_global_refcount();
 
 bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
@@ -356,13 +398,15 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         if(!verifyLeaderCert(r->lc.get(),t.meta.get()))
             err="leader cert verify failed";
     }
+    if(!err)
+        fix_missed_rounds(r->lc->node_validators);
     if (!err)
     {
 
     MUTEX_INSPECTOR;
         // auto new_root_hash =
         t.validateBlockREQ = r;
-
+        
         auto new_root_hash = execute_block(t, r->heart_beat);
 
         std::map<std::string, std::string> diffs;
