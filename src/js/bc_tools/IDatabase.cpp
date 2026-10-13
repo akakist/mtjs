@@ -315,36 +315,52 @@ REF_getter<const bc_values> IDatabase::getValuesNoCreateConst()
 {
     MUTEX_INSPECTOR;
     return dynamic_cast<const bc_values *> (getValuesNoCreate().get());
-    // auto r = this;
-    // MutexLockerDeferred lk(r->mx);
-    // auto l = getByPathNoCreate(root.get(), getPath("VALUES"));
-    // if(!l.valid())
-    //     return NULL;
-    // if (l->data.valid())
-    // {
-    //     return dynamic_cast<const bc_values *>(l->data.get());
-    // }
-    // return NULL;
+
+}
+////////////// VOTES
+REF_getter<bc_votes> IDatabase::getVotesOrCreate(Rollback* roll)
+{
+    MUTEX_INSPECTOR;
+    auto r = this;
+    MutexLockerDeferred lk(r->mx);
+    auto l = getByPathOrCreate(root.get(), getPath("VOTES"),  roll);
+    if (!l.valid())
+        throw CommonError("if(!l.valid())");
+    if (l->data.valid())
+    {
+        return dynamic_cast<bc_votes *>(l->data.get());
+    }
+
+    REF_getter<bc_votes> v = new bc_votes(l.get());
+    lk.lock();
+    l->data = v.get();
+    l->payload_ctor_idx = hsh::bc_votes;
+    lk.unlock();
+    return v;
+}
+REF_getter<bc_votes> IDatabase::getVotesNoCreate()
+{
+    MUTEX_INSPECTOR;
+    auto r = this;
+    MutexLockerDeferred lk(r->mx);
+    auto l = getByPathNoCreate(root.get(), getPath("VOTES"));
+    if(!l.valid())
+        return NULL;
+    if (l->data.valid())
+    {
+        return dynamic_cast<bc_votes *>(l->data.get());
+    }
+    return NULL;
+
+}
+REF_getter<const bc_votes> IDatabase::getVotesNoCreateConst()
+{
+    MUTEX_INSPECTOR;
+    return dynamic_cast<const bc_votes *> (getVotesNoCreate().get());
 
 }
 
-// REF_getter<bc_values> IDatabase::checkValues()
-// {
-//     MUTEX_INSPECTOR;
-//     auto r = this;
-//     MutexLockerDeferred lk(r->mx);
-//     auto l = getByPathNoCreate(root.get(), getPath("VALUES"));
-//     if (!l.valid())
-//         return NULL;
-//     lk.lock();
-//     auto data=l->data;
-//     lk.unlock();
-//     if (data.valid())
-//     {
-//         return dynamic_cast<bc_values *>(data.get());
-//     }
-//     return NULL;
-// }
+////////////////////
 
 std::vector<std::string> IDatabase::getUserPath(const ADDRESS_id &addr)
 {

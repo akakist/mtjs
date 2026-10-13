@@ -11,6 +11,7 @@ namespace hsh
         bc_values,
         // bc_epoch,
         bc_contract_data,
+        bc_votes,
         HSH_END
     };
 }

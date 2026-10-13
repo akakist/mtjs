@@ -10,6 +10,7 @@
 #include "bc_node.h"
 #include "bc_nodelist.h"
 #include "bc_values.h"
+#include "bc_vote.h"
 #include "CONTRACT_id.h"
 #include "CONTRACT_DATA_id.h"
 #include "md/md_BlockAcceptedREQ.h"
@@ -106,6 +107,10 @@ struct IDatabase: public Refcountable
     REF_getter<bc_values> getValuesOrCreate(Rollback*);
     REF_getter<bc_values> getValuesNoCreate();
     REF_getter<const bc_values> getValuesNoCreateConst();
+
+    REF_getter<bc_votes> getVotesOrCreate(Rollback*);
+    REF_getter<bc_votes> getVotesNoCreate();
+    REF_getter<const bc_votes> getVotesNoCreateConst();
 
 
     REF_getter<bc_address_state> getAddressStateOrCreate(const ADDRESS_id &pk,Rollback*);

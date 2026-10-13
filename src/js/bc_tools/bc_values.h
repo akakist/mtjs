@@ -17,6 +17,7 @@ bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         fees["transfer"]=1000;
         fees["cashback_percent"]=200;
         fees["validator_count_percent"]=50;
+        fees["missed_rounds_max"]=100;
     }
     std::map<std::string,uint64_t> fees;
     std::set<ADDRESS_id> emitters_bin;

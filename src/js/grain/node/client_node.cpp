@@ -299,8 +299,10 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
 }
 void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators)
 {
-    return;
+    // return;
     auto ls=db_state->getAllNodes();
+    auto v=db_state->getValuesNoCreateConst();
+    auto round_limit=v->getGas("missed_rounds_max");
     for(auto &z: ls)
     {
         if(!z->isEnabled())
@@ -314,7 +316,7 @@ void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators)
                 missed=z->missed_rounds;
                 logNode("missed ++");
             }
-            if(missed>100)
+            if(missed>round_limit)
             {
                 logNode("disable node");
                 z->setEnabled(false);

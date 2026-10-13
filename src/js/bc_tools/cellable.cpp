@@ -9,6 +9,7 @@
 #include "bc_node.h"
 #include "bc_nodelist.h"
 #include "bc_values.h"
+#include "bc_vote.h"
 
 
 std::vector<data_base *(*)(Cellable *)> db_constructors = {
@@ -29,6 +30,9 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
 
     +[](Cellable *p) -> data_base *
     { return new bc_contract_data(p); },
+
+    +[](Cellable *p) -> data_base *
+    { return new bc_votes(p); },
 
 };
 
