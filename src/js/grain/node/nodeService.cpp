@@ -936,56 +936,6 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
     return std::nullopt;
 }
-std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params)
-{
-    auto it=contracts.find(ct);
-    if(it==contracts.end())
-    {
-        auto err=load_contract(ct);
-        if(err)
-            return err;
-        it==contracts.find(ct);
-        if(it==contracts.end())
-            throw CommonError("if(it--contracts.end())");
-    }
-    JSScope<10, 10> scope(it->second->ctx);
-    YYJsonToQuickJS converter(it->second->ctx);
-    JSValue jspars=converter.convert(params);
-    scope.addValue(jspars);
-    auto mi=it->second->methods.find(method);
-    if(mi==it->second->methods.end())
-        return "method not found";
-
-    return std::nullopt;
-}
-#include "jsscope.h"
-#include "js_tools.h"
-std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contract)
-{
-    auto c=db_state->getContract(contract);
-    REF_getter<contract_rt> ct=new contract_rt();
-    contracts.insert_or_assign(contract,ct);
-    ct->ctx=JS_NewContext(contract_runtime);
-    {
-        M_LOCK(c->parent->mx);
-        ct->src=c->src;
-        ct->owner=c->owner;
-    }
-
-    JSScope<10, 10> scope(ct->ctx);
-    JSValue module1 = JS_Eval(ct->ctx, ct->src.data(), ct->src.size(), "<module>", JS_EVAL_TYPE_MODULE | JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
-
-    std::string err;
-    if (qjs::CheckAndGetException(ct->ctx, module1, "loadModule",err))
-        return err;
-
-    JSValue ret = JS_EvalFunction(ct->ctx, module1);
-    scope.addValue(ret);
-    if (qjs::CheckAndGetException(ct->ctx, ret, "loadModule",err))
-        return err;
-
-    return std::nullopt;
-}
 
 inline uint64_t read_uint64(const uint8_t* data) {
     return (static_cast<uint64_t>(data[0]) << 56) |
