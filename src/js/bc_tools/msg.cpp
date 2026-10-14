@@ -56,7 +56,7 @@ const char *msgName(int id)
         return "BlockDiffValidateRSP";
     case msgid::LeaderCert:
         return "LeaderCert";
-        
+
 
     default:
         return "unknown";

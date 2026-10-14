@@ -10,9 +10,9 @@
 #include "QUORUM.h"
 
 std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_params &t,
-          int seqId)
+        int seqId)
 {
-        MUTEX_INSPECTOR;
+    MUTEX_INSPECTOR;
 
     auto v = b.db->getValuesNoCreateConst();
     auto it = v->emitters_bin.find(t.senderAddress);
@@ -40,13 +40,13 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     t.gasUsed+=v->getGas("mint");
 
     b.emit_command(t.tx_id, seqId,"mint",R"({"to":"%s","amount":"%s"})",
-        base16::encode(t.senderAddress.addr).c_str(),
-         std::to_string(amount).c_str());
+                   base16::encode(t.senderAddress.addr).c_str(),
+                   std::to_string(amount).c_str());
 
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b, t_params &t,
-     int seqId)
+        int seqId)
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
@@ -83,7 +83,7 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
         return "destination user not found";
     }
     if(amount>t.value)
-    return "amount>t.value";
+        return "amount>t.value";
 
     t.value-=amount;
     {
@@ -96,16 +96,16 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
 
 
 
-    b.emit_command(t.tx_id, seqId, "transfer", R"({"from":"%s","to":"%s","amount":"%s"})", 
-        base16::encode(t.senderAddress.addr).c_str(), 
-        base16::encode(to_addr.addr).c_str(), 
-        std::to_string(amount).c_str()
-        );
+    b.emit_command(t.tx_id, seqId, "transfer", R"({"from":"%s","to":"%s","amount":"%s"})",
+                   base16::encode(t.senderAddress.addr).c_str(),
+                   base16::encode(to_addr.addr).c_str(),
+                   std::to_string(amount).c_str()
+                  );
 
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params &b, t_params &t,
-    int seqId)
+        int seqId)
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
@@ -113,7 +113,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
 
-    
+
 
     auto nn = b.db->getNodeNoCreate(name);
     if (!nn.valid())
@@ -133,7 +133,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     {
         nn->set_ip(ip);
         b.emit_command(t.tx_id, seqId, "node_change_ip",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
-        
+
     }
 
     t.markDirty(nn.get());
@@ -146,7 +146,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
 }
 
 std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params &b, t_params &t,
-     int seqId)
+        int seqId)
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
@@ -184,13 +184,13 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
     err=yy_get_string(params,"pk_bls",pk_bls);
     if(err) return err;
 
-        blst_cpp::PublicKey bls;
-        bls.deserializeHexStr(pk_bls);
-    n->init(name, 
-        t.senderAddress, 
-        bls, 
-        base16::decode(pk_ed), ip);
-    
+    blst_cpp::PublicKey bls;
+    bls.deserializeHexStr(pk_bls);
+    n->init(name,
+            t.senderAddress,
+            bls,
+            base16::decode(pk_ed), ip);
+
     t.markDirty(n.get());
 
 
@@ -203,7 +203,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params & b,t_params &t,
-     int seqId)
+        int seqId)
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
@@ -236,17 +236,17 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     t.gasUsed += v->getGas("node_stake");
 
     b.emit_command(t.tx_id, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
-        node.container.c_str(),
-        std::to_string(amount).c_str(),
-        base16::encode(t.senderAddress.addr).c_str()
-    );
+                   node.container.c_str(),
+                   std::to_string(amount).c_str(),
+                   base16::encode(t.senderAddress.addr).c_str()
+                  );
     t.markDirty(n.get());
 
 
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params & b,t_params &t,
-     int seqId)
+        int seqId)
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
@@ -256,7 +256,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     NODE_id node;
     err=yy_get_string(params,"node",node.container);
     if(err) return err;
-    
+
 
     auto n = b.db->getNodeNoCreate(node);
     if (!n.valid())
@@ -282,15 +282,15 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     t.gasUsed+=v->getGas("node_unstake");
 
     b.emit_command(t.tx_id, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
-        node.container.c_str(),
-        base16::encode(t.senderAddress.addr).c_str(),
-        std::to_string(amount).c_str()
-    );
+                   node.container.c_str(),
+                   base16::encode(t.senderAddress.addr).c_str(),
+                   std::to_string(amount).c_str()
+                  );
     return std::nullopt;
 }
 
 std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params & b,t_params &t,
-     int seqId)
+        int seqId)
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
@@ -309,20 +309,20 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     }
     if(n->isEnabled())
         return "node already enabled";
-    
+
     n->setEnabled(1);
     t.markDirty(n.get());
 
     t.gasUsed+=v->getGas("node_enable");
 
     b.emit_command(t.tx_id, seqId, "node_enable",R"({"node":"%s"})", node.container.c_str());
-    
-    
+
+
     return std::nullopt;
 }
 
 std::optional<std::string> TR::execute_node_disable(yyjson_val *params, b_params & b,t_params &t,
-     int seqId)
+        int seqId)
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
@@ -341,23 +341,23 @@ std::optional<std::string> TR::execute_node_disable(yyjson_val *params, b_params
     }
     if(!n->isEnabled())
         return "node already disabled";
-    
+
     n->setEnabled(0);
     t.markDirty(n.get());
 
     t.gasUsed+=v->getGas("node_enable");
 
     b.emit_command(t.tx_id, seqId, "node_disable",R"({"node":"%s"})", node.container.c_str());
-    
 
-    
+
+
     return std::nullopt;
 }
 
 
 
 std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_params &b, t_params &t,
-    int seqId)
+        int seqId)
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
@@ -389,7 +389,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     auto n = b.db->addContract(cn, t.roll);
 
     std::string src;
-     err=yy_get_string(params,"src",src);
+    err=yy_get_string(params,"src",src);
     if(err)return err;
 
     {
@@ -408,7 +408,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_params &b, t_params &t,
-     int seqId)
+        int seqId)
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
@@ -428,7 +428,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     auto us = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-    
+
 
 
     std::string src;
@@ -448,7 +448,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     return std::nullopt;
 }
 std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_params &t,
-     int seqId)
+        int seqId)
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
@@ -492,11 +492,14 @@ std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_p
         t.markDirty(votes.get());
     }
     uint64_t stake=0;
-    
+
     bool accepted=false;
     for(auto& z: voted)
     {
-        stake+=b.db->getNodeNoCreateConst(z)->get_full_stake();
+        auto n=b.db->getNodeNoCreateConst(z);
+        if(!n.valid())
+            return "node not found "+z.container;
+        stake+=n->get_full_stake();
     }
     if((stake*100)/b.meta->fullStake()>QUORUM)
     {
@@ -508,7 +511,7 @@ std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_p
         votes->votes.erase(vhash);
         t.markDirty(votes.get());
         t.markDirty(vv.get());
-    
+
         accepted=true;
     }
 

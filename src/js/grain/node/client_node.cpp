@@ -45,7 +45,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         XTRY;
         auto n=db_state->getNodeNoCreateConst(z);
         if(!n.valid())
-            throw CommonError("if(!n.valid())");
+            throw CommonError("if(!n.valid()) @09");
 
         agg_pk.push_back(n->get_bls_pk());
         XPASS;
@@ -82,7 +82,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         logNode("failed quorum check V");
         return true;
     }
-    
+
 /// применяем диффы
     Rollback roll;
     for(auto& z: r->diffs)
@@ -114,8 +114,8 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     {
         return true;
     }
-     stage_is_working=iUtils->getNow();
-         
+    stage_is_working=iUtils->getNow();
+
 
 
     XTRY;
@@ -152,7 +152,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         XTRY;
         auto n=db_state->getNodeNoCreateConst(z);
         if(!n.valid())
-            throw CommonError("if(!n.valid())");
+            throw CommonError("if(!n.valid()) @86");
 
         agg_pk_v.push_back(n->get_bls_pk());
         stake_val+=mf->getPrevStake(z);
@@ -184,6 +184,8 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     for(auto & z: r->blockAccepted2REQ->node_diff_validators)
     {
         auto n=db_state->getNodeNoCreateConst(z);
+        if(!n.valid())
+            throw CommonError("if(!n.valid()) ##88");
         stake_n+=n->get_full_stake();
         agg_pk_n.push_back(n->get_bls_pk());
     }
@@ -206,7 +208,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         return true;
     }
 
-    
+
 
     if(this_node_name==r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->node_leader)
     {
@@ -257,10 +259,10 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 
 bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const NODE_id &src_node, const route_t &route)
 {
-    MUTEX_INSPECTOR;    
+    MUTEX_INSPECTOR;
 
     stage_is_working=iUtils->getNow();
-        
+
 
     if(!db_state->sync_empty)
     {
@@ -342,8 +344,8 @@ int get_global_refcount();
 bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
-     stage_is_working=iUtils->getNow();
-         
+    stage_is_working=iUtils->getNow();
+
 
     if(!db_state->sync_empty)
     {
@@ -355,7 +357,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     b_params t(db_state.get());
     t.meta=getMetaFull(r->heart_beat->block_timestamp);
     bool err = false;
-    
+
     auto &cli=cli_leader_info[prev_root_hash];
     if(!cli.node_leader.valid())
     {
@@ -400,10 +402,10 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     if (!err)
     {
 
-    MUTEX_INSPECTOR;
+        MUTEX_INSPECTOR;
         // auto new_root_hash =
         t.validateBlockREQ = r;
-        
+
         auto new_root_hash = execute_block(t, r->heart_beat);
 
         std::map<std::string, std::string> diffs;

@@ -15,13 +15,20 @@ std::pair<std::string,std::string> splice(const std::string& id)
 {
     switch(id.size())
     {
-        case 0: return {"",""};
-        case 1: return {"",id};
-        case 2: return {id.substr(0,1),id.substr(1,1)};
-        case 3: return {id.substr(0,2),id.substr(2,1)};
-        case 4: return {id.substr(0,3),id.substr(3,1)};
-        case 32:return {id.substr(0,4),id.substr(4,28)};
-        default: throw CommonError("defauil switch(id.size())");
+    case 0:
+        return {"",""};
+    case 1:
+        return {"",id};
+    case 2:
+        return {id.substr(0,1),id.substr(1,1)};
+    case 3:
+        return {id.substr(0,2),id.substr(2,1)};
+    case 4:
+        return {id.substr(0,3),id.substr(3,1)};
+    case 32:
+        return {id.substr(0,4),id.substr(4,28)};
+    default:
+        throw CommonError("defauil switch(id.size())");
     }
 }
 void collect_sync_req2(const std::string& id, const std::string &granule,IDatabase* db)
@@ -69,7 +76,7 @@ bool Node::Service::GetGranulesREQ(const bcEvent::GetGranulesREQ*e)
         ret.push_back({z,rg});
     }
     passEvent(new bcEvent::GetGranulesRSP(root_hash, this_node_name, ret, poppedFrontRoute(e->route)));
-    return true;    
+    return true;
 }
 
 bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
@@ -78,7 +85,7 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
     // root->replaceLeafNoCreate()
     // getByPathNoCreate()
 
-    
+
     _db_to_save db;
 
     for(auto& z: m->v)
@@ -87,7 +94,7 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
         {
 
         }
-        else 
+        else
         {
             logNode("GetGranulesRSP: recv granule '%s'",base16::encode(z.first).c_str());
             auto id=splice(z.first);
@@ -130,7 +137,7 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
         sendEvent(ip,ServiceEnum::Node,new bcEvent::GetGranulesREQ(pathes,ListenerBase::serviceId));
 
     }
-    else{
+    else {
     }
     return true;
 }

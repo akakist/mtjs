@@ -42,7 +42,7 @@ std::string base16::decode(const uint8_t* data, size_t length)
 
     if (length % 2 != 0) {
         throw std::invalid_argument("Hex string length must be even "
-            +std::string((char*)data, length));
+                                    +std::string((char*)data, length));
     }
 
     std::string result;

@@ -11,7 +11,7 @@
 JSValue YYJsonToQuickJS::convert( yyjson_val* val) {
     // Получаем сырой указатель на структуру yyjson
     // xyjson::Value хранит внутри себя yyjson_val*
-     yyjson_val* raw_val = val;
+    yyjson_val* raw_val = val;
 
     // Проверяем, что указатель валидный
     if (!raw_val) {

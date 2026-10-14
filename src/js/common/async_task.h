@@ -46,7 +46,7 @@ struct op_deque: public Refcountable
     size_t size()
     {
         M_LOCKC(m_mutex);
-        return container.size();        
+        return container.size();
     }
     bool empty()
     {

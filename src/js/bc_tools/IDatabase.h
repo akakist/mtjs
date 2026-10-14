@@ -78,13 +78,13 @@ struct IDatabase: public Refcountable
     std::atomic<bool> sync_empty=true;
 
 
-    private:
+private:
     Mutex mx;
     std::map<int, std::set<std::string> > sync_out;
     std::string sync_ip;
     // REF_getter<root_data> _root;
 
-    public:
+public:
     static std::vector<std::string> getPath(const std::string& name);
     static std::vector<std::string> getPathFromHash(const THASH_id& h);
 
@@ -138,7 +138,7 @@ struct IDatabase: public Refcountable
 
     REF_getter<Cellable> getByPathNoCreate(const REF_getter<Cellable>&cur, const std::vector<std::string>& v);
 
-  
+
 };
 
 REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAccepted2REQ>& pb);

@@ -5,7 +5,7 @@ struct bc_values: public data_base
 {
 
 
-bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
+    bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         fees["contract_deploy"]=5000;
         fees["contract_transfer"]=1000;
         fees["node_create"]=20000;

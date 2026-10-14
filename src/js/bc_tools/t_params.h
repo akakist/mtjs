@@ -60,8 +60,8 @@ struct b_params
 struct t_params
 {
     t_params(const REF_getter<IDatabase>& d)
-    : 
-    db(d) 
+        :
+        db(d)
     {}
     REF_getter<IDatabase> db;
     ADDRESS_id senderAddress;

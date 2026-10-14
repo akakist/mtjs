@@ -45,7 +45,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     uint64_t stake = 0;
     for (auto &z : li.transaction_responders)
     {
-        
+
         auto n = db_state->getNodeNoCreate(z);
         if(!n.valid())
             throw CommonError("if(!n.valid())");
@@ -82,7 +82,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     }
     auto nnn=db_state->getNodeNoCreateConst(r->node_validator);
     if(!nnn.valid())
-        throw CommonError("if(!nnn.valid())");
+        throw CommonError("if(!nnn.valid()) @44");
     if (!r->sig.verify(nnn->get_bls_pk(),bt.blockDiffValidateREQ->blockAcceptedREQ->getHash().container))
     {
         logNode("block response not validated");
@@ -99,12 +99,15 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         if(z->isEnabled())
             fullstakeVal += z->get_full_stake();
     }
-    
+
 
     uint64_t stakeVal = 0;
     for (auto &z : bt.BlockDiffValidateRSP_m[h])
     {
-        stakeVal += db_state->getNodeNoCreateConst(z->node_validator)->get_full_stake();
+        auto n=db_state->getNodeNoCreateConst(z->node_validator);
+        if(!n.valid())
+            throw CommonError("if(!n.valid()) $555");
+        stakeVal += n->get_full_stake();
     }
     std::set<NODE_id> hb_live;
     for(auto& z: bt.leader_info.HeartBeatRSP_m)
@@ -119,7 +122,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     }
     if ((stakeVal * 100) / fullstakeVal > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
     {
-    MUTEX_INSPECTOR;
+        MUTEX_INSPECTOR;
         XTRY;
         bt.blockAccepted2REQ_sent=iUtils->getNow();
         REF_getter<MsgData::BlockAccepted2REQ> ba2 = new MsgData::BlockAccepted2REQ();
@@ -130,6 +133,8 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         for (auto &z : bt.BlockDiffValidateRSP_m[h])
         {
             auto n = db_state->getNodeNoCreateConst(z->node_validator);
+            if(!n.valid())
+                throw CommonError("if(!n.valid()) @#1");
             agg_pk.push_back(n->get_bls_pk());
             ba2->agg_diff_sig.add(z->sig);
             ba2->node_diff_validators.push_back(z->node_validator);
@@ -168,7 +173,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         XPASS;
     }
 
-    
+
     return true;
 }
 
@@ -179,6 +184,8 @@ bool Node::Service::verifyLeaderCert(const MsgData::LeaderCert* lc, const BlockM
     for(auto &z: lc->node_validators)
     {
         auto n=db_state->getNodeNoCreateConst(z);
+        if(!n.valid())
+            throw CommonError("if(!n.valid()) @@$8");
         agg_pk_lc.push_back(n->get_bls_pk());
         stake_lc+=mf->getPrevStake(z);
     }
@@ -193,7 +200,7 @@ bool Node::Service::verifyLeaderCert(const MsgData::LeaderCert* lc, const BlockM
         return false;
     }
 
-    return true;    
+    return true;
 }
 
 REF_getter<MsgData::LeaderCert> Node::Service::makeLeaderCert(const MsgData::HeartBeatREQ* hb, const BlockMetaFull* mf)
@@ -207,6 +214,8 @@ REF_getter<MsgData::LeaderCert> Node::Service::makeLeaderCert(const MsgData::Hea
     for(auto& z:bt.leader_info.ConfirmLeaderRSP_m[hb_hash])
     {
         auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
+        if(!n.valid())
+            throw CommonError("if(!n.valid()) ##124");
         agg_pk_lc.push_back(n->get_bls_pk());
         lc->agg_sig.add(z.second->signature);
         lc->node_validators.insert(z.second->node_signer);
@@ -219,7 +228,7 @@ REF_getter<MsgData::LeaderCert> Node::Service::makeLeaderCert(const MsgData::Hea
     }
     if((stake_lc* 100)/mf->fullStake() < QUORUM)
         throw CommonError("if((stake_lc* 100)/mf->fullStake() < QUORUM) %lld",(stake_lc * 100)/mf->fullStake());
-    
+
     return lc;
 
 }
@@ -266,7 +275,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         fullstake += mf->getPrevStake(z);
 
     }
-    
+
     if ((stakeVal * 100) / fullstake > QUORUM )
     {
         XTRY;
@@ -287,6 +296,8 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         {
             nv_+=z->node_validator.container+" ";
             auto n = db_state->getNodeNoCreateConst(z->node_validator);
+            if(!n.valid())
+                throw CommonError("if(!n.valid()) ^14");
             auto st=mf->getPrevStake(z->node_validator);
             nv_+=std::to_string(st)+" ";
             agg_pk.push_back(n->get_bls_pk());

@@ -5,7 +5,7 @@
 
 inline int64_t get_tariff(int64_t ttl_seconds) {
     if (ttl_seconds == -1) return 15;           // бессрочно
-    
+
     if (ttl_seconds <= 86400) return 1;         // 1 день
     if (ttl_seconds <= 604800) return 2;        // 7 дней
     if (ttl_seconds <= 2592000) return 3;       // 30 дней
@@ -13,7 +13,7 @@ inline int64_t get_tariff(int64_t ttl_seconds) {
     if (ttl_seconds <= 15552000) return 5;      // 180 дней
     if (ttl_seconds <= 31536000) return 6;      // 1 год
     if (ttl_seconds <= 94608000) return 10;     // 3 года
-    
+
     return 15;  // больше 3 лет -> приравниваем к бессрочному? или 15?
 }
 struct TtlRule {
@@ -34,14 +34,14 @@ static std::vector<TtlRule> rules = {
 
 int get_tariff2(int ttl_seconds) {
     auto it = std::lower_bound(rules.begin(), rules.end(), ttl_seconds,
-        [](const TtlRule& rule, int ttl) {
-            return rule.max_ttl < ttl;  // ищем первый, у которого max_ttl >= ttl
-        });
-    
+    [](const TtlRule& rule, int ttl) {
+        return rule.max_ttl < ttl;  // ищем первый, у которого max_ttl >= ttl
+    });
+
     if (it == rules.end()) {
         // TTL больше 3 лет -> бессрочный тариф
         return -1;
     }
-    
+
     return it->tariff;
 }

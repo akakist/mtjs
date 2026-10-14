@@ -1,6 +1,6 @@
 #pragma once
 #include "cellable.h"
-// #include 
+// #include
 struct bc_contract_data:  public data_base
 {
 

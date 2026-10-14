@@ -14,7 +14,7 @@ struct CDatabaseMysql: public IDatabase
                 CHARACTER SET utf8mb4
                 COLLATE utf8mb4_unicode_ci;
           )"<< db_name);
-        
+
         dbh->execSimple((QUERY)R"(
             CREATE TABLE IF NOT EXISTS ?.granule_storage (
                 path VARBINARY(32) NOT NULL,

@@ -137,7 +137,7 @@ namespace Node
 
 
         bool DelayNotificationREQ(const MsgData::DelayNotificationREQ* m, const NODE_id & src_node, const route_t& route);
-        
+
 
         bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);
@@ -163,15 +163,15 @@ namespace Node
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
 
         bool handle_send_to_child(const NODE_id &_node_signer, int64_t _node_start_timestamp, int64_t _seqId, const std::string &sig,
-                   const std::string &_msg,
-                   const route_t &r, bool *need_continue_broadcast);
+                                  const std::string &_msg,
+                                  const route_t &r, bool *need_continue_broadcast);
 
 
 
         struct block_leader
         {
             std::map<THASH_id /*payload hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
-            
+
             std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
             std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
             REF_getter<MsgData::BlockDiffValidateREQ> blockDiffValidateREQ=nullptr;
@@ -183,7 +183,7 @@ namespace Node
         _db_to_save db_to_save_Z;
 
 
-        
+
 
         struct block_validator
         {
@@ -227,7 +227,7 @@ namespace Node
         THASH_id prev_root_hash_Z()
         {
             if(prev_block.valid())
-            return prev_block->blockAcceptedREQ->blockInfo->new_root_hash1;
+                return prev_block->blockAcceptedREQ->blockInfo->new_root_hash1;
             THASH_id r;
             r.container="";
             return r;
@@ -235,7 +235,7 @@ namespace Node
         uint64_t epoch_current()
         {
             if(prev_block.valid())
-            return prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch+1;
+                return prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch+1;
             return 0;
 
         }
@@ -274,15 +274,15 @@ namespace Node
         void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::HeartBeatREQ> &lc);
 
         THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &r);
-    
+
         // bool verify_block_committee(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
         bool verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ>& lc);
 
         std::optional<std::string> execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
-                         const REF_getter<MsgData::TX> &tx, uint64_t epoch);
+                const REF_getter<MsgData::TX> &tx, uint64_t epoch);
 
-        std::optional<std::string> execute_tx_commands(b_params &b, t_params& t, 
-             yyjson_val * j_tx);
+        std::optional<std::string> execute_tx_commands(b_params &b, t_params& t,
+                yyjson_val * j_tx);
 
         REF_getter<MsgData::LeaderCert> makeLeaderCert(const MsgData::HeartBeatREQ* hb, const BlockMetaFull* mf);
         bool verifyLeaderCert(const MsgData::LeaderCert* lc, const BlockMetaFull* mf);

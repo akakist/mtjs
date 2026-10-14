@@ -142,7 +142,7 @@ bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
 
 bool TxValidator::Service::ClientMsg(const bcEvent::ClientMsg *e)
 {
-logErr2("TxValidator ClientMsg");
+    logErr2("TxValidator ClientMsg");
     MUTEX_INSPECTOR;
     inBuffer in(e->msg);
 

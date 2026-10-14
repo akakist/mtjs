@@ -85,10 +85,10 @@ REF_getter<Cellable> IDatabase::replaceLeafNoCreate(const REF_getter<Cellable>& 
             // setDirty__(NULL);
             // return NULL;
             throw CommonError("getGranule: cell hash not matched %s %s granule size %ld body %s",
-                 base16::encode(it->second.container).c_str(), 
-                 base16::encode(h.container).c_str(), 
-                 result.size(),
-                base16::encode(result).c_str());
+                              base16::encode(it->second.container).c_str(),
+                              base16::encode(h.container).c_str(),
+                              result.size(),
+                              base16::encode(result).c_str());
         }
     }
     {
@@ -138,7 +138,7 @@ REF_getter<Cellable> IDatabase::getByPathNoCreate(const REF_getter<Cellable>& _c
     }
     return cur;
 }
-std::vector<std::string> IDatabase::getPathFromHash(const THASH_id& h) 
+std::vector<std::string> IDatabase::getPathFromHash(const THASH_id& h)
 {
     std::vector<std::string> out;
     out.reserve(5);
@@ -151,7 +151,7 @@ std::vector<std::string> IDatabase::getPathFromHash(const THASH_id& h)
 
 }
 
-std::vector<std::string> IDatabase::getPath(const std::string& name) 
+std::vector<std::string> IDatabase::getPath(const std::string& name)
 {
     auto h = blake2b_hash(name);
     return getPathFromHash(h);
@@ -163,7 +163,7 @@ std::vector<std::string> IDatabase::getContractPath(const CONTRACT_id &name)
 }
 std::vector<std::string> IDatabase::getContractDataPath(const CONTRACT_DATA_id &name)
 {
-    std::string key="CONTRACT_DATA_"+name.container;    
+    std::string key="CONTRACT_DATA_"+name.container;
     return getPath(key);
 
 }
@@ -177,12 +177,12 @@ REF_getter<data_base> IDatabase::replaceLeaf(const THASH_id &h, Rollback *roll, 
         M_LOCK(cc->mx);
         inBuffer in(buffer);
         cc->unpack_mx(in);
-        
+
     }
     if(!cc->data.valid())
         throw CommonError("if(!cc->data.valid())");
     cc->data->setDirty(roll);
-        // return NULL;
+    // return NULL;
     // if (!cc->data.valid())
     //     throw CommonError("if(!cc->data.valid())");
     return cc->data;
@@ -461,7 +461,7 @@ REF_getter<bc_node> IDatabase::getNodeNoCreate(const NODE_id &name)
         return NULL;
     if (cc->data.valid())
         return dynamic_cast<bc_node *>(cc->data.get());
-    else   
+    else
         throw CommonError("if(cc->data.valid())");
 }
 
@@ -491,7 +491,7 @@ REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcce
         MUTEX_INSPECTOR;
         std::string lb;
         int err = db->getGranule("", &lb);
-        
+
         if(!err && lb.size() && pb.valid())
         {
             MUTEX_INSPECTOR;
@@ -501,12 +501,12 @@ REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcce
                 inBuffer in(lb);
                 r->unpack_mx(in);
             }
-            else{
-                 logErr2("block hash not matched %s %s",base16::encode(pb->blockAcceptedREQ->blockInfo->new_root_hash1.container).c_str(),base16::encode(h.container).c_str());
+            else {
+                logErr2("block hash not matched %s %s",base16::encode(pb->blockAcceptedREQ->blockInfo->new_root_hash1.container).c_str(),base16::encode(h.container).c_str());
                 // throw CommonError("block hash not matched");
-                 return new Cellable(NULL,"");
+                return new Cellable(NULL,"");
             }
-            
+
         }
 
 

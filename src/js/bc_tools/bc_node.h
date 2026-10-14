@@ -10,7 +10,7 @@ struct bc_node: public data_base
 
     bc_node(Cellable *p):data_base(hsh::bc_node,p,0,-1) {
     }
-    private:
+private:
     NODE_id name_;
     ADDRESS_id owner_address;
     blst_cpp::PublicKey bls_pk;
@@ -18,7 +18,7 @@ struct bc_node: public data_base
     std::string ip;
     std::map<ADDRESS_id /*user*/, uint64_t> stakes;
     bool enabled=true;
-    public:
+public:
     int missed_rounds=0;
     size_t size() const
     {
@@ -79,7 +79,7 @@ struct bc_node: public data_base
         M_LOCK(parent->mx);
         return owner_address;
     }
-     std::string ip_port()
+    std::string ip_port()
     {
         M_LOCK(parent->mx);
         return ip;
@@ -115,7 +115,7 @@ struct bc_node: public data_base
         return bls_pk;
     }
     void init(const NODE_id& name, const ADDRESS_id &_owner_address, const blst_cpp::PublicKey &_bls_pk,
-    const std::string &_ed_pk, const std::string& _ip)
+              const std::string &_ed_pk, const std::string& _ip)
     {
         M_LOCK (parent->mx);
         name_=name;

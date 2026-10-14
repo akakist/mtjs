@@ -184,7 +184,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     case timers::TIMER_SYNC_TIMEDOUT:
         logNode("FAILED SYNC, NODE STOPPED---------------------------------------------------------------");
-    break;
+        break;
     case timers::TIMER_VALIDATE_BLOCK_DELAY:
     {
         if(!db_state->sync_empty)
@@ -286,7 +286,7 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         break;
         case rpcEventEnum::IncomingOnConnector:
         {
-        MUTEX_INSPECTOR;
+            MUTEX_INSPECTOR;
             const rpcEvent::IncomingOnConnector *ev = static_cast<const rpcEvent::IncomingOnConnector *>(e.get());
             auto &IDC = ev->e->id;
             switch (IDC)
@@ -502,7 +502,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         if (!t_err)
             b.emit_tx(tx_hash, "result", R"({"success":true})");
         else
-            b.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());    
+            b.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());
     }
 
     auto rh=proceed_merkle_on_transaction_pool_hashers(db_state->root);
@@ -545,7 +545,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
             u->setDirty(NULL);
             b.emit_block("reward",R"({"node":"%s","fee":"%s"})",z.container.c_str(),std::to_string(portion).c_str());
         }
-        
+
     }
 
 
@@ -595,6 +595,8 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
         for (auto &z : lc->node_diff_validators)
         {
             auto n = db_state->getNodeNoCreateConst(z);
+            if(!n.valid())
+                throw CommonError("if(!n.valid()) #00");
             agg_pk.push_back(n->get_bls_pk());
             stake += n->get_full_stake();
         }
@@ -607,7 +609,7 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
                 full_stake+=z->get_full_stake();
             }
         }
-        
+
         if ((stake * 100) / full_stake < QUORUM)
         {
             logNode("this quorum %lld",(stake * 100) / full_stake);
@@ -633,7 +635,7 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     if(iUtils->getNow()-stage_is_working> STAGE_IS_WORKING_TIMEOUT* _1sec)
     {
         stage_is_working=iUtils->getNow();
-            
+
         do_heart_beat(time(NULL));
     }
     else {
@@ -736,15 +738,15 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     return true;
 }
-std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_params& t, 
-      yyjson_val * j_tx)
+std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_params& t,
+        yyjson_val * j_tx)
 {
     MUTEX_INSPECTOR;
     if(!yyjson_is_arr(j_tx))
         return "command list must be json array";
-        // throw CommonError("if(!yyjson_is_arr(root))");
+    // throw CommonError("if(!yyjson_is_arr(root))");
     yyjson_arr_iter iter;
-    yyjson_arr_iter_init(j_tx, &iter);    
+    yyjson_arr_iter_init(j_tx, &iter);
     // if(root.isArray())
     uint32_t index = 0;
     yyjson_val* item;
@@ -817,7 +819,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 CONTRACT_id c;
                 c.container=contract_str;
                 auto m=method;
-                
+
             }
 
         }
@@ -825,15 +827,15 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
     return std::nullopt;
 }
 
-std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress, 
-    const REF_getter<MsgData::TX> &tx, uint64_t epoch)
+std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
+        const REF_getter<MsgData::TX> &tx, uint64_t epoch)
 {
     MUTEX_INSPECTOR;
     // yyjson::Document doc(tx_cmds);
     uint64_t gasLimit=0;
     uint64_t gasPrice=0;
     uint64_t value=0;
-    
+
     yyjson_val *jroot=yyjson_doc_get_root(tx->doc);
 
     yyjson_val * j_tx = yyjson_obj_get(jroot,"tx");
@@ -848,7 +850,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {
         b.emit_tx(tx_id,"error",R"({"error":"%s"})",err->c_str());
         return err;
-    }    
+    }
     Rollback roll;
     t_params t(db_state);
     t.senderAddress=senderAddress;
@@ -860,7 +862,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.gasLimit=gasLimit;
     auto uu=db_state->getAddressStateNoCreate(senderAddress);
     if(!uu.valid())
-    throw CommonError("if(!uu.valid())");
+        throw CommonError("if(!uu.valid())");
     {
         M_LOCK(uu->parent->mx);
         if(uu->balance < gasLimit*gasPrice+value)
@@ -884,7 +886,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         M_LOCK(uu->parent->mx);
         uu->balance-=gu*gasPrice;
         b.node_rewards+=gu*gasPrice;
-        
+
         return err;
 
     }
@@ -931,7 +933,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
     db_state->root->calc_tree_hash(db_dump);
     db_to_save_Z.add(db_dump);
-    
+
     return std::nullopt;
 }
 std::optional<std::string> Node::Service::execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params)
@@ -969,7 +971,7 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
         ct->src=c->src;
         ct->owner=c->owner;
     }
-    
+
     JSScope<10, 10> scope(ct->ctx);
     JSValue module1 = JS_Eval(ct->ctx, ct->src.data(), ct->src.size(), "<module>", JS_EVAL_TYPE_MODULE | JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
 
@@ -1024,10 +1026,10 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
             live_nodes++;
         }
     }
-            
+
 
     auto v=db_state->getValuesNoCreateConst();
-    
+
     auto validators_percent=v->getGas("validator_count_percent");
 
     size_t validator_count=(live_nodes * validators_percent)/100;
@@ -1069,7 +1071,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
         throw CommonError("if(validator_count>=vne.size())");
     std::vector<NodeElement> vne_committe;
 
-    for(size_t i=0;i<validator_count;i++)
+    for(size_t i=0; i<validator_count; i++)
     {
         auto n=vne[i].name;
         vne_committe.push_back(vne[i]);
@@ -1091,7 +1093,7 @@ void Node::Service::logNode(const char *fmt, ...)
         fprintf(stdout, "\n");
         va_end(ap);
     }
-    if(0){
+    if(0) {
         va_list ap;
         va_start(ap, fmt);
         std::string pn=this_node_name.container+".log";
@@ -1104,7 +1106,7 @@ void Node::Service::logNode(const char *fmt, ...)
             fclose(f);
         }
         va_end(ap);
-        
+
         // fclose(f);
     }
 }

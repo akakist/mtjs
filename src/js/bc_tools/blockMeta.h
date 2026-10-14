@@ -29,6 +29,6 @@ struct BlockMetaFull: public Refcountable
     TreeNode tree_committe;
     std::map<NODE_id, size_t> position_of_node;
     std::set<NODE_id> committe_members;
-    BlockMetaFull(): Refcountable("BlockMetaFull"){}
-    
+    BlockMetaFull(): Refcountable("BlockMetaFull") {}
+
 };

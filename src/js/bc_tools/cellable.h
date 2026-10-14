@@ -33,13 +33,13 @@ struct data_base : public Refcountable
 
     data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
         type(t), parent(_parent), create_time(_create_time),ttl(_ttl) {
-            // last_update_epoch=0;
-        }
+        // last_update_epoch=0;
+    }
     ~data_base()
     {
     }
     void setDirty(Rollback* roll);
-;   
+    ;
     size_t size_() const
     {
         return sizeof(type)+sizeof(create_time)+sizeof(ttl);
@@ -157,7 +157,7 @@ public:
             v.push_back(id.substr(3,1));
         if(id.size()>4)
             v.push_back(id.substr(4,28));
-        
+
         Cellable *r=this;
         while(v.size())
         {
@@ -178,7 +178,7 @@ public:
                 r->children_ptrs_mx.erase(id);
             }
         }
-        
+
     }
 
     void get_path(std::vector<const Cellable*> &s) const

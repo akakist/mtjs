@@ -232,7 +232,7 @@ namespace qjs
     inline bool CheckAndGetException(JSContext* ctx, JSValue value, const char* where, std::string& out)
     {
         JSScope <10,10> scope(ctx);
-        
+
         if(!JS_IsException(value)) return false;
         JSValue exc = JS_GetException(ctx);
         scope.addValue(exc);

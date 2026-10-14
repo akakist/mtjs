@@ -70,10 +70,10 @@ void Cellable::get_dirty_leaves(_db_to_save &db_dump)
     }
     if(!has_children)
     {
-            lk.lock();
-            auto child_buf = getBuffer_mx();
-            db_dump.add(getDbId(), child_buf);
-            lk.unlock();
+        lk.lock();
+        auto child_buf = getBuffer_mx();
+        db_dump.add(getDbId(), child_buf);
+        lk.unlock();
 
 
     }
@@ -118,7 +118,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
 }
 void data_base::setDirty(Rollback* roll)
 {
-        MUTEX_INSPECTOR;
+    MUTEX_INSPECTOR;
 
     // last_update_epoch=epoch;
     parent->setDirty__(roll);

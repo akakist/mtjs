@@ -4,7 +4,7 @@
 void init_root(IDatabase* db)
 {
     MUTEX_INSPECTOR;
-        uint64_t e=0;
+    uint64_t e=0;
     std::vector<int> stakes;
     for(int i=0; i<10; i++)
     {

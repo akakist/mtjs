@@ -12,7 +12,7 @@ struct _db_to_save
     void add(_db_to_save& d)
     {
         for(auto& z:d.cells)
-        cells[z.first]=z.second;
+            cells[z.first]=z.second;
     }
     size_t size()
     {

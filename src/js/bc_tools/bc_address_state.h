@@ -9,8 +9,8 @@ struct bc_address_state: public data_base
     }
     uint64_t balance;
     uint64_t nonce;
-    private:
-    public:
+private:
+public:
     size_t size() const
     {
         return size_()+sizeof(balance)+sizeof(nonce);

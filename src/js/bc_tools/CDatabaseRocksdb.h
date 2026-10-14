@@ -42,7 +42,7 @@ struct CDatabaseRocksdb: public IDatabase
 
         // 5. Дополнительные оптимизации для экономии памяти
         options.optimize_filters_for_hits = true; // Меньше памяти на фильтры
-        options.compaction_pri = rocksdb::kMinOverlappingRatio; // Эффективнее compaction        
+        options.compaction_pri = rocksdb::kMinOverlappingRatio; // Эффективнее compaction
 
         rocksdb::Status status = rocksdb::DB::Open(options, db_name, &db_ptr);
 
@@ -100,7 +100,7 @@ struct CDatabaseRocksdb: public IDatabase
 // bool read_granule(rocksdb::DB* db, const GranuleKey& key, GranuleData& out_data) {
 //     std::string value;
 //     rocksdb::Slice key_slice(reinterpret_cast<const char*>(key.data()), key.size());
-    
+
 //     rocksdb::Status status = db->Get(rocksdb::ReadOptions(), key_slice, &value);
 
 //     if (status.ok()) {
@@ -160,9 +160,9 @@ struct CDatabaseRocksdb: public IDatabase
 
     int getGranule(const std::string& k, std::string* v)
     {
-    //   std::string value;
-    // rocksdb::Slice key_slice(reinterpret_cast<const char*>(key.data()), key.size());
-        
+        //   std::string value;
+        // rocksdb::Slice key_slice(reinterpret_cast<const char*>(key.data()), key.size());
+
         rocksdb::Status status = db_ptr->Get(rocksdb::ReadOptions(), k, v);
 
         if (status.ok()) {

@@ -9,7 +9,7 @@
 #include "IDatabase.h"
 struct contract_rt: public Refcountable
 {
-    contract_rt():Refcountable("contract_rt"){}
+    contract_rt():Refcountable("contract_rt") {}
     JSContext *ctx;
     JSRuntime *rt;
     std::map<std::string,JSValueGuard> methods;
@@ -17,6 +17,6 @@ struct contract_rt: public Refcountable
     ADDRESS_id owner;
     CONTRACT_id name;
     REF_getter<IDatabase> db;
-    
+
 
 };

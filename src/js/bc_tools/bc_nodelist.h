@@ -5,10 +5,10 @@ struct bc_nodelist:  public data_base
 {
 
     bc_nodelist(Cellable *p):data_base(hsh::bc_nodelist,p, 0,-1) {}
-    private:
+private:
     std::set<NODE_id> list;
-    public:
-    size_t size() const 
+public:
+    size_t size() const
     {
         M_LOCK(parent->mx);
         size_t sz=size_();

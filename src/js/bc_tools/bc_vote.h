@@ -1,6 +1,6 @@
 #pragma once
 #include "cellable.h"
-// #include 
+// #include
 struct vote
 {
     std::string param;
