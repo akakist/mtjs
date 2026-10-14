@@ -797,6 +797,8 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                     err = TR::execute_contract_deploy(params,b, t,  index);
                 else if (meth == "contract_update")
                     err = TR::execute_contract_update(params, b,t,  index);
+                else if (meth == "vote")
+                    err = TR::execute_vote(params, b,t,  index);
                 else
                 {
                     MUTEX_INSPECTOR;

@@ -5,18 +5,17 @@ struct vote
 {
     std::string param;
     uint64_t value;
-    blst_cpp::AggregateSignature agg_signature;
-    std::vector<NODE_id> nodes;
+    std::set<NODE_id> nodes;
     time_t create_time;
 };
 inline outBuffer& operator<<(outBuffer &o,const vote& z)
 {
-    o<<z.param<<z.value<<z.agg_signature<<z.nodes<<z.create_time;
+    o<<z.param<<z.value<<z.nodes<<z.create_time;
     return o;
 }
 inline inBuffer& operator>>(inBuffer &o,vote& z)
 {
-    o>>z.param>>z.value>>z.agg_signature>>z.nodes>>z.create_time;
+    o>>z.param>>z.value>>z.nodes>>z.create_time;
     return o;
 }
 

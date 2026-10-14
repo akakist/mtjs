@@ -3,11 +3,11 @@
 #include <yyjson.h>
 #include <string>
 #include "commonError.h"
-// #include "bigint.h"
 #include "tr_exec.h"
 #include "ADDRESS_id.h"
 #include "PK_id.h"
 #include "yyjson_to_quickjs.h"
+#include "QUORUM.h"
 
 std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_params &t,
           int seqId)
@@ -36,8 +36,6 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
         u->balance+=amount;
     }
     t.markDirty(u.get());
-    // u->setDirty(t.roll);
-    // t.dirty.add(u.get());
 
     t.gasUsed+=v->getGas("mint");
 
@@ -71,7 +69,6 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     {
         return "sender userstate invalid";
     }
-    // auto to_addr = params["to"].get<std::string>();
     if (to_addr == t.senderAddress)
     {
         return "cannot transfer to self";
@@ -89,22 +86,11 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     return "amount>t.value";
 
     t.value-=amount;
-    // if (u->getBalance() < fee + amount)
-    // {
-    //     return "Not enough funds";
-    // }
-    // u->subBalance(amount);
     {
         M_LOCK(to->parent->mx);
         to->balance+=amount;
     }
-    // to->addBalance(amount);
-    // t.markDirty(u.get());
     t.markDirty(to.get());
-    // u->setDirty(t.roll);
-    // t.dirty.add(u.get());
-    // to->setDirty(t.roll);
-    // t.dirty.add(to.get());
 
     t.gasUsed+=v->getGas("transfer");
 
@@ -122,15 +108,12 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     int seqId)
 {
     MUTEX_INSPECTOR;
-    // if(senderAddress!=)
     auto v = b.db->getValuesNoCreateConst();
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
     if(err) return err;
 
     
-    // if(b.meta->committe_members.count(name))
-    //     return (std::string)"cannot execute_node_update on member committe " + __FUNCTION__;
 
     auto nn = b.db->getNodeNoCreate(name);
     if (!nn.valid())
@@ -149,20 +132,11 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
 
     {
         nn->set_ip(ip);
-        // t.logMsg(txid, seqId, "ip changed");
         b.emit_command(t.tx_id, seqId, "node_change_ip",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
         
     }
 
     t.markDirty(nn.get());
-    // t.markDirty(us.get());
-
-    // nn->setDirty(t.roll);
-    //     t.dirty.add(nn.get());
-
-    // us->setDirty(t.roll);
-    //     t.dirty.add(us.get());
-
 
 
     t.gasUsed+=v->getGas("node_update");
@@ -218,13 +192,6 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
         base16::decode(pk_ed), ip);
     
     t.markDirty(n.get());
-    // t.markDirty(us.get());
-    // n->setDirty(t.roll);
-    //     t.dirty.add(n.get());
-
-    // us->setDirty(t.roll);
-    //     t.dirty.add(us.get());
-
 
 
 
@@ -249,8 +216,6 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     err=yy_get_string(params,"node",node.container);
     if(err) return err;
 
-    // if(b.meta->committe_members.count(node))
-    //     return (std::string)"cannot execute_node_update on member committe " + __FUNCTION__;
 
     auto us = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!us.valid())
@@ -261,7 +226,6 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     {
         return "node not found";
     }
-    // BigInt &nodeStake = n->get_stastakes[senderAddress];
     if(t.value<amount)
     {
         return "Insufficient funds";
@@ -277,13 +241,6 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
         base16::encode(t.senderAddress.addr).c_str()
     );
     t.markDirty(n.get());
-    // t.markDirty(us.get());
-    // n->setDirty(t.roll);
-    //     t.dirty.add(n.get());
-
-    // us->setDirty(t.roll);
-    //     t.dirty.add(us.get());
-    // t.node_stake_changes[node]['+']+=amount;
 
 
     return std::nullopt;
@@ -300,8 +257,6 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     err=yy_get_string(params,"node",node.container);
     if(err) return err;
     
-    // if(b.meta->committe_members.count(node))
-    //     return (std::string)"cannot execute_node_update on member committe " + __FUNCTION__;
 
     auto n = b.db->getNodeNoCreate(node);
     if (!n.valid())
@@ -309,12 +264,10 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
         return "nodes not registered";
     }
     auto stake=n->get_user_stake(t.senderAddress);
-    // auto nodeStakeIt = n->stakes.find(senderAddress);
     if (stake == 0)
     {
         return "no_stake_found";
     }
-    // auto &nodeStake = nodeStakeIt->second;
     if (stake < amount)
     {
         return "insufficient stake in node";
@@ -333,7 +286,6 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
         base16::encode(t.senderAddress.addr).c_str(),
         std::to_string(amount).c_str()
     );
-    // t.node_stake_changes[node]['-']+=amount;
     return std::nullopt;
 }
 
@@ -365,7 +317,6 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
 
     b.emit_command(t.tx_id, seqId, "node_enable",R"({"node":"%s"})", node.container.c_str());
     
-    // t.node_enables[node]=1;
     
     return std::nullopt;
 }
@@ -398,7 +349,6 @@ std::optional<std::string> TR::execute_node_disable(yyjson_val *params, b_params
 
     b.emit_command(t.tx_id, seqId, "node_disable",R"({"node":"%s"})", node.container.c_str());
     
-    // t.node_enables[node]=0;
 
     
     return std::nullopt;
@@ -449,12 +399,6 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     }
 
     t.markDirty(n.get());
-    // t.markDirty(us.get());
-    // n->setDirty(t.roll);
-    //     t.dirty.add(n.get());
-
-    // us->setDirty(t.roll);
-    //     t.dirty.add(us.get());
 
 
     t.gasUsed+=v->getGas("contract_deploy");
@@ -487,7 +431,6 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     
 
 
-    // auto n = t.root->addContract(name, by);
     std::string src;
     err=yy_get_string(params,"src",src);
     if(err) return err;
@@ -497,17 +440,84 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
         n->src=src;
     }
     t.markDirty(n.get());
-    // t.markDirty(us.get());
-    // n->setDirty(t.roll);
-    //     t.dirty.add(n.get());
-
-    // us->setDirty(t.roll);
-    //     t.dirty.add(us.get());
-
 
     t.gasUsed+=v->getGas("contract_update");
 
     b.emit_command(t.tx_id, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",cn.container.c_str(),base16::encode(t.senderAddress.addr).c_str());
+
+    return std::nullopt;
+}
+std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_params &t,
+     int seqId)
+{
+    MUTEX_INSPECTOR;
+    auto v = b.db->getValuesNoCreateConst();
+    auto votes=b.db->getVotesOrCreate(t.roll);
+    NODE_id node;
+    auto err=yy_get_string(params,"node",node.container);
+    if(err)
+        return err;
+    std::string param;
+    err=yy_get_string(params,"param",param);
+    if(err)
+        return err;
+    std::string value;
+    err=yy_get_string(params,"value",value);
+    if(err)
+        return err;
+
+    auto n = b.db->getNodeNoCreateConst(node);
+    if (!n.valid())
+        return "node not exists";
+    if(n->get_owner()!=t.senderAddress)
+    {
+        return "insufficient privileges, node owner required";
+    }
+    auto vhash=blake2b_hash(param+value);
+    std::set<NODE_id> voted;
+    {
+        MutexLockerDeferred l(votes->parent->mx);
+        l.lock();
+        if(!votes->votes.count(vhash))
+        {
+            votes->votes[vhash].create_time=b.validateBlockREQ->heart_beat->block_timestamp;
+        }
+        auto &z=votes->votes[vhash];
+        if(!z.nodes.count(node))
+        {
+            z.nodes.insert(node);
+        }
+        voted=z.nodes;
+        l.unlock();
+        t.markDirty(votes.get());
+    }
+    uint64_t stake=0;
+    
+    bool accepted=false;
+    for(auto& z: voted)
+    {
+        stake+=b.db->getNodeNoCreateConst(z)->get_full_stake();
+    }
+    if((stake*100)/b.meta->fullStake()>QUORUM)
+    {
+        auto vv=b.db->getValuesNoCreate();
+        {
+            M_LOCK(v->parent->mx);
+            vv->fees[param]=atoll(value.c_str());
+        }
+        votes->votes.erase(vhash);
+        t.markDirty(votes.get());
+        t.markDirty(vv.get());
+    
+        accepted=true;
+    }
+
+
+    t.gasUsed+=v->getGas("vote");
+
+    b.emit_command(t.tx_id, seqId, "vote_counted",R"({"node":"%s","param":"%s","value":"%s"})",node.container.c_str(),param.c_str(),value.c_str());
+    if(accepted)
+        b.emit_command(t.tx_id, seqId, "vote_applied",R"({"param":"%s","value":"%s"})",param.c_str(),value.c_str());
 
     return std::nullopt;
 }

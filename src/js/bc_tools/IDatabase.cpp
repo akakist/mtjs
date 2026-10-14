@@ -286,7 +286,8 @@ REF_getter<bc_values> IDatabase::getValuesOrCreate(Rollback* roll)
         throw CommonError("if(!l.valid())");
     if (l->data.valid())
     {
-        return dynamic_cast<bc_values *>(l->data.get());
+        auto *p=dynamic_cast<bc_values *>(l->data.get());
+        return p;
     }
 
     REF_getter<bc_values> v = new bc_values(l.get());

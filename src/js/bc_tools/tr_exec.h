@@ -14,5 +14,6 @@ namespace TR {
     std::optional<std::string> execute_node_disable(yyjson_val *params, b_params &,t_params &t,  int seqId);
     std::optional<std::string> execute_contract_deploy(yyjson_val *params, b_params & ,t_params &t,  int seqId);
     std::optional<std::string> execute_contract_update(yyjson_val *params, b_params & ,t_params &t,  int seqId);
+    std::optional<std::string> execute_vote(yyjson_val *params, b_params & ,t_params &t,  int seqId);
 
 }
