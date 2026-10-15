@@ -44,6 +44,7 @@ std::optional<std::string> Node::Service::load_contract(const CONTRACT_id& contr
 
     JSScope<10, 10> scope(ct->ctx);
     JSValue module1 = JS_Eval(ct->ctx, ct->src.data(), ct->src.size(), "<module>", JS_EVAL_FLAG_STRICT | JS_EVAL_TYPE_MODULE | JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
+    scope.addValue(module1);
 
     std::string err;
     if (qjs::CheckAndGetException(ct->ctx, module1, "loadModule",err))
