@@ -74,6 +74,8 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         return true;
     }
     auto& bt=l_blocks[prev_root_hash_Z()];
+    if(!bt.blockDiffValidateREQ.valid())
+        return true;
 
     if (bt.blockDiffValidateREQ->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1 != prev_root_hash_Z())
     {
