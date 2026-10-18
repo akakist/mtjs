@@ -555,30 +555,15 @@ static js_force_inline JSValue JS_NewCatchOffset(JSContext *ctx, int32_t val)
 
 static js_force_inline JSValue JS_NewInt64(JSContext *ctx, int64_t val)
 {
-    // JSValue v;
     return JS_MKVAL(JS_TAG_INT, val);
 
-    // if (val == (int32_t)val) {
-        // v = JS_NewInt64(ctx, val);
-    // } else {
-    //     v = __JS_NewFloat64(ctx, val);
-    // }
-    // return v;
 }
 
 static js_force_inline JSValue JS_NewUint32(JSContext *ctx, uint32_t val)
 {
-    JSValue v;
-    if (val <= 0x7fffffff) {
-        v = JS_NewInt32(ctx, val);
-    } else {
-        v = __JS_NewFloat64(ctx, val);
-    }
-    return v;
+    return JS_MKVAL(JS_TAG_INT, val);
 }
 
-JSValue JS_NewBigInt64(JSContext *ctx, int64_t v);
-JSValue JS_NewBigUint64(JSContext *ctx, uint64_t v);
 
 static js_force_inline JSValue JS_NewFloat64(JSContext *ctx, double d)
 {
