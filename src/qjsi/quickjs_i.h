@@ -215,7 +215,7 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int32_t d)
 #else /* !JS_NAN_BOXING */
 
 typedef union JSValueUnion {
-    int32_t int32;
+    int64_t int64;
     double float64;
     void *ptr;
 #if JS_SHORT_BIG_INT_BITS == 32
@@ -236,13 +236,13 @@ typedef struct JSValue {
 #define JS_VALUE_GET_TAG(v) ((int32_t)(v).tag)
 /* same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing */
 #define JS_VALUE_GET_NORM_TAG(v) JS_VALUE_GET_TAG(v)
-#define JS_VALUE_GET_INT(v) ((v).u.int32)
-#define JS_VALUE_GET_BOOL(v) ((v).u.int32)
+#define JS_VALUE_GET_INT(v) ((v).u.int64)
+#define JS_VALUE_GET_BOOL(v) ((v).u.int64)
 #define JS_VALUE_GET_FLOAT64(v) ((v).u.float64)
 #define JS_VALUE_GET_SHORT_BIG_INT(v) ((v).u.short_big_int)
 #define JS_VALUE_GET_PTR(v) ((v).u.ptr)
 
-#define JS_MKVAL(tag, val) (JSValue){ (JSValueUnion){ .int32 = val }, tag, .is_nan=0 }
+#define JS_MKVAL(tag, val) (JSValue){ (JSValueUnion){ .int64 = val }, tag, .is_nan=0 }
 #define JS_MKPTR(tag, p) (JSValue){ (JSValueUnion){ .ptr = p }, tag,.is_nan=0 }
 
 #define JS_TAG_IS_FLOAT64(tag) ((unsigned)(tag) == JS_TAG_FLOAT64)
@@ -260,15 +260,15 @@ static inline JSValue __JS_NewFloat64(JSContext *ctx, double d)
 
 static inline JS_BOOL JS_VALUE_IS_NAN(JSValue v)
 {
-    // return v.is_nan;
-    union {
-        double d;
-        uint64_t u64;
-    } u;
-    if (v.tag != JS_TAG_FLOAT64)
-        return 0;
-    u.d = v.u.float64;
-    return (u.u64 & 0x7fffffffffffffff) > 0x7ff0000000000000;
+    return v.is_nan;
+    // union {
+    //     double d;
+    //     uint64_t u64;
+    // } u;
+    // if (v.tag != JS_TAG_FLOAT64)
+    //     return 0;
+    // u.d = v.u.float64;
+    // return (u.u64 & 0x7fffffffffffffff) > 0x7ff0000000000000;
 }
 
 
@@ -555,13 +555,15 @@ static js_force_inline JSValue JS_NewCatchOffset(JSContext *ctx, int32_t val)
 
 static js_force_inline JSValue JS_NewInt64(JSContext *ctx, int64_t val)
 {
-    JSValue v;
-    if (val == (int32_t)val) {
-        v = JS_NewInt32(ctx, val);
-    } else {
-        v = __JS_NewFloat64(ctx, val);
-    }
-    return v;
+    // JSValue v;
+    return JS_MKVAL(JS_TAG_INT, val);
+
+    // if (val == (int32_t)val) {
+        // v = JS_NewInt64(ctx, val);
+    // } else {
+    //     v = __JS_NewFloat64(ctx, val);
+    // }
+    // return v;
 }
 
 static js_force_inline JSValue JS_NewUint32(JSContext *ctx, uint32_t val)

@@ -3029,14 +3029,14 @@ static JSValue JS_AtomIsNumericIndex1(JSContext *ctx, JSAtom atom)
     if (p1->atom_type != JS_ATOM_TYPE_STRING)
         return JS_UNDEFINED;
     switch(atom) {
-    case JS_ATOM_minus_zero:
-        return __JS_NewFloat64(ctx, -0.0);
-    case JS_ATOM_Infinity:
-        return __JS_NewFloat64(ctx, INFINITY);
-    case JS_ATOM_minus_Infinity:
-        return __JS_NewFloat64(ctx, -INFINITY);
-    case JS_ATOM_NaN:
-        return __JS_NewFloat64(ctx, NAN);
+    // case JS_ATOM_minus_zero:
+    //     return __JS_NewFloat64(ctx, -0.0);
+    // case JS_ATOM_Infinity:
+    //     return __JS_NewFloat64(ctx, INFINITY);
+    // case JS_ATOM_minus_Infinity:
+    //     return __JS_NewFloat64(ctx, -INFINITY);
+    // case JS_ATOM_NaN:
+    //     return __JS_NewFloat64(ctx, NAN);
     default:
         break;
     }
@@ -11941,7 +11941,7 @@ static void js_print_value(JSPrintValueState *s, JSValueConst val)
 
     switch(tag) {
     case JS_TAG_INT:
-        js_printf(s, "%d", JS_VALUE_GET_INT(val));
+        js_printf(s, "%ld", JS_VALUE_GET_INT(val));
         break;
     case JS_TAG_BOOL:
         if (JS_VALUE_GET_BOOL(val))
@@ -12234,8 +12234,9 @@ static no_inline __exception int js_unary_arith_slow(JSContext *ctx,
                 break;
             case OP_neg:
                 if (v64 == 0) {
-                    sp[-1] = __JS_NewFloat64(ctx, -0.0);
-                    return 0;
+                    return -1;
+                    // sp[-1] = __JS_NewFloat64(ctx, -0.0);
+                    // return 0;
                 } else {
                     v64 = -v64;
                 }
@@ -12249,8 +12250,8 @@ static no_inline __exception int js_unary_arith_slow(JSContext *ctx,
     default:
     handle_float64:
         {
-            double d;
-            d = JS_VALUE_GET_FLOAT64(op1);
+            int64_t d;
+            d = JS_VALUE_GET_INT(op1);
             switch(op) {
             case OP_inc:
             case OP_dec:
@@ -12265,7 +12266,7 @@ static no_inline __exception int js_unary_arith_slow(JSContext *ctx,
             default:
                 abort();
             }
-            sp[-1] = __JS_NewFloat64(ctx, d);
+            sp[-1] = JS_NewInt64(ctx, d);
         }
         break;
     }
@@ -12346,7 +12347,7 @@ static no_inline __exception int js_binary_arith_slow(JSContext *ctx, JSValue *s
     tag2 = JS_VALUE_GET_NORM_TAG(op2);
 
     if (tag1 == JS_TAG_INT && tag2 == JS_TAG_INT) {
-        int32_t v1, v2;
+        int64_t v1, v2;
         int64_t v;
         v1 = JS_VALUE_GET_INT(op1);
         v2 = JS_VALUE_GET_INT(op2);
@@ -12356,32 +12357,29 @@ static no_inline __exception int js_binary_arith_slow(JSContext *ctx, JSValue *s
             break;
         case OP_mul:
             v = (int64_t)v1 * (int64_t)v2;
-            if (v == 0 && (v1 | v2) < 0) {
-                sp[-2] = __JS_NewFloat64(ctx, -0.0);
-                return 0;
-            }
+            // if (v == 0 && (v1 | v2) < 0) {
+            //     sp[-2] = __JS_NewFloat64(ctx, -0.0);
+            //     return 0;
+            // }
             break;
         case OP_div:
-            sp[-2] = JS_NewFloat64(ctx, (double)v1 / (double)v2);
+            sp[-2] = JS_NewInt64(ctx, v1 / v2);
             return 0;
         case OP_mod:
             if (v1 < 0 || v2 <= 0) {
-                sp[-2] = JS_NewFloat64(ctx, fmod(v1, v2));
+                sp[-2] = JS_NewInt64(ctx, v1 % v2);
                 return 0;
             } else {
                 v = (int64_t)v1 % (int64_t)v2;
             }
             break;
-        case OP_pow:
-            sp[-2] = JS_NewFloat64(ctx, js_pow(v1, v2));
-            return 0;
         default:
             abort();
         }
         sp[-2] = JS_NewInt64(ctx, v);
     } else if (0) {
     } else {
-        double dr;
+        int64_t dr;
         /* float64 result */
         if (JS_ToFloat64Free(ctx, &d1, op1)) {
             JS_FreeValue(ctx, op2);
@@ -12402,9 +12400,6 @@ static no_inline __exception int js_binary_arith_slow(JSContext *ctx, JSValue *s
             break;
         case OP_mod:
             dr = fmod(d1, d2);
-            break;
-        case OP_pow:
-            dr = js_pow(d1, d2);
             break;
         default:
             abort();
@@ -12490,15 +12485,15 @@ static no_inline __exception int js_add_slow(JSContext *ctx, JSValue *sp)
         sp[-2] = JS_NewInt64(ctx, v);
     } else if (0) {
     } else {
-        double d1, d2;
-        /* float64 result */
-        if (JS_ToFloat64Free(ctx, &d1, op1)) {
-            JS_FreeValue(ctx, op2);
-            goto exception;
-        }
-        if (JS_ToFloat64Free(ctx, &d2, op2))
-            goto exception;
-        sp[-2] = __JS_NewFloat64(ctx, d1 + d2);
+        // double d1, d2;
+        // /* float64 result */
+        // if (JS_ToFloat64Free(ctx, &d1, op1)) {
+        //     JS_FreeValue(ctx, op2);
+        //     goto exception;
+        // }
+        // if (JS_ToFloat64Free(ctx, &d2, op2))
+        //     goto exception;
+        // sp[-2] = __JS_NewFloat64(ctx, d1 + d2);
     }
     return 0;
  exception:
@@ -23561,24 +23556,6 @@ static __exception int js_parse_unary(JSParseState *s, int parse_flags)
         break;
     }
     if (parse_flags & (PF_POW_ALLOWED | PF_POW_FORBIDDEN)) {
-        if (s->token.val == TOK_POW) {
-            /* Strict ES7 exponentiation syntax rules: To solve
-               conficting semantics between different implementations
-               regarding the precedence of prefix operators and the
-               postifx exponential, ES7 specifies that -2**2 is a
-               syntax error. */
-            if (parse_flags & PF_POW_FORBIDDEN) {
-                JS_ThrowSyntaxError(s->ctx, "unparenthesized unary expression can't appear on the left-hand side of '**'");
-                return -1;
-            }
-            op_token_ptr = s->token.ptr;
-            if (next_token(s))
-                return -1;
-            if (js_parse_unary(s, PF_POW_ALLOWED))
-                return -1;
-            emit_source_pos(s, op_token_ptr);
-            emit_op(s, OP_pow);
-        }
     }
     return 0;
 }
@@ -24066,7 +24043,7 @@ static __exception int js_parse_assign_expr2(JSParseState *s, int parse_flags)
             static const uint8_t assign_opcodes[] = {
                 OP_mul, OP_div, OP_mod, OP_add, OP_sub,
                 OP_shl, OP_sar, OP_shr, OP_and, OP_xor, OP_or,
-                OP_pow,
+                
             };
             op = assign_opcodes[op - TOK_MUL_ASSIGN];
             emit_source_pos(s, op_token_ptr);
