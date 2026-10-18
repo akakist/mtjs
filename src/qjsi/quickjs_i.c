@@ -10723,7 +10723,7 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
             if (end == buf)
                 return JS_ThrowSyntaxError(ctx, "invalid number literal");
             if (errno == ERANGE)
-                return JS_ThrowRangeError(ctx, "number too large");
+                return JS_ThrowRangeError(ctx, "number too large %s",buf);
             val = JS_NewInt64(ctx, d);        
         }
         break;
@@ -12069,7 +12069,7 @@ static no_inline __exception int js_binary_arith_slow(JSContext *ctx, JSValue *s
 {
     JSValue op1, op2;
     uint32_t tag1, tag2;
-    double d1, d2;
+    // double d1, d2;
 
     op1 = sp[-2];
     op2 = sp[-1];
@@ -12135,12 +12135,12 @@ static inline BOOL tag_is_string(uint32_t tag)
 {
     return tag == JS_TAG_STRING || tag == JS_TAG_STRING_ROPE;
 }
-
+// #ifdef KALL
 static no_inline __exception int js_add_slow(JSContext *ctx, JSValue *sp)
 {
     JSValue op1, op2;
     uint32_t tag1, tag2;
-
+printf("js_add_slow\n");
     op1 = sp[-2];
     op2 = sp[-1];
 
@@ -12205,7 +12205,7 @@ static no_inline __exception int js_add_slow(JSContext *ctx, JSValue *sp)
     sp[-1] = JS_UNDEFINED;
     return -1;
 }
-
+// #endif
 static no_inline __exception int js_binary_logic_slow(JSContext *ctx,
                                                       JSValue *sp,
                                                       OPCodeEnum op)
@@ -16020,10 +16020,17 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                 op2 = sp[-1];
                 if (likely(JS_VALUE_IS_BOTH_INT(op1, op2))) {
                     int64_t r;
-                    r = (int64_t)JS_VALUE_GET_INT(op1) + JS_VALUE_GET_INT(op2);
-                    if (unlikely((int)r != r))
-                        goto add_slow;
-                    sp[-2] = JS_NewInt32(ctx, r);
+                    printf("add %ld %ld\n",JS_VALUE_GET_INT(op1),JS_VALUE_GET_INT(op2));
+                    if(__builtin_add_overflow(JS_VALUE_GET_INT(op1),JS_VALUE_GET_INT(op2),&r))
+                    {
+                        printf("add overflow \n");
+                        JS_ThrowRangeError(ctx,"add overflow");
+                        goto exception;
+                    }
+                    // r = (int64_t)JS_VALUE_GET_INT(op1) + JS_VALUE_GET_INT(op2);
+                    // if (unlikely((int)r != r))
+                    //     goto add_slow;
+                    sp[-2] = JS_NewInt64(ctx, r);
                     sp--;
                 } else if (0) {
                 } else if (JS_IsString(op1) && JS_IsString(op2)) {
@@ -16094,10 +16101,16 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                 op2 = sp[-1];
                 if (likely(JS_VALUE_IS_BOTH_INT(op1, op2))) {
                     int64_t r;
-                    r = (int64_t)JS_VALUE_GET_INT(op1) - JS_VALUE_GET_INT(op2);
-                    if (unlikely((int)r != r))
-                        goto binary_arith_slow;
-                    sp[-2] = JS_NewInt32(ctx, r);
+                    if(__builtin_sub_overflow(JS_VALUE_GET_INT(op1),JS_VALUE_GET_INT(op2),&r))
+                    {
+                        JS_ThrowRangeError(ctx,"sub overflow");
+                        goto exception;
+                    }
+
+                    // r = (int64_t)JS_VALUE_GET_INT(op1) - JS_VALUE_GET_INT(op2);
+                    // if (unlikely((int)r != r))
+                    //     goto binary_arith_slow;
+                    sp[-2] = JS_NewInt64(ctx, r);
                     sp--;
                 } else if (0) {
                 } else {
@@ -16108,15 +16121,19 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_mul):
             {
                 JSValue op1, op2;
-                // double d;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JS_VALUE_IS_BOTH_INT(op1, op2))) {
-                    int32_t v1, v2;
+                    // int32_t v1, v2;
                     int64_t r;
-                    v1 = JS_VALUE_GET_INT(op1);
-                    v2 = JS_VALUE_GET_INT(op2);
-                    r = (int64_t)v1 * v2;
+                    if(__builtin_mul_overflow(JS_VALUE_GET_INT(op1),JS_VALUE_GET_INT(op2),&r))
+                    {
+                        JS_ThrowRangeError(ctx,"sub overflow");
+                        goto exception;
+                    }
+                    // v1 = JS_VALUE_GET_INT(op1);
+                    // v2 = JS_VALUE_GET_INT(op2);
+                    // r = (int64_t)v1 * v2;
                     sp[-2] = JS_NewInt64(ctx, r);
                     sp--;
                 } else if (0) {
@@ -16131,12 +16148,22 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JS_VALUE_IS_BOTH_INT(op1, op2))) {
-                    int v1, v2;
+                    int64_t v1, v2;
+                    // r;
                     v1 = JS_VALUE_GET_INT(op1);
                     v2 = JS_VALUE_GET_INT(op2);
-                    sp[-2] = JS_NewFloat64(ctx, (double)v1 / (double)v2);
+
+                    if(v2==0)
+                    {
+                        JS_ThrowRangeError(ctx,"divide by zero");
+                        goto exception;
+
+                    }
+                        // return JS_EXCEPTION;
+                    sp[-2] = JS_NewInt64(ctx, v1 / v2);
                     sp--;
                 } else {
+                    printf("goto binary_arith_slow @344\n");
                     goto binary_arith_slow;
                 }
             }
@@ -16150,14 +16177,22 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                     int v1, v2, r;
                     v1 = JS_VALUE_GET_INT(op1);
                     v2 = JS_VALUE_GET_INT(op2);
+                    if(v2==0)
+                    {
+                        JS_ThrowRangeError(ctx,"divide by zero");
+                        goto exception;
+                    }
+                        // return JS_EXCEPTION;
+
                     /* We must avoid v2 = 0, v1 = INT32_MIN and v2 =
                        -1 and the cases where the result is -0. */
-                    if (unlikely(v1 < 0 || v2 <= 0))
-                        goto binary_arith_slow;
+                    // if (unlikely(v1 < 0 || v2 <= 0))
+                    //     goto binary_arith_slow;
                     r = v1 % v2;
-                    sp[-2] = JS_NewInt32(ctx, r);
+                    sp[-2] = JS_NewInt64(ctx, r);
                     sp--;
                 } else {
+                    printf("goto binary_arith_slow @3442\n");
                     goto binary_arith_slow;
                 }
             }
@@ -16189,20 +16224,10 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                 JSValue op1;
                 uint32_t tag;
                 int val;
-                // double d;
                 op1 = sp[-1];
                 tag = JS_VALUE_GET_TAG(op1);
                 if (tag == JS_TAG_INT) {
                     val = JS_VALUE_GET_INT(op1);
-                    /* Note: -0 cannot be expressed as integer */
-                    // if (unlikely(val == 0)) {
-                    //     d = -0.0;
-                    //     goto neg_fp_res;
-                    // }
-                    // if (unlikely(val == INT32_MIN)) {
-                    //     d = -(double)val;
-                    //     goto neg_fp_res;
-                    // }
                     sp[-1] = JS_NewInt32(ctx, -val);
                 } else if (0) {
                 } else {
@@ -36530,7 +36555,7 @@ static JSValue js_number_toString(JSContext *ctx, JSValueConst this_val,
 {
     JSValue val;
     int base, flags;
-    double d;
+    // double d;
 
     val = js_thisNumberValue(ctx, this_val);
     if (JS_IsException(val))
@@ -38235,32 +38260,6 @@ void JS_AddIntrinsicStringNormalize(JSContext *ctx)
 /* Math */
 
 /* precondition: a and b are not NaN */
-static double js_fmin(double a, double b)
-{
-    if (a == 0 && b == 0) {
-        JSFloat64Union a1, b1;
-        a1.d = a;
-        b1.d = b;
-        a1.u64 |= b1.u64;
-        return a1.d;
-    } else {
-        return fmin(a, b);
-    }
-}
-
-/* precondition: a and b are not NaN */
-static double js_fmax(double a, double b)
-{
-    if (a == 0 && b == 0) {
-        JSFloat64Union a1, b1;
-        a1.d = a;
-        b1.d = b;
-        a1.u64 &= b1.u64;
-        return a1.d;
-    } else {
-        return fmax(a, b);
-    }
-}
 
 
 /* xorshift* random number generator by Marsaglia */
