@@ -11386,9 +11386,6 @@ static JSValue JS_ToStringInternal(JSContext *ctx, JSValueConst val, BOOL is_ToP
         } else {
             return JS_ThrowTypeError(ctx, "cannot convert symbol to string");
         }
-    case JS_TAG_FLOAT64:
-        return js_dtoa2(ctx, JS_VALUE_GET_FLOAT64(val), 10, 0,
-                        JS_DTOA_FORMAT_FREE);
     default:
         return js_new_string8(ctx, "[unsupported type]");
     }
@@ -11529,14 +11526,6 @@ static void __attribute__((format(printf, 2, 3))) js_printf(JSPrintValueState *s
     s->write_func(s->write_opaque, buf, strlen(buf));
 }
 
-static void js_print_float64(JSPrintValueState *s, double d)
-{
-    JSDTOATempMem dtoa_mem;
-    char buf[32];
-    int len;
-    len = js_dtoa(buf, d, 10, 0, JS_DTOA_FORMAT_FREE | JS_DTOA_MINUS_ZERO, &dtoa_mem);
-    s->write_func(s->write_opaque, buf, len);
-}
 
 static uint32_t js_string_get_length(JSValueConst val)
 {
@@ -11911,9 +11900,6 @@ static void js_print_value(JSPrintValueState *s, JSValueConst val)
         str = "undefined";
     print_str:
         js_puts(s, str);
-        break;
-    case JS_TAG_FLOAT64:
-        js_print_float64(s, JS_VALUE_GET_FLOAT64(val));
         break;
     case JS_TAG_STRING:
     case JS_TAG_STRING_ROPE:
@@ -36803,43 +36789,20 @@ static JSValue js_number_toString(JSContext *ctx, JSValueConst this_val,
         len = i64toa_radix(buf1, JS_VALUE_GET_INT(val), base);
         return js_new_string8_len(ctx, buf1, len);
     }
-    if (JS_ToFloat64Free(ctx, &d, val))
-        return JS_EXCEPTION;
-    flags = JS_DTOA_FORMAT_FREE;
-    if (base != 10)
-        flags |= JS_DTOA_EXP_DISABLED;
-    return js_dtoa2(ctx, d, base, 0, flags);
+    // if (JS_ToFloat64Free(ctx, &d, val))
+    //     return JS_EXCEPTION;
+    // flags = JS_DTOA_FORMAT_FREE;
+    // if (base != 10)
+    //     flags |= JS_DTOA_EXP_DISABLED;
+    // return js_dtoa2(ctx, d, base, 0, flags);
  fail:
     JS_FreeValue(ctx, val);
     return JS_EXCEPTION;
 }
 
-static JSValue js_number_toFixed(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
-{
-    JSValue val;
-    int f, flags;
-    double d;
-
-    val = js_thisNumberValue(ctx, this_val);
-    if (JS_IsException(val))
-        return val;
-    if (JS_ToFloat64Free(ctx, &d, val))
-        return JS_EXCEPTION;
-    if (JS_ToInt32Sat(ctx, &f, argv[0]))
-        return JS_EXCEPTION;
-    if (f < 0 || f > 100)
-        return JS_ThrowRangeError(ctx, "invalid number of digits");
-    if (fabs(d) >= 1e21)
-        flags = JS_DTOA_FORMAT_FREE;
-    else
-        flags = JS_DTOA_FORMAT_FRAC;
-    return js_dtoa2(ctx, d, 10, f, flags);
-}
 
 
 static const JSCFunctionListEntry js_number_proto_funcs[] = {
-    JS_CFUNC_DEF("toFixed", 1, js_number_toFixed ),
     JS_CFUNC_MAGIC_DEF("toString", 1, js_number_toString, 0 ),
     JS_CFUNC_MAGIC_DEF("toLocaleString", 0, js_number_toString, 1 ),
     JS_CFUNC_DEF("valueOf", 0, js_number_valueOf ),
