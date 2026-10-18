@@ -11135,14 +11135,7 @@ static __exception int JS_ToArrayLengthFree(JSContext *ctx, uint32_t *plen,
         }
         break;
     default:
-        if (JS_TAG_IS_FLOAT64(tag)) {
-            double d;
-            d = JS_VALUE_GET_FLOAT64(val);
-            if (!(d >= 0 && d <= UINT32_MAX))
-                goto fail;
-            len = (uint32_t)d;
-            if (len != d)
-                goto fail;
+        if (0) {
         } else {
             uint32_t len1;
 
@@ -12381,8 +12374,8 @@ static no_inline int js_relational_slow(JSContext *ctx, JSValue *sp,
         }
         JS_FreeValue(ctx, op1);
         JS_FreeValue(ctx, op2);
-    } else if ((tag1 <= JS_TAG_NULL || tag1 == JS_TAG_FLOAT64) &&
-               (tag2 <= JS_TAG_NULL || tag2 == JS_TAG_FLOAT64)) {
+    } else if ((tag1 <= JS_TAG_NULL) &&
+               (tag2 <= JS_TAG_NULL)) {
         /* fast path for float64/int */
         goto float64_compare;
     } else {
@@ -12406,17 +12399,15 @@ static no_inline int js_relational_slow(JSContext *ctx, JSValue *sp,
         if (0) {
             
         } else {
-            double d1, d2;
+            int64_t d1, d2;
 
         float64_compare:
             /* can use floating point comparison */
-            if (tag1 == JS_TAG_FLOAT64) {
-                d1 = JS_VALUE_GET_FLOAT64(op1);
+            if (0) {
             } else {
                 d1 = JS_VALUE_GET_INT(op1);
             }
-            if (tag2 == JS_TAG_FLOAT64) {
-                d2 = JS_VALUE_GET_FLOAT64(op2);
+            if (0) {
             } else {
                 d2 = JS_VALUE_GET_INT(op2);
             }
@@ -12448,8 +12439,7 @@ static no_inline int js_relational_slow(JSContext *ctx, JSValue *sp,
 
 static BOOL tag_is_number(uint32_t tag)
 {
-    return (tag == JS_TAG_INT || 
-            tag == JS_TAG_FLOAT64);
+    return (tag == JS_TAG_INT);
 }
 
 static no_inline __exception int js_eq_slow(JSContext *ctx, JSValue *sp,
