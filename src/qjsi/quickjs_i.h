@@ -987,8 +987,8 @@ typedef union JSCFunctionType {
     JSCFunction *constructor;
     JSValue (*constructor_magic)(JSContext *ctx, JSValueConst new_target, int argc, JSValueConst *argv, int magic);
     JSCFunction *constructor_or_func;
-    double (*f_f)(double);
-    double (*f_f_f)(double, double);
+    int64_t (*f_f)(int64_t);
+    int64_t (*f_f_f)(int64_t, int64_t);
     JSValue (*getter)(JSContext *ctx, JSValueConst this_val);
     JSValue (*setter)(JSContext *ctx, JSValueConst this_val, JSValueConst val);
     JSValue (*getter_magic)(JSContext *ctx, JSValueConst this_val, int magic);
