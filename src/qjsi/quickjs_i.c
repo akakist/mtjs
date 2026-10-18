@@ -10042,9 +10042,7 @@ static int JS_ToBoolFree(JSContext *ctx, JSValue val)
         break;
     default:
         if (JS_TAG_IS_FLOAT64(tag)) {
-            printf("float @@@!");
-            // double d = JS_VALUE_GET_FLOAT64(val);
-            // return !isnan(d) && d != 0;
+            printf("float @@@!\n");
         } else {
             JS_FreeValue(ctx, val);
             return TRUE;
@@ -10718,11 +10716,15 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
     switch(atod_type) {
     case ATOD_TYPE_FLOAT64:
         {
-            double d;
-            d = js_atod(buf, NULL, radix, is_float ? 0 : JS_ATOD_INT_ONLY,
-                        &atod_mem);
-            /* return int or float64 */
-            val = JS_NewFloat64(ctx, d);
+            char *end;
+            long long d;
+            errno = 0;
+            d = strtoll(buf, &end, radix);
+            if (end == buf)
+                return JS_ThrowSyntaxError(ctx, "invalid number literal");
+            if (errno == ERANGE)
+                return JS_ThrowRangeError(ctx, "number too large");
+            val = JS_NewInt64(ctx, d);        
         }
         break;
     case ATOD_TYPE_BIG_INT:
@@ -10830,50 +10832,6 @@ static JSValue JS_ToNumeric(JSContext *ctx, JSValueConst val)
     return JS_ToNumericFree(ctx, JS_DupValue(ctx, val));
 }
 
-static __exception int __JS_ToFloat64Free(JSContext *ctx, double *pres,
-                                          JSValue val)
-{
-    double d;
-    uint32_t tag;
-    
-    val = JS_ToNumberFree(ctx, val);
-    if (JS_IsException(val))
-        goto fail;
-    tag = JS_VALUE_GET_NORM_TAG(val);
-    switch(tag) {
-    case JS_TAG_INT:
-        d = JS_VALUE_GET_INT(val);
-        break;
-    default:
-        abort();
-    }
-    *pres = d;
-    return 0;
- fail:
-    *pres = JS_FLOAT64_NAN;
-    return -1;
-}
-
-static inline int JS_ToFloat64Free(JSContext *ctx, double *pres, JSValue val)
-{
-    uint32_t tag;
-
-    tag = JS_VALUE_GET_TAG(val);
-    if (tag <= JS_TAG_NULL) {
-        *pres = JS_VALUE_GET_INT(val);
-        return 0;
-    } else if (JS_TAG_IS_FLOAT64(tag)) {
-        *pres = JS_VALUE_GET_FLOAT64(val);
-        return 0;
-    } else {
-        return __JS_ToFloat64Free(ctx, pres, val);
-    }
-}
-
-int JS_ToFloat64(JSContext *ctx, double *pres, JSValueConst val)
-{
-    return JS_ToFloat64Free(ctx, pres, JS_DupValue(ctx, val));
-}
 
 static JSValue JS_ToNumber(JSContext *ctx, JSValueConst val)
 {
@@ -16180,16 +16138,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                     v1 = JS_VALUE_GET_INT(op1);
                     v2 = JS_VALUE_GET_INT(op2);
                     r = (int64_t)v1 * v2;
-                    // if (unlikely((int)r != r)) {
-                    //     d = (double)r;
-                    //     goto mul_fp_res;
-                    // }
-                    /* need to test zero case for -0 result */
-                    // if (unlikely(r == 0 && (v1 | v2) < 0)) {
-                    //     d = -0.0;
-                    //     goto mul_fp_res;
-                    // }
-                    sp[-2] = JS_NewInt32(ctx, r);
+                    sp[-2] = JS_NewInt64(ctx, r);
                     sp--;
                 } else if (0) {
                 } else {
@@ -36546,23 +36495,12 @@ static JSValue js_number_isInteger(JSContext *ctx, JSValueConst this_val,
         return JS_NewBool(ctx, ret);
 }
 
-static JSValue js_number_isSafeInteger(JSContext *ctx, JSValueConst this_val,
-                                       int argc, JSValueConst *argv)
-{
-    int64_t d;
-    if (!JS_IsNumber(argv[0]))
-        return JS_FALSE;
-    if (unlikely(JS_ToInt64(ctx, &d, argv[0])))
-        return JS_EXCEPTION;
-    return JS_NewBool(ctx, is_safe_integer(d));
-}
 
 static const JSCFunctionListEntry js_number_funcs[] = {
     /* global ParseInt and parseFloat should be defined already or delayed */
     JS_ALIAS_BASE_DEF("parseInt", "parseInt", 0 ),
     JS_ALIAS_BASE_DEF("parseFloat", "parseFloat", 0 ),
     JS_CFUNC_DEF("isInteger", 1, js_number_isInteger ),
-    JS_CFUNC_DEF("isSafeInteger", 1, js_number_isSafeInteger ),
 };
 
 static JSValue js_thisNumberValue(JSContext *ctx, JSValueConst this_val)

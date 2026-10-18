@@ -696,7 +696,6 @@ static inline int JS_ToUint32(JSContext *ctx, uint32_t *pres, JSValueConst val)
 }
 int JS_ToInt64(JSContext *ctx, int64_t *pres, JSValueConst val);
 int JS_ToIndex(JSContext *ctx, uint64_t *plen, JSValueConst val);
-int JS_ToFloat64(JSContext *ctx, double *pres, JSValueConst val);
 /* return an exception if 'val' is a Number */
 /* same as JS_ToInt64() but allow BigInt */
 int JS_ToInt64Ext(JSContext *ctx, int64_t *pres, JSValueConst val);
