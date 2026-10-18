@@ -216,6 +216,7 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int32_t d)
 
 typedef union JSValueUnion {
     int64_t int64;
+    uint64_t uint64;
     double float64;
     void *ptr;
 #if JS_SHORT_BIG_INT_BITS == 32
@@ -243,6 +244,7 @@ typedef struct JSValue {
 #define JS_VALUE_GET_PTR(v) ((v).u.ptr)
 
 #define JS_MKVAL(tag, val) (JSValue){ (JSValueUnion){ .int64 = val }, tag, .is_nan=0 }
+#define JS_MKVALU(tag, val) (JSValue){ (JSValueUnion){ .uint64 = val }, tag, .is_nan=0 }
 #define JS_MKPTR(tag, p) (JSValue){ (JSValueUnion){ .ptr = p }, tag,.is_nan=0 }
 
 #define JS_TAG_IS_FLOAT64(tag) ((unsigned)(tag) == JS_TAG_FLOAT64)
@@ -535,12 +537,12 @@ static js_force_inline JSValue JS_NewBool(JSContext *ctx, JS_BOOL val)
     return JS_MKVAL(JS_TAG_BOOL, (val != 0));
 }
 
-static js_force_inline JSValue JS_NewInt32(JSContext *ctx, int32_t val)
+static js_force_inline JSValue JS_NewInt32(JSContext *ctx, int64_t val)
 {
     return JS_MKVAL(JS_TAG_INT, val);
 }
 
-static js_force_inline JSValue JS_NewCatchOffset(JSContext *ctx, int32_t val)
+static js_force_inline JSValue JS_NewCatchOffset(JSContext *ctx, int64_t val)
 {
     return JS_MKVAL(JS_TAG_CATCH_OFFSET, val);
 }
@@ -551,9 +553,9 @@ static js_force_inline JSValue JS_NewInt64(JSContext *ctx, int64_t val)
 
 }
 
-static js_force_inline JSValue JS_NewUint32(JSContext *ctx, uint32_t val)
+static js_force_inline JSValue JS_NewUint32(JSContext *ctx, uint64_t val)
 {
-    return JS_MKVAL(JS_TAG_INT, val);
+    return JS_MKVALU(JS_TAG_INT, val);
 }
 
 

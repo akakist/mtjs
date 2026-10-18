@@ -473,11 +473,11 @@ struct JSContext {
     void *user_opaque;
 };
 
-typedef union JSFloat64Union {
-    double d;
-    uint64_t u64;
-    uint32_t u32[2];
-} JSFloat64Union;
+// typedef union JSFloat64Union {
+//     double d;
+//     uint64_t u64;
+//     uint32_t u32[2];
+// } JSFloat64Union;
 
 enum {
     JS_ATOM_TYPE_STRING = 1,
@@ -12521,17 +12521,11 @@ static BOOL js_strict_eq2(JSContext *ctx, JSValue op1, JSValue op2,
         }
         break;
     number_test:
-        if (unlikely(eq_mode >= JS_EQ_SAME_VALUE)) {
-            JSFloat64Union u1, u2;
+        if (unlikely(eq_mode >= JS_EQ_SAME_VALUE)) 
+        {
+            // JSFloat64Union u1, u2;
             /* NaN is not always normalized, so this test is necessary */
-            if (0) {
-            } else if (eq_mode == JS_EQ_SAME_VALUE_ZERO) {
                 res = (d1 == d2); /* +0 == -0 */
-            } else {
-                u1.d = d1;
-                u2.d = d2;
-                res = (u1.u64 == u2.u64); /* +0 != -0 */
-            }
         } else {
             res = (d1 == d2); /* if NaN return false and +0 == -0 */
         }
