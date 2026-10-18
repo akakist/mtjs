@@ -75,8 +75,8 @@ void js_dtoa_dump_stats(void);
 #endif
 
 /* additional exported functions */
-size_t u32toa(char *buf, uint32_t n);
-size_t i32toa(char *buf, int32_t n);
+// size_t u32toa(char *buf, uint32_t n);
+// size_t i32toa(char *buf, int32_t n);
 size_t u64toa(char *buf, uint64_t n);
 size_t i64toa(char *buf, int64_t n);
 size_t u64toa_radix(char *buf, uint64_t n, unsigned int radix);

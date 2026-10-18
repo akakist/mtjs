@@ -2844,7 +2844,7 @@ JSAtom JS_NewAtomUInt32(JSContext *ctx, uint32_t n)
         char buf[11];
         JSValue val;
         size_t len;
-        len = u32toa(buf, n);
+        len = u64toa(buf, n);
         val = js_new_string8_len(ctx, buf, len);
         if (JS_IsException(val))
             return JS_ATOM_NULL;
@@ -2954,7 +2954,7 @@ static JSValue __JS_AtomToValue(JSContext *ctx, JSAtom atom, BOOL force_string)
     char buf[ATOM_GET_STR_BUF_SIZE];
 
     if (__JS_AtomIsTaggedInt(atom)) {
-        size_t len = u32toa(buf, __JS_AtomToUInt32(atom));
+        size_t len = u64toa(buf, __JS_AtomToUInt32(atom));
         return js_new_string8_len(ctx, buf, len);
     } else {
         JSRuntime *rt = ctx->rt;
@@ -3152,7 +3152,7 @@ static JSAtom js_atom_concat_num(JSContext *ctx, JSAtom name, uint32_t n)
 {
     char buf[16];
     size_t len;
-    len = u32toa(buf, n);
+    len = u64toa(buf, n);
     buf[len] = '\0';
     return js_atom_concat_str(ctx, name, buf);
 }
@@ -7116,7 +7116,7 @@ static JSValueConst JS_GetPrototypePrimitive(JSContext *ctx, JSValueConst val)
 {
     switch(JS_VALUE_GET_NORM_TAG(val)) {
     case JS_TAG_INT:
-    case JS_TAG_FLOAT64:
+    // case JS_TAG_FLOAT64:
         val = ctx->class_proto[JS_CLASS_NUMBER];
         break;
     case JS_TAG_BOOL:
@@ -10857,9 +10857,9 @@ static __exception int __JS_ToFloat64Free(JSContext *ctx, double *pres,
     case JS_TAG_INT:
         d = JS_VALUE_GET_INT(val);
         break;
-    case JS_TAG_FLOAT64:
-        d = JS_VALUE_GET_FLOAT64(val);
-        break;
+    // case JS_TAG_FLOAT64:
+    //     d = JS_VALUE_GET_FLOAT64(val);
+    //     break;
     default:
         abort();
     }
@@ -10938,21 +10938,21 @@ static int JS_ToInt32SatFree(JSContext *ctx, int *pres, JSValue val)
     case JS_TAG_EXCEPTION:
         *pres = 0;
         return -1;
-    case JS_TAG_FLOAT64:
-        {
-            double d = JS_VALUE_GET_FLOAT64(val);
-            if (isnan(d)) {
-                ret = 0;
-            } else {
-                if (d < INT32_MIN)
-                    ret = INT32_MIN;
-                else if (d > INT32_MAX)
-                    ret = INT32_MAX;
-                else
-                    ret = (int)d;
-            }
-        }
-        break;
+    // case JS_TAG_FLOAT64:
+    //     {
+    //         double d = JS_VALUE_GET_FLOAT64(val);
+    //         if (isnan(d)) {
+    //             ret = 0;
+    //         } else {
+    //             if (d < INT32_MIN)
+    //                 ret = INT32_MIN;
+    //             else if (d > INT32_MAX)
+    //                 ret = INT32_MAX;
+    //             else
+    //                 ret = (int)d;
+    //         }
+    //     }
+    //     break;
     default:
         val = JS_ToNumberFree(ctx, val);
         if (JS_IsException(val)) {
@@ -11049,31 +11049,31 @@ static int JS_ToInt64Free(JSContext *ctx, int64_t *pres, JSValue val)
     case JS_TAG_UNDEFINED:
         ret = JS_VALUE_GET_INT(val);
         break;
-    case JS_TAG_FLOAT64:
-        {
-            JSFloat64Union u;
-            double d;
-            int e;
-            d = JS_VALUE_GET_FLOAT64(val);
-            u.d = d;
-            /* we avoid doing fmod(x, 2^64) */
-            e = (u.u64 >> 52) & 0x7ff;
-            if (likely(e <= (1023 + 62))) {
-                /* fast case */
-                ret = (int64_t)d;
-            } else if (e <= (1023 + 62 + 53)) {
-                uint64_t v;
-                /* remainder modulo 2^64 */
-                v = (u.u64 & (((uint64_t)1 << 52) - 1)) | ((uint64_t)1 << 52);
-                ret = v << ((e - 1023) - 52);
-                /* take the sign into account */
-                if (u.u64 >> 63)
-                    ret = -ret;
-            } else {
-                ret = 0; /* also handles NaN and +inf */
-            }
-        }
-        break;
+    // case JS_TAG_FLOAT64:
+    //     {
+    //         JSFloat64Union u;
+    //         double d;
+    //         int e;
+    //         d = JS_VALUE_GET_FLOAT64(val);
+    //         u.d = d;
+    //         /* we avoid doing fmod(x, 2^64) */
+    //         e = (u.u64 >> 52) & 0x7ff;
+    //         if (likely(e <= (1023 + 62))) {
+    //             /* fast case */
+    //             ret = (int64_t)d;
+    //         } else if (e <= (1023 + 62 + 53)) {
+    //             uint64_t v;
+    //             /* remainder modulo 2^64 */
+    //             v = (u.u64 & (((uint64_t)1 << 52) - 1)) | ((uint64_t)1 << 52);
+    //             ret = v << ((e - 1023) - 52);
+    //             /* take the sign into account */
+    //             if (u.u64 >> 63)
+    //                 ret = -ret;
+    //         } else {
+    //             ret = 0; /* also handles NaN and +inf */
+    //         }
+    //     }
+    //     break;
     default:
         val = JS_ToNumberFree(ctx, val);
         if (JS_IsException(val)) {
@@ -11111,32 +11111,32 @@ static int JS_ToInt32Free(JSContext *ctx, int32_t *pres, JSValue val)
     case JS_TAG_UNDEFINED:
         ret = JS_VALUE_GET_INT(val);
         break;
-    case JS_TAG_FLOAT64:
-        {
-            JSFloat64Union u;
-            double d;
-            int e;
-            d = JS_VALUE_GET_FLOAT64(val);
-            u.d = d;
-            /* we avoid doing fmod(x, 2^32) */
-            e = (u.u64 >> 52) & 0x7ff;
-            if (likely(e <= (1023 + 30))) {
-                /* fast case */
-                ret = (int32_t)d;
-            } else if (e <= (1023 + 30 + 53)) {
-                uint64_t v;
-                /* remainder modulo 2^32 */
-                v = (u.u64 & (((uint64_t)1 << 52) - 1)) | ((uint64_t)1 << 52);
-                v = v << ((e - 1023) - 52 + 32);
-                ret = v >> 32;
-                /* take the sign into account */
-                if (u.u64 >> 63)
-                    ret = -ret;
-            } else {
-                ret = 0; /* also handles NaN and +inf */
-            }
-        }
-        break;
+    // case JS_TAG_FLOAT64:
+    //     {
+    //         JSFloat64Union u;
+    //         double d;
+    //         int e;
+    //         d = JS_VALUE_GET_FLOAT64(val);
+    //         u.d = d;
+    //         /* we avoid doing fmod(x, 2^32) */
+    //         e = (u.u64 >> 52) & 0x7ff;
+    //         if (likely(e <= (1023 + 30))) {
+    //             /* fast case */
+    //             ret = (int32_t)d;
+    //         } else if (e <= (1023 + 30 + 53)) {
+    //             uint64_t v;
+    //             /* remainder modulo 2^32 */
+    //             v = (u.u64 & (((uint64_t)1 << 52) - 1)) | ((uint64_t)1 << 52);
+    //             v = v << ((e - 1023) - 52 + 32);
+    //             ret = v >> 32;
+    //             /* take the sign into account */
+    //             if (u.u64 >> 63)
+    //                 ret = -ret;
+    //         } else {
+    //             ret = 0; /* also handles NaN and +inf */
+    //         }
+    //     }
+    //     break;
     default:
         val = JS_ToNumberFree(ctx, val);
         if (JS_IsException(val)) {
@@ -11303,12 +11303,12 @@ static BOOL JS_NumberIsNegativeOrMinusZero(JSContext *ctx, JSValueConst val)
             v = JS_VALUE_GET_INT(val);
             return (v < 0);
         }
-    case JS_TAG_FLOAT64:
-        {
-            JSFloat64Union u;
-            u.d = JS_VALUE_GET_FLOAT64(val);
-            return (u.u64 >> 63);
-        }
+    // case JS_TAG_FLOAT64:
+    //     {
+    //         JSFloat64Union u;
+    //         u.d = JS_VALUE_GET_FLOAT64(val);
+    //         return (u.u64 >> 63);
+    //     }
     default:
         return FALSE;
     }
@@ -11354,7 +11354,7 @@ static JSValue JS_ToStringInternal(JSContext *ctx, JSValueConst val, BOOL is_ToP
     case JS_TAG_INT:
         {
             size_t len;
-            len = i32toa(buf, JS_VALUE_GET_INT(val));
+            len = i64toa(buf, JS_VALUE_GET_INT(val));
             return js_new_string8_len(ctx, buf, len);
         }
         break;
@@ -12162,8 +12162,8 @@ static no_inline __exception int js_unary_arith_slow(JSContext *ctx,
 
     op1 = sp[-1];
     /* fast path for float64 */
-    if (JS_TAG_IS_FLOAT64(JS_VALUE_GET_TAG(op1)))
-        goto handle_float64;
+    // if (JS_TAG_IS_FLOAT64(JS_VALUE_GET_TAG(op1)))
+    //     goto handle_float64;
     op1 = JS_ToNumericFree(ctx, op1);
     if (JS_IsException(op1))
         goto exception;
@@ -12198,29 +12198,31 @@ static no_inline __exception int js_unary_arith_slow(JSContext *ctx,
         }
         break;
     default:
-    handle_float64:
-        {
-            int64_t d;
-            d = JS_VALUE_GET_INT(op1);
-            switch(op) {
-            case OP_inc:
-            case OP_dec:
-                v = 2 * (op - OP_dec) - 1;
-                d += v;
-                break;
-            case OP_plus:
-                break;
-            case OP_neg:
-                d = -d;
-                break;
-            default:
-                abort();
-            }
-            sp[-1] = JS_NewInt64(ctx, d);
-        }
-        break;
+    // handle_float64:
+    //     {
+    //         int64_t d;
+    //         d = JS_VALUE_GET_INT(op1);
+    //         switch(op) {
+    //         case OP_inc:
+    //         case OP_dec:
+    //             v = 2 * (op - OP_dec) - 1;
+    //             d += v;
+    //             break;
+    //         case OP_plus:
+    //             break;
+    //         case OP_neg:
+    //             d = -d;
+    //             break;
+    //         default:
+    //             abort();
+    //         }
+    //         sp[-1] = JS_NewInt64(ctx, d);
+    //     }
+    //     break;
+        sp[-1] = JS_UNDEFINED;
+        return -1;
     }
-    return 0;
+    return -1;
  exception:
     sp[-1] = JS_UNDEFINED;
     return -1;

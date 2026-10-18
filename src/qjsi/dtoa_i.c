@@ -587,37 +587,36 @@ static void limb_to_a(char *buf, limb_t n, unsigned int radix, int len)
     }
 }
 
-size_t u32toa(char *buf, uint32_t n)
-{
-    char buf1[10], *q;
-    size_t len;
+// size_t u64toa(char *buf, uint64_t n)
+// {
+//     char buf1[10], *q;
+//     size_t len;
     
-    q = buf1 + sizeof(buf1);
-    do {
-        *--q = n % 10 + '0';
-        n /= 10;
-    } while (n != 0);
-    len = buf1 + sizeof(buf1) - q;
-    memcpy(buf, q, len);
-    return len;
-}
+//     q = buf1 + sizeof(buf1);
+//     do {
+//         *--q = n % 10 + '0';
+//         n /= 10;
+//     } while (n != 0);
+//     len = buf1 + sizeof(buf1) - q;
+//     memcpy(buf, q, len);
+//     return len;
+// }
 
-size_t i32toa(char *buf, int32_t n)
-{
-    if (n >= 0) {
-        return u32toa(buf, n);
-    } else {
-        buf[0] = '-';
-        return u32toa(buf + 1, -(uint32_t)n) + 1;
-    }
-}
+// size_t i64toa(char *buf, int64_t n)
+// {
+//     if (n >= 0) {
+//         return u64toa(buf, n);
+//     } else {
+//         buf[0] = '-';
+//         return u64toa(buf + 1, -(uint32_t)n) + 1;
+//     }
+// }
 
 #ifdef USE_FAST_INT
 size_t u64toa(char *buf, uint64_t n)
 {
-    if (n < 0x100000000) {
-        return u32toa(buf, n);
-    } else {
+
+    {
         uint64_t n1;
         char *q = buf;
         uint32_t n2;
@@ -636,7 +635,7 @@ size_t u64toa(char *buf, uint64_t n)
             u32toa_len(q, n1, 9);
             q += 9;
         } else {
-            q += u32toa(q, n1);
+            q += u64toa(q, n1);
         }
         u32toa_len(q, n, 9);
         q += 9;
@@ -1298,7 +1297,7 @@ int js_dtoa(char *buf, double d, int radix, int n_digits, int flags,
         } else {
             *q++ = '+';
         }
-        q += u32toa(q, E);
+        q += u64toa(q, E);
     } else if (E <= 0) {
         *q++ = '0';
         *q++ = '.';
