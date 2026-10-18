@@ -37269,15 +37269,9 @@ static JSValue js_string_indexOf(JSContext *ctx, JSValueConst this_val,
     if (lastIndexOf) {
         pos = len - v_len;
         if (argc > 1) {
-            double d;
-            if (JS_ToFloat64(ctx, &d, argv[1]))
+            int64_t d;
+            if (JS_ToInt64(ctx, &d, argv[1]))
                 goto fail;
-            if (!isnan(d)) {
-                if (d <= 0)
-                    pos = 0;
-                else if (d < pos)
-                    pos = d;
-            }
         }
         start = pos;
         stop = 0;
