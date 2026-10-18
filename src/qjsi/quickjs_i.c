@@ -14177,17 +14177,17 @@ static JSValue js_call_c_function(JSContext *ctx, JSValueConst func_obj,
         break;
     case JS_CFUNC_f_f_f:
         {
-            double d1, d2;
+            int64_t d1, d2;
 
-            if (unlikely(JS_ToFloat64(ctx, &d1, arg_buf[0]))) {
+            if (unlikely(JS_ToInt64(ctx, &d1, arg_buf[0]))) {
                 ret_val = JS_EXCEPTION;
                 break;
             }
-            if (unlikely(JS_ToFloat64(ctx, &d2, arg_buf[1]))) {
+            if (unlikely(JS_ToInt64(ctx, &d2, arg_buf[1]))) {
                 ret_val = JS_EXCEPTION;
                 break;
             }
-            ret_val = JS_NewFloat64(ctx, func.f_f_f(d1, d2));
+            ret_val = JS_NewInt64(ctx, func.f_f_f(d1, d2));
         }
         break;
     case JS_CFUNC_iterator_next:
