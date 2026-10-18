@@ -11206,13 +11206,9 @@ static __exception int JS_ToLengthFree(JSContext *ctx, int64_t *plen,
 /* Note: can return an exception */
 static int JS_NumberIsInteger(JSContext *ctx, JSValueConst val)
 {
-    // double d;
     if (!JS_IsNumber(val))
         return FALSE;
     return TRUE;
-    // if (unlikely(JS_ToFloat64(ctx, &d, val)))
-    //     return -1;
-    // return isfinite(d) && floor(d) == d;
 }
 
 static BOOL JS_NumberIsNegativeOrMinusZero(JSContext *ctx, JSValueConst val)
