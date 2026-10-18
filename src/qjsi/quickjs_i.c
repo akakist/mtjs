@@ -3029,14 +3029,6 @@ static JSValue JS_AtomIsNumericIndex1(JSContext *ctx, JSAtom atom)
     if (p1->atom_type != JS_ATOM_TYPE_STRING)
         return JS_UNDEFINED;
     switch(atom) {
-    // case JS_ATOM_minus_zero:
-    //     return __JS_NewFloat64(ctx, -0.0);
-    // case JS_ATOM_Infinity:
-    //     return __JS_NewFloat64(ctx, INFINITY);
-    // case JS_ATOM_minus_Infinity:
-    //     return __JS_NewFloat64(ctx, -INFINITY);
-    // case JS_ATOM_NaN:
-    //     return __JS_NewFloat64(ctx, NAN);
     default:
         break;
     }
@@ -10780,7 +10772,6 @@ static JSValue JS_ToNumberHintFree(JSContext *ctx, JSValue val,
  redo:
     tag = JS_VALUE_GET_NORM_TAG(val);
     switch(tag) {
-    case JS_TAG_FLOAT64:
     case JS_TAG_INT:
     case JS_TAG_EXCEPTION:
         ret = val;
@@ -10918,19 +10909,7 @@ static __maybe_unused JSValue JS_ToIntegerFree(JSContext *ctx, JSValue val)
     case JS_TAG_BOOL:
     case JS_TAG_NULL:
     case JS_TAG_UNDEFINED:
-        ret = JS_NewInt32(ctx, JS_VALUE_GET_INT(val));
-        break;
-    case JS_TAG_FLOAT64:
-        {
-            double d = JS_VALUE_GET_FLOAT64(val);
-            if (isnan(d)) {
-                ret = JS_NewInt32(ctx, 0);
-            } else {
-                /* convert -0 to +0 */
-                d = trunc(d) + 0.0;
-                ret = JS_NewFloat64(ctx, d);
-            }
-        }
+        ret = JS_NewInt64(ctx, JS_VALUE_GET_INT(val));
         break;
     default:
         val = JS_ToNumberFree(ctx, val);
@@ -11024,21 +11003,6 @@ static int JS_ToInt64SatFree(JSContext *ctx, int64_t *pres, JSValue val)
     case JS_TAG_EXCEPTION:
         *pres = 0;
         return -1;
-    case JS_TAG_FLOAT64:
-        {
-            double d = JS_VALUE_GET_FLOAT64(val);
-            if (isnan(d)) {
-                *pres = 0;
-            } else {
-                if (d < INT64_MIN)
-                    *pres = INT64_MIN;
-                else if (d >= 0x1p63) /* must use INT64_MAX + 1 because INT64_MAX cannot be exactly represented as a double */
-                    *pres = INT64_MAX;
-                else
-                    *pres = (int64_t)d;
-            }
-        }
-        return 0;
     default:
         val = JS_ToNumberFree(ctx, val);
         if (JS_IsException(val)) {
@@ -11209,21 +11173,6 @@ static int JS_ToUint8ClampFree(JSContext *ctx, int32_t *pres, JSValue val)
     case JS_TAG_UNDEFINED:
         res = JS_VALUE_GET_INT(val);
         res = max_int(0, min_int(255, res));
-        break;
-    case JS_TAG_FLOAT64:
-        {
-            double d = JS_VALUE_GET_FLOAT64(val);
-            if (isnan(d)) {
-                res = 0;
-            } else {
-                if (d < 0)
-                    res = 0;
-                else if (d > 255)
-                    res = 255;
-                else
-                    res = lrint(d);
-            }
-        }
         break;
     default:
         val = JS_ToNumberFree(ctx, val);
@@ -12206,7 +12155,7 @@ static no_inline __exception int js_unary_arith_slow(JSContext *ctx,
                                                      OPCodeEnum op)
 {
     JSValue op1;
-    int v;
+    int64_t v;
     uint32_t tag;
     JSBigIntBuf buf1;
     JSBigInt *p1;
@@ -12325,10 +12274,7 @@ static no_inline __exception int js_binary_arith_slow(JSContext *ctx, JSValue *s
     tag1 = JS_VALUE_GET_NORM_TAG(op1);
     tag2 = JS_VALUE_GET_NORM_TAG(op2);
     /* fast path for float operations */
-    if (tag1 == JS_TAG_FLOAT64 && tag2 == JS_TAG_FLOAT64) {
-        d1 = JS_VALUE_GET_FLOAT64(op1);
-        d2 = JS_VALUE_GET_FLOAT64(op2);
-        goto handle_float64;
+    if (0) {
     }
     /* fast path for short big int operations */
     if (0) {
@@ -12379,32 +12325,6 @@ static no_inline __exception int js_binary_arith_slow(JSContext *ctx, JSValue *s
         sp[-2] = JS_NewInt64(ctx, v);
     } else if (0) {
     } else {
-        int64_t dr;
-        /* float64 result */
-        if (JS_ToFloat64Free(ctx, &d1, op1)) {
-            JS_FreeValue(ctx, op2);
-            goto exception;
-        }
-        if (JS_ToFloat64Free(ctx, &d2, op2))
-            goto exception;
-    handle_float64:
-        switch(op) {
-        case OP_sub:
-            dr = d1 - d2;
-            break;
-        case OP_mul:
-            dr = d1 * d2;
-            break;
-        case OP_div:
-            dr = d1 / d2;
-            break;
-        case OP_mod:
-            dr = fmod(d1, d2);
-            break;
-        default:
-            abort();
-        }
-        sp[-2] = __JS_NewFloat64(ctx, dr);
     }
     return 0;
  exception:
@@ -12485,15 +12405,6 @@ static no_inline __exception int js_add_slow(JSContext *ctx, JSValue *sp)
         sp[-2] = JS_NewInt64(ctx, v);
     } else if (0) {
     } else {
-        // double d1, d2;
-        // /* float64 result */
-        // if (JS_ToFloat64Free(ctx, &d1, op1)) {
-        //     JS_FreeValue(ctx, op2);
-        //     goto exception;
-        // }
-        // if (JS_ToFloat64Free(ctx, &d2, op2))
-        //     goto exception;
-        // sp[-2] = __JS_NewFloat64(ctx, d1 + d2);
     }
     return 0;
  exception:
@@ -16388,10 +16299,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                         goto add_loc_slow;
                     *pv = JS_NewInt32(ctx, r);
                     sp--;
-                } else if (JS_VALUE_IS_BOTH_FLOAT(*pv, op2)) {
-                    *pv = __JS_NewFloat64(ctx, JS_VALUE_GET_FLOAT64(*pv) +
-                                               JS_VALUE_GET_FLOAT64(op2));
-                    sp--;
+                } else if (0) {
                 } else if (JS_VALUE_GET_TAG(*pv) == JS_TAG_STRING) {
                     sp--;
                     sf->cur_pc = pc;
@@ -37044,64 +36952,9 @@ static JSValue js_number_toFixed(JSContext *ctx, JSValueConst this_val,
     return js_dtoa2(ctx, d, 10, f, flags);
 }
 
-static JSValue js_number_toExponential(JSContext *ctx, JSValueConst this_val,
-                                       int argc, JSValueConst *argv)
-{
-    JSValue val;
-    int f, flags;
-    double d;
-
-    val = js_thisNumberValue(ctx, this_val);
-    if (JS_IsException(val))
-        return val;
-    if (JS_ToFloat64Free(ctx, &d, val))
-        return JS_EXCEPTION;
-    if (JS_ToInt32Sat(ctx, &f, argv[0]))
-        return JS_EXCEPTION;
-    if (!isfinite(d)) {
-        return JS_ToStringFree(ctx,  __JS_NewFloat64(ctx, d));
-    }
-    if (JS_IsUndefined(argv[0])) {
-        flags = JS_DTOA_FORMAT_FREE;
-        f = 0;
-    } else {
-        if (f < 0 || f > 100)
-            return JS_ThrowRangeError(ctx, "invalid number of digits");
-        f++;
-        flags = JS_DTOA_FORMAT_FIXED;
-    }
-    return js_dtoa2(ctx, d, 10, f, flags | JS_DTOA_EXP_ENABLED);
-}
-
-static JSValue js_number_toPrecision(JSContext *ctx, JSValueConst this_val,
-                                     int argc, JSValueConst *argv)
-{
-    JSValue val;
-    int p;
-    double d;
-
-    val = js_thisNumberValue(ctx, this_val);
-    if (JS_IsException(val))
-        return val;
-    if (JS_ToFloat64Free(ctx, &d, val))
-        return JS_EXCEPTION;
-    if (JS_IsUndefined(argv[0]))
-        goto to_string;
-    if (JS_ToInt32Sat(ctx, &p, argv[0]))
-        return JS_EXCEPTION;
-    if (!isfinite(d)) {
-    to_string:
-        return JS_ToStringFree(ctx,  __JS_NewFloat64(ctx, d));
-    }
-    if (p < 1 || p > 100)
-        return JS_ThrowRangeError(ctx, "invalid number of digits");
-    return js_dtoa2(ctx, d, 10, p, JS_DTOA_FORMAT_FIXED);
-}
 
 static const JSCFunctionListEntry js_number_proto_funcs[] = {
-    JS_CFUNC_DEF("toExponential", 1, js_number_toExponential ),
     JS_CFUNC_DEF("toFixed", 1, js_number_toFixed ),
-    JS_CFUNC_DEF("toPrecision", 1, js_number_toPrecision ),
     JS_CFUNC_MAGIC_DEF("toString", 1, js_number_toString, 0 ),
     JS_CFUNC_MAGIC_DEF("toLocaleString", 0, js_number_toString, 1 ),
     JS_CFUNC_DEF("valueOf", 0, js_number_valueOf ),
@@ -38816,159 +38669,6 @@ static double js_fmax(double a, double b)
     }
 }
 
-static JSValue js_math_min_max(JSContext *ctx, JSValueConst this_val,
-                               int argc, JSValueConst *argv, int magic)
-{
-    BOOL is_max = magic;
-    double r, a;
-    int i;
-    uint32_t tag;
-
-    if (unlikely(argc == 0)) {
-        return __JS_NewFloat64(ctx, is_max ? -1.0 / 0.0 : 1.0 / 0.0);
-    }
-
-    tag = JS_VALUE_GET_TAG(argv[0]);
-    if (tag == JS_TAG_INT) {
-        int a1, r1 = JS_VALUE_GET_INT(argv[0]);
-        for(i = 1; i < argc; i++) {
-            tag = JS_VALUE_GET_TAG(argv[i]);
-            if (tag != JS_TAG_INT) {
-                r = r1;
-                goto generic_case;
-            }
-            a1 = JS_VALUE_GET_INT(argv[i]);
-            if (is_max)
-                r1 = max_int(r1, a1);
-            else
-                r1 = min_int(r1, a1);
-
-        }
-        return JS_NewInt32(ctx, r1);
-    } else {
-        if (JS_ToFloat64(ctx, &r, argv[0]))
-            return JS_EXCEPTION;
-        i = 1;
-    generic_case:
-        while (i < argc) {
-            if (JS_ToFloat64(ctx, &a, argv[i]))
-                return JS_EXCEPTION;
-            if (!isnan(r)) {
-                if (isnan(a)) {
-                    r = a;
-                } else {
-                    if (is_max)
-                        r = js_fmax(r, a);
-                    else
-                        r = js_fmin(r, a);
-                }
-            }
-            i++;
-        }
-        return JS_NewFloat64(ctx, r);
-    }
-}
-
-static double js_math_sign(double a)
-{
-    if (isnan(a) || a == 0.0)
-        return a;
-    if (a < 0)
-        return -1;
-    else
-        return 1;
-}
-
-static double js_math_round(double a)
-{
-    JSFloat64Union u;
-    uint64_t frac_mask, one;
-    unsigned int e, s;
-
-    u.d = a;
-    e = (u.u64 >> 52) & 0x7ff;
-    if (e < 1023) {
-        /* abs(a) < 1 */
-        if (e == (1023 - 1) && u.u64 != 0xbfe0000000000000) {
-            /* abs(a) > 0.5 or a = 0.5: return +/-1.0 */
-            u.u64 = (u.u64 & ((uint64_t)1 << 63)) | ((uint64_t)1023 << 52);
-        } else {
-            /* return +/-0.0 */
-            u.u64 &= (uint64_t)1 << 63;
-        }
-    } else if (e < (1023 + 52)) {
-        s = u.u64 >> 63;
-        one = (uint64_t)1 << (52 - (e - 1023));
-        frac_mask = one - 1;
-        u.u64 += (one >> 1) - s;
-        u.u64 &= ~frac_mask; /* truncate to an integer */
-    }
-    /* otherwise: abs(a) >= 2^52, or NaN, +/-Infinity: no change */
-    return u.d;
-}
-
-static JSValue js_math_hypot(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv)
-{
-    double r, a;
-    int i;
-
-    r = 0;
-    if (argc > 0) {
-        if (JS_ToFloat64(ctx, &r, argv[0]))
-            return JS_EXCEPTION;
-        if (argc == 1) {
-            r = fabs(r);
-        } else {
-            /* use the built-in function to minimize precision loss */
-            for (i = 1; i < argc; i++) {
-                if (JS_ToFloat64(ctx, &a, argv[i]))
-                    return JS_EXCEPTION;
-                r = hypot(r, a);
-            }
-        }
-    }
-    return JS_NewFloat64(ctx, r);
-}
-
-static double js_math_f16round(double a)
-{
-    return fromfp16(tofp16(a));
-}
-
-static double js_math_fround(double a)
-{
-    return (float)a;
-}
-
-static JSValue js_math_imul(JSContext *ctx, JSValueConst this_val,
-                            int argc, JSValueConst *argv)
-{
-    uint32_t a, b, c;
-    int32_t d;
-
-    if (JS_ToUint32(ctx, &a, argv[0]))
-        return JS_EXCEPTION;
-    if (JS_ToUint32(ctx, &b, argv[1]))
-        return JS_EXCEPTION;
-    c = a * b;
-    memcpy(&d, &c, sizeof(d));
-    return JS_NewInt32(ctx, d);
-}
-
-static JSValue js_math_clz32(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv)
-{
-    uint32_t a, r;
-
-    if (JS_ToUint32(ctx, &a, argv[0]))
-        return JS_EXCEPTION;
-    if (a == 0)
-        r = 32;
-    else
-        r = clz32(a);
-    return JS_NewInt32(ctx, r);
-}
 
 /* xorshift* random number generator by Marsaglia */
 static uint64_t xorshift64star(uint64_t *pstate)
@@ -38982,27 +38682,6 @@ static uint64_t xorshift64star(uint64_t *pstate)
     return x * 0x2545F4914F6CDD1D;
 }
 
-static void js_random_init(JSContext *ctx)
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    ctx->random_state = ((int64_t)tv.tv_sec * 1000000) + tv.tv_usec;
-    /* the state must be non zero */
-    if (ctx->random_state == 0)
-        ctx->random_state = 1;
-}
-
-static JSValue js_math_random(JSContext *ctx, JSValueConst this_val,
-                              int argc, JSValueConst *argv)
-{
-    JSFloat64Union u;
-    uint64_t v;
-
-    v = xorshift64star(&ctx->random_state);
-    /* 1.0 <= u.d < 2 */
-    u.u64 = ((uint64_t)0x3ff << 52) | (v >> 12);
-    return __JS_NewFloat64(ctx, u.d - 1.0);
-}
 
 
 /* Date */
@@ -40087,7 +39766,6 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx)
                                countof(js_string_iterator_proto_funcs));
 
     /* Math: create as autoinit object */
-    js_random_init(ctx);
 
     /* ES6 Reflect: create as autoinit object */
 
