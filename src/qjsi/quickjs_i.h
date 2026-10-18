@@ -75,7 +75,7 @@ typedef uint32_t JSAtom;
 enum {
     /* all tags with a reference count are negative */
     JS_TAG_FIRST       = -9, /* first negative tag */
-    JS_TAG_BIG_INT     = -9,
+    // JS_TAG_BIG_INT     = -9,
     JS_TAG_SYMBOL      = -8,
     JS_TAG_STRING      = -7,
     JS_TAG_STRING_ROPE = -6,
@@ -90,7 +90,7 @@ enum {
     JS_TAG_UNINITIALIZED = 4,
     JS_TAG_CATCH_OFFSET = 5,
     JS_TAG_EXCEPTION   = 6,
-    JS_TAG_SHORT_BIG_INT = 7,
+    // JS_TAG_SHORT_BIG_INT = 7,
     JS_TAG_FLOAT64     = 8,
     /* any larger tag is FLOAT64 if JS_NAN_BOXING */
 };
@@ -228,6 +228,7 @@ typedef union JSValueUnion {
 typedef struct JSValue {
     JSValueUnion u;
     int64_t tag;
+    // bool is_nan;
 } JSValue;
 
 #define JSValueConst JSValue
@@ -258,6 +259,7 @@ static inline JSValue __JS_NewFloat64(JSContext *ctx, double d)
 
 static inline JS_BOOL JS_VALUE_IS_NAN(JSValue v)
 {
+    // return v.is_nan;
     union {
         double d;
         uint64_t u64;
@@ -268,13 +270,6 @@ static inline JS_BOOL JS_VALUE_IS_NAN(JSValue v)
     return (u.u64 & 0x7fffffffffffffff) > 0x7ff0000000000000;
 }
 
-static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int64_t d)
-{
-    JSValue v;
-    v.tag = JS_TAG_SHORT_BIG_INT;
-    v.u.short_big_int = d;
-    return v;
-}
 
 #endif /* !JS_NAN_BOXING */
 
@@ -396,17 +391,9 @@ JSValue JS_GetClassProto(JSContext *ctx, JSClassID class_id);
    save memory */
 JSContext *JS_NewContextRaw(JSRuntime *rt);
 void JS_AddIntrinsicBaseObjects(JSContext *ctx);
-void JS_AddIntrinsicDate(JSContext *ctx);
 void JS_AddIntrinsicEval(JSContext *ctx);
 void JS_AddIntrinsicStringNormalize(JSContext *ctx);
-void JS_AddIntrinsicRegExpCompiler(JSContext *ctx);
-void JS_AddIntrinsicRegExp(JSContext *ctx);
-void JS_AddIntrinsicJSON(JSContext *ctx);
-void JS_AddIntrinsicProxy(JSContext *ctx);
-void JS_AddIntrinsicMapSet(JSContext *ctx);
-void JS_AddIntrinsicTypedArrays(JSContext *ctx);
 void JS_AddIntrinsicPromise(JSContext *ctx);
-void JS_AddIntrinsicWeakRef(JSContext *ctx);
 
 JSValue js_string_codePointRange(JSContext *ctx, JSValueConst this_val,
                                  int argc, JSValueConst *argv);
@@ -615,11 +602,6 @@ static inline JS_BOOL JS_IsNumber(JSValueConst v)
     return tag == JS_TAG_INT || JS_TAG_IS_FLOAT64(tag);
 }
 
-static inline JS_BOOL JS_IsBigInt(JSContext *ctx, JSValueConst v)
-{
-    int tag = JS_VALUE_GET_TAG(v);
-    return tag == JS_TAG_BIG_INT || tag == JS_TAG_SHORT_BIG_INT;
-}
 
 static inline JS_BOOL JS_IsBool(JSValueConst v)
 {
@@ -728,7 +710,6 @@ int JS_ToInt64(JSContext *ctx, int64_t *pres, JSValueConst val);
 int JS_ToIndex(JSContext *ctx, uint64_t *plen, JSValueConst val);
 int JS_ToFloat64(JSContext *ctx, double *pres, JSValueConst val);
 /* return an exception if 'val' is a Number */
-int JS_ToBigInt64(JSContext *ctx, int64_t *pres, JSValueConst val);
 /* same as JS_ToInt64() but allow BigInt */
 int JS_ToInt64Ext(JSContext *ctx, int64_t *pres, JSValueConst val);
 
@@ -903,16 +884,11 @@ typedef enum JSPromiseStateEnum {
     JS_PROMISE_REJECTED,
 } JSPromiseStateEnum;
 
-JSValue JS_NewPromiseCapability(JSContext *ctx, JSValue *resolving_funcs);
-JSPromiseStateEnum JS_PromiseState(JSContext *ctx, JSValue promise);
-JSValue JS_PromiseResult(JSContext *ctx, JSValue promise);
 
 /* is_handled = TRUE means that the rejection is handled */
 typedef void JSHostPromiseRejectionTracker(JSContext *ctx, JSValueConst promise,
                                            JSValueConst reason,
                                            JS_BOOL is_handled, void *opaque);
-void JS_SetHostPromiseRejectionTracker(JSRuntime *rt, JSHostPromiseRejectionTracker *cb, void *opaque);
-void JS_SetHostUnhandledPromiseRejectionTracker(JSRuntime *rt, JSHostPromiseRejectionTracker *cb, void *opaque);
 
 /* return != 0 if the JS code needs to be interrupted */
 typedef int JSInterruptHandler(JSRuntime *rt, void *opaque);
