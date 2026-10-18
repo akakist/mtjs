@@ -249,14 +249,6 @@ typedef struct JSValue {
 
 #define JS_NAN (JSValue){ .u.float64 = JS_FLOAT64_NAN, .tag=JS_TAG_FLOAT64, .is_nan=1 }
 
-static inline JSValue __JS_NewFloat64(JSContext *ctx, double d)
-{
-    JSValue v;
-    v.tag = JS_TAG_FLOAT64;
-    v.u.float64 = d;
-    v.is_nan=0;
-    return v;
-}
 
 static inline JS_BOOL JS_VALUE_IS_NAN(JSValue v)
 {
@@ -565,24 +557,6 @@ static js_force_inline JSValue JS_NewUint32(JSContext *ctx, uint32_t val)
 }
 
 
-static js_force_inline JSValue JS_NewFloat64(JSContext *ctx, double d)
-{
-    int32_t val;
-    union {
-        double d;
-        uint64_t u;
-    } u, t;
-    if (d >= INT32_MIN && d <= INT32_MAX) {
-        u.d = d;
-        val = (int32_t)d;
-        t.d = val;
-        /* -0 cannot be represented as integer, so we compare the bit
-           representation */
-        if (u.u == t.u)
-            return JS_MKVAL(JS_TAG_INT, val);
-    }
-    return __JS_NewFloat64(ctx, d);
-}
 
 static inline JS_BOOL JS_IsNumber(JSValueConst v)
 {
