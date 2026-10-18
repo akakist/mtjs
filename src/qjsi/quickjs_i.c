@@ -36636,12 +36636,6 @@ static JSValue js_number_toString(JSContext *ctx, JSValueConst this_val,
         len = i64toa_radix(buf1, JS_VALUE_GET_INT(val), base);
         return js_new_string8_len(ctx, buf1, len);
     }
-    // if (JS_ToFloat64Free(ctx, &d, val))
-    //     return JS_EXCEPTION;
-    // flags = JS_DTOA_FORMAT_FREE;
-    // if (base != 10)
-    //     flags |= JS_DTOA_EXP_DISABLED;
-    // return js_dtoa2(ctx, d, base, 0, flags);
  fail:
     JS_FreeValue(ctx, val);
     return JS_EXCEPTION;
@@ -36909,7 +36903,7 @@ static JSValue js_string_fromCharCode(JSContext *ctx, JSValueConst this_val,
 static JSValue js_string_fromCodePoint(JSContext *ctx, JSValueConst this_val,
                                        int argc, JSValueConst *argv)
 {
-    double d;
+    int64_t d;
     int i, c;
     StringBuffer b_s, *b = &b_s;
 
@@ -36923,10 +36917,8 @@ static JSValue js_string_fromCodePoint(JSContext *ctx, JSValueConst this_val,
             if (c < 0 || c > 0x10ffff)
                 goto range_error;
         } else {
-            if (JS_ToFloat64(ctx, &d, argv[i]))
+            if (JS_ToInt64(ctx, &d, argv[i]))
                 goto fail;
-            if (isnan(d) || d < 0 || d > 0x10ffff || (c = (int)d) != d)
-                goto range_error;
         }
         if (string_buffer_putc(b, c))
             goto fail;
