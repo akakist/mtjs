@@ -12457,22 +12457,7 @@ static no_inline __exception int js_eq_slow(JSContext *ctx, JSValue *sp,
     if (tag_is_number(tag1) && tag_is_number(tag2)) {
         if (tag1 == JS_TAG_INT && tag2 == JS_TAG_INT) {
             res = JS_VALUE_GET_INT(op1) == JS_VALUE_GET_INT(op2);
-        } else if ((tag1 == JS_TAG_FLOAT64 &&
-                    (tag2 == JS_TAG_INT || tag2 == JS_TAG_FLOAT64)) ||
-                   (tag2 == JS_TAG_FLOAT64 &&
-                    (tag1 == JS_TAG_INT || tag1 == JS_TAG_FLOAT64))) {
-            double d1, d2;
-            if (tag1 == JS_TAG_FLOAT64) {
-                d1 = JS_VALUE_GET_FLOAT64(op1);
-            } else {
-                d1 = JS_VALUE_GET_INT(op1);
-            }
-            if (tag2 == JS_TAG_FLOAT64) {
-                d2 = JS_VALUE_GET_FLOAT64(op2);
-            } else {
-                d2 = JS_VALUE_GET_INT(op2);
-            }
-            res = (d1 == d2);
+        } else if (0) {
         } else {
             printf("wrongf !!!!!!!!!!!!!!!!!!");
             // res = js_compare_bigint(ctx, OP_eq, op1, op2);
@@ -12586,7 +12571,7 @@ static BOOL js_strict_eq2(JSContext *ctx, JSValue op1, JSValue op2,
 {
     BOOL res;
     int tag1, tag2;
-    double d1, d2;
+    int64_t d1, d2;
 
     tag1 = JS_VALUE_GET_NORM_TAG(op1);
     tag2 = JS_VALUE_GET_NORM_TAG(op2);
@@ -12639,29 +12624,16 @@ static BOOL js_strict_eq2(JSContext *ctx, JSValue op1, JSValue op2,
         if (tag2 == JS_TAG_INT) {
             d2 = JS_VALUE_GET_INT(op2);
             goto number_test;
-        } else if (tag2 == JS_TAG_FLOAT64) {
-            d2 = JS_VALUE_GET_FLOAT64(op2);
-            goto number_test;
+        } else if (0) {
         } else {
             res = FALSE;
         }
         break;
-    case JS_TAG_FLOAT64:
-        d1 = JS_VALUE_GET_FLOAT64(op1);
-        if (tag2 == JS_TAG_FLOAT64) {
-            d2 = JS_VALUE_GET_FLOAT64(op2);
-        } else if (tag2 == JS_TAG_INT) {
-            d2 = JS_VALUE_GET_INT(op2);
-        } else {
-            res = FALSE;
-            break;
-        }
     number_test:
         if (unlikely(eq_mode >= JS_EQ_SAME_VALUE)) {
             JSFloat64Union u1, u2;
             /* NaN is not always normalized, so this test is necessary */
-            if (isnan(d1) || isnan(d2)) {
-                res = isnan(d1) == isnan(d2);
+            if (0) {
             } else if (eq_mode == JS_EQ_SAME_VALUE_ZERO) {
                 res = (d1 == d2); /* +0 == -0 */
             } else {
@@ -12833,7 +12805,6 @@ static __exception int js_operator_typeof(JSContext *ctx, JSValueConst op1)
     tag = JS_VALUE_GET_NORM_TAG(op1);
     switch(tag) {
     case JS_TAG_INT:
-    case JS_TAG_FLOAT64:
         atom = JS_ATOM_number;
         break;
     case JS_TAG_UNDEFINED:
@@ -34248,18 +34219,7 @@ static JSValue js_function_bind(JSContext *ctx, JSValueConst this_val,
             else
                 len1 -= arg_count;
             len_val = JS_NewInt32(ctx, len1);
-        } else if (JS_VALUE_GET_NORM_TAG(len_val) == JS_TAG_FLOAT64) {
-            double d = JS_VALUE_GET_FLOAT64(len_val);
-            if (isnan(d)) {
-                d = 0.0;
-            } else {
-                d = trunc(d);
-                if (d <= (double)arg_count)
-                    d = 0.0;
-                else
-                    d -= (double)arg_count; /* also converts -0 to +0 */
-            }
-            len_val = JS_NewFloat64(ctx, d);
+        } else if (0) {
         } else {
             JS_FreeValue(ctx, len_val);
             len_val = JS_NewInt32(ctx, 0);
