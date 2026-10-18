@@ -12175,20 +12175,21 @@ static no_inline __exception int js_unary_arith_slow(JSContext *ctx,
             v64 = JS_VALUE_GET_INT(op1);
             switch(op) {
             case OP_inc:
+                v64++;
+                break;
             case OP_dec:
-                v = 2 * (op - OP_dec) - 1;
-                v64 += v;
+                v64--;
+                // v = 2 * (op - OP_dec) - 1;
+                // v64 += v;
                 break;
             case OP_plus:
                 break;
             case OP_neg:
-                if (v64 == 0) {
-                    return -1;
-                    // sp[-1] = __JS_NewFloat64(ctx, -0.0);
-                    // return 0;
-                } else {
+                // if (v64 == 0) {
+                //     return -1;
+                // } else {
                     v64 = -v64;
-                }
+                // }
                 break;
             default:
                 abort();
@@ -12303,10 +12304,6 @@ static no_inline __exception int js_binary_arith_slow(JSContext *ctx, JSValue *s
             break;
         case OP_mul:
             v = (int64_t)v1 * (int64_t)v2;
-            // if (v == 0 && (v1 | v2) < 0) {
-            //     sp[-2] = __JS_NewFloat64(ctx, -0.0);
-            //     return 0;
-            // }
             break;
         case OP_div:
             sp[-2] = JS_NewInt64(ctx, v1 / v2);
