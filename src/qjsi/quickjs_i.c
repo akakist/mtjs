@@ -10427,37 +10427,6 @@ static uint64_t shr_rndn(uint64_t a, int n)
     return (a + addend) >> n;
 }
 
-/* convert to float64 with round to nearest, ties to even. Return
-   +/-infinity if too large. */
-
-/* contains 10^i */
-static const js_limb_t js_pow_dec[JS_LIMB_DIGITS + 1] = {
-    1U,
-    10U,
-    100U,
-    1000U,
-    10000U,
-    100000U,
-    1000000U,
-    10000000U,
-    100000000U,
-    1000000000U,
-#if JS_LIMB_BITS == 64
-    10000000000U,
-    100000000000U,
-    1000000000000U,
-    10000000000000U,
-    100000000000000U,
-    1000000000000000U,
-    10000000000000000U,
-    100000000000000000U,
-    1000000000000000000U,
-    10000000000000000000U,
-#endif
-};
-
-/* syntax: [-]digits in base radix. Return NULL if memory error. radix
-   = 10, 2, 8 or 16. */
 
 /* 2 <= base <= 36 */
 static char const digits[36] = "0123456789abcdefghijklmnopqrstuvwxyz";
