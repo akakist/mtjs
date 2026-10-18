@@ -16353,7 +16353,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_mul):
             {
                 JSValue op1, op2;
-                double d;
+                // double d;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JS_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -16362,22 +16362,18 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                     v1 = JS_VALUE_GET_INT(op1);
                     v2 = JS_VALUE_GET_INT(op2);
                     r = (int64_t)v1 * v2;
-                    if (unlikely((int)r != r)) {
-                        d = (double)r;
-                        goto mul_fp_res;
-                    }
+                    // if (unlikely((int)r != r)) {
+                    //     d = (double)r;
+                    //     goto mul_fp_res;
+                    // }
                     /* need to test zero case for -0 result */
-                    if (unlikely(r == 0 && (v1 | v2) < 0)) {
-                        d = -0.0;
-                        goto mul_fp_res;
-                    }
+                    // if (unlikely(r == 0 && (v1 | v2) < 0)) {
+                    //     d = -0.0;
+                    //     goto mul_fp_res;
+                    // }
                     sp[-2] = JS_NewInt32(ctx, r);
                     sp--;
-                } else if (JS_VALUE_IS_BOTH_FLOAT(op1, op2)) {
-                    d = JS_VALUE_GET_FLOAT64(op1) * JS_VALUE_GET_FLOAT64(op2);
-                mul_fp_res:
-                    sp[-2] = __JS_NewFloat64(ctx, d);
-                    sp--;
+                } else if (0) {
                 } else {
                     goto binary_arith_slow;
                 }
@@ -16447,25 +16443,22 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                 JSValue op1;
                 uint32_t tag;
                 int val;
-                double d;
+                // double d;
                 op1 = sp[-1];
                 tag = JS_VALUE_GET_TAG(op1);
                 if (tag == JS_TAG_INT) {
                     val = JS_VALUE_GET_INT(op1);
                     /* Note: -0 cannot be expressed as integer */
-                    if (unlikely(val == 0)) {
-                        d = -0.0;
-                        goto neg_fp_res;
-                    }
-                    if (unlikely(val == INT32_MIN)) {
-                        d = -(double)val;
-                        goto neg_fp_res;
-                    }
+                    // if (unlikely(val == 0)) {
+                    //     d = -0.0;
+                    //     goto neg_fp_res;
+                    // }
+                    // if (unlikely(val == INT32_MIN)) {
+                    //     d = -(double)val;
+                    //     goto neg_fp_res;
+                    // }
                     sp[-1] = JS_NewInt32(ctx, -val);
-                } else if (JS_TAG_IS_FLOAT64(tag)) {
-                    d = -JS_VALUE_GET_FLOAT64(op1);
-                neg_fp_res:
-                    sp[-1] = __JS_NewFloat64(ctx, d);
+                } else if (0) {
                 } else {
                     sf->cur_pc = pc;
                     if (js_unary_arith_slow(ctx, sp, opcode))
@@ -32844,54 +32837,54 @@ int JS_SetPropertyFunctionList(JSContext *ctx, JSValueConst obj,
     return 0;
 }
 
-int JS_AddModuleExportList(JSContext *ctx, JSModuleDef *m,
-                           const JSCFunctionListEntry *tab, int len)
-{
-    int i;
-    for(i = 0; i < len; i++) {
-        if (JS_AddModuleExport(ctx, m, tab[i].name))
-            return -1;
-    }
-    return 0;
-}
+// int JS_AddModuleExportList(JSContext *ctx, JSModuleDef *m,
+//                            const JSCFunctionListEntry *tab, int len)
+// {
+//     int i;
+//     for(i = 0; i < len; i++) {
+//         if (JS_AddModuleExport(ctx, m, tab[i].name))
+//             return -1;
+//     }
+//     return 0;
+// }
 
-int JS_SetModuleExportList(JSContext *ctx, JSModuleDef *m,
-                           const JSCFunctionListEntry *tab, int len)
-{
-    int i;
-    JSValue val;
+// int JS_SetModuleExportList(JSContext *ctx, JSModuleDef *m,
+//                            const JSCFunctionListEntry *tab, int len)
+// {
+//     int i;
+//     JSValue val;
 
-    for(i = 0; i < len; i++) {
-        const JSCFunctionListEntry *e = &tab[i];
-        switch(e->def_type) {
-        case JS_DEF_CFUNC:
-            val = JS_NewCFunction2(ctx, e->u.func.cfunc.generic,
-                                   e->name, e->u.func.length, e->u.func.cproto, e->magic);
-            break;
-        case JS_DEF_PROP_STRING:
-            val = JS_NewString(ctx, e->u.str);
-            break;
-        case JS_DEF_PROP_INT32:
-            val = JS_NewInt32(ctx, e->u.i32);
-            break;
-        case JS_DEF_PROP_INT64:
-            val = JS_NewInt64(ctx, e->u.i64);
-            break;
-        case JS_DEF_PROP_DOUBLE:
-            val = __JS_NewFloat64(ctx, e->u.f64);
-            break;
-        case JS_DEF_OBJECT:
-            val = JS_NewObject(ctx);
-            JS_SetPropertyFunctionList(ctx, val, e->u.prop_list.tab, e->u.prop_list.len);
-            break;
-        default:
-            abort();
-        }
-        if (JS_SetModuleExport(ctx, m, e->name, val))
-            return -1;
-    }
-    return 0;
-}
+//     for(i = 0; i < len; i++) {
+//         const JSCFunctionListEntry *e = &tab[i];
+//         switch(e->def_type) {
+//         case JS_DEF_CFUNC:
+//             val = JS_NewCFunction2(ctx, e->u.func.cfunc.generic,
+//                                    e->name, e->u.func.length, e->u.func.cproto, e->magic);
+//             break;
+//         case JS_DEF_PROP_STRING:
+//             val = JS_NewString(ctx, e->u.str);
+//             break;
+//         case JS_DEF_PROP_INT32:
+//             val = JS_NewInt32(ctx, e->u.i32);
+//             break;
+//         case JS_DEF_PROP_INT64:
+//             val = JS_NewInt64(ctx, e->u.i64);
+//             break;
+//         case JS_DEF_PROP_DOUBLE:
+//             val = __JS_NewFloat64(ctx, e->u.f64);
+//             break;
+//         case JS_DEF_OBJECT:
+//             val = JS_NewObject(ctx);
+//             JS_SetPropertyFunctionList(ctx, val, e->u.prop_list.tab, e->u.prop_list.len);
+//             break;
+//         default:
+//             abort();
+//         }
+//         if (JS_SetModuleExport(ctx, m, e->name, val))
+//             return -1;
+//     }
+//     return 0;
+// }
 
 /* Note: 'func_obj' is not necessarily a constructor */
 static void JS_SetConstructor2(JSContext *ctx,
