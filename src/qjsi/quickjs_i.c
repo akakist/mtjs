@@ -36132,8 +36132,8 @@ static int js_array_cmp_generic(const void *a, const void *b, void *opaque) {
             int val = JS_VALUE_GET_INT(res);
             cmp = (val > 0) - (val < 0);
         } else {
-            double val;
-            if (JS_ToFloat64Free(ctx, &val, res) < 0)
+            int64_t val;
+            if (JS_ToInt64Free(ctx, &val, res) < 0)
                 goto exception;
             cmp = (val > 0) - (val < 0);
         }
