@@ -11119,11 +11119,6 @@ static __exception int JS_ToArrayLengthFree(JSContext *ctx, uint32_t *plen,
 
 #define MAX_SAFE_INTEGER (((int64_t)1 << 53) - 1)
 
-static BOOL is_safe_integer(double d)
-{
-    return isfinite(d) && floor(d) == d &&
-        fabs(d) <= (double)MAX_SAFE_INTEGER;
-}
 
 int JS_ToIndex(JSContext *ctx, uint64_t *plen, JSValueConst val)
 {
@@ -11949,22 +11944,6 @@ int JS_IsArray(JSContext *ctx, JSValueConst val)
     }
 }
 
-static double js_pow(double a, double b)
-{
-    if (unlikely(!isfinite(b)) && fabs(a) == 1) {
-        /* not compatible with IEEE 754 */
-        return JS_FLOAT64_NAN;
-    } else {
-        return pow(a, b);
-    }
-}
-
-
-
-/* return NaN if bad bigint literal */
-
-
-/* JS Numbers are not allowed */
 
 
 /* XXX: merge with JS_ToInt64Free with a specific flag ? */
