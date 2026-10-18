@@ -970,18 +970,6 @@ struct JSObject {
             } u1;
             union {
                 JSValue *values;        /* JS_CLASS_ARRAY, JS_CLASS_ARGUMENTS */
-                // void *ptr;              /* JS_CLASS_UINT8C_ARRAY..JS_CLASS_FLOAT64_ARRAY */
-                // int8_t *int8_ptr;       /* JS_CLASS_INT8_ARRAY */
-                // uint8_t *uint8_ptr;     /* JS_CLASS_UINT8_ARRAY, JS_CLASS_UINT8C_ARRAY */
-                // int16_t *int16_ptr;     /* JS_CLASS_INT16_ARRAY */
-                // uint16_t *uint16_ptr;   /* JS_CLASS_UINT16_ARRAY */
-                // int32_t *int32_ptr;     /* JS_CLASS_INT32_ARRAY */
-                // uint32_t *uint32_ptr;   /* JS_CLASS_UINT32_ARRAY */
-                // int64_t *int64_ptr;     /* JS_CLASS_INT64_ARRAY */
-                // uint64_t *uint64_ptr;   /* JS_CLASS_UINT64_ARRAY */
-                // uint16_t *fp16_ptr;     /* JS_CLASS_FLOAT16_ARRAY */
-                // float *float_ptr;       /* JS_CLASS_FLOAT32_ARRAY */
-                // double *double_ptr;     /* JS_CLASS_FLOAT64_ARRAY */
             } u;
             uint32_t count; /* <= 2^31-1. 0 for a detached typed array */
         } array;    /* 12/20 bytes */
@@ -1106,7 +1094,6 @@ static JSValue JS_ToPrimitiveFree(JSContext *ctx, JSValue val, int hint);
 static JSValue JS_ToStringFree(JSContext *ctx, JSValue val);
 static int JS_ToBoolFree(JSContext *ctx, JSValue val);
 static int JS_ToInt32Free(JSContext *ctx, int32_t *pres, JSValue val);
-static int JS_ToFloat64Free(JSContext *ctx, double *pres, JSValue val);
 static int JS_ToUint8ClampFree(JSContext *ctx, int32_t *pres, JSValue val);
 static JSValue js_new_string8_len(JSContext *ctx, const char *buf, int len);
 static void gc_decref(JSRuntime *rt);
@@ -6034,11 +6021,11 @@ BOOL JS_IsLiveObject(JSRuntime *rt, JSValueConst obj)
 /* Compute memory used by various object types */
 /* XXX: poor man's approach to handling multiply referenced objects */
 typedef struct JSMemoryUsage_helper {
-    double memory_used_count;
-    double str_count;
-    double str_size;
+    int64_t memory_used_count;
+    int64_t str_count;
+    int64_t str_size;
     int64_t js_func_count;
-    double js_func_size;
+    int64_t js_func_size;
     int64_t js_func_code_size;
     int64_t js_func_pc2line_count;
     int64_t js_func_pc2line_size;
@@ -6049,7 +6036,7 @@ static void compute_value_size(JSValueConst val, JSMemoryUsage_helper *hp);
 static void compute_jsstring_size(JSString *str, JSMemoryUsage_helper *hp)
 {
     if (!str->atom_type) {  /* atoms are handled separately */
-        double s_ref_count = str->header.ref_count;
+        int64_t s_ref_count = str->header.ref_count;
         hp->str_count += 1 / s_ref_count;
         hp->str_size += ((sizeof(*str) + (str->len << str->is_wide_char) +
                           1 - str->is_wide_char) / s_ref_count);
@@ -6239,7 +6226,7 @@ void JS_ComputeMemoryUsage(JSRuntime *rt, JSMemoryUsage *s)
                     s->js_func_size += b->closure_var_count * sizeof(*var_refs);
                     for (i = 0; i < b->closure_var_count; i++) {
                         if (var_refs[i]) {
-                            double ref_count = var_refs[i]->header.ref_count;
+                            int64_t ref_count = var_refs[i]->header.ref_count;
                             s->memory_used_count += 1 / ref_count;
                             s->js_func_size += sizeof(*var_refs[i]) / ref_count;
                             /* handle non object closed values */
@@ -6432,46 +6419,46 @@ void JS_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt)
     fprintf(fp, "%-20s %8s %8s\n", "NAME", "COUNT", "SIZE");
 
     if (s->malloc_count) {
-        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%0.1f per block)\n",
+        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%ld per block)\n",
                 "memory allocated", s->malloc_count, s->malloc_size,
-                (double)s->malloc_size / s->malloc_count);
-        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%d overhead, %0.1f average slack)\n",
+                (int64_t)s->malloc_size / s->malloc_count);
+        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%d overhead, %ld average slack)\n",
                 "memory used", s->memory_used_count, s->memory_used_size,
-                MALLOC_OVERHEAD, ((double)(s->malloc_size - s->memory_used_size) /
+                MALLOC_OVERHEAD, ((s->malloc_size - s->memory_used_size) /
                                   s->memory_used_count));
     }
     if (s->atom_count) {
-        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%0.1f per atom)\n",
+        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%ld per atom)\n",
                 "atoms", s->atom_count, s->atom_size,
-                (double)s->atom_size / s->atom_count);
+                s->atom_size / s->atom_count);
     }
     if (s->str_count) {
-        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%0.1f per string)\n",
+        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%ld per string)\n",
                 "strings", s->str_count, s->str_size,
-                (double)s->str_size / s->str_count);
+                s->str_size / s->str_count);
     }
     if (s->obj_count) {
-        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%0.1f per object)\n",
+        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%ld per object)\n",
                 "objects", s->obj_count, s->obj_size,
-                (double)s->obj_size / s->obj_count);
-        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%0.1f per object)\n",
+                s->obj_size / s->obj_count);
+        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%ld per object)\n",
                 "  properties", s->prop_count, s->prop_size,
-                (double)s->prop_count / s->obj_count);
-        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%0.1f per shape)\n",
+                s->prop_count / s->obj_count);
+        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%ld per shape)\n",
                 "  shapes", s->shape_count, s->shape_size,
-                (double)s->shape_size / s->shape_count);
+                s->shape_size / s->shape_count);
     }
     if (s->js_func_count) {
         fprintf(fp, "%-20s %8"PRId64" %8"PRId64"\n",
                 "bytecode functions", s->js_func_count, s->js_func_size);
-        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%0.1f per function)\n",
+        fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%ld per function)\n",
                 "  bytecode", s->js_func_count, s->js_func_code_size,
-                (double)s->js_func_code_size / s->js_func_count);
+                s->js_func_code_size / s->js_func_count);
         if (s->js_func_pc2line_count) {
-            fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%0.1f per function)\n",
+            fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%ld per function)\n",
                     "  pc2line", s->js_func_pc2line_count,
                     s->js_func_pc2line_size,
-                    (double)s->js_func_pc2line_size / s->js_func_pc2line_count);
+                    s->js_func_pc2line_size / s->js_func_pc2line_count);
         }
     }
     if (s->c_func_count) {
@@ -6481,10 +6468,10 @@ void JS_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt)
         fprintf(fp, "%-20s %8"PRId64"\n", "arrays", s->array_count);
         if (s->fast_array_count) {
             fprintf(fp, "%-20s %8"PRId64"\n", "  fast arrays", s->fast_array_count);
-            fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%0.1f per fast array)\n",
+            fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%ld per fast array)\n",
                     "  elements", s->fast_array_elements,
                     s->fast_array_elements * (int)sizeof(JSValue),
-                    (double)s->fast_array_elements / s->fast_array_count);
+                    s->fast_array_elements / s->fast_array_count);
         }
     }
     if (s->binary_object_count) {
@@ -8845,7 +8832,7 @@ static int JS_SetPropertyValue(JSContext *ctx, JSValueConst this_obj,
                JS_VALUE_GET_TAG(prop) == JS_TAG_INT)) {
         JSObject *p;
         uint32_t idx;
-        double d;
+        int64_t d;
         int32_t v;
 
         /* fast path for array access */
@@ -10055,8 +10042,9 @@ static int JS_ToBoolFree(JSContext *ctx, JSValue val)
         break;
     default:
         if (JS_TAG_IS_FLOAT64(tag)) {
-            double d = JS_VALUE_GET_FLOAT64(val);
-            return !isnan(d) && d != 0;
+            printf("float @@@!");
+            // double d = JS_VALUE_GET_FLOAT64(val);
+            // return !isnan(d) && d != 0;
         } else {
             JS_FreeValue(ctx, val);
             return TRUE;
@@ -10646,10 +10634,10 @@ static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
         if (!(flags & ATOD_INT_ONLY) &&
             (atod_type == ATOD_TYPE_FLOAT64) &&
             strstart(p, "Infinity", &p)) {
-            double d = 1.0 / 0.0;
+            int64_t d = 1;
             if (is_neg)
                 d = -d;
-            val = JS_NewFloat64(ctx, d);
+            val = JS_NewInt64(ctx, d);
             goto done;
         }
     }

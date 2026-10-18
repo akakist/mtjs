@@ -93,16 +93,18 @@ std::string serialize_value(JSContext* ctx, JSValueConst val) {
     if (JS_IsNull(val)) return "null";
     if (JS_IsBool(val)) return JS_ToBool(ctx, val) ? "true" : "false";
 
-    if (JS_IsNumber(val)) {
-        double d;
-        if (JS_ToFloat64(ctx, &d, val) != 0) return "0";
-        if (std::isnan(d)) return "NaN";
-        if (std::isinf(d)) return d > 0 ? "Infinity" : "-Infinity";
+    if ( val.tag == JS_TAG_FLOAT64 )
+    printf("if ( val.tag == JS_TAG_FLOAT64 ) %f\n",val.u.float64);
+    if ( val.tag == JS_TAG_INT ) {
+        int64_t d;
+        if (JS_ToInt64(ctx, &d, val) != 0) return "0";
+        // if (std::isnan(d)) return "NaN";
+        // if (std::isinf(d)) return d > 0 ? "Infinity" : "-Infinity";
         int64_t n;
-        if (d == std::trunc(d) && std::fabs(d) < 1e15 && JS_ToInt64(ctx, &n, val) == 0)
-            return std::to_string(n);
+        // if (d == std::trunc(d) && std::fabs(d) < 1e15 && JS_ToInt64(ctx, &n, val) == 0)
+        //     return std::to_string(n);
         char buf[32];
-        std::snprintf(buf, sizeof buf, "%.17g", d);
+        std::snprintf(buf, sizeof buf, "%ld", d);
         return buf;
     }
 
