@@ -228,7 +228,7 @@ typedef union JSValueUnion {
 typedef struct JSValue {
     JSValueUnion u;
     int32_t tag;
-    // bool is_nan;
+    int is_nan;
 } JSValue;
 
 #define JSValueConst JSValue
@@ -242,18 +242,19 @@ typedef struct JSValue {
 #define JS_VALUE_GET_SHORT_BIG_INT(v) ((v).u.short_big_int)
 #define JS_VALUE_GET_PTR(v) ((v).u.ptr)
 
-#define JS_MKVAL(tag, val) (JSValue){ (JSValueUnion){ .int32 = val }, tag }
-#define JS_MKPTR(tag, p) (JSValue){ (JSValueUnion){ .ptr = p }, tag }
+#define JS_MKVAL(tag, val) (JSValue){ (JSValueUnion){ .int32 = val }, tag, .is_nan=0 }
+#define JS_MKPTR(tag, p) (JSValue){ (JSValueUnion){ .ptr = p }, tag,.is_nan=0 }
 
 #define JS_TAG_IS_FLOAT64(tag) ((unsigned)(tag) == JS_TAG_FLOAT64)
 
-#define JS_NAN (JSValue){ .u.float64 = JS_FLOAT64_NAN, JS_TAG_FLOAT64 }
+#define JS_NAN (JSValue){ .u.float64 = JS_FLOAT64_NAN, .tag=JS_TAG_FLOAT64, .is_nan=1 }
 
 static inline JSValue __JS_NewFloat64(JSContext *ctx, double d)
 {
     JSValue v;
     v.tag = JS_TAG_FLOAT64;
     v.u.float64 = d;
+    v.is_nan=0;
     return v;
 }
 

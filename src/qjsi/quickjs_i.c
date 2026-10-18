@@ -936,7 +936,7 @@ struct JSObject {
         struct JSBoundFunction *bound_function; /* JS_CLASS_BOUND_FUNCTION */
         struct JSCFunctionDataRecord *c_function_data_record; /* JS_CLASS_C_FUNCTION_DATA */
         struct JSForInIterator *for_in_iterator; /* JS_CLASS_FOR_IN_ITERATOR */
-        struct JSArrayBuffer *array_buffer; /* JS_CLASS_ARRAY_BUFFER, JS_CLASS_SHARED_ARRAY_BUFFER */
+        struct JSArrayBuffer *array_buffer; /*  JS_CLASS_SHARED_ARRAY_BUFFER */
         struct JSTypedArray *typed_array; /* JS_CLASS_UINT8C_ARRAY..JS_CLASS_DATAVIEW */
         struct JSMapState *map_state;   /* JS_CLASS_MAP..JS_CLASS_WEAKSET */
         struct JSMapIteratorData *map_iterator_data; /* JS_CLASS_MAP_ITERATOR, JS_CLASS_SET_ITERATOR */
