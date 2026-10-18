@@ -19007,7 +19007,7 @@ static int json_parse_number(JSParseState *s, const uint8_t **pp)
     const uint8_t *p = *pp;
     const uint8_t *p_start = p;
     int radix;
-    double d;
+    int64_t d;
     JSATODTempMem atod_mem;
     
     if (*p == '+' || *p == '-')
@@ -19079,10 +19079,20 @@ static int json_parse_number(JSParseState *s, const uint8_t **pp)
         while (is_digit(*p))
             p++;
     }
-    d = js_atod((const char *)p_start, NULL, 10, 0, &atod_mem);
+    {
+        char *end;
+        errno = 0;
+        d = strtoll((const char *)p_start, &end, radix);   // radix, не 10 (или 10, если всегда десятичное)
+        if (end == (const char *)p_start)
+            return -1;
+        if (errno == ERANGE)
+            return -1;
+        // val = JS_NewInt64(ctx, d);        
+    }
+    // d = js_atod((const char *)p_start, NULL, 10, 0, &atod_mem);
  done:
     s->token.val = TOK_NUMBER;
-    s->token.u.num.val = JS_NewFloat64(s->ctx, d);
+    s->token.u.num.val = JS_NewInt64(s->ctx, d);
     *pp = p;
     return 0;
 }
