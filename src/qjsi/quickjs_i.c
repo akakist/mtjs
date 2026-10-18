@@ -11206,12 +11206,13 @@ static __exception int JS_ToLengthFree(JSContext *ctx, int64_t *plen,
 /* Note: can return an exception */
 static int JS_NumberIsInteger(JSContext *ctx, JSValueConst val)
 {
-    double d;
+    // double d;
     if (!JS_IsNumber(val))
         return FALSE;
-    if (unlikely(JS_ToFloat64(ctx, &d, val)))
-        return -1;
-    return isfinite(d) && floor(d) == d;
+    return TRUE;
+    // if (unlikely(JS_ToFloat64(ctx, &d, val)))
+    //     return -1;
+    // return isfinite(d) && floor(d) == d;
 }
 
 static BOOL JS_NumberIsNegativeOrMinusZero(JSContext *ctx, JSValueConst val)
@@ -14166,13 +14167,13 @@ static JSValue js_call_c_function(JSContext *ctx, JSValueConst func_obj,
         break;
     case JS_CFUNC_f_f:
         {
-            double d1;
+            int64_t d1;
 
-            if (unlikely(JS_ToFloat64(ctx, &d1, arg_buf[0]))) {
+            if (unlikely(JS_ToInt64(ctx, &d1, arg_buf[0]))) {
                 ret_val = JS_EXCEPTION;
                 break;
             }
-            ret_val = JS_NewFloat64(ctx, func.f_f(d1));
+            ret_val = JS_NewInt64(ctx, func.f_f(d1));
         }
         break;
     case JS_CFUNC_f_f_f:
