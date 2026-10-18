@@ -159,7 +159,7 @@ static JSValue js_printf_internal(JSContext *ctx,
     size_t fmt_len;
     int32_t int32_arg;
     int64_t int64_arg;
-    int64_t double_arg;
+    // int64_t double_arg;
     const char *string_arg;
     /* Use indirect call to dbuf_printf to prevent gcc warning */
     int (*dbuf_printf_fun)(DynBuf *s, const char *fmt, ...) = (void*)dbuf_printf;
@@ -321,9 +321,9 @@ static JSValue js_printf_internal(JSContext *ctx,
             case 'A':
                 if (i >= argc)
                     goto missing;
-                if (JS_ToInt64(ctx, &double_arg, argv[i++]))
+                if (JS_ToInt64(ctx, &int64_arg, argv[i++]))
                     goto fail;
-                dbuf_printf_fun(&dbuf, fmtbuf, double_arg);
+                dbuf_printf_fun(&dbuf, fmtbuf, int64_arg);
                 break;
 
             case '%':
