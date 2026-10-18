@@ -36564,10 +36564,10 @@ static JSValue js_number_isInteger(JSContext *ctx, JSValueConst this_val,
 static JSValue js_number_isSafeInteger(JSContext *ctx, JSValueConst this_val,
                                        int argc, JSValueConst *argv)
 {
-    double d;
+    int64_t d;
     if (!JS_IsNumber(argv[0]))
         return JS_FALSE;
-    if (unlikely(JS_ToFloat64(ctx, &d, argv[0])))
+    if (unlikely(JS_ToInt64(ctx, &d, argv[0])))
         return JS_EXCEPTION;
     return JS_NewBool(ctx, is_safe_integer(d));
 }
