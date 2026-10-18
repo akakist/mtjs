@@ -227,7 +227,7 @@ typedef union JSValueUnion {
 
 typedef struct JSValue {
     JSValueUnion u;
-    int64_t tag;
+    int32_t tag;
     // bool is_nan;
 } JSValue;
 
