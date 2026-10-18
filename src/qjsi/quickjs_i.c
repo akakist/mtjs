@@ -17920,9 +17920,9 @@ static void __attribute((unused)) dump_token(JSParseState *s,
     switch(token->val) {
     case TOK_NUMBER:
         {
-            double d;
-            JS_ToFloat64(s->ctx, &d, token->u.num.val);  /* no exception possible */
-            printf("number: %.14g\n", d);
+            int64_t d;
+            JS_ToInt64(s->ctx, &d, token->u.num.val);  /* no exception possible */
+            printf("number: %ld\n", d);
         }
         break;
     case TOK_IDENT:
