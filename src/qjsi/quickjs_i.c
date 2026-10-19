@@ -10444,6 +10444,26 @@ static const js_limb_t radix_base_table[JS_RADIX_MAX - 1] = {
 /* return an exception in case of memory error. Return JS_NAN if
    invalid syntax */
 /* XXX: directly use js_atod() */
+static JSValue js_atof2(JSContext *ctx, const char *str, const char **pp,
+                       int radix, int flags)
+{
+    // printf("js_atof2 %s\n",str);
+            char *end;
+            long long d;
+            errno = 0;
+            d = strtoll(str, &end, radix);
+            if (end == str)
+                return JS_ThrowSyntaxError(ctx, "invalid number literal");
+            if (errno == ERANGE)
+                return JS_ThrowRangeError(ctx, "number too large %s",str);
+            *pp=end;
+            // printf("js_atof2: buf ");
+            // fwrite(str,1,end-str,stdout);
+            // printf("\n");
+            // printf("result: %lld\n",d);
+            return  JS_NewInt64(ctx, d);        
+
+}
 static JSValue js_atof(JSContext *ctx, const char *str, const char **pp,
                        int radix, int flags)
 {
@@ -10671,10 +10691,10 @@ static JSValue JS_ToNumberHintFree(JSContext *ctx, JSValue val,
             p = str;
             p += skip_spaces(p);
             if ((p - str) == len) {
-                ret = JS_NewInt32(ctx, 0);
+                ret = JS_NewInt64(ctx, 0);
             } else {
                 int flags = ATOD_ACCEPT_BIN_OCT;
-                ret = js_atof(ctx, p, &p, 0, flags);
+                ret = js_atof2(ctx, p, &p, 0, flags);
                 if (!JS_IsException(ret)) {
                     p += skip_spaces(p);
                     if ((p - str) != len) {
@@ -18484,7 +18504,7 @@ static __exception int next_token(JSParseState *s)
             int flags;
             flags = ATOD_ACCEPT_BIN_OCT | ATOD_ACCEPT_LEGACY_OCTAL |
                 ATOD_ACCEPT_UNDERSCORES | ATOD_ACCEPT_SUFFIX;
-            ret = js_atof(s->ctx, (const char *)p, (const char **)&p, 0,
+            ret = js_atof2(s->ctx, (const char *)p, (const char **)&p, 0,
                           flags);
             if (JS_IsException(ret))
                 goto fail;
@@ -36169,21 +36189,6 @@ static JSValue js_parseInt(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue js_parseFloat(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv)
-{
-    const char *str, *p;
-    JSValue ret;
-
-    str = JS_ToCString(ctx, argv[0]);
-    if (!str)
-        return JS_EXCEPTION;
-    p = str;
-    p += skip_spaces(p);
-    ret = js_atof(ctx, p, NULL, 10, 0);
-    JS_FreeCString(ctx, str);
-    return ret;
-}
 
 /* Boolean */
 static JSValue js_boolean_constructor(JSContext *ctx, JSValueConst new_target,
@@ -38434,7 +38439,6 @@ static int isUnescaped(int c) {
 
 static const JSCFunctionListEntry js_global_funcs[] = {
     JS_CFUNC_DEF("parseInt", 2, js_parseInt ),
-    JS_CFUNC_DEF("parseFloat", 1, js_parseFloat ),
 
     JS_PROP_UNDEFINED_DEF("undefined", 0 ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "global", JS_PROP_CONFIGURABLE ),
