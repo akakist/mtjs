@@ -137,33 +137,11 @@ enum {
     JS_CLASS_GENERATOR_FUNCTION, /* u.func */
     JS_CLASS_FOR_IN_ITERATOR,   /* u.for_in_iterator */
     JS_CLASS_REGEXP,            /* u.regexp */
-    // JS_CLASS_ARRAY_BUFFER,      /* u.array_buffer */
-    // JS_CLASS_SHARED_ARRAY_BUFFER, /* u.array_buffer */
-    // JS_CLASS_UINT8C_ARRAY,      /* u.array (typed_array) */
-    // JS_CLASS_INT8_ARRAY,        /* u.array (typed_array) */
-    // JS_CLASS_UINT8_ARRAY,       /* u.array (typed_array) */
-    // JS_CLASS_INT16_ARRAY,       /* u.array (typed_array) */
-    // JS_CLASS_UINT16_ARRAY,      /* u.array (typed_array) */
-    // JS_CLASS_INT32_ARRAY,       /* u.array (typed_array) */
-    // JS_CLASS_UINT32_ARRAY,      /* u.array (typed_array) */
-    // JS_CLASS_BIG_INT64_ARRAY,   /* u.array (typed_array) */
-    // JS_CLASS_BIG_UINT64_ARRAY,  /* u.array (typed_array) */
-    // JS_CLASS_FLOAT16_ARRAY,     /* u.array (typed_array) */
-    // JS_CLASS_FLOAT32_ARRAY,     /* u.array (typed_array) */
-    // JS_CLASS_FLOAT64_ARRAY,     /* u.array (typed_array) */
-    // JS_CLASS_DATAVIEW,          /* u.typed_array */
-    JS_CLASS_BIG_INT,           /* u.object_data */
-    // JS_CLASS_MAP,               /* u.map_state */
-    // JS_CLASS_SET,               /* u.map_state */
-    // JS_CLASS_WEAKMAP,           /* u.map_state */
-    // JS_CLASS_WEAKSET,           /* u.map_state */
-    // JS_CLASS_MAP_ITERATOR,      /* u.map_iterator_data */
-    // JS_CLASS_SET_ITERATOR,      /* u.map_iterator_data */
+    // JS_CLASS_BIG_INT,           /* u.object_data */
     JS_CLASS_ARRAY_ITERATOR,    /* u.array_iterator_data */
     JS_CLASS_STRING_ITERATOR,   /* u.array_iterator_data */
     JS_CLASS_REGEXP_STRING_ITERATOR,   /* u.regexp_string_iterator_data */
     JS_CLASS_GENERATOR,         /* u.generator_data */
-    // JS_CLASS_PROXY,             /* u.proxy_data */
     JS_CLASS_PROMISE,           /* u.promise_data */
     JS_CLASS_PROMISE_RESOLVE_FUNCTION,  /* u.promise_function_data */
     JS_CLASS_PROMISE_REJECT_FUNCTION,   /* u.promise_function_data */
@@ -1396,7 +1374,7 @@ static JSClassShortDef const js_std_class_def[] = {
     { JS_ATOM_Function, js_c_function_data_finalizer, js_c_function_data_mark }, /* JS_CLASS_C_FUNCTION_DATA */
     { JS_ATOM_GeneratorFunction, js_bytecode_function_finalizer, js_bytecode_function_mark },  /* JS_CLASS_GENERATOR_FUNCTION */
     { JS_ATOM_ForInIterator, js_for_in_iterator_finalizer, js_for_in_iterator_mark },      /* JS_CLASS_FOR_IN_ITERATOR */
-    { JS_ATOM_BigInt, js_object_data_finalizer, js_object_data_mark },      /* JS_CLASS_BIG_INT */
+    // { JS_ATOM_BigInt, js_object_data_finalizer, js_object_data_mark },      /* JS_CLASS_BIG_INT */
     { JS_ATOM_Array_Iterator, js_array_iterator_finalizer, js_array_iterator_mark }, /* JS_CLASS_ARRAY_ITERATOR */
     { JS_ATOM_String_Iterator, js_array_iterator_finalizer, js_array_iterator_mark }, /* JS_CLASS_STRING_ITERATOR */
     { JS_ATOM_Generator, js_generator_finalizer, js_generator_mark }, /* JS_CLASS_GENERATOR */
@@ -4978,7 +4956,7 @@ static JSValue JS_NewObjectFromShape(JSContext *ctx, JSShape *sh, JSClassID clas
     case JS_CLASS_STRING:
     case JS_CLASS_BOOLEAN:
     case JS_CLASS_SYMBOL:
-    case JS_CLASS_BIG_INT:
+    // case JS_CLASS_BIG_INT:
         p->u.object_data = JS_UNDEFINED;
         goto set_exotic;
     case JS_CLASS_REGEXP:
@@ -5036,7 +5014,7 @@ static int JS_SetObjectData(JSContext *ctx, JSValueConst obj, JSValue val)
         case JS_CLASS_STRING:
         case JS_CLASS_BOOLEAN:
         case JS_CLASS_SYMBOL:
-        case JS_CLASS_BIG_INT:
+        // case JS_CLASS_BIG_INT:
             JS_FreeValue(ctx, p->u.object_data);
             p->u.object_data = val; /* for JS_CLASS_STRING, 'val' must
                                        be JS_TAG_STRING (and not a
@@ -6210,7 +6188,7 @@ void JS_ComputeMemoryUsage(JSRuntime *rt, JSMemoryUsage *s)
         case JS_CLASS_STRING:            /* u.object_data */
         case JS_CLASS_BOOLEAN:           /* u.object_data */
         case JS_CLASS_SYMBOL:            /* u.object_data */
-        case JS_CLASS_BIG_INT:           /* u.object_data */
+        // case JS_CLASS_BIG_INT:           /* u.object_data */
             compute_value_size(p->u.object_data, hp);
             break;
         case JS_CLASS_C_FUNCTION:        /* u.cfunc */
@@ -14204,6 +14182,10 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             *sp++ = JS_NewInt32(ctx, get_u32(pc));
             pc += 4;
             BREAK;
+        CASE(OP_push_i64):
+            *sp++ = JS_NewInt64(ctx, get_u64(pc));
+            pc += 8;
+            BREAK;
         CASE(OP_push_const):
             *sp++ = JS_DupValue(ctx, b->cpool[get_u32(pc)]);
             pc += 4;
@@ -15878,10 +15860,10 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                 op2 = sp[-1];
                 if (likely(JS_VALUE_IS_BOTH_INT(op1, op2))) {
                     int64_t r;
-                    printf("add %ld %ld\n",JS_VALUE_GET_INT(op1),JS_VALUE_GET_INT(op2));
+                    // printf("add %ld %ld\n",JS_VALUE_GET_INT(op1),JS_VALUE_GET_INT(op2));
                     if(__builtin_add_overflow(JS_VALUE_GET_INT(op1),JS_VALUE_GET_INT(op2),&r))
                     {
-                        printf("add overflow \n");
+                        // printf("add overflow \n");
                         JS_ThrowRangeError(ctx,"add overflow");
                         goto exception;
                     }
@@ -19328,6 +19310,10 @@ static void emit_u32(JSParseState *s, uint32_t val)
 {
     dbuf_put_u32(&s->cur_func->byte_code, val);
 }
+static void emit_u64(JSParseState *s, uint64_t val)
+{
+    dbuf_put_u64(&s->cur_func->byte_code, val);
+}
 
 static void emit_source_pos(JSParseState *s, const uint8_t *source_ptr)
 {
@@ -22187,10 +22173,11 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags)
             val = s->token.u.num.val;
 
             if (JS_VALUE_GET_TAG(val) == JS_TAG_INT) {
-                emit_op(s, OP_push_i32);
-                emit_u32(s, JS_VALUE_GET_INT(val));
+                emit_op(s, OP_push_i64);
+                emit_u64(s, JS_VALUE_GET_INT(val));
             } else if (0) {
             } else {
+
             large_number:
                 if (emit_push_const(s, val, 0) < 0)
                     return -1;

@@ -45,6 +45,8 @@ FMT(arg)
 FMT(var_ref)
 FMT(u32)
 FMT(i32)
+FMT(u64)
+FMT(i64)
 FMT(const)
 FMT(label)
 FMT(atom)
@@ -66,6 +68,7 @@ DEF(invalid, 1, 0, 0, none) /* never emitted */
 
 /* push values */
 DEF(       push_i32, 5, 0, 1, i32)
+DEF(       push_i64, 9, 0, 1, i64)
 DEF(     push_const, 5, 0, 1, const)
 DEF(       fclosure, 5, 0, 1, const) /* must follow push_const */
 DEF(push_atom_value, 5, 0, 1, atom)
