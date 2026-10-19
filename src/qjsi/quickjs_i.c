@@ -7459,95 +7459,6 @@ static JSValue JS_ThrowTypeErrorPrivateNotFound(JSContext *ctx, JSAtom atom)
                                  atom);
 }
 
-/* Private fields can be added even on non extensible objects or
-   Proxies */
-static int JS_DefinePrivateField(JSContext *ctx, JSValueConst obj,
-                                 JSValueConst name, JSValue val)
-{
-    JSObject *p;
-    JSShapeProperty *prs;
-    JSProperty *pr;
-    JSAtom prop;
-
-    if (unlikely(JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT)) {
-        JS_ThrowTypeErrorNotAnObject(ctx);
-        goto fail;
-    }
-    /* safety check */
-    if (unlikely(JS_VALUE_GET_TAG(name) != JS_TAG_SYMBOL)) {
-        JS_ThrowTypeErrorNotASymbol(ctx);
-        goto fail;
-    }
-    prop = js_symbol_to_atom(ctx, (JSValue)name);
-    p = JS_VALUE_GET_OBJ(obj);
-    prs = find_own_property(&pr, p, prop);
-    if (prs) {
-        JS_ThrowTypeErrorAtom(ctx, "private class field '%s' already exists",
-                              prop);
-        goto fail;
-    }
-    pr = add_property(ctx, p, prop, JS_PROP_C_W_E);
-    if (unlikely(!pr)) {
-    fail:
-        JS_FreeValue(ctx, val);
-        return -1;
-    }
-    pr->u.value = val;
-    return 0;
-}
-
-static JSValue JS_GetPrivateField(JSContext *ctx, JSValueConst obj,
-                                  JSValueConst name)
-{
-    JSObject *p;
-    JSShapeProperty *prs;
-    JSProperty *pr;
-    JSAtom prop;
-
-    if (unlikely(JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT))
-        return JS_ThrowTypeErrorNotAnObject(ctx);
-    /* safety check */
-    if (unlikely(JS_VALUE_GET_TAG(name) != JS_TAG_SYMBOL))
-        return JS_ThrowTypeErrorNotASymbol(ctx);
-    prop = js_symbol_to_atom(ctx, (JSValue)name);
-    p = JS_VALUE_GET_OBJ(obj);
-    prs = find_own_property(&pr, p, prop);
-    if (!prs) {
-        JS_ThrowTypeErrorPrivateNotFound(ctx, prop);
-        return JS_EXCEPTION;
-    }
-    return JS_DupValue(ctx, pr->u.value);
-}
-
-static int JS_SetPrivateField(JSContext *ctx, JSValueConst obj,
-                              JSValueConst name, JSValue val)
-{
-    JSObject *p;
-    JSShapeProperty *prs;
-    JSProperty *pr;
-    JSAtom prop;
-
-    if (unlikely(JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT)) {
-        JS_ThrowTypeErrorNotAnObject(ctx);
-        goto fail;
-    }
-    /* safety check */
-    if (unlikely(JS_VALUE_GET_TAG(name) != JS_TAG_SYMBOL)) {
-        JS_ThrowTypeErrorNotASymbol(ctx);
-        goto fail;
-    }
-    prop = js_symbol_to_atom(ctx, (JSValue)name);
-    p = JS_VALUE_GET_OBJ(obj);
-    prs = find_own_property(&pr, p, prop);
-    if (!prs) {
-        JS_ThrowTypeErrorPrivateNotFound(ctx, prop);
-    fail:
-        JS_FreeValue(ctx, val);
-        return -1;
-    }
-    set_value(ctx, &pr->u.value, val);
-    return 0;
-}
 
 /* add a private brand field to 'home_obj' if not already present and
    if obj is != null add a private brand to it */
@@ -15583,42 +15494,6 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             }
             BREAK;
 
-        CASE(OP_get_private_field):
-            {
-                JSValue val;
-
-                val = JS_GetPrivateField(ctx, sp[-2], sp[-1]);
-                JS_FreeValue(ctx, sp[-1]);
-                JS_FreeValue(ctx, sp[-2]);
-                sp[-2] = val;
-                sp--;
-                if (unlikely(JS_IsException(val)))
-                    goto exception;
-            }
-            BREAK;
-
-        CASE(OP_put_private_field):
-            {
-                int ret;
-                ret = JS_SetPrivateField(ctx, sp[-3], sp[-1], sp[-2]);
-                JS_FreeValue(ctx, sp[-3]);
-                JS_FreeValue(ctx, sp[-1]);
-                sp -= 3;
-                if (unlikely(ret < 0))
-                    goto exception;
-            }
-            BREAK;
-
-        CASE(OP_define_private_field):
-            {
-                int ret;
-                ret = JS_DefinePrivateField(ctx, sp[-3], sp[-2], sp[-1]);
-                JS_FreeValue(ctx, sp[-2]);
-                sp -= 2;
-                if (unlikely(ret < 0))
-                    goto exception;
-            }
-            BREAK;
 
         CASE(OP_define_field):
             {
@@ -17456,7 +17331,7 @@ enum {
     TOK_DOUBLE_QUESTION_MARK,
     TOK_QUESTION_MARK_DOT,
     TOK_ERROR,
-    TOK_PRIVATE_NAME,
+    // TOK_PRIVATE_NAME,
     TOK_EOF,
     /* keywords: WARNING: same order as atoms */
     TOK_NULL, /* must be first */
@@ -17803,7 +17678,6 @@ static void free_token(JSParseState *s, JSToken *token)
         JS_FreeValue(s->ctx, token->u.regexp.flags);
         break;
     case TOK_IDENT:
-    case TOK_PRIVATE_NAME:
         JS_FreeAtom(s->ctx, token->u.ident.atom);
         break;
     default:
@@ -18579,31 +18453,6 @@ static __exception int next_token(JSParseState *s)
         s->token.u.ident.is_reserved = FALSE;
         s->token.val = TOK_IDENT;
         update_token_ident(s);
-        break;
-    case '#':
-        /* private name */
-        {
-            const uint8_t *p1;
-            p++;
-            p1 = p;
-            c = *p1++;
-            if (c == '\\' && *p1 == 'u') {
-                c = lre_parse_escape(&p1, TRUE);
-            } else if (c >= 128) {
-                c = unicode_from_utf8(p, UTF8_CHAR_LEN_MAX, &p1);
-            }
-            if (!lre_js_is_ident_first(c)) {
-                js_parse_error(s, "invalid first character of private name");
-                goto fail;
-            }
-            p = p1;
-            ident_has_escape = FALSE; /* not used */
-            atom = parse_ident(s, &p, &ident_has_escape, c, TRUE);
-            if (atom == JS_ATOM_NULL)
-                goto fail;
-            s->token.u.ident.atom = atom;
-            s->token.val = TOK_PRIVATE_NAME;
-        }
         break;
     case '.':
         if (p[1] == '.' && p[2] == '.') {
@@ -20216,7 +20065,7 @@ static __exception int js_parse_template(JSParseState *s, int call, int *argc)
 #define PROP_TYPE_ASYNC 5
 #define PROP_TYPE_ASYNC_STAR 6
 
-#define PROP_TYPE_PRIVATE (1 << 4)
+// #define PROP_TYPE_PRIVATE (1 << 4)
 
 static BOOL token_is_ident(int tok)
 {
@@ -20322,11 +20171,7 @@ static int __exception js_parse_property_name(JSParseState *s,
         if (js_parse_expect(s, ']'))
             goto fail;
         name = JS_ATOM_NULL;
-    } else if (s->token.val == TOK_PRIVATE_NAME && allow_private) {
-        name = JS_DupAtom(s->ctx, s->token.u.ident.atom);
-        if (next_token(s))
-            goto fail1;
-        is_private = PROP_TYPE_PRIVATE;
+    } else if (0) {
     } else {
         goto invalid_prop;
     }
@@ -20890,7 +20735,7 @@ static __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
     JSFunctionDef *method_fd, *ctor_fd;
     int saved_js_mode, class_name_var_idx, prop_type, ctor_cpool_offset;
     int class_flags = 0, i, define_class_offset;
-    BOOL is_static, is_private;
+    BOOL is_static;
     const uint8_t *class_start_ptr = s->token.ptr;
     const uint8_t *start_ptr;
     ClassFieldsDef class_fields[2];
@@ -21038,8 +20883,6 @@ static __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
             if (prop_type < 0)
                 goto fail;
         }
-        is_private = prop_type & PROP_TYPE_PRIVATE;
-        prop_type &= ~PROP_TYPE_PRIVATE;
 
         if ((name == JS_ATOM_constructor && !is_static &&
              prop_type != PROP_TYPE_IDENT) ||
@@ -21052,27 +20895,7 @@ static __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
             BOOL is_set = prop_type - PROP_TYPE_GET;
             JSFunctionDef *method_fd;
 
-            if (is_private) {
-                int idx, var_kind, is_static1;
-                idx = find_private_class_field(ctx, fd, name, fd->scope_level);
-                if (idx >= 0) {
-                    var_kind = fd->vars[idx].var_kind;
-                    is_static1 = fd->vars[idx].is_static_private;
-                    if (var_kind == JS_VAR_PRIVATE_FIELD ||
-                        var_kind == JS_VAR_PRIVATE_METHOD ||
-                        var_kind == JS_VAR_PRIVATE_GETTER_SETTER ||
-                        var_kind == (JS_VAR_PRIVATE_GETTER + is_set) ||
-                        (var_kind == (JS_VAR_PRIVATE_GETTER + 1 - is_set) &&
-                         is_static != is_static1)) {
-                        goto private_field_already_defined;
-                    }
-                    fd->vars[idx].var_kind = JS_VAR_PRIVATE_GETTER_SETTER;
-                } else {
-                    if (add_private_class_field(s, fd, name,
-                                                JS_VAR_PRIVATE_GETTER + is_set, is_static) < 0)
-                        goto fail;
-                }
-                class_fields[is_static].need_brand = TRUE;
+            if (0) {
             }
 
             if (js_parse_function_decl2(s, JS_PARSE_FUNC_GETTER + is_set,
@@ -21080,28 +20903,7 @@ static __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
                                         start_ptr,
                                         JS_PARSE_EXPORT_NONE, &method_fd))
                 goto fail;
-            if (is_private) {
-                method_fd->need_home_object = TRUE; /* needed for brand check */
-                emit_op(s, OP_set_home_object);
-                /* XXX: missing function name */
-                emit_op(s, OP_scope_put_var_init);
-                if (is_set) {
-                    JSAtom setter_name;
-                    int ret;
-
-                    setter_name = get_private_setter_name(ctx, name);
-                    if (setter_name == JS_ATOM_NULL)
-                        goto fail;
-                    emit_atom(s, setter_name);
-                    ret = add_private_class_field(s, fd, setter_name,
-                                                  JS_VAR_PRIVATE_SETTER, is_static);
-                    JS_FreeAtom(ctx, setter_name);
-                    if (ret < 0)
-                        goto fail;
-                } else {
-                    emit_atom(s, name);
-                }
-                emit_u16(s, s->cur_func->scope_level);
+            if (0) {
             } else {
                 if (name == JS_ATOM_NULL) {
                     emit_op(s, OP_define_method_computed);
@@ -21123,20 +20925,6 @@ static __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
                 goto fail;
             }
 
-            if (is_private) {
-                if (find_private_class_field(ctx, fd, name,
-                                             fd->scope_level) >= 0) {
-                    goto private_field_already_defined;
-                }
-                if (add_private_class_field(s, fd, name,
-                                            JS_VAR_PRIVATE_FIELD, is_static) < 0)
-                    goto fail;
-                emit_op(s, OP_private_symbol);
-                emit_atom(s, name);
-                emit_op(s, OP_scope_put_var_init);
-                emit_atom(s, name);
-                emit_u16(s, s->cur_func->scope_level);
-            }
 
             if (!cf->fields_init_fd) {
                 if (emit_class_init_start(s, cf))
@@ -21167,10 +20955,7 @@ static __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
                 emit_u16(s, s->cur_func->scope_level);
                 cf->computed_fields_count++;
                 JS_FreeAtom(ctx, field_var_name);
-            } else if (is_private) {
-                emit_op(s, OP_scope_get_var);
-                emit_atom(s, name);
-                emit_u16(s, s->cur_func->scope_level);
+            } else if (0) {
             }
 
             if (s->token.val == '=') {
@@ -21181,9 +20966,7 @@ static __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
             } else {
                 emit_op(s, OP_undefined);
             }
-            if (is_private) {
-                set_object_name_computed(s);
-                emit_op(s, OP_define_private_field);
+            if (0) {
             } else if (name == JS_ATOM_NULL) {
                 set_object_name_computed(s);
                 emit_op(s, OP_define_array_el);
@@ -21218,31 +21001,12 @@ static __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
                 else
                     func_type = JS_PARSE_FUNC_CLASS_CONSTRUCTOR;
             }
-            if (is_private) {
-                class_fields[is_static].need_brand = TRUE;
-            }
             if (js_parse_function_decl2(s, func_type, func_kind, JS_ATOM_NULL, start_ptr, JS_PARSE_EXPORT_NONE, &method_fd))
                 goto fail;
             if (func_type == JS_PARSE_FUNC_DERIVED_CLASS_CONSTRUCTOR ||
                 func_type == JS_PARSE_FUNC_CLASS_CONSTRUCTOR) {
                 ctor_fd = method_fd;
-            } else if (is_private) {
-                method_fd->need_home_object = TRUE; /* needed for brand check */
-                if (find_private_class_field(ctx, fd, name,
-                                             fd->scope_level) >= 0) {
-                private_field_already_defined:
-                    js_parse_error(s, "private class field is already defined");
-                    goto fail;
-                }
-                if (add_private_class_field(s, fd, name,
-                                            JS_VAR_PRIVATE_METHOD, is_static) < 0)
-                    goto fail;
-                emit_op(s, OP_set_home_object);
-                emit_op(s, OP_set_name);
-                emit_atom(s, name);
-                emit_op(s, OP_scope_put_var_init);
-                emit_atom(s, name);
-                emit_u16(s, s->cur_func->scope_level);
+            } else if (0) {
             } else {
                 if (name == JS_ATOM_NULL) {
                     emit_op(s, OP_define_method_computed);
@@ -21568,11 +21332,6 @@ static __exception int get_lvalue(JSParseState *s, int *popcode, int *pscope,
         name = get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1);
         depth = 1;
         break;
-    case OP_scope_get_private_field:
-        name = get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1);
-        scope = get_u16(fd->byte_code.buf + fd->last_opcode_pos + 5);
-        depth = 1;
-        break;
     case OP_get_array_el:
         depth = 2;
         break;
@@ -21613,11 +21372,6 @@ static __exception int get_lvalue(JSParseState *s, int *popcode, int *pscope,
         case OP_get_field:
             emit_op(s, OP_get_field2);
             emit_atom(s, name);
-            break;
-        case OP_scope_get_private_field:
-            emit_op(s, OP_scope_get_private_field2);
-            emit_atom(s, name);
-            emit_u16(s, scope);
             break;
         case OP_get_array_el:
             emit_op(s, OP_get_array_el3);
@@ -21676,7 +21430,6 @@ static void put_lvalue(JSParseState *s, int opcode, int scope,
 {
     switch(opcode) {
     case OP_get_field:
-    case OP_scope_get_private_field:
         /* depth = 1 */
         switch(special) {
         case PUT_LVALUE_NOKEEP:
@@ -21755,11 +21508,6 @@ static void put_lvalue(JSParseState *s, int opcode, int scope,
     case OP_get_field:
         emit_op(s, OP_put_field);
         emit_u32(s, name);  /* name has refcount */
-        break;
-    case OP_scope_get_private_field:
-        emit_op(s, OP_scope_put_private_field);
-        emit_u32(s, name);  /* name has refcount */
-        emit_u16(s, scope);
         break;
     case OP_get_array_el:
         emit_op(s, OP_put_array_el);
@@ -22655,11 +22403,6 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags)
                         opcode = OP_get_field;
                     }
                     break;
-                case OP_scope_get_private_field:
-                    /* keep the object on the stack */
-                    fd->byte_code.buf[fd->last_opcode_pos] = OP_scope_get_private_field2;
-                    drop_count = 2;
-                    break;
                 case OP_get_array_el:
                     /* keep the object on the stack */
                     fd->byte_code.buf[fd->last_opcode_pos] = OP_get_array_el2;
@@ -22827,7 +22570,6 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags)
                 /* apply function call */
                 switch(opcode) {
                 case OP_get_field:
-                case OP_scope_get_private_field:
                 case OP_get_array_el:
                 case OP_scope_get_ref:
                     /* obj func array -> func obj array */
@@ -22872,7 +22614,6 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags)
                 emit_source_pos(s, op_token_ptr);
                 switch(opcode) {
                 case OP_get_field:
-                case OP_scope_get_private_field:
                 case OP_get_array_el:
                 case OP_scope_get_ref:
                     emit_op(s, OP_call_method);
@@ -22913,17 +22654,7 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags)
                 return -1;
         parse_property:
             emit_source_pos(s, op_token_ptr);
-            if (s->token.val == TOK_PRIVATE_NAME) {
-                /* private class field */
-                if (get_prev_opcode(fd) == OP_get_super) {
-                    return js_parse_error(s, "private class field forbidden after super");
-                }
-                if (has_optional_chain) {
-                    optional_chain_test(s, &optional_chaining_label, 1);
-                }
-                emit_op(s, OP_scope_get_private_field);
-                emit_atom(s, s->token.u.ident.atom);
-                emit_u16(s, s->cur_func->scope_level);
+            if (0) {
             } else {
                 if (!token_is_ident(s->token.val)) {
                     return js_parse_error(s, "expecting field name");
@@ -23065,8 +22796,6 @@ static __exception int js_parse_delete(JSParseState *s)
             fd->byte_code.buf[fd->last_opcode_pos] = OP_scope_delete_var;
         }
         break;
-    case OP_scope_get_private_field:
-        return js_parse_error(s, "cannot delete a private class field");
     case OP_get_super_value:
         fd->byte_code.size = fd->last_opcode_pos;
         fd->last_opcode_pos = -1;
@@ -23214,28 +22943,7 @@ static __exception int js_parse_expr_binary(JSParseState *s, int level,
     
     if (level == 0) {
         return js_parse_unary(s, PF_POW_ALLOWED);
-    } else if (s->token.val == TOK_PRIVATE_NAME &&
-               (parse_flags & PF_IN_ACCEPTED) && level == 4 &&
-               peek_token(s, FALSE) == TOK_IN) {
-        JSAtom atom;
-
-        atom = JS_DupAtom(s->ctx, s->token.u.ident.atom);
-        if (next_token(s))
-            goto fail_private_in;
-        if (s->token.val != TOK_IN)
-            goto fail_private_in;
-        if (next_token(s))
-            goto fail_private_in;
-        if (js_parse_expr_binary(s, level - 1, parse_flags)) {
-        fail_private_in:
-            JS_FreeAtom(s->ctx, atom);
-            return -1;
-        }
-        emit_op(s, OP_scope_in_private_field);
-        emit_atom(s, atom);
-        emit_u16(s, s->cur_func->scope_level);
-        JS_FreeAtom(s->ctx, atom);
-        return 0;
+    } else if (0) {
     } else {
         if (js_parse_expr_binary(s, level - 1, parse_flags))
             return -1;
@@ -28508,106 +28216,6 @@ static int resolve_scope_private_field1(JSContext *ctx,
     return idx;
 }
 
-/* return 0 if OK or -1 if the private field could not be resolved */
-static int resolve_scope_private_field(JSContext *ctx, JSFunctionDef *s,
-                                       JSAtom var_name, int scope_level, int op,
-                                       DynBuf *bc)
-{
-    int idx, var_kind;
-    BOOL is_ref;
-
-    idx = resolve_scope_private_field1(ctx, &is_ref, &var_kind, s,
-                                       var_name, scope_level);
-    if (idx < 0)
-        return -1;
-    assert(var_kind != JS_VAR_NORMAL);
-    switch (op) {
-    case OP_scope_get_private_field:
-    case OP_scope_get_private_field2:
-        switch(var_kind) {
-        case JS_VAR_PRIVATE_FIELD:
-            if (op == OP_scope_get_private_field2)
-                dbuf_putc(bc, OP_dup);
-            get_loc_or_ref(bc, is_ref, idx);
-            dbuf_putc(bc, OP_get_private_field);
-            break;
-        case JS_VAR_PRIVATE_METHOD:
-            get_loc_or_ref(bc, is_ref, idx);
-            dbuf_putc(bc, OP_check_brand);
-            if (op != OP_scope_get_private_field2)
-                dbuf_putc(bc, OP_nip);
-            break;
-        case JS_VAR_PRIVATE_GETTER:
-        case JS_VAR_PRIVATE_GETTER_SETTER:
-            if (op == OP_scope_get_private_field2)
-                dbuf_putc(bc, OP_dup);
-            get_loc_or_ref(bc, is_ref, idx);
-            dbuf_putc(bc, OP_check_brand);
-            dbuf_putc(bc, OP_call_method);
-            dbuf_put_u16(bc, 0);
-            break;
-        case JS_VAR_PRIVATE_SETTER:
-            /* XXX: add clearer error message */
-            dbuf_putc(bc, OP_throw_error);
-            dbuf_put_u32(bc, JS_DupAtom(ctx, var_name));
-            dbuf_putc(bc, JS_THROW_VAR_RO);
-            break;
-        default:
-            abort();
-        }
-        break;
-    case OP_scope_put_private_field:
-        switch(var_kind) {
-        case JS_VAR_PRIVATE_FIELD:
-            get_loc_or_ref(bc, is_ref, idx);
-            dbuf_putc(bc, OP_put_private_field);
-            break;
-        case JS_VAR_PRIVATE_METHOD:
-        case JS_VAR_PRIVATE_GETTER:
-            /* XXX: add clearer error message */
-            dbuf_putc(bc, OP_throw_error);
-            dbuf_put_u32(bc, JS_DupAtom(ctx, var_name));
-            dbuf_putc(bc, JS_THROW_VAR_RO);
-            break;
-        case JS_VAR_PRIVATE_SETTER:
-        case JS_VAR_PRIVATE_GETTER_SETTER:
-            {
-                JSAtom setter_name = get_private_setter_name(ctx, var_name);
-                if (setter_name == JS_ATOM_NULL)
-                    return -1;
-                idx = resolve_scope_private_field1(ctx, &is_ref,
-                                                   &var_kind, s,
-                                                   setter_name, scope_level);
-                JS_FreeAtom(ctx, setter_name);
-                if (idx < 0)
-                    return -1;
-                assert(var_kind == JS_VAR_PRIVATE_SETTER);
-                get_loc_or_ref(bc, is_ref, idx);
-                dbuf_putc(bc, OP_swap);
-                /* obj func value */
-                dbuf_putc(bc, OP_rot3r);
-                /* value obj func */
-                dbuf_putc(bc, OP_check_brand);
-                dbuf_putc(bc, OP_rot3l);
-                /* obj func value */
-                dbuf_putc(bc, OP_call_method);
-                dbuf_put_u16(bc, 1);
-                dbuf_putc(bc, OP_drop);
-            }
-            break;
-        default:
-            abort();
-        }
-        break;
-    case OP_scope_in_private_field:
-        get_loc_or_ref(bc, is_ref, idx);
-        dbuf_putc(bc, OP_private_in);
-        break;
-    default:
-        abort();
-    }
-    return 0;
-}
 
 static void mark_eval_captured_variables(JSContext *ctx, JSFunctionDef *s,
                                          int scope_level)
@@ -29307,20 +28915,6 @@ static __exception int resolve_variables(JSContext *ctx, JSFunctionDef *s)
                 ls->ref_count--;  /* always remove label reference */
                 pos_next = resolve_scope_var(ctx, s, var_name, scope, op, &bc_out,
                                              bc_buf, ls, pos_next);
-                JS_FreeAtom(ctx, var_name);
-            }
-            break;
-        case OP_scope_get_private_field:
-        case OP_scope_get_private_field2:
-        case OP_scope_put_private_field:
-        case OP_scope_in_private_field:
-            {
-                int ret;
-                var_name = get_u32(bc_buf + pos + 1);
-                scope = get_u16(bc_buf + pos + 5);
-                ret = resolve_scope_private_field(ctx, s, var_name, scope, op, &bc_out);
-                if (ret < 0)
-                    goto fail;
                 JS_FreeAtom(ctx, var_name);
             }
             break;

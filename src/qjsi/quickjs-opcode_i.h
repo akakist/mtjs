@@ -139,9 +139,9 @@ DEF(    define_func, 6, 1, 0, atom_u8)
 DEF(      get_field, 5, 1, 1, atom)
 DEF(     get_field2, 5, 1, 2, atom)
 DEF(      put_field, 5, 2, 0, atom)
-DEF( get_private_field, 1, 2, 1, none) /* obj prop -> value */
-DEF( put_private_field, 1, 3, 0, none) /* obj value prop -> */
-DEF(define_private_field, 1, 3, 1, none) /* obj prop value -> obj */
+// DEF( get_private_field, 1, 2, 1, none) /* obj prop -> value */
+// DEF( put_private_field, 1, 3, 0, none) /* obj value prop -> */
+// DEF(define_private_field, 1, 3, 1, none) /* obj prop value -> obj */
 DEF(   get_array_el, 1, 2, 1, none)
 DEF(  get_array_el2, 1, 2, 2, none) /* obj prop -> obj value */
 DEF(  get_array_el3, 1, 2, 3, none) /* obj prop -> obj prop1 value */
@@ -280,10 +280,6 @@ def( scope_make_ref, 11, 0, 2, atom_label_u16) /* emitted in phase 1, removed in
 def(  scope_get_ref, 7, 0, 2, atom_u16) /* emitted in phase 1, removed in phase 2 */
 def(scope_put_var_init, 7, 0, 2, atom_u16) /* emitted in phase 1, removed in phase 2 */
 def(scope_get_var_checkthis, 7, 0, 1, atom_u16) /* emitted in phase 1, removed in phase 2, only used to return 'this' in derived class constructors */
-def(scope_get_private_field, 7, 1, 1, atom_u16) /* obj -> value, emitted in phase 1, removed in phase 2 */
-def(scope_get_private_field2, 7, 1, 2, atom_u16) /* obj -> obj value, emitted in phase 1, removed in phase 2 */
-def(scope_put_private_field, 7, 2, 0, atom_u16) /* obj value ->, emitted in phase 1, removed in phase 2 */
-def(scope_in_private_field, 7, 1, 1, atom_u16) /* obj -> res emitted in phase 1, removed in phase 2 */
 def(get_field_opt_chain, 5, 1, 1, atom) /* emitted in phase 1, removed in phase 2 */
 def(get_array_el_opt_chain, 1, 2, 1, none) /* emitted in phase 1, removed in phase 2 */
 def( set_class_name, 5, 1, 1, u32) /* emitted in phase 1, removed in phase 2 */
