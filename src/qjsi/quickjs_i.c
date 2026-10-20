@@ -221,7 +221,7 @@ struct JSRuntime {
     int class_count;    /* size of class_array */
     JSClass *class_array;
 
-    struct list_head context_list; /* list of JSContext.link */
+    struct list_head context_list; /* list of JSIContext.link */
     /* list of JSGCObjectHeader.link. List of allocated GC objects (used
        by the garbage collector) */
     struct list_head gc_obj_list;
@@ -239,7 +239,7 @@ struct JSRuntime {
     uintptr_t stack_top;
     uintptr_t stack_limit; /* lower stack limit */
 
-    JSValue current_exception;
+    JSIValue current_exception;
     /* true if the current exception cannot be catched */
     BOOL current_exception_is_uncatchable : 8;
     /* true if inside an out of memory error, to avoid recursing */
@@ -299,9 +299,9 @@ struct JSClass {
 
 typedef struct JSStackFrame {
     struct JSStackFrame *prev_frame; /* NULL if first stack frame */
-    JSValue cur_func; /* current function, JSI_UNDEFINED if the frame is detached */
-    JSValue *arg_buf; /* arguments */
-    JSValue *var_buf; /* variables */
+    JSIValue cur_func; /* current function, JSI_UNDEFINED if the frame is detached */
+    JSIValue *arg_buf; /* arguments */
+    JSIValue *var_buf; /* variables */
     struct list_head var_ref_list; /* list of JSVarRef.var_ref_link */
     const uint8_t *cur_pc; /* only used in bytecode functions : PC of the
                         instruction after the call */
@@ -309,7 +309,7 @@ typedef struct JSStackFrame {
     int jsi_mode; /* not supported for C functions */
     /* only used in generators. Current stack pointer value. NULL if
        the function is running. */
-    JSValue *cur_sp;
+    JSIValue *cur_sp;
 } JSStackFrame;
 
 typedef enum {
@@ -345,10 +345,10 @@ typedef struct JSVarRef {
             uint8_t is_detached;
         };
     };
-    JSValue *pvalue; /* pointer to the value, either on the stack or
+    JSIValue *pvalue; /* pointer to the value, either on the stack or
                         to 'value' */
     union {
-        JSValue value; /* used when is_detached = TRUE */
+        JSIValue value; /* used when is_detached = TRUE */
         struct {
             struct list_head var_ref_link; /* JSStackFrame.var_ref_list list */
             struct JSAsyncFunctionState *async_func; /* != NULL if async stack frame */
@@ -405,7 +405,7 @@ typedef enum {
    enough to call the interrupt callback often. */
 #define JSI_INTERRUPT_COUNTER_INIT 10000
 
-struct JSContext {
+struct JSIContext {
     JSGCObjectHeader header; /* must come first */
     JSRuntime *rt;
     struct list_head link;
@@ -415,21 +415,21 @@ struct JSContext {
 
     JSShape *array_shape;   /* initial shape for Array objects */
 
-    JSValue *class_proto;
-    JSValue function_proto;
-    JSValue function_ctor;
-    JSValue array_ctor;
-    // JSValue regexp_ctor;
-    // JSValue promise_ctor;
-    JSValue native_error_proto[JSI_NATIVE_ERROR_COUNT];
-    JSValue iterator_proto;
-    JSValue async_iterator_proto;
-    JSValue array_proto_values;
-    JSValue throw_type_error;
-    JSValue eval_obj;
+    JSIValue *class_proto;
+    JSIValue function_proto;
+    JSIValue function_ctor;
+    JSIValue array_ctor;
+    // JSIValue regexp_ctor;
+    // JSIValue promise_ctor;
+    JSIValue native_error_proto[JSI_NATIVE_ERROR_COUNT];
+    JSIValue iterator_proto;
+    JSIValue async_iterator_proto;
+    JSIValue array_proto_values;
+    JSIValue throw_type_error;
+    JSIValue eval_obj;
 
-    JSValue global_obj; /* global object */
-    JSValue global_var_obj; /* contains the global let/const definitions */
+    JSIValue global_obj; /* global object */
+    JSIValue global_var_obj; /* contains the global let/const definitions */
 
     uint64_t random_state;
 
@@ -439,10 +439,10 @@ struct JSContext {
     struct list_head loaded_modules; /* list of JSModuleDef.link */
 
     /* if NULL, RegExp compilation is not supported */
-    // JSValue (*compile_regexp)(JSContext *ctx, JSValueConst pattern,
-    //                           JSValueConst flags);
+    // JSIValue (*compile_regexp)(JSIContext *ctx, JSIValueConst pattern,
+    //                           JSIValueConst flags);
     /* if NULL, eval is not supported */
-    JSValue (*eval_internal)(JSContext *ctx, JSValueConst this_obj,
+    JSIValue (*eval_internal)(JSIContext *ctx, JSIValueConst this_obj,
                              const char *input, size_t input_len,
                              const char *filename, int flags, int scope_idx);
     void *user_opaque;
@@ -496,8 +496,8 @@ typedef struct JSStringRope {
     uint8_t depth; /* max depth of the rope tree */
     /* XXX: could reduce memory usage by using a direct pointer with
        bit 0 to select rope or string */
-    JSValue left;
-    JSValue right; /* might be the empty string */
+    JSIValue left;
+    JSIValue right; /* might be the empty string */
 } JSStringRope;
 
 typedef struct JSClosureVar {
@@ -605,8 +605,8 @@ typedef struct JSFunctionBytecode {
     uint16_t var_count;
     uint16_t defined_arg_count; /* for length function property */
     uint16_t stack_size; /* maximum stack size */
-    JSContext *realm; /* function realm */
-    JSValue *cpool; /* constant pool (self pointer) */
+    JSIContext *realm; /* function realm */
+    JSIValue *cpool; /* constant pool (self pointer) */
     int cpool_count;
     int closure_var_count;
     struct {
@@ -620,10 +620,10 @@ typedef struct JSFunctionBytecode {
 } JSFunctionBytecode;
 
 typedef struct JSBoundFunction {
-    JSValue func_obj;
-    JSValue this_val;
+    JSIValue func_obj;
+    JSIValue this_val;
     int argc;
-    JSValue argv[0];
+    JSIValue argv[0];
 } JSBoundFunction;
 
 typedef enum JSIteratorKindEnum {
@@ -633,7 +633,7 @@ typedef enum JSIteratorKindEnum {
 } JSIteratorKindEnum;
 
 typedef struct JSForInIterator {
-    JSValue obj;
+    JSIValue obj;
     uint32_t idx;
     uint32_t atom_count;
     uint8_t in_prototype_chain;
@@ -647,8 +647,8 @@ typedef struct JSRegExp {
 } JSRegExp;
 
 typedef struct JSProxyData {
-    JSValue target;
-    JSValue handler;
+    JSIValue target;
+    JSIValue handler;
     uint8_t is_func;
     uint8_t is_revoked;
 } JSProxyData;
@@ -673,12 +673,12 @@ typedef struct JSTypedArray {
 
 typedef struct JSAsyncFunctionState {
     JSGCObjectHeader header;
-    JSValue this_val; /* 'this' argument */
+    JSIValue this_val; /* 'this' argument */
     int argc; /* number of function arguments */
     BOOL throw_flag; /* used to throw an exception in JSI_CallInternal() */
     BOOL is_completed; /* TRUE if the function has returned. The stack
                           frame is no longer valid */
-    JSValue resolving_funcs[2]; /* only used in JS async functions */
+    JSIValue resolving_funcs[2]; /* only used in JS async functions */
     JSStackFrame frame;
 } JSAsyncFunctionState;
 
@@ -732,7 +732,7 @@ typedef struct {
 typedef struct JSReqModuleEntry {
     JSAtom module_name;
     JSModuleDef *module; /* used using resolution */
-    JSValue attributes; /* JSI_UNDEFINED or an object contains the attributes as key/value */
+    JSIValue attributes; /* JSI_UNDEFINED or an object contains the attributes as key/value */
 } JSReqModuleEntry;
 
 typedef enum JSExportTypeEnum {
@@ -795,8 +795,8 @@ struct JSModuleDef {
     int import_entries_count;
     int import_entries_size;
 
-    JSValue module_ns;
-    JSValue func_obj; /* only used for JS modules */
+    JSIValue module_ns;
+    JSIValue func_obj; /* only used for JS modules */
     JSModuleInitFunc *init_func; /* only used for C modules */
     BOOL has_tla : 8; /* true if func_obj contains await */
     BOOL resolved : 8;
@@ -814,28 +814,28 @@ struct JSModuleDef {
                               false: [[AsyncEvaluationOrder]] is UNSET or DONE */
     int64_t async_evaluation_timestamp;
     JSModuleDef *cycle_root;
-    JSValue promise; /* corresponds to spec field: capability */
-    JSValue resolving_funcs[2]; /* corresponds to spec field: capability */
+    JSIValue promise; /* corresponds to spec field: capability */
+    JSIValue resolving_funcs[2]; /* corresponds to spec field: capability */
 
     /* true if evaluation yielded an exception. It is saved in
        eval_exception */
     BOOL eval_has_exception : 8;
-    JSValue eval_exception;
-    JSValue meta_obj; /* for import.meta */
-    JSValue private_value; /* private value for C modules */
+    JSIValue eval_exception;
+    JSIValue meta_obj; /* for import.meta */
+    JSIValue private_value; /* private value for C modules */
 };
 
 typedef struct JSJobEntry {
     struct list_head link;
-    JSContext *realm;
+    JSIContext *realm;
     JSJobFunc *job_func;
     int argc;
-    JSValue argv[0];
+    JSIValue argv[0];
 } JSJobEntry;
 
 typedef struct JSProperty {
     union {
-        JSValue value;      /* JSI_PROP_NORMAL */
+        JSIValue value;      /* JSI_PROP_NORMAL */
         struct {            /* JSI_PROP_GETSET */
             JSObject *getter; /* NULL if undefined */
             JSObject *setter; /* NULL if undefined */
@@ -931,7 +931,7 @@ struct JSObject {
             JSObject *home_object; /* for 'super' access */
         } func;
         struct { /* JSI_CLASS_C_FUNCTION: 12/20 bytes */
-            JSContext *realm;
+            JSIContext *realm;
             JSCFunctionType c_function;
             uint8_t length;
             uint8_t cproto;
@@ -944,12 +944,12 @@ struct JSObject {
                 struct JSTypedArray *typed_array; /* JSI_CLASS_UINT8C_ARRAY..JSI_CLASS_FLOAT64_ARRAY */
             } u1;
             union {
-                JSValue *values;        /* JSI_CLASS_ARRAY, JSI_CLASS_ARGUMENTS */
+                JSIValue *values;        /* JSI_CLASS_ARRAY, JSI_CLASS_ARGUMENTS */
             } u;
             uint32_t count; /* <= 2^31-1. 0 for a detached typed array */
         } array;    /* 12/20 bytes */
         JSRegExp regexp;    /* JSI_CLASS_REGEXP: 8/16 bytes */
-        JSValue object_data;    /* for JSI_SetObjectData(): 8/16/16 bytes */
+        JSIValue object_data;    /* for JSI_SetObjectData(): 8/16/16 bytes */
     } u;
 };
 
@@ -1006,59 +1006,59 @@ static JSAtom __JSI_NewAtomInit(JSRuntime *rt, const char *str, int len,
                                int atom_type);
 static void JSI_FreeAtomStruct(JSRuntime *rt, JSAtomStruct *p);
 static void free_function_bytecode(JSRuntime *rt, JSFunctionBytecode *b);
-static JSValue jsi_call_c_function(JSContext *ctx, JSValueConst func_obj,
-                                  JSValueConst this_obj,
-                                  int argc, JSValueConst *argv, int flags);
-static JSValue jsi_call_bound_function(JSContext *ctx, JSValueConst func_obj,
-                                      JSValueConst this_obj,
-                                      int argc, JSValueConst *argv, int flags);
-static JSValue JSI_CallInternal(JSContext *ctx, JSValueConst func_obj,
-                               JSValueConst this_obj, JSValueConst new_target,
-                               int argc, JSValue *argv, int flags);
-static JSValue JSI_CallConstructorInternal(JSContext *ctx,
-                                          JSValueConst func_obj,
-                                          JSValueConst new_target,
-                                          int argc, JSValue *argv, int flags);
-static JSValue JSI_CallFree(JSContext *ctx, JSValue func_obj, JSValueConst this_obj,
-                           int argc, JSValueConst *argv);
-static JSValue JSI_InvokeFree(JSContext *ctx, JSValue this_val, JSAtom atom,
-                             int argc, JSValueConst *argv);
-static __exception int JSI_ToArrayLengthFree(JSContext *ctx, uint32_t *plen,
-                                            JSValue val, BOOL is_array_ctor);
-static JSValue JSI_EvalObject(JSContext *ctx, JSValueConst this_obj,
-                             JSValueConst val, int flags, int scope_idx);
-JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowInternalError(JSContext *ctx, const char *fmt, ...);
+static JSIValue jsi_call_c_function(JSIContext *ctx, JSIValueConst func_obj,
+                                  JSIValueConst this_obj,
+                                  int argc, JSIValueConst *argv, int flags);
+static JSIValue jsi_call_bound_function(JSIContext *ctx, JSIValueConst func_obj,
+                                      JSIValueConst this_obj,
+                                      int argc, JSIValueConst *argv, int flags);
+static JSIValue JSI_CallInternal(JSIContext *ctx, JSIValueConst func_obj,
+                               JSIValueConst this_obj, JSIValueConst new_target,
+                               int argc, JSIValue *argv, int flags);
+static JSIValue JSI_CallConstructorInternal(JSIContext *ctx,
+                                          JSIValueConst func_obj,
+                                          JSIValueConst new_target,
+                                          int argc, JSIValue *argv, int flags);
+static JSIValue JSI_CallFree(JSIContext *ctx, JSIValue func_obj, JSIValueConst this_obj,
+                           int argc, JSIValueConst *argv);
+static JSIValue JSI_InvokeFree(JSIContext *ctx, JSIValue this_val, JSAtom atom,
+                             int argc, JSIValueConst *argv);
+static __exception int JSI_ToArrayLengthFree(JSIContext *ctx, uint32_t *plen,
+                                            JSIValue val, BOOL is_array_ctor);
+static JSIValue JSI_EvalObject(JSIContext *ctx, JSIValueConst this_obj,
+                             JSIValueConst val, int flags, int scope_idx);
+JSIValue __attribute__((format(printf, 2, 3))) JSI_ThrowInternalError(JSIContext *ctx, const char *fmt, ...);
 static __maybe_unused void JSI_DumpAtoms(JSRuntime *rt);
 static __maybe_unused void JSI_DumpString(JSRuntime *rt, const JSString *p);
 static __maybe_unused void JSI_DumpObjectHeader(JSRuntime *rt);
 static __maybe_unused void JSI_DumpObject(JSRuntime *rt, JSObject *p);
 static __maybe_unused void JSI_DumpGCObject(JSRuntime *rt, JSGCObjectHeader *p);
-static __maybe_unused void JSI_DumpValueRT(JSRuntime *rt, const char *str, JSValueConst val);
-static __maybe_unused void JSI_DumpValue(JSContext *ctx, const char *str, JSValueConst val);
+static __maybe_unused void JSI_DumpValueRT(JSRuntime *rt, const char *str, JSIValueConst val);
+static __maybe_unused void JSI_DumpValue(JSIContext *ctx, const char *str, JSIValueConst val);
 static __maybe_unused void JSI_DumpShapes(JSRuntime *rt);
 static void jsi_dump_value_write(void *opaque, const char *buf, size_t len);
-static JSValue jsi_function_apply(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv, int magic);
-static void jsi_array_finalizer(JSRuntime *rt, JSValue val);
-static void jsi_array_mark(JSRuntime *rt, JSValueConst val, JSI_MarkFunc *mark_func);
-static void jsi_object_data_finalizer(JSRuntime *rt, JSValue val);
-static void jsi_object_data_mark(JSRuntime *rt, JSValueConst val, JSI_MarkFunc *mark_func);
-static void jsi_c_function_finalizer(JSRuntime *rt, JSValue val);
-static void jsi_c_function_mark(JSRuntime *rt, JSValueConst val, JSI_MarkFunc *mark_func);
-static void jsi_bytecode_function_finalizer(JSRuntime *rt, JSValue val);
-static void jsi_bytecode_function_mark(JSRuntime *rt, JSValueConst val,
+static JSIValue jsi_function_apply(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv, int magic);
+static void jsi_array_finalizer(JSRuntime *rt, JSIValue val);
+static void jsi_array_mark(JSRuntime *rt, JSIValueConst val, JSI_MarkFunc *mark_func);
+static void jsi_object_data_finalizer(JSRuntime *rt, JSIValue val);
+static void jsi_object_data_mark(JSRuntime *rt, JSIValueConst val, JSI_MarkFunc *mark_func);
+static void jsi_c_function_finalizer(JSRuntime *rt, JSIValue val);
+static void jsi_c_function_mark(JSRuntime *rt, JSIValueConst val, JSI_MarkFunc *mark_func);
+static void jsi_bytecode_function_finalizer(JSRuntime *rt, JSIValue val);
+static void jsi_bytecode_function_mark(JSRuntime *rt, JSIValueConst val,
                                 JSI_MarkFunc *mark_func);
-static void jsi_bound_function_finalizer(JSRuntime *rt, JSValue val);
-static void jsi_bound_function_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_bound_function_finalizer(JSRuntime *rt, JSIValue val);
+static void jsi_bound_function_mark(JSRuntime *rt, JSIValueConst val,
                                 JSI_MarkFunc *mark_func);
-static void jsi_for_in_iterator_finalizer(JSRuntime *rt, JSValue val);
-static void jsi_for_in_iterator_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_for_in_iterator_finalizer(JSRuntime *rt, JSIValue val);
+static void jsi_for_in_iterator_mark(JSRuntime *rt, JSIValueConst val,
                                 JSI_MarkFunc *mark_func);
-static void jsi_array_iterator_finalizer(JSRuntime *rt, JSValue val);
-static void jsi_array_iterator_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_array_iterator_finalizer(JSRuntime *rt, JSIValue val);
+static void jsi_array_iterator_mark(JSRuntime *rt, JSIValueConst val,
                                 JSI_MarkFunc *mark_func);
-static void jsi_generator_finalizer(JSRuntime *rt, JSValue obj);
-static void jsi_generator_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_generator_finalizer(JSRuntime *rt, JSIValue obj);
+static void jsi_generator_mark(JSRuntime *rt, JSIValueConst val,
                                 JSI_MarkFunc *mark_func);
 static char *pstrcat(char *buf, int buf_size, const char *s);
 
@@ -1066,12 +1066,12 @@ static char *pstrcat(char *buf, int buf_size, const char *s);
 #define HINT_NUMBER  1
 #define HINT_NONE    2
 #define HINT_FORCE_ORDINARY (1 << 4) // don't try Symbol.toPrimitive
-static JSValue JSI_ToPrimitiveFree(JSContext *ctx, JSValue val, int hint);
-static JSValue JSI_ToStringFree(JSContext *ctx, JSValue val);
-static int JSI_ToBoolFree(JSContext *ctx, JSValue val);
-static int JSI_ToInt32Free(JSContext *ctx, int32_t *pres, JSValue val);
-static int JSI_ToUint8ClampFree(JSContext *ctx, int32_t *pres, JSValue val);
-static JSValue jsi_new_string8_len(JSContext *ctx, const char *buf, int len);
+static JSIValue JSI_ToPrimitiveFree(JSIContext *ctx, JSIValue val, int hint);
+static JSIValue JSI_ToStringFree(JSIContext *ctx, JSIValue val);
+static int JSI_ToBoolFree(JSIContext *ctx, JSIValue val);
+static int JSI_ToInt32Free(JSIContext *ctx, int32_t *pres, JSIValue val);
+static int JSI_ToUint8ClampFree(JSIContext *ctx, int32_t *pres, JSIValue val);
+static JSIValue jsi_new_string8_len(JSIContext *ctx, const char *buf, int len);
 static void gc_decref(JSRuntime *rt);
 static int JSI_NewClass1(JSRuntime *rt, JSClassID class_id,
                         const JSClassDef *class_def, JSAtom name);
@@ -1082,92 +1082,92 @@ typedef enum JSStrictEqModeEnum {
     JSI_EQ_SAME_VALUE_ZERO,
 } JSStrictEqModeEnum;
 
-static BOOL jsi_strict_eq2(JSContext *ctx, JSValue op1, JSValue op2,
+static BOOL jsi_strict_eq2(JSIContext *ctx, JSIValue op1, JSIValue op2,
                           JSStrictEqModeEnum eq_mode);
-static BOOL jsi_strict_eq(JSContext *ctx, JSValueConst op1, JSValueConst op2);
-static BOOL jsi_same_value(JSContext *ctx, JSValueConst op1, JSValueConst op2);
-static BOOL jsi_same_value_zero(JSContext *ctx, JSValueConst op1, JSValueConst op2);
-static JSValue JSI_ToObject(JSContext *ctx, JSValueConst val);
-static JSValue JSI_ToObjectFree(JSContext *ctx, JSValue val);
-static JSProperty *add_property(JSContext *ctx,
+static BOOL jsi_strict_eq(JSIContext *ctx, JSIValueConst op1, JSIValueConst op2);
+static BOOL jsi_same_value(JSIContext *ctx, JSIValueConst op1, JSIValueConst op2);
+static BOOL jsi_same_value_zero(JSIContext *ctx, JSIValueConst op1, JSIValueConst op2);
+static JSIValue JSI_ToObject(JSIContext *ctx, JSIValueConst val);
+static JSIValue JSI_ToObjectFree(JSIContext *ctx, JSIValue val);
+static JSProperty *add_property(JSIContext *ctx,
                                 JSObject *p, JSAtom prop, int prop_flags);
-JSValue JSI_ThrowOutOfMemory(JSContext *ctx);
+JSIValue JSI_ThrowOutOfMemory(JSIContext *ctx);
 
-static int JSI_CreateProperty(JSContext *ctx, JSObject *p,
-                             JSAtom prop, JSValueConst val,
-                             JSValueConst getter, JSValueConst setter,
+static int JSI_CreateProperty(JSIContext *ctx, JSObject *p,
+                             JSAtom prop, JSIValueConst val,
+                             JSIValueConst getter, JSIValueConst setter,
                              int flags);
 static int jsi_string_memcmp(const JSString *p1, int pos1, const JSString *p2,
                             int pos2, int len);
 static void __async_func_free(JSRuntime *rt, JSAsyncFunctionState *s);
 static void async_func_free(JSRuntime *rt, JSAsyncFunctionState *s);
-static JSValue jsi_generator_function_call(JSContext *ctx, JSValueConst func_obj,
-                                          JSValueConst this_obj,
-                                          int argc, JSValueConst *argv,
+static JSIValue jsi_generator_function_call(JSIContext *ctx, JSIValueConst func_obj,
+                                          JSIValueConst this_obj,
+                                          int argc, JSIValueConst *argv,
                                           int flags);
-static void jsi_async_function_resolve_finalizer(JSRuntime *rt, JSValue val);
-static void jsi_async_function_resolve_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_async_function_resolve_finalizer(JSRuntime *rt, JSIValue val);
+static void jsi_async_function_resolve_mark(JSRuntime *rt, JSIValueConst val,
                                            JSI_MarkFunc *mark_func);
-static JSValue JSI_EvalInternal(JSContext *ctx, JSValueConst this_obj,
+static JSIValue JSI_EvalInternal(JSIContext *ctx, JSIValueConst this_obj,
                                const char *input, size_t input_len,
                                const char *filename, int flags, int scope_idx);
 static void jsi_free_module_def(JSRuntime *rt, JSModuleDef *m);
 static void jsi_mark_module_def(JSRuntime *rt, JSModuleDef *m,
                                JSI_MarkFunc *mark_func);
-static JSValue jsi_import_meta(JSContext *ctx);
+static JSIValue jsi_import_meta(JSIContext *ctx);
 static void free_var_ref(JSRuntime *rt, JSVarRef *var_ref);
-static JSValue jsi_new_promise_capability(JSContext *ctx,
-                                         JSValue *resolving_funcs,
-                                         JSValueConst ctor);
-static int jsi_string_compare(JSContext *ctx,
+static JSIValue jsi_new_promise_capability(JSIContext *ctx,
+                                         JSIValue *resolving_funcs,
+                                         JSIValueConst ctor);
+static int jsi_string_compare(JSIContext *ctx,
                              const JSString *p1, const JSString *p2);
-static JSValue JSI_ToNumber(JSContext *ctx, JSValueConst val);
-static int JSI_SetPropertyValue(JSContext *ctx, JSValueConst this_obj,
-                               JSValue prop, JSValue val, int flags);
-static int JSI_NumberIsInteger(JSContext *ctx, JSValueConst val);
-static BOOL JSI_NumberIsNegativeOrMinusZero(JSContext *ctx, JSValueConst val);
-static JSValue JSI_ToNumberFree(JSContext *ctx, JSValue val);
-static int JSI_GetOwnPropertyInternal(JSContext *ctx, JSPropertyDescriptor *desc,
+static JSIValue JSI_ToNumber(JSIContext *ctx, JSIValueConst val);
+static int JSI_SetPropertyValue(JSIContext *ctx, JSIValueConst this_obj,
+                               JSIValue prop, JSIValue val, int flags);
+static int JSI_NumberIsInteger(JSIContext *ctx, JSIValueConst val);
+static BOOL JSI_NumberIsNegativeOrMinusZero(JSIContext *ctx, JSIValueConst val);
+static JSIValue JSI_ToNumberFree(JSIContext *ctx, JSIValue val);
+static int JSI_GetOwnPropertyInternal(JSIContext *ctx, JSPropertyDescriptor *desc,
                                      JSObject *p, JSAtom prop);
-static void jsi_free_desc(JSContext *ctx, JSPropertyDescriptor *desc);
-static void JSI_AddIntrinsicBasicObjects(JSContext *ctx);
+static void jsi_free_desc(JSIContext *ctx, JSPropertyDescriptor *desc);
+static void JSI_AddIntrinsicBasicObjects(JSIContext *ctx);
 static void jsi_free_shape(JSRuntime *rt, JSShape *sh);
 static void jsi_free_shape_null(JSRuntime *rt, JSShape *sh);
-static int jsi_shape_prepare_update(JSContext *ctx, JSObject *p,
+static int jsi_shape_prepare_update(JSIContext *ctx, JSObject *p,
                                    JSShapeProperty **pprs);
 static int init_shape_hash(JSRuntime *rt);
-static __exception int jsi_get_length32(JSContext *ctx, uint32_t *pres,
-                                       JSValueConst obj);
-static __exception int jsi_get_length64(JSContext *ctx, int64_t *pres,
-                                       JSValueConst obj);
-static void free_arg_list(JSContext *ctx, JSValue *tab, uint32_t len);
-static JSValue *build_arg_list(JSContext *ctx, uint32_t *plen,
-                               JSValueConst array_arg);
-static BOOL jsi_get_fast_array(JSContext *ctx, JSValueConst obj,
-                              JSValue **arrpp, uint32_t *countp);
-static JSValue JSI_CreateAsyncFromSyncIterator(JSContext *ctx,
-                                              JSValueConst sync_iter);
-static void jsi_c_function_data_finalizer(JSRuntime *rt, JSValue val);
-static void jsi_c_function_data_mark(JSRuntime *rt, JSValueConst val,
+static __exception int jsi_get_length32(JSIContext *ctx, uint32_t *pres,
+                                       JSIValueConst obj);
+static __exception int jsi_get_length64(JSIContext *ctx, int64_t *pres,
+                                       JSIValueConst obj);
+static void free_arg_list(JSIContext *ctx, JSIValue *tab, uint32_t len);
+static JSIValue *build_arg_list(JSIContext *ctx, uint32_t *plen,
+                               JSIValueConst array_arg);
+static BOOL jsi_get_fast_array(JSIContext *ctx, JSIValueConst obj,
+                              JSIValue **arrpp, uint32_t *countp);
+static JSIValue JSI_CreateAsyncFromSyncIterator(JSIContext *ctx,
+                                              JSIValueConst sync_iter);
+static void jsi_c_function_data_finalizer(JSRuntime *rt, JSIValue val);
+static void jsi_c_function_data_mark(JSRuntime *rt, JSIValueConst val,
                                     JSI_MarkFunc *mark_func);
-static JSValue jsi_c_function_data_call(JSContext *ctx, JSValueConst func_obj,
-                                       JSValueConst this_val,
-                                       int argc, JSValueConst *argv, int flags);
-static JSAtom jsi_symbol_to_atom(JSContext *ctx, JSValue val);
+static JSIValue jsi_c_function_data_call(JSIContext *ctx, JSIValueConst func_obj,
+                                       JSIValueConst this_val,
+                                       int argc, JSIValueConst *argv, int flags);
+static JSAtom jsi_symbol_to_atom(JSIContext *ctx, JSIValue val);
 static void add_gc_object(JSRuntime *rt, JSGCObjectHeader *h,
                           JSGCObjectTypeEnum type);
 static void remove_gc_object(JSGCObjectHeader *h);
-static JSValue jsi_instantiate_prototype(JSContext *ctx, JSObject *p, JSAtom atom, void *opaque);
-static JSValue jsi_module_ns_autoinit(JSContext *ctx, JSObject *p, JSAtom atom,
+static JSIValue jsi_instantiate_prototype(JSIContext *ctx, JSObject *p, JSAtom atom, void *opaque);
+static JSIValue jsi_module_ns_autoinit(JSIContext *ctx, JSObject *p, JSAtom atom,
                                  void *opaque);
-static JSValue JSI_InstantiateFunctionListItem2(JSContext *ctx, JSObject *p,
+static JSIValue JSI_InstantiateFunctionListItem2(JSIContext *ctx, JSObject *p,
                                                JSAtom atom, void *opaque);
 static void JSI_RunGCInternal(JSRuntime *rt);
-static JSValue jsi_array_from_iterator(JSContext *ctx, uint32_t *plen,
-                                      JSValueConst obj, JSValueConst method);
+static JSIValue jsi_array_from_iterator(JSIContext *ctx, uint32_t *plen,
+                                      JSIValueConst obj, JSIValueConst method);
 static int jsi_string_find_invalid_codepoint(JSString *p);
-static JSValue jsi_error_toString(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv);
+static JSIValue jsi_error_toString(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv);
 
 static const JSClassExoticMethods jsi_arguments_exotic_methods;
 static const JSClassExoticMethods jsi_string_exotic_methods;
@@ -1238,13 +1238,13 @@ typedef struct {
 typedef struct {
     struct list_head link;
     JSWorkerMessagePipe *recv_pipe;
-    JSValue on_message_func;
+    JSIValue on_message_func;
 } JSWorkerMessageHandler;
 
 typedef struct {
     struct list_head link;
-    JSValue promise;
-    JSValue reason;
+    JSIValue promise;
+    JSIValue reason;
 } JSRejectedPromiseEntry;
 
 typedef struct JSThreadState {
@@ -1257,9 +1257,9 @@ typedef struct JSThreadState {
 } JSThreadState;
 
 static uint64_t os_pending_signals;
-static int (*os_poll_func)(JSContext *ctx);
+static int (*os_poll_func)(JSIContext *ctx);
 
-static void jsi_std_dbuf_jsi_init(JSContext *ctx, DynBuf *s)
+static void jsi_std_dbuf_jsi_init(JSIContext *ctx, DynBuf *s)
 {
     dbuf_jsi_init2(s, JSI_GetRuntime(ctx), (DynBufReallocFunc *)jsi_realloc_rt);
 }
@@ -1270,12 +1270,12 @@ static BOOL my_isdigit(int c)
 }
 
 /* XXX: use 'o' and 'O' for object using JSI_PrintValue() ? */
-static JSValue jsi_printf_internal(JSContext *ctx,
-                                  int argc, JSValueConst *argv, FILE *fp)
+static JSIValue jsi_printf_internal(JSIContext *ctx,
+                                  int argc, JSIValueConst *argv, FILE *fp)
 {
     char fmtbuf[32];
     uint8_t cbuf[UTF8_CHAR_LEN_MAX+1];
-    JSValue res;
+    JSIValue res;
     DynBuf dbuf;
     const char *fmt_str = NULL;
     const uint8_t *fmt, *fmt_end;
@@ -1492,16 +1492,16 @@ fail:
 
 /* load a file as a UTF-8 encoded string */
 
-typedef JSModuleDef *(JSInitModuleFunc)(JSContext *ctx,
+typedef JSModuleDef *(JSInitModuleFunc)(JSIContext *ctx,
                                         const char *module_name);
 
 
-int jsi_module_set_import_meta(JSContext *ctx, JSValueConst func_val,
+int jsi_module_set_import_meta(JSIContext *ctx, JSIValueConst func_val,
                               JSI_BOOL use_realpath, JSI_BOOL is_main)
 {
     JSModuleDef *m;
     char buf[PATH_MAX + 16];
-    JSValue meta_obj;
+    JSIValue meta_obj;
     JSAtom module_name_atom;
     const char *module_name;
 
@@ -1549,15 +1549,15 @@ int jsi_module_set_import_meta(JSContext *ctx, JSValueConst func_val,
     return 0;
 }
 
-static int json_module_init(JSContext *ctx, JSModuleDef *m)
+static int json_module_init(JSIContext *ctx, JSModuleDef *m)
 {
-    JSValue val;
+    JSIValue val;
     val = JSI_GetModulePrivateValue(ctx, m);
     JSI_SetModuleExport(ctx, m, "default", val);
     return 0;
 }
 
-static JSModuleDef *create_json_module(JSContext *ctx, const char *module_name, JSValue val)
+static JSModuleDef *create_json_module(JSIContext *ctx, const char *module_name, JSIValue val)
 {
     JSModuleDef *m;
     m = JSI_NewCModule(ctx, module_name, json_module_init);
@@ -1573,8 +1573,8 @@ static JSModuleDef *create_json_module(JSContext *ctx, const char *module_name, 
 
 /* in order to conform with the specification, only the keys should be
    tested and not the associated values. */
-int jsi_module_check_attributes(JSContext *ctx, void *opaque,
-                               JSValueConst attributes)
+int jsi_module_check_attributes(JSIContext *ctx, void *opaque,
+                               JSIValueConst attributes)
 {
     JSPropertyEnum *tab;
     uint32_t i, len;
@@ -1604,9 +1604,9 @@ int jsi_module_check_attributes(JSContext *ctx, void *opaque,
 }
 
 /* return > 0 if the attributes indicate a JSON module */
-int jsi_module_test_json(JSContext *ctx, JSValueConst attributes)
+int jsi_module_test_json(JSIContext *ctx, JSIValueConst attributes)
 {
-    JSValue str;
+    JSIValue str;
     const char *cstr;
     size_t len;
     BOOL res;
@@ -1640,11 +1640,11 @@ int jsi_module_test_json(JSContext *ctx, JSValueConst attributes)
 
 
 
-static int get_bool_option(JSContext *ctx, BOOL *pbool,
-                           JSValueConst obj,
+static int get_bool_option(JSIContext *ctx, BOOL *pbool,
+                           JSIValueConst obj,
                            const char *option)
 {
-    JSValue val;
+    JSIValue val;
     val = JSI_GetPropertyStr(ctx, obj, option);
     if (JSI_IsException(val))
         return -1;
@@ -1732,7 +1732,7 @@ static int64_t get_time_ns(void)
 
 #if defined(_WIN32)
 
-static int jsi_os_poll(JSContext *ctx)
+static int jsi_os_poll(JSIContext *ctx)
 {
     JSRuntime *rt = JSI_GetRuntime(ctx);
     JSThreadState *ts = JSI_GetRuntimeOpaque(rt);
@@ -1756,7 +1756,7 @@ static int jsi_os_poll(JSContext *ctx)
             JSOSTimer *th = list_entry(el, JSOSTimer, link);
             delay = th->timeout - cur_time;
             if (delay <= 0) {
-                JSValue func;
+                JSIValue func;
                 /* the timer expired */
                 func = th->func;
                 th->func = JSI_UNDEFINED;
@@ -1829,11 +1829,11 @@ static int jsi_os_poll(JSContext *ctx)
 
 #endif /* !_WIN32 */
 
-static JSValue make_obj_error(JSContext *ctx,
-                              JSValue obj,
+static JSIValue make_obj_error(JSIContext *ctx,
+                              JSIValue obj,
                               int err)
 {
-    JSValue arr;
+    JSIValue arr;
     if (JSI_IsException(obj))
         return obj;
     arr = JSI_NewArray(ctx);
@@ -1846,7 +1846,7 @@ static JSValue make_obj_error(JSContext *ctx,
     return arr;
 }
 
-static JSValue make_string_error(JSContext *ctx,
+static JSIValue make_string_error(JSIContext *ctx,
                                  const char *buf,
                                  int err)
 {
@@ -1894,13 +1894,13 @@ static char *realpath(const char *path, char *buf)
 
 #if !defined(_WIN32)
 
-static char **build_envp(JSContext *ctx, JSValueConst obj)
+static char **build_envp(JSIContext *ctx, JSIValueConst obj)
 {
     uint32_t len, i;
     JSPropertyEnum *tab;
     char **envp, *pair;
     const char *key, *str;
-    JSValue val;
+    JSIValue val;
     size_t key_len, str_len;
 
     if (JSI_GetOwnPropertyNames(ctx, &tab, &len, obj,
@@ -1960,7 +1960,7 @@ static char **build_envp(JSContext *ctx, JSValueConst obj)
 #endif /* !_WIN32 */
 
 
-void jsi_std_set_worker_new_context_func(JSContext *(*func)(JSRuntime *rt))
+void jsi_std_set_worker_new_context_func(JSIContext *(*func)(JSRuntime *rt))
 {
 }
 
@@ -2676,7 +2676,7 @@ void *jsi_mallocz_rt(JSRuntime *rt, size_t size)
 }
 
 /* Throw out of memory in case of error */
-void *jsi_malloc(JSContext *ctx, size_t size)
+void *jsi_malloc(JSIContext *ctx, size_t size)
 {
     void *ptr;
     ptr = jsi_malloc_rt(ctx->rt, size);
@@ -2688,7 +2688,7 @@ void *jsi_malloc(JSContext *ctx, size_t size)
 }
 
 /* Throw out of memory in case of error */
-void *jsi_mallocz(JSContext *ctx, size_t size)
+void *jsi_mallocz(JSIContext *ctx, size_t size)
 {
     void *ptr;
     ptr = jsi_mallocz_rt(ctx->rt, size);
@@ -2699,13 +2699,13 @@ void *jsi_mallocz(JSContext *ctx, size_t size)
     return ptr;
 }
 
-void jsi_free(JSContext *ctx, void *ptr)
+void jsi_free(JSIContext *ctx, void *ptr)
 {
     jsi_free_rt(ctx->rt, ptr);
 }
 
 /* Throw out of memory in case of error */
-void *jsi_realloc(JSContext *ctx, void *ptr, size_t size)
+void *jsi_realloc(JSIContext *ctx, void *ptr, size_t size)
 {
     void *ret;
     ret = jsi_realloc_rt(ctx->rt, ptr, size);
@@ -2717,7 +2717,7 @@ void *jsi_realloc(JSContext *ctx, void *ptr, size_t size)
 }
 
 /* store extra allocated size in *pslack if successful */
-void *jsi_realloc2(JSContext *ctx, void *ptr, size_t size, size_t *pslack)
+void *jsi_realloc2(JSIContext *ctx, void *ptr, size_t size, size_t *pslack)
 {
     void *ret;
     ret = jsi_realloc_rt(ctx->rt, ptr, size);
@@ -2732,13 +2732,13 @@ void *jsi_realloc2(JSContext *ctx, void *ptr, size_t size, size_t *pslack)
     return ret;
 }
 
-size_t jsi_malloc_usable_size(JSContext *ctx, const void *ptr)
+size_t jsi_malloc_usable_size(JSIContext *ctx, const void *ptr)
 {
     return jsi_malloc_usable_size_rt(ctx->rt, ptr);
 }
 
 /* Throw out of memory exception in case of error */
-char *jsi_strndup(JSContext *ctx, const char *s, size_t n)
+char *jsi_strndup(JSIContext *ctx, const char *s, size_t n)
 {
     char *ptr;
     ptr = jsi_malloc(ctx, n + 1);
@@ -2749,12 +2749,12 @@ char *jsi_strndup(JSContext *ctx, const char *s, size_t n)
     return ptr;
 }
 
-char *jsi_strdup(JSContext *ctx, const char *str)
+char *jsi_strdup(JSIContext *ctx, const char *str)
 {
     return jsi_strndup(ctx, str, strlen(str));
 }
 
-static no_inline int jsi_realloc_array(JSContext *ctx, void **parray,
+static no_inline int jsi_realloc_array(JSIContext *ctx, void **parray,
                                       int elem_size, int *psize, int req_size)
 {
     int new_size;
@@ -2772,7 +2772,7 @@ static no_inline int jsi_realloc_array(JSContext *ctx, void **parray,
 }
 
 /* resize the array and update its size if req_size > *psize */
-static inline int jsi_resize_array(JSContext *ctx, void **parray, int elem_size,
+static inline int jsi_resize_array(JSIContext *ctx, void **parray, int elem_size,
                                   int *psize, int req_size)
 {
     if (unlikely(req_size > *psize))
@@ -2781,7 +2781,7 @@ static inline int jsi_resize_array(JSContext *ctx, void **parray, int elem_size,
         return 0;
 }
 
-static inline void jsi_dbuf_jsi_init(JSContext *ctx, DynBuf *s)
+static inline void jsi_dbuf_jsi_init(JSIContext *ctx, DynBuf *s)
 {
     dbuf_jsi_init2(s, ctx->rt, (DynBufReallocFunc *)jsi_realloc_rt);
 }
@@ -3066,14 +3066,14 @@ int JSI_GetStripInfo(JSRuntime *rt)
 }
 
 /* return 0 if OK, < 0 if exception */
-int JSI_EnqueueJob(JSContext *ctx, JSJobFunc *job_func,
-                  int argc, JSValueConst *argv)
+int JSI_EnqueueJob(JSIContext *ctx, JSJobFunc *job_func,
+                  int argc, JSIValueConst *argv)
 {
     JSRuntime *rt = ctx->rt;
     JSJobEntry *e;
     int i;
 
-    e = jsi_malloc(ctx, sizeof(*e) + argc * sizeof(JSValue));
+    e = jsi_malloc(ctx, sizeof(*e) + argc * sizeof(JSIValue));
     if (!e)
         return -1;
     e->realm = JSI_DupContext(ctx);
@@ -3096,11 +3096,11 @@ BOOL JSI_IsJobPending(JSRuntime *rt)
    if pctx != NULL. It may be NULL if the context was already
    destroyed or if no job was pending. The 'pctx' parameter is now
    absolete. */
-int JSI_ExecutePendingJob(JSRuntime *rt, JSContext **pctx)
+int JSI_ExecutePendingJob(JSRuntime *rt, JSIContext **pctx)
 {
-    JSContext *ctx;
+    JSIContext *ctx;
     JSJobEntry *e;
-    JSValue res;
+    JSIValue res;
     int i, ret;
 
     if (list_empty(&rt->job_list)) {
@@ -3113,7 +3113,7 @@ int JSI_ExecutePendingJob(JSRuntime *rt, JSContext **pctx)
     e = list_entry(rt->job_list.next, JSJobEntry, link);
     list_del(&e->link);
     ctx = e->realm;
-    res = e->job_func(ctx, e->argc, (JSValueConst *)e->argv);
+    res = e->job_func(ctx, e->argc, (JSIValueConst *)e->argv);
     for(i = 0; i < e->argc; i++)
         JSI_FreeValue(ctx, e->argv[i]);
     if (JSI_IsException(res))
@@ -3166,7 +3166,7 @@ static JSString *jsi_alloc_string_rt(JSRuntime *rt, int max_len, int is_wide_cha
     return str;
 }
 
-static JSString *jsi_alloc_string(JSContext *ctx, int max_len, int is_wide_char)
+static JSString *jsi_alloc_string(JSIContext *ctx, int max_len, int is_wide_char)
 {
     JSString *p;
     p = jsi_alloc_string_rt(ctx->rt, max_len, is_wide_char);
@@ -3386,12 +3386,12 @@ void JSI_FreeRuntime(JSRuntime *rt)
     }
 }
 
-JSContext *JSI_NewContextRaw(JSRuntime *rt)
+JSIContext *JSI_NewContextRaw(JSRuntime *rt)
 {
-    JSContext *ctx;
+    JSIContext *ctx;
     int i;
 
-    ctx = jsi_mallocz_rt(rt, sizeof(JSContext));
+    ctx = jsi_mallocz_rt(rt, sizeof(JSIContext));
     if (!ctx)
         return NULL;
     ctx->header.ref_count = 1;
@@ -3416,9 +3416,9 @@ JSContext *JSI_NewContextRaw(JSRuntime *rt)
     return ctx;
 }
 
-JSContext *JSI_NewContext(JSRuntime *rt)
+JSIContext *JSI_NewContext(JSRuntime *rt)
 {
-    JSContext *ctx;
+    JSIContext *ctx;
 
     ctx = JSI_NewContextRaw(rt);
     if (!ctx)
@@ -3431,34 +3431,34 @@ JSContext *JSI_NewContext(JSRuntime *rt)
 }
 
 
-void *JSI_GetContextOpaque(JSContext *ctx)
+void *JSI_GetContextOpaque(JSIContext *ctx)
 {
     return ctx->user_opaque;
 }
 
-void JSI_SetContextOpaque(JSContext *ctx, void *opaque)
+void JSI_SetContextOpaque(JSIContext *ctx, void *opaque)
 {
     ctx->user_opaque = opaque;
 }
 
 /* set the new value and free the old value after (freeing the value
    can reallocate the object data) */
-static inline void set_value(JSContext *ctx, JSValue *pval, JSValue new_val)
+static inline void set_value(JSIContext *ctx, JSIValue *pval, JSIValue new_val)
 {
-    JSValue old_val;
+    JSIValue old_val;
     old_val = *pval;
     *pval = new_val;
     JSI_FreeValue(ctx, old_val);
 }
 
-void JSI_SetClassProto(JSContext *ctx, JSClassID class_id, JSValue obj)
+void JSI_SetClassProto(JSIContext *ctx, JSClassID class_id, JSIValue obj)
 {
     JSRuntime *rt = ctx->rt;
     assert(class_id < rt->class_count);
     set_value(ctx, &ctx->class_proto[class_id], obj);
 }
 
-JSValue JSI_GetClassProto(JSContext *ctx, JSClassID class_id)
+JSIValue JSI_GetClassProto(JSIContext *ctx, JSClassID class_id)
 {
     JSRuntime *rt = ctx->rt;
     assert(class_id < rt->class_count);
@@ -3471,7 +3471,7 @@ typedef enum JSFreeModuleEnum {
 } JSFreeModuleEnum;
 
 /* XXX: would be more efficient with separate module lists */
-static void jsi_free_modules(JSContext *ctx, JSFreeModuleEnum flag)
+static void jsi_free_modules(JSIContext *ctx, JSFreeModuleEnum flag)
 {
     struct list_head *el, *el1;
     list_for_each_safe(el, el1, &ctx->loaded_modules) {
@@ -3489,14 +3489,14 @@ static void jsi_free_modules(JSContext *ctx, JSFreeModuleEnum flag)
     }
 }
 
-JSContext *JSI_DupContext(JSContext *ctx)
+JSIContext *JSI_DupContext(JSIContext *ctx)
 {
     ctx->header.ref_count++;
     return ctx;
 }
 
 /* used by the GC */
-static void JSI_MarkContext(JSRuntime *rt, JSContext *ctx,
+static void JSI_MarkContext(JSRuntime *rt, JSIContext *ctx,
                            JSI_MarkFunc *mark_func)
 {
     int i;
@@ -3532,7 +3532,7 @@ static void JSI_MarkContext(JSRuntime *rt, JSContext *ctx,
         mark_func(rt, &ctx->array_shape->header);
 }
 
-void JSI_FreeContext(JSContext *ctx)
+void JSI_FreeContext(JSIContext *ctx)
 {
     JSRuntime *rt = ctx->rt;
     int i;
@@ -3599,7 +3599,7 @@ void JSI_FreeContext(JSContext *ctx)
     jsi_free_rt(ctx->rt, ctx);
 }
 
-JSRuntime *JSI_GetRuntime(JSContext *ctx)
+JSRuntime *JSI_GetRuntime(JSIContext *ctx)
 {
     return ctx->rt;
 }
@@ -3625,7 +3625,7 @@ void JSI_UpdateStackTop(JSRuntime *rt)
     update_stack_limit(rt);
 }
 
-static inline BOOL is_strict_mode(JSContext *ctx)
+static inline BOOL is_strict_mode(JSIContext *ctx)
 {
     JSStackFrame *sf = ctx->rt->current_stack_frame;
     return (sf && (sf->jsi_mode & JSI_MODE_STRICT));
@@ -3733,7 +3733,7 @@ static uint32_t hash_string(const JSString *str, uint32_t h)
     return h;
 }
 
-static uint32_t hash_string_rope(JSValueConst val, uint32_t h)
+static uint32_t hash_string_rope(JSIValueConst val, uint32_t h)
 {
     if (JSI_VALUE_GET_TAG(val) == JSI_TAG_STRING) {
         return hash_string(JSI_VALUE_GET_STRING(val), h);
@@ -3881,7 +3881,7 @@ static JSAtom JSI_DupAtomRT(JSRuntime *rt, JSAtom v)
     return v;
 }
 
-JSAtom JSI_DupAtom(JSContext *ctx, JSAtom v)
+JSAtom JSI_DupAtom(JSIContext *ctx, JSAtom v)
 {
     JSRuntime *rt;
     JSAtomStruct *p;
@@ -3894,7 +3894,7 @@ JSAtom JSI_DupAtom(JSContext *ctx, JSAtom v)
     return v;
 }
 
-static JSAtomKindEnum JSI_AtomGetKind(JSContext *ctx, JSAtom v)
+static JSAtomKindEnum JSI_AtomGetKind(JSIContext *ctx, JSAtom v)
 {
     JSRuntime *rt;
     JSAtomStruct *p;
@@ -3918,7 +3918,7 @@ static JSAtomKindEnum JSI_AtomGetKind(JSContext *ctx, JSAtom v)
     }
 }
 
-static BOOL JSI_AtomIsString(JSContext *ctx, JSAtom v)
+static BOOL JSI_AtomIsString(JSIContext *ctx, JSAtom v)
 {
     return JSI_AtomGetKind(ctx, v) == JSI_ATOM_KIND_STRING;
 }
@@ -4197,7 +4197,7 @@ static void __JSI_FreeAtom(JSRuntime *rt, uint32_t i)
 }
 
 /* Warning: 'p' is freed */
-static JSAtom JSI_NewAtomStr(JSContext *ctx, JSString *p)
+static JSAtom JSI_NewAtomStr(JSIContext *ctx, JSString *p)
 {
     JSRuntime *rt = ctx->rt;
     uint32_t n;
@@ -4223,9 +4223,9 @@ static size_t count_ascii(const uint8_t *buf, size_t len)
 }
 
 /* str is UTF-8 encoded */
-JSAtom JSI_NewAtomLen(JSContext *ctx, const char *str, size_t len)
+JSAtom JSI_NewAtomLen(JSIContext *ctx, const char *str, size_t len)
 {
-    JSValue val;
+    JSIValue val;
 
     if (len == 0 ||
         (!is_digit(*str) &&
@@ -4240,7 +4240,7 @@ JSAtom JSI_NewAtomLen(JSContext *ctx, const char *str, size_t len)
     return JSI_NewAtomStr(ctx, JSI_VALUE_GET_STRING(val));
 }
 
-JSAtom JSI_NewAtom(JSContext *ctx, const char *str)
+JSAtom JSI_NewAtom(JSIContext *ctx, const char *str)
 {
     return JSI_NewAtomLen(ctx, str, strlen(str));
 }
@@ -4273,13 +4273,13 @@ static int64_t u64toa2(char* buf, int64_t n)
     return p - buf;
 }
 
-JSAtom JSI_NewAtomUInt32(JSContext *ctx, uint32_t n)
+JSAtom JSI_NewAtomUInt32(JSIContext *ctx, uint32_t n)
 {
     if (n <= JSI_ATOM_MAX_INT) {
         return __JSI_AtomFromUInt32(n);
     } else {
         char buf[11];
-        JSValue val;
+        JSIValue val;
         size_t len;
         len = u64toa2(buf, n);
         val = jsi_new_string8_len(ctx, buf, len);
@@ -4290,13 +4290,13 @@ JSAtom JSI_NewAtomUInt32(JSContext *ctx, uint32_t n)
     }
 }
 
-static JSAtom JSI_NewAtomInt64(JSContext *ctx, int64_t n)
+static JSAtom JSI_NewAtomInt64(JSIContext *ctx, int64_t n)
 {
     if ((uint64_t)n <= JSI_ATOM_MAX_INT) {
         return __JSI_AtomFromUInt32((uint32_t)n);
     } else {
         char buf[24];
-        JSValue val;
+        JSIValue val;
         size_t len;
         len = u64toa2(buf, n);
         val = jsi_new_string8_len(ctx, buf, len);
@@ -4308,7 +4308,7 @@ static JSAtom JSI_NewAtomInt64(JSContext *ctx, int64_t n)
 }
 
 /* 'p' is freed */
-static JSValue JSI_NewSymbol(JSContext *ctx, JSString *p, int atom_type)
+static JSIValue JSI_NewSymbol(JSIContext *ctx, JSString *p, int atom_type)
 {
     JSRuntime *rt = ctx->rt;
     JSAtom atom;
@@ -4319,7 +4319,7 @@ static JSValue JSI_NewSymbol(JSContext *ctx, JSString *p, int atom_type)
 }
 
 /* descr must be a non-numeric string atom */
-static JSValue JSI_NewSymbolFromAtom(JSContext *ctx, JSAtom descr,
+static JSIValue JSI_NewSymbolFromAtom(JSIContext *ctx, JSAtom descr,
                                     int atom_type)
 {
     JSRuntime *rt = ctx->rt;
@@ -4381,12 +4381,12 @@ static const char *JSI_AtomGetStrRT(JSRuntime *rt, char *buf, int buf_size,
     return buf;
 }
 
-static const char *JSI_AtomGetStr(JSContext *ctx, char *buf, int buf_size, JSAtom atom)
+static const char *JSI_AtomGetStr(JSIContext *ctx, char *buf, int buf_size, JSAtom atom)
 {
     return JSI_AtomGetStrRT(ctx->rt, buf, buf_size, atom);
 }
 
-static JSValue __JSI_AtomToValue(JSContext *ctx, JSAtom atom, BOOL force_string)
+static JSIValue __JSI_AtomToValue(JSIContext *ctx, JSAtom atom, BOOL force_string)
 {
     char buf[ATOM_GET_STR_BUF_SIZE];
 
@@ -4413,19 +4413,19 @@ static JSValue __JSI_AtomToValue(JSContext *ctx, JSAtom atom, BOOL force_string)
     }
 }
 
-JSValue JSI_AtomToValue(JSContext *ctx, JSAtom atom)
+JSIValue JSI_AtomToValue(JSIContext *ctx, JSAtom atom)
 {
     return __JSI_AtomToValue(ctx, atom, FALSE);
 }
 
-JSValue JSI_AtomToString(JSContext *ctx, JSAtom atom)
+JSIValue JSI_AtomToString(JSIContext *ctx, JSAtom atom)
 {
     return __JSI_AtomToValue(ctx, atom, TRUE);
 }
 
 /* return TRUE if the atom is an array index (i.e. 0 <= index <=
    2^32-2 and return its value */
-static BOOL JSI_AtomIsArrayIndex(JSContext *ctx, uint32_t *pval, JSAtom atom)
+static BOOL JSI_AtomIsArrayIndex(JSIContext *ctx, uint32_t *pval, JSAtom atom)
 {
     if (__JSI_AtomIsTaggedInt(atom)) {
         *pval = __JSI_AtomToUInt32(atom);
@@ -4451,13 +4451,13 @@ static BOOL JSI_AtomIsArrayIndex(JSContext *ctx, uint32_t *pval, JSAtom atom)
 /* This test must be fast if atom is not a numeric index (e.g. a
    method name). Return JSI_UNDEFINED if not a numeric
    index. JSI_EXCEPTION can also be returned. */
-static JSValue JSI_AtomIsNumericIndex1(JSContext *ctx, JSAtom atom)
+static JSIValue JSI_AtomIsNumericIndex1(JSIContext *ctx, JSAtom atom)
 {
     JSRuntime *rt = ctx->rt;
     JSAtomStruct *p1;
     JSString *p;
     int c, ret;
-    JSValue num, str;
+    JSIValue num, str;
 
     if (__JSI_AtomIsTaggedInt(atom))
         return JSI_NewInt32(ctx, __JSI_AtomToUInt32(atom));
@@ -4495,9 +4495,9 @@ static JSValue JSI_AtomIsNumericIndex1(JSContext *ctx, JSAtom atom)
 }
 
 /* return -1 if exception or TRUE/FALSE */
-static int JSI_AtomIsNumericIndex(JSContext *ctx, JSAtom atom)
+static int JSI_AtomIsNumericIndex(JSIContext *ctx, JSAtom atom)
 {
-    JSValue num;
+    JSIValue num;
     num = JSI_AtomIsNumericIndex1(ctx, atom);
     if (likely(JSI_IsUndefined(num)))
         return FALSE;
@@ -4507,7 +4507,7 @@ static int JSI_AtomIsNumericIndex(JSContext *ctx, JSAtom atom)
     return TRUE;
 }
 
-void JSI_FreeAtom(JSContext *ctx, JSAtom v)
+void JSI_FreeAtom(JSIContext *ctx, JSAtom v)
 {
     if (!__JSI_AtomIsConst(v))
         __JSI_FreeAtom(ctx->rt, v);
@@ -4520,7 +4520,7 @@ void JSI_FreeAtomRT(JSRuntime *rt, JSAtom v)
 }
 
 /* return TRUE if 'v' is a symbol with a string description */
-static BOOL JSI_AtomSymbolHasDescription(JSContext *ctx, JSAtom v)
+static BOOL JSI_AtomSymbolHasDescription(JSIContext *ctx, JSAtom v)
 {
     JSRuntime *rt;
     JSAtomStruct *p;
@@ -4536,9 +4536,9 @@ static BOOL JSI_AtomSymbolHasDescription(JSContext *ctx, JSAtom v)
 }
 
 /* free with JSI_FreeCString() */
-const char *JSI_AtomToCStringLen(JSContext *ctx, size_t *plen, JSAtom atom)
+const char *JSI_AtomToCStringLen(JSIContext *ctx, size_t *plen, JSAtom atom)
 {
-    JSValue str;
+    JSIValue str;
     const char *cstr;
 
     str = JSI_AtomToString(ctx, atom);
@@ -4553,9 +4553,9 @@ const char *JSI_AtomToCStringLen(JSContext *ctx, size_t *plen, JSAtom atom)
 }
 
 /* return a string atom containing name concatenated with str1 */
-static JSAtom jsi_atom_concat_str(JSContext *ctx, JSAtom name, const char *str1)
+static JSAtom jsi_atom_concat_str(JSIContext *ctx, JSAtom name, const char *str1)
 {
-    JSValue str;
+    JSIValue str;
     JSAtom atom;
     const char *cstr;
     char *cstr2;
@@ -4585,7 +4585,7 @@ static JSAtom jsi_atom_concat_str(JSContext *ctx, JSAtom name, const char *str1)
     return JSI_ATOM_NULL;
 }
 
-static JSAtom jsi_atom_concat_num(JSContext *ctx, JSAtom name, uint32_t n)
+static JSAtom jsi_atom_concat_num(JSIContext *ctx, JSAtom name, uint32_t n)
 {
     char buf[16];
     size_t len;
@@ -4594,7 +4594,7 @@ static JSAtom jsi_atom_concat_num(JSContext *ctx, JSAtom name, uint32_t n)
     return jsi_atom_concat_str(ctx, name, buf);
 }
 
-static inline BOOL JSI_IsEmptyString(JSValueConst v)
+static inline BOOL JSI_IsEmptyString(JSIValueConst v)
 {
     return JSI_VALUE_GET_TAG(v) == JSI_TAG_STRING && JSI_VALUE_GET_STRING(v)->len == 0;
 }
@@ -4623,7 +4623,7 @@ JSClassID JSI_NewClassID(JSClassID *pclass_id)
     return class_id;
 }
 
-JSClassID JSI_GetClassID(JSValueConst v)
+JSClassID JSI_GetClassID(JSIValueConst v)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(v) != JSI_TAG_OBJECT)
@@ -4659,8 +4659,8 @@ static int JSI_NewClass1(JSRuntime *rt, JSClassID class_id,
 
         /* reallocate the context class prototype array, if any */
         list_for_each(el, &rt->context_list) {
-            JSContext *ctx = list_entry(el, JSContext, link);
-            JSValue *new_tab;
+            JSIContext *ctx = list_entry(el, JSIContext, link);
+            JSIValue *new_tab;
             new_tab = jsi_realloc_rt(rt, ctx->class_proto,
                                     sizeof(ctx->class_proto[0]) * new_size);
             if (!new_tab)
@@ -4706,7 +4706,7 @@ int JSI_NewClass(JSRuntime *rt, JSClassID class_id, const JSClassDef *class_def)
     return ret;
 }
 
-static JSValue jsi_new_string8_len(JSContext *ctx, const char *buf, int len)
+static JSIValue jsi_new_string8_len(JSIContext *ctx, const char *buf, int len)
 {
     JSString *str;
 
@@ -4721,12 +4721,12 @@ static JSValue jsi_new_string8_len(JSContext *ctx, const char *buf, int len)
     return JSI_MKPTR(JSI_TAG_STRING, str);
 }
 
-static JSValue jsi_new_string8(JSContext *ctx, const char *buf)
+static JSIValue jsi_new_string8(JSIContext *ctx, const char *buf)
 {
     return jsi_new_string8_len(ctx, buf, strlen(buf));
 }
 
-static JSValue jsi_new_string16_len(JSContext *ctx, const uint16_t *buf, int len)
+static JSIValue jsi_new_string16_len(JSIContext *ctx, const uint16_t *buf, int len)
 {
     JSString *str;
     str = jsi_alloc_string(ctx, len, 1);
@@ -4736,7 +4736,7 @@ static JSValue jsi_new_string16_len(JSContext *ctx, const uint16_t *buf, int len
     return JSI_MKPTR(JSI_TAG_STRING, str);
 }
 
-static JSValue jsi_new_string_char(JSContext *ctx, uint16_t c)
+static JSIValue jsi_new_string_char(JSIContext *ctx, uint16_t c)
 {
     if (c < 0x100) {
         uint8_t ch8 = c;
@@ -4747,7 +4747,7 @@ static JSValue jsi_new_string_char(JSContext *ctx, uint16_t c)
     }
 }
 
-static JSValue jsi_sub_string(JSContext *ctx, JSString *p, int start, int end)
+static JSIValue jsi_sub_string(JSIContext *ctx, JSString *p, int start, int end)
 {
     int len = end - start;
     if (start == 0 && end == p->len) {
@@ -4777,7 +4777,7 @@ static JSValue jsi_sub_string(JSContext *ctx, JSString *p, int start, int end)
 }
 
 typedef struct StringBuffer {
-    JSContext *ctx;
+    JSIContext *ctx;
     JSString *str;
     int len;
     int size;
@@ -4789,7 +4789,7 @@ typedef struct StringBuffer {
    if string_buffer_init() or another string_buffer function returns an error.
    If the error_status is set, string_buffer_end() returns JSI_EXCEPTION.
  */
-static int string_buffer_init2(JSContext *ctx, StringBuffer *s, int size,
+static int string_buffer_init2(JSIContext *ctx, StringBuffer *s, int size,
                                int is_wide)
 {
     s->ctx = ctx;
@@ -4809,7 +4809,7 @@ static int string_buffer_init2(JSContext *ctx, StringBuffer *s, int size,
     return 0;
 }
 
-static inline int string_buffer_init(JSContext *ctx, StringBuffer *s, int size)
+static inline int string_buffer_init(JSIContext *ctx, StringBuffer *s, int size)
 {
     return string_buffer_init2(ctx, s, size, 0);
 }
@@ -5021,10 +5021,10 @@ static int string_buffer_concat(StringBuffer *s, const JSString *p,
         return string_buffer_write8(s, p->u.str8 + from, to - from);
 }
 
-static int string_buffer_concat_value(StringBuffer *s, JSValueConst v)
+static int string_buffer_concat_value(StringBuffer *s, JSIValueConst v)
 {
     JSString *p;
-    JSValue v1;
+    JSIValue v1;
     int res;
 
     if (s->error_status) {
@@ -5052,7 +5052,7 @@ static int string_buffer_concat_value(StringBuffer *s, JSValueConst v)
     return string_buffer_concat(s, p, 0, p->len);
 }
 
-static int string_buffer_concat_value_free(StringBuffer *s, JSValue v)
+static int string_buffer_concat_value_free(StringBuffer *s, JSIValue v)
 {
     JSString *p;
     int res;
@@ -5087,7 +5087,7 @@ static int string_buffer_fill(StringBuffer *s, int c, int count)
     return 0;
 }
 
-static JSValue string_buffer_end(StringBuffer *s)
+static JSIValue string_buffer_end(StringBuffer *s)
 {
     JSString *str;
     str = s->str;
@@ -5120,7 +5120,7 @@ static JSValue string_buffer_end(StringBuffer *s)
 }
 
 /* create a string from a UTF-8 buffer */
-JSValue JSI_NewStringLen(JSContext *ctx, const char *buf, size_t buf_len)
+JSIValue JSI_NewStringLen(JSIContext *ctx, const char *buf, size_t buf_len)
 {
     const uint8_t *p, *p_end, *p_start, *p_next;
     uint32_t c;
@@ -5177,8 +5177,8 @@ JSValue JSI_NewStringLen(JSContext *ctx, const char *buf, size_t buf_len)
     return JSI_EXCEPTION;
 }
 
-static JSValue JSI_ConcatString3(JSContext *ctx, const char *str1,
-                                JSValue str2, const char *str3)
+static JSIValue JSI_ConcatString3(JSIContext *ctx, const char *str1,
+                                JSIValue str2, const char *str3)
 {
     StringBuffer b_s, *b = &b_s;
     int len1, len3;
@@ -5208,12 +5208,12 @@ static JSValue JSI_ConcatString3(JSContext *ctx, const char *str1,
     return JSI_EXCEPTION;
 }
 
-JSValue JSI_NewAtomString(JSContext *ctx, const char *str)
+JSIValue JSI_NewAtomString(JSIContext *ctx, const char *str)
 {
     JSAtom atom = JSI_NewAtom(ctx, str);
     if (atom == JSI_ATOM_NULL)
         return JSI_EXCEPTION;
-    JSValue val = JSI_AtomToString(ctx, atom);
+    JSIValue val = JSI_AtomToString(ctx, atom);
     JSI_FreeAtom(ctx, atom);
     return val;
 }
@@ -5221,9 +5221,9 @@ JSValue JSI_NewAtomString(JSContext *ctx, const char *str)
 /* return (NULL, 0) if exception. */
 /* return pointer into a JSString with a live ref_count */
 /* cesu8 determines if non-BMP1 codepoints are encoded as 1 or 2 utf-8 sequences */
-const char *JSI_ToCStringLen2(JSContext *ctx, size_t *plen, JSValueConst val1, BOOL cesu8)
+const char *JSI_ToCStringLen2(JSIContext *ctx, size_t *plen, JSIValueConst val1, BOOL cesu8)
 {
-    JSValue val;
+    JSIValue val;
     JSString *str, *str_new;
     int pos, len, c, c1;
     uint8_t *q;
@@ -5317,7 +5317,7 @@ const char *JSI_ToCStringLen2(JSContext *ctx, size_t *plen, JSValueConst val1, B
     return NULL;
 }
 
-void JSI_FreeCString(JSContext *ctx, const char *ptr)
+void JSI_FreeCString(JSIContext *ctx, const char *ptr)
 {
     JSString *p;
     if (!ptr)
@@ -5369,7 +5369,7 @@ static int jsi_string_memcmp(const JSString *p1, int pos1, const JSString *p2,
 }
 
 /* return < 0, 0 or > 0 */
-static int jsi_string_compare(JSContext *ctx,
+static int jsi_string_compare(JSIContext *ctx,
                              const JSString *p1, const JSString *p2)
 {
     int res, len;
@@ -5399,7 +5399,7 @@ static void copy_str16(uint16_t *dst, const JSString *p, int offset, int len)
     }
 }
 
-static JSValue JSI_ConcatString1(JSContext *ctx,
+static JSIValue JSI_ConcatString1(JSIContext *ctx,
                                 const JSString *p1, const JSString *p2)
 {
     JSString *p;
@@ -5424,7 +5424,7 @@ static JSValue JSI_ConcatString1(JSContext *ctx,
     return JSI_MKPTR(JSI_TAG_STRING, p);
 }
 
-static BOOL JSI_ConcatStringInPlace(JSContext *ctx, JSString *p1, JSValueConst op2) {
+static BOOL JSI_ConcatStringInPlace(JSIContext *ctx, JSString *p1, JSIValueConst op2) {
     if (JSI_VALUE_GET_TAG(op2) == JSI_TAG_STRING) {
         JSString *p2 = JSI_VALUE_GET_STRING(op2);
         size_t size1;
@@ -5460,9 +5460,9 @@ static BOOL JSI_ConcatStringInPlace(JSContext *ctx, JSString *p1, JSValueConst o
     return FALSE;
 }
 
-static JSValue JSI_ConcatString2(JSContext *ctx, JSValue op1, JSValue op2)
+static JSIValue JSI_ConcatString2(JSIContext *ctx, JSIValue op1, JSIValue op2)
 {
-    JSValue ret;
+    JSIValue ret;
     JSString *p1, *p2;
     p1 = JSI_VALUE_GET_STRING(op1);
     if (JSI_ConcatStringInPlace(ctx, p1, op2)) {
@@ -5477,7 +5477,7 @@ static JSValue JSI_ConcatString2(JSContext *ctx, JSValue op1, JSValue op2)
 }
 
 /* Return the character at position 'idx'. 'val' must be a string or rope */
-static int string_rope_get(JSValueConst val, uint32_t idx)
+static int string_rope_get(JSIValueConst val, uint32_t idx)
 {
     if (JSI_VALUE_GET_TAG(val) == JSI_TAG_STRING) {
         return string_get(JSI_VALUE_GET_STRING(val), idx);
@@ -5496,11 +5496,11 @@ static int string_rope_get(JSValueConst val, uint32_t idx)
 }
 
 typedef struct {
-    JSValueConst stack[JSI_STRING_ROPE_MAX_DEPTH];
+    JSIValueConst stack[JSI_STRING_ROPE_MAX_DEPTH];
     int stack_len;
 } JSStringRopeIter;
 
-static void string_rope_iter_init(JSStringRopeIter *s, JSValueConst val)
+static void string_rope_iter_init(JSStringRopeIter *s, JSIValueConst val)
 {
     s->stack_len = 0;
     s->stack[s->stack_len++] = val;
@@ -5509,7 +5509,7 @@ static void string_rope_iter_init(JSStringRopeIter *s, JSValueConst val)
 /* iterate thru a rope and return the strings in order */
 static JSString *string_rope_iter_next(JSStringRopeIter *s)
 {
-    JSValueConst val;
+    JSIValueConst val;
     JSStringRope *r;
 
     if (s->stack_len == 0)
@@ -5525,7 +5525,7 @@ static JSString *string_rope_iter_next(JSStringRopeIter *s)
     }
 }
 
-static uint32_t string_rope_get_len(JSValueConst val)
+static uint32_t string_rope_get_len(JSIValueConst val)
 {
     if (JSI_VALUE_GET_TAG(val) == JSI_TAG_STRING)
         return JSI_VALUE_GET_STRING(val)->len;
@@ -5533,8 +5533,8 @@ static uint32_t string_rope_get_len(JSValueConst val)
         return JSI_VALUE_GET_STRING_ROPE(val)->len;
 }
 
-static int jsi_string_rope_compare(JSContext *ctx, JSValueConst op1,
-                                  JSValueConst op2, BOOL eq_only)
+static int jsi_string_rope_compare(JSIContext *ctx, JSIValueConst op1,
+                                  JSIValueConst op2, BOOL eq_only)
 {
     uint32_t len1, len2, len, pos1, pos2, l;
     int res;
@@ -5584,11 +5584,11 @@ static int jsi_string_rope_compare(JSContext *ctx, JSValueConst op1,
 
 /* 'rope' must be a rope. return a string and modify the rope so that
    it won't need to be linearized again. */
-static JSValue jsi_linearize_string_rope(JSContext *ctx, JSValue rope)
+static JSIValue jsi_linearize_string_rope(JSIContext *ctx, JSIValue rope)
 {
     StringBuffer b_s, *b = &b_s;
     JSStringRope *r;
-    JSValue ret;
+    JSIValue ret;
     
     r = JSI_VALUE_GET_STRING_ROPE(rope);
 
@@ -5618,15 +5618,15 @@ static JSValue jsi_linearize_string_rope(JSContext *ctx, JSValue rope)
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_rebalancee_string_rope(JSContext *ctx, JSValueConst rope);
+static JSIValue jsi_rebalancee_string_rope(JSIContext *ctx, JSIValueConst rope);
 
 /* op1 and op2 must be strings or string ropes */
-static JSValue jsi_new_string_rope(JSContext *ctx, JSValue op1, JSValue op2)
+static JSIValue jsi_new_string_rope(JSIContext *ctx, JSIValue op1, JSIValue op2)
 {
     uint32_t len;
     int is_wide_char, depth;
     JSStringRope *r;
-    JSValue res;
+    JSIValue res;
     
     if (JSI_VALUE_GET_TAG(op1) == JSI_TAG_STRING) {
         JSString *p1 = JSI_VALUE_GET_STRING(op1);
@@ -5665,7 +5665,7 @@ static JSValue jsi_new_string_rope(JSContext *ctx, JSValue op1, JSValue op2)
     r->right = op2;
     res = JSI_MKPTR(JSI_TAG_STRING_ROPE, r);
     if (r->depth > JSI_STRING_ROPE_MAX_DEPTH) {
-        JSValue res2;
+        JSIValue res2;
 #ifdef DUMP_ROPE_REBALANCE
         printf("rebalance: initial depth=%d\n", r->depth);
 #endif
@@ -5702,13 +5702,13 @@ static const uint32_t rope_bucket_len[ROPE_N_BUCKETS] = {
   267914296,  433494437,  701408733, 1134903170, /* > JSI_STRING_LEN_MAX */
 };
 
-static int jsi_rebalancee_string_rope_rec(JSContext *ctx, JSValue *buckets,
-                                          JSValueConst val)
+static int jsi_rebalancee_string_rope_rec(JSIContext *ctx, JSIValue *buckets,
+                                          JSIValueConst val)
 {
     if (JSI_VALUE_GET_TAG(val) == JSI_TAG_STRING) {
         JSString *p = JSI_VALUE_GET_STRING(val);
         uint32_t len, i;
-        JSValue a, b;
+        JSIValue a, b;
         
         len = p->len;
         if (len == 0)
@@ -5758,9 +5758,9 @@ static int jsi_rebalancee_string_rope_rec(JSContext *ctx, JSValue *buckets,
 /* Return a new rope which is balanced. Algorithm from "Ropes: an
    Alternative to Strings", Hans-J. Boehm, Russ Atkinson and Michael
    Plass. */
-static JSValue jsi_rebalancee_string_rope(JSContext *ctx, JSValueConst rope)
+static JSIValue jsi_rebalancee_string_rope(JSIContext *ctx, JSIValueConst rope)
 {
-    JSValue buckets[ROPE_N_BUCKETS], a, b;
+    JSIValue buckets[ROPE_N_BUCKETS], a, b;
     int i;
     
     for(i = 0; i < ROPE_N_BUCKETS; i++)
@@ -5795,7 +5795,7 @@ static JSValue jsi_rebalancee_string_rope(JSContext *ctx, JSValueConst rope)
 
 /* op1 and op2 are converted to strings. For convenience, op1 or op2 =
    JSI_EXCEPTION are accepted and return JSI_EXCEPTION.  */
-static JSValue JSI_ConcatString(JSContext *ctx, JSValue op1, JSValue op2)
+static JSIValue JSI_ConcatString(JSIContext *ctx, JSIValue op1, JSIValue op2)
 {
     JSString *p1, *p2;
 
@@ -5836,7 +5836,7 @@ static JSValue JSI_ConcatString(JSContext *ctx, JSValue op1, JSValue op2)
                 r1 = JSI_VALUE_GET_STRING_ROPE(op1);
                 if (JSI_VALUE_GET_TAG(r1->right) == JSI_TAG_STRING &&
                     JSI_VALUE_GET_STRING(r1->right)->len <= JSI_STRING_ROPE_SHORT_LEN) {
-                    JSValue val, ret;
+                    JSIValue val, ret;
                     val = JSI_ConcatString2(ctx, JSI_DupValue(ctx, r1->right), op2);
                     if (JSI_IsException(val)) {
                         JSI_FreeValue(ctx, op1);
@@ -5858,7 +5858,7 @@ static JSValue JSI_ConcatString(JSContext *ctx, JSValue op1, JSValue op2)
         r2 = JSI_VALUE_GET_STRING_ROPE(op2);
         if (JSI_VALUE_GET_TAG(r2->left) == JSI_TAG_STRING &&
             JSI_VALUE_GET_STRING(r2->left)->len <= JSI_STRING_ROPE_SHORT_LEN) {
-            JSValue val, ret;
+            JSIValue val, ret;
             val = JSI_ConcatString2(ctx, op1, JSI_DupValue(ctx, r2->left));
             if (JSI_IsException(val)) {
                 JSI_FreeValue(ctx, op2);
@@ -5982,7 +5982,7 @@ static void jsi_shape_hash_unlink(JSRuntime *rt, JSShape *sh)
 }
 
 /* create a new empty shape with prototype 'proto' */
-static no_inline JSShape *jsi_new_shape2(JSContext *ctx, JSObject *proto,
+static no_inline JSShape *jsi_new_shape2(JSIContext *ctx, JSObject *proto,
                                         int hash_size, int prop_size)
 {
     JSRuntime *rt = ctx->rt;
@@ -6018,7 +6018,7 @@ static no_inline JSShape *jsi_new_shape2(JSContext *ctx, JSObject *proto,
     return sh;
 }
 
-static JSShape *jsi_new_shape(JSContext *ctx, JSObject *proto)
+static JSShape *jsi_new_shape(JSIContext *ctx, JSObject *proto)
 {
     return jsi_new_shape2(ctx, proto, JSI_PROP_INITIAL_HASH_SIZE,
                          JSI_PROP_INITIAL_SIZE);
@@ -6026,7 +6026,7 @@ static JSShape *jsi_new_shape(JSContext *ctx, JSObject *proto)
 
 /* The shape is cloned. The new shape is not inserted in the shape
    hash table */
-static JSShape *jsi_clone_shape(JSContext *ctx, JSShape *sh1)
+static JSShape *jsi_clone_shape(JSIContext *ctx, JSShape *sh1)
 {
     JSShape *sh;
     void *sh_alloc, *sh_alloc1;
@@ -6094,7 +6094,7 @@ static void jsi_free_shape_null(JSRuntime *rt, JSShape *sh)
 }
 
 /* make space to hold at least 'count' properties */
-static no_inline int resize_properties(JSContext *ctx, JSShape **psh,
+static no_inline int resize_properties(JSIContext *ctx, JSShape **psh,
                                        JSObject *p, uint32_t count)
 {
     JSShape *sh;
@@ -6156,7 +6156,7 @@ static no_inline int resize_properties(JSContext *ctx, JSShape **psh,
 }
 
 /* remove the deleted properties. */
-static int compact_properties(JSContext *ctx, JSObject *p)
+static int compact_properties(JSIContext *ctx, JSObject *p)
 {
     JSShape *sh, *old_sh;
     void *sh_alloc;
@@ -6223,7 +6223,7 @@ static int compact_properties(JSContext *ctx, JSObject *p)
     return 0;
 }
 
-static int add_shape_property(JSContext *ctx, JSShape **psh,
+static int add_shape_property(JSIContext *ctx, JSShape **psh,
                               JSObject *p, JSAtom atom, int prop_flags)
 {
     JSRuntime *rt = ctx->rt;
@@ -6364,7 +6364,7 @@ static __maybe_unused void JSI_DumpShapes(JSRuntime *rt)
     printf("}\n");
 }
 
-static JSValue JSI_NewObjectFromShape(JSContext *ctx, JSShape *sh, JSClassID class_id)
+static JSIValue JSI_NewObjectFromShape(JSIContext *ctx, JSShape *sh, JSClassID class_id)
 {
     JSObject *p;
 
@@ -6447,7 +6447,7 @@ static JSValue JSI_NewObjectFromShape(JSContext *ctx, JSShape *sh, JSClassID cla
     return JSI_MKPTR(JSI_TAG_OBJECT, p);
 }
 
-static JSObject *get_proto_obj(JSValueConst proto_val)
+static JSObject *get_proto_obj(JSIValueConst proto_val)
 {
     if (JSI_VALUE_GET_TAG(proto_val) != JSI_TAG_OBJECT)
         return NULL;
@@ -6456,7 +6456,7 @@ static JSObject *get_proto_obj(JSValueConst proto_val)
 }
 
 /* WARNING: proto must be an object or JSI_NULL */
-JSValue JSI_NewObjectProtoClass(JSContext *ctx, JSValueConst proto_val,
+JSIValue JSI_NewObjectProtoClass(JSIContext *ctx, JSIValueConst proto_val,
                                JSClassID class_id)
 {
     JSShape *sh;
@@ -6475,7 +6475,7 @@ JSValue JSI_NewObjectProtoClass(JSContext *ctx, JSValueConst proto_val,
 }
 
 
-static int JSI_SetObjectData(JSContext *ctx, JSValueConst obj, JSValue val)
+static int JSI_SetObjectData(JSIContext *ctx, JSIValueConst obj, JSIValue val)
 {
     JSObject *p;
 
@@ -6500,29 +6500,29 @@ static int JSI_SetObjectData(JSContext *ctx, JSValueConst obj, JSValue val)
     return -1;
 }
 
-JSValue JSI_NewObjectClass(JSContext *ctx, int class_id)
+JSIValue JSI_NewObjectClass(JSIContext *ctx, int class_id)
 {
     return JSI_NewObjectProtoClass(ctx, ctx->class_proto[class_id], class_id);
 }
 
-JSValue JSI_NewObjectProto(JSContext *ctx, JSValueConst proto)
+JSIValue JSI_NewObjectProto(JSIContext *ctx, JSIValueConst proto)
 {
     return JSI_NewObjectProtoClass(ctx, proto, JSI_CLASS_OBJECT);
 }
 
-JSValue JSI_NewArray(JSContext *ctx)
+JSIValue JSI_NewArray(JSIContext *ctx)
 {
     return JSI_NewObjectFromShape(ctx, jsi_dup_shape(ctx->array_shape),
                                  JSI_CLASS_ARRAY);
 }
 
-JSValue JSI_NewObject(JSContext *ctx)
+JSIValue JSI_NewObject(JSIContext *ctx)
 {
     /* inline JSI_NewObjectClass(ctx, JSI_CLASS_OBJECT); */
     return JSI_NewObjectProtoClass(ctx, ctx->class_proto[JSI_CLASS_OBJECT], JSI_CLASS_OBJECT);
 }
 
-static void jsi_function_set_properties(JSContext *ctx, JSValueConst func_obj,
+static void jsi_function_set_properties(JSIContext *ctx, JSIValueConst func_obj,
                                        JSAtom name, int len)
 {
     /* ES6 feature non compatible with ES5.1: length is configurable */
@@ -6541,7 +6541,7 @@ static BOOL jsi_class_has_bytecode(JSClassID class_id)
 }
 
 /* return NULL without exception if not a function or no bytecode */
-static JSFunctionBytecode *JSI_GetFunctionBytecode(JSValueConst val)
+static JSFunctionBytecode *JSI_GetFunctionBytecode(JSIValueConst val)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(val) != JSI_TAG_OBJECT)
@@ -6552,8 +6552,8 @@ static JSFunctionBytecode *JSI_GetFunctionBytecode(JSValueConst val)
     return p->u.func.function_bytecode;
 }
 
-static void jsi_method_set_home_object(JSContext *ctx, JSValueConst func_obj,
-                                      JSValueConst home_obj)
+static void jsi_method_set_home_object(JSIContext *ctx, JSIValueConst func_obj,
+                                      JSIValueConst home_obj)
 {
     JSObject *p, *p1;
     JSFunctionBytecode *b;
@@ -6577,9 +6577,9 @@ static void jsi_method_set_home_object(JSContext *ctx, JSValueConst func_obj,
     }
 }
 
-static JSValue jsi_get_function_name(JSContext *ctx, JSAtom name)
+static JSIValue jsi_get_function_name(JSIContext *ctx, JSAtom name)
 {
-    JSValue name_str;
+    JSIValue name_str;
 
     name_str = JSI_AtomToString(ctx, name);
     if (JSI_AtomSymbolHasDescription(ctx, name)) {
@@ -6592,10 +6592,10 @@ static JSValue jsi_get_function_name(JSContext *ctx, JSAtom name)
    'flags'. 'flags' is a bitmask of JSI_PROP_HAS_GET and
    JSI_PROP_HAS_SET. Also set the home object of the method.
    Return < 0 if exception. */
-static int jsi_method_set_properties(JSContext *ctx, JSValueConst func_obj,
-                                    JSAtom name, int flags, JSValueConst home_obj)
+static int jsi_method_set_properties(JSIContext *ctx, JSIValueConst func_obj,
+                                    JSAtom name, int flags, JSIValueConst home_obj)
 {
-    JSValue name_str;
+    JSIValue name_str;
 
     name_str = jsi_get_function_name(ctx, name);
     if (flags & JSI_PROP_HAS_GET) {
@@ -6613,12 +6613,12 @@ static int jsi_method_set_properties(JSContext *ctx, JSValueConst func_obj,
 }
 
 /* Note: at least 'length' arguments will be readable in 'argv' */
-static JSValue JSI_NewCFunction3(JSContext *ctx, JSCFunction *func,
+static JSIValue JSI_NewCFunction3(JSIContext *ctx, JSCFunction *func,
                                 const char *name,
                                 int length, JSCFunctionEnum cproto, int magic,
-                                JSValueConst proto_val)
+                                JSIValueConst proto_val)
 {
-    JSValue func_obj;
+    JSIValue func_obj;
     JSObject *p;
     JSAtom name_atom;
 
@@ -6648,7 +6648,7 @@ static JSValue JSI_NewCFunction3(JSContext *ctx, JSCFunction *func,
 }
 
 /* Note: at least 'length' arguments will be readable in 'argv' */
-JSValue JSI_NewCFunction2(JSContext *ctx, JSCFunction *func,
+JSIValue JSI_NewCFunction2(JSIContext *ctx, JSCFunction *func,
                          const char *name,
                          int length, JSCFunctionEnum cproto, int magic)
 {
@@ -6661,10 +6661,10 @@ typedef struct JSCFunctionDataRecord {
     uint8_t length;
     uint8_t data_len;
     uint16_t magic;
-    JSValue data[0];
+    JSIValue data[0];
 } JSCFunctionDataRecord;
 
-static void jsi_c_function_data_finalizer(JSRuntime *rt, JSValue val)
+static void jsi_c_function_data_finalizer(JSRuntime *rt, JSIValue val)
 {
     JSCFunctionDataRecord *s = JSI_GetOpaque(val, JSI_CLASS_C_FUNCTION_DATA);
     int i;
@@ -6677,7 +6677,7 @@ static void jsi_c_function_data_finalizer(JSRuntime *rt, JSValue val)
     }
 }
 
-static void jsi_c_function_data_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_c_function_data_mark(JSRuntime *rt, JSIValueConst val,
                                     JSI_MarkFunc *mark_func)
 {
     JSCFunctionDataRecord *s = JSI_GetOpaque(val, JSI_CLASS_C_FUNCTION_DATA);
@@ -6690,12 +6690,12 @@ static void jsi_c_function_data_mark(JSRuntime *rt, JSValueConst val,
     }
 }
 
-static JSValue jsi_c_function_data_call(JSContext *ctx, JSValueConst func_obj,
-                                       JSValueConst this_val,
-                                       int argc, JSValueConst *argv, int flags)
+static JSIValue jsi_c_function_data_call(JSIContext *ctx, JSIValueConst func_obj,
+                                       JSIValueConst this_val,
+                                       int argc, JSIValueConst *argv, int flags)
 {
     JSCFunctionDataRecord *s = JSI_GetOpaque(func_obj, JSI_CLASS_C_FUNCTION_DATA);
-    JSValueConst *arg_buf;
+    JSIValueConst *arg_buf;
     int i;
 
     /* XXX: could add the function on the stack for debug */
@@ -6712,19 +6712,19 @@ static JSValue jsi_c_function_data_call(JSContext *ctx, JSValueConst func_obj,
     return s->func(ctx, this_val, argc, arg_buf, s->magic, s->data);
 }
 
-JSValue JSI_NewCFunctionData(JSContext *ctx, JSCFunctionData *func,
+JSIValue JSI_NewCFunctionData(JSIContext *ctx, JSCFunctionData *func,
                             int length, int magic, int data_len,
-                            JSValueConst *data)
+                            JSIValueConst *data)
 {
     JSCFunctionDataRecord *s;
-    JSValue func_obj;
+    JSIValue func_obj;
     int i;
 
     func_obj = JSI_NewObjectProtoClass(ctx, ctx->function_proto,
                                       JSI_CLASS_C_FUNCTION_DATA);
     if (JSI_IsException(func_obj))
         return func_obj;
-    s = jsi_malloc(ctx, sizeof(*s) + data_len * sizeof(JSValue));
+    s = jsi_malloc(ctx, sizeof(*s) + data_len * sizeof(JSIValue));
     if (!s) {
         JSI_FreeValue(ctx, func_obj);
         return JSI_EXCEPTION;
@@ -6741,9 +6741,9 @@ JSValue JSI_NewCFunctionData(JSContext *ctx, JSCFunctionData *func,
     return func_obj;
 }
 
-static JSContext *jsi_autoinit_get_realm(JSProperty *pr)
+static JSIContext *jsi_autoinit_get_realm(JSProperty *pr)
 {
-    return (JSContext *)(pr->u.init.realm_and_id & ~3);
+    return (JSIContext *)(pr->u.init.realm_and_id & ~3);
 }
 
 static JSAutoInitIDEnum jsi_autoinit_get_id(JSProperty *pr)
@@ -6825,7 +6825,7 @@ static force_inline JSShapeProperty *find_own_property(JSProperty **ppr,
 }
 
 /* indicate that the object may be part of a function prototype cycle */
-static void set_cycle_flag(JSContext *ctx, JSValueConst obj)
+static void set_cycle_flag(JSIContext *ctx, JSIValueConst obj)
 {
 }
 
@@ -6847,7 +6847,7 @@ static void free_var_ref(JSRuntime *rt, JSVarRef *var_ref)
     }
 }
 
-static void jsi_array_finalizer(JSRuntime *rt, JSValue val)
+static void jsi_array_finalizer(JSRuntime *rt, JSIValue val)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
     int i;
@@ -6858,7 +6858,7 @@ static void jsi_array_finalizer(JSRuntime *rt, JSValue val)
     jsi_free_rt(rt, p->u.array.u.values);
 }
 
-static void jsi_array_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_array_mark(JSRuntime *rt, JSIValueConst val,
                           JSI_MarkFunc *mark_func)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
@@ -6869,21 +6869,21 @@ static void jsi_array_mark(JSRuntime *rt, JSValueConst val,
     }
 }
 
-static void jsi_object_data_finalizer(JSRuntime *rt, JSValue val)
+static void jsi_object_data_finalizer(JSRuntime *rt, JSIValue val)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
     JSI_FreeValueRT(rt, p->u.object_data);
     p->u.object_data = JSI_UNDEFINED;
 }
 
-static void jsi_object_data_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_object_data_mark(JSRuntime *rt, JSIValueConst val,
                                 JSI_MarkFunc *mark_func)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
     JSI_MarkValue(rt, p->u.object_data, mark_func);
 }
 
-static void jsi_c_function_finalizer(JSRuntime *rt, JSValue val)
+static void jsi_c_function_finalizer(JSRuntime *rt, JSIValue val)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
 
@@ -6891,7 +6891,7 @@ static void jsi_c_function_finalizer(JSRuntime *rt, JSValue val)
         JSI_FreeContext(p->u.cfunc.realm);
 }
 
-static void jsi_c_function_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_c_function_mark(JSRuntime *rt, JSIValueConst val,
                                JSI_MarkFunc *mark_func)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
@@ -6900,7 +6900,7 @@ static void jsi_c_function_mark(JSRuntime *rt, JSValueConst val,
         mark_func(rt, &p->u.cfunc.realm->header);
 }
 
-static void jsi_bytecode_function_finalizer(JSRuntime *rt, JSValue val)
+static void jsi_bytecode_function_finalizer(JSRuntime *rt, JSIValue val)
 {
     JSObject *p1, *p = JSI_VALUE_GET_OBJ(val);
     JSFunctionBytecode *b;
@@ -6923,7 +6923,7 @@ static void jsi_bytecode_function_finalizer(JSRuntime *rt, JSValue val)
     }
 }
 
-static void jsi_bytecode_function_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_bytecode_function_mark(JSRuntime *rt, JSIValueConst val,
                                       JSI_MarkFunc *mark_func)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
@@ -6950,7 +6950,7 @@ static void jsi_bytecode_function_mark(JSRuntime *rt, JSValueConst val,
     }
 }
 
-static void jsi_bound_function_finalizer(JSRuntime *rt, JSValue val)
+static void jsi_bound_function_finalizer(JSRuntime *rt, JSIValue val)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
     JSBoundFunction *bf = p->u.bound_function;
@@ -6964,7 +6964,7 @@ static void jsi_bound_function_finalizer(JSRuntime *rt, JSValue val)
     jsi_free_rt(rt, bf);
 }
 
-static void jsi_bound_function_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_bound_function_mark(JSRuntime *rt, JSIValueConst val,
                                 JSI_MarkFunc *mark_func)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
@@ -6977,7 +6977,7 @@ static void jsi_bound_function_mark(JSRuntime *rt, JSValueConst val,
         JSI_MarkValue(rt, bf->argv[i], mark_func);
 }
 
-static void jsi_for_in_iterator_finalizer(JSRuntime *rt, JSValue val)
+static void jsi_for_in_iterator_finalizer(JSRuntime *rt, JSIValue val)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
     JSForInIterator *it = p->u.for_in_iterator;
@@ -6993,7 +6993,7 @@ static void jsi_for_in_iterator_finalizer(JSRuntime *rt, JSValue val)
     jsi_free_rt(rt, it);
 }
 
-static void jsi_for_in_iterator_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_for_in_iterator_mark(JSRuntime *rt, JSIValueConst val,
                                 JSI_MarkFunc *mark_func)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
@@ -7093,7 +7093,7 @@ static void free_zero_refcount(JSRuntime *rt)
 }
 
 /* called with the ref_count of 'v' reaches zero. */
-void __JSI_FreeValueRT(JSRuntime *rt, JSValue v)
+void __JSI_FreeValueRT(JSRuntime *rt, JSIValue v)
 {
     uint32_t tag = JSI_VALUE_GET_TAG(v);
 
@@ -7158,7 +7158,7 @@ void __JSI_FreeValueRT(JSRuntime *rt, JSValue v)
     }
 }
 
-void __JSI_FreeValue(JSContext *ctx, JSValue v)
+void __JSI_FreeValue(JSIContext *ctx, JSIValue v)
 {
     __JSI_FreeValueRT(ctx->rt, v);
 }
@@ -7179,7 +7179,7 @@ static void remove_gc_object(JSGCObjectHeader *h)
     list_del(&h->link);
 }
 
-void JSI_MarkValue(JSRuntime *rt, JSValueConst val, JSI_MarkFunc *mark_func)
+void JSI_MarkValue(JSRuntime *rt, JSIValueConst val, JSI_MarkFunc *mark_func)
 {
     if (JSI_VALUE_HAS_REF_COUNT(val)) {
         switch(JSI_VALUE_GET_TAG(val)) {
@@ -7265,7 +7265,7 @@ static void mark_children(JSRuntime *rt, JSGCObjectHeader *gp,
         {
             JSAsyncFunctionState *s = (JSAsyncFunctionState *)gp;
             JSStackFrame *sf = &s->frame;
-            JSValue *sp;
+            JSIValue *sp;
 
             if (!s->is_completed) {
                 JSI_MarkValue(rt, sf->cur_func, mark_func);
@@ -7294,7 +7294,7 @@ static void mark_children(JSRuntime *rt, JSGCObjectHeader *gp,
         break;
     case JSI_GC_OBJ_TYPE_JSI_CONTEXT:
         {
-            JSContext *ctx = (JSContext *)gp;
+            JSIContext *ctx = (JSIContext *)gp;
             JSI_MarkContext(rt, ctx, mark_func);
         }
         break;
@@ -7459,7 +7459,7 @@ void JSI_RunGC(JSRuntime *rt)
 /* Return false if not an object or if the object has already been
    freed (zombie objects are visible in finalizers when freeing
    cycles). */
-BOOL JSI_IsLiveObject(JSRuntime *rt, JSValueConst obj)
+BOOL JSI_IsLiveObject(JSRuntime *rt, JSIValueConst obj)
 {
     JSObject *p;
     if (!JSI_IsObject(obj))
@@ -7481,7 +7481,7 @@ typedef struct JSMemoryUsage_helper {
     int64_t jsi_func_pc2line_size;
 } JSMemoryUsage_helper;
 
-static void compute_value_size(JSValueConst val, JSMemoryUsage_helper *hp);
+static void compute_value_size(JSIValueConst val, JSMemoryUsage_helper *hp);
 
 static void compute_jsstring_size(JSString *str, JSMemoryUsage_helper *hp)
 {
@@ -7505,7 +7505,7 @@ static void compute_bytecode_size(JSFunctionBytecode *b, JSMemoryUsage_helper *h
     if (b->cpool) {
         jsi_func_size += b->cpool_count * sizeof(*b->cpool);
         for (i = 0; i < b->cpool_count; i++) {
-            JSValueConst val = b->cpool[i];
+            JSIValueConst val = b->cpool[i];
             compute_value_size(val, hp);
         }
     }
@@ -7532,7 +7532,7 @@ static void compute_bytecode_size(JSFunctionBytecode *b, JSMemoryUsage_helper *h
     hp->memory_used_count += memory_used_count;
 }
 
-static void compute_value_size(JSValueConst val, JSMemoryUsage_helper *hp)
+static void compute_value_size(JSIValueConst val, JSMemoryUsage_helper *hp)
 {
     switch(JSI_VALUE_GET_TAG(val)) {
     case JSI_TAG_STRING:
@@ -7553,14 +7553,14 @@ void JSI_ComputeMemoryUsage(JSRuntime *rt, JSMemoryUsage *s)
     s->malloc_limit = rt->malloc_state.malloc_limit;
 
     s->memory_used_count = 2; /* rt + rt->class_array */
-    s->memory_used_size = sizeof(JSRuntime) + sizeof(JSValue) * rt->class_count;
+    s->memory_used_size = sizeof(JSRuntime) + sizeof(JSIValue) * rt->class_count;
 
     list_for_each(el, &rt->context_list) {
-        JSContext *ctx = list_entry(el, JSContext, link);
+        JSIContext *ctx = list_entry(el, JSIContext, link);
         JSShape *sh = ctx->array_shape;
         s->memory_used_count += 2; /* ctx + ctx->class_proto */
-        s->memory_used_size += sizeof(JSContext) +
-            sizeof(JSValue) * rt->class_count;
+        s->memory_used_size += sizeof(JSIContext) +
+            sizeof(JSIValue) * rt->class_count;
         s->binary_object_count += ctx->binary_object_count;
         s->binary_object_size += ctx->binary_object_size;
 
@@ -7816,7 +7816,7 @@ void JSI_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt)
             size_t size;
         } object_types[] = {
             { "JSRuntime", sizeof(JSRuntime) },
-            { "JSContext", sizeof(JSContext) },
+            { "JSIContext", sizeof(JSIContext) },
             { "JSObject", sizeof(JSObject) },
             { "JSString", sizeof(JSString) },
             { "JSFunctionBytecode", sizeof(JSFunctionBytecode) },
@@ -7920,7 +7920,7 @@ void JSI_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt)
             fprintf(fp, "%-20s %8"PRId64"\n", "  fast arrays", s->fast_array_count);
             fprintf(fp, "%-20s %8"PRId64" %8"PRId64"  (%ld per fast array)\n",
                     "  elements", s->fast_array_elements,
-                    s->fast_array_elements * (int)sizeof(JSValue),
+                    s->fast_array_elements * (int)sizeof(JSIValue),
                     s->fast_array_elements / s->fast_array_count);
         }
     }
@@ -7930,13 +7930,13 @@ void JSI_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt)
     }
 }
 
-JSValue JSI_GetGlobalObject(JSContext *ctx)
+JSIValue JSI_GetGlobalObject(JSIContext *ctx)
 {
     return JSI_DupValue(ctx, ctx->global_obj);
 }
 
 /* WARNING: obj is freed */
-JSValue JSI_Throw(JSContext *ctx, JSValue obj)
+JSIValue JSI_Throw(JSIContext *ctx, JSIValue obj)
 {
     JSRuntime *rt = ctx->rt;
     JSI_FreeValue(ctx, rt->current_exception);
@@ -7946,16 +7946,16 @@ JSValue JSI_Throw(JSContext *ctx, JSValue obj)
 }
 
 /* return the pending exception (cannot be called twice). */
-JSValue JSI_GetException(JSContext *ctx)
+JSIValue JSI_GetException(JSIContext *ctx)
 {
-    JSValue val;
+    JSIValue val;
     JSRuntime *rt = ctx->rt;
     val = rt->current_exception;
     rt->current_exception = JSI_UNINITIALIZED;
     return val;
 }
 
-JSI_BOOL JSI_HasException(JSContext *ctx)
+JSI_BOOL JSI_HasException(JSIContext *ctx)
 {
     return !JSI_IsUninitialized(ctx->rt->current_exception);
 }
@@ -8016,7 +8016,7 @@ static int get_sleb128(int32_t *pval, const uint8_t *buf,
 }
 
 /* use pc_value = -1 to get the position of the function definition */
-static int find_line_num(JSContext *ctx, JSFunctionBytecode *b,
+static int find_line_num(JSIContext *ctx, JSFunctionBytecode *b,
                          uint32_t pc_value, int *pcol_num)
 {
     const uint8_t *p_end, *p;
@@ -8086,11 +8086,11 @@ static int find_line_num(JSContext *ctx, JSFunctionBytecode *b,
 /* in order to avoid executing arbitrary code during the stack trace
    generation, we only look at simple 'name' properties containing a
    string. */
-static const char *get_func_name(JSContext *ctx, JSValueConst func)
+static const char *get_func_name(JSIContext *ctx, JSIValueConst func)
 {
     JSProperty *pr;
     JSShapeProperty *prs;
-    JSValueConst val;
+    JSIValueConst val;
 
     if (JSI_VALUE_GET_TAG(func) != JSI_TAG_OBJECT)
         return NULL;
@@ -8109,12 +8109,12 @@ static const char *get_func_name(JSContext *ctx, JSValueConst func)
 
 /* if filename != NULL, an additional level is added with the filename
    and line number information (used for parse error). */
-static void build_backtrace(JSContext *ctx, JSValueConst error_obj,
+static void build_backtrace(JSIContext *ctx, JSIValueConst error_obj,
                             const char *filename, int line_num, int col_num,
                             int backtrace_flags)
 {
     JSStackFrame *sf;
-    JSValue str;
+    JSIValue str;
     DynBuf dbuf;
     const char *func_name_str;
     const char *str1;
@@ -8191,7 +8191,7 @@ static void build_backtrace(JSContext *ctx, JSValueConst error_obj,
 }
 
 /* Note: it is important that no exception is returned by this function */
-static BOOL is_backtrace_needed(JSContext *ctx, JSValueConst obj)
+static BOOL is_backtrace_needed(JSIContext *ctx, JSIValueConst obj)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(obj) != JSI_TAG_OBJECT)
@@ -8204,16 +8204,16 @@ static BOOL is_backtrace_needed(JSContext *ctx, JSValueConst obj)
     return TRUE;
 }
 
-JSValue JSI_NewError(JSContext *ctx)
+JSIValue JSI_NewError(JSIContext *ctx)
 {
     return JSI_NewObjectClass(ctx, JSI_CLASS_ERROR);
 }
 
-static JSValue JSI_ThrowError2(JSContext *ctx, JSErrorEnum error_num,
+static JSIValue JSI_ThrowError2(JSIContext *ctx, JSErrorEnum error_num,
                               const char *fmt, va_list ap, BOOL add_backtrace)
 {
     char buf[256];
-    JSValue obj, ret;
+    JSIValue obj, ret;
 
     vsnprintf(buf, sizeof(buf), fmt, ap);
     obj = JSI_NewObjectProtoClass(ctx, ctx->native_error_proto[error_num],
@@ -8233,7 +8233,7 @@ static JSValue JSI_ThrowError2(JSContext *ctx, JSErrorEnum error_num,
     return ret;
 }
 
-static JSValue JSI_ThrowError(JSContext *ctx, JSErrorEnum error_num,
+static JSIValue JSI_ThrowError(JSIContext *ctx, JSErrorEnum error_num,
                              const char *fmt, va_list ap)
 {
     JSRuntime *rt = ctx->rt;
@@ -8247,9 +8247,9 @@ static JSValue JSI_ThrowError(JSContext *ctx, JSErrorEnum error_num,
     return JSI_ThrowError2(ctx, error_num, fmt, ap, add_backtrace);
 }
 
-JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowSyntaxError(JSContext *ctx, const char *fmt, ...)
+JSIValue __attribute__((format(printf, 2, 3))) JSI_ThrowSyntaxError(JSIContext *ctx, const char *fmt, ...)
 {
-    JSValue val;
+    JSIValue val;
     va_list ap;
 
     va_start(ap, fmt);
@@ -8258,9 +8258,9 @@ JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowSyntaxError(JSContext *ct
     return val;
 }
 
-JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowTypeError(JSContext *ctx, const char *fmt, ...)
+JSIValue __attribute__((format(printf, 2, 3))) JSI_ThrowTypeError(JSIContext *ctx, const char *fmt, ...)
 {
-    JSValue val;
+    JSIValue val;
     va_list ap;
 
     va_start(ap, fmt);
@@ -8269,7 +8269,7 @@ JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowTypeError(JSContext *ctx,
     return val;
 }
 
-static int __attribute__((format(printf, 3, 4))) JSI_ThrowTypeErrorOrFalse(JSContext *ctx, int flags, const char *fmt, ...)
+static int __attribute__((format(printf, 3, 4))) JSI_ThrowTypeErrorOrFalse(JSIContext *ctx, int flags, const char *fmt, ...)
 {
     va_list ap;
 
@@ -8285,7 +8285,7 @@ static int __attribute__((format(printf, 3, 4))) JSI_ThrowTypeErrorOrFalse(JSCon
 }
 
 /* never use it directly */
-static JSValue __attribute__((format(printf, 3, 4))) __JSI_ThrowTypeErrorAtom(JSContext *ctx, JSAtom atom, const char *fmt, ...)
+static JSIValue __attribute__((format(printf, 3, 4))) __JSI_ThrowTypeErrorAtom(JSIContext *ctx, JSAtom atom, const char *fmt, ...)
 {
     char buf[ATOM_GET_STR_BUF_SIZE];
     return JSI_ThrowTypeError(ctx, fmt,
@@ -8293,7 +8293,7 @@ static JSValue __attribute__((format(printf, 3, 4))) __JSI_ThrowTypeErrorAtom(JS
 }
 
 /* never use it directly */
-static JSValue __attribute__((format(printf, 3, 4))) __JSI_ThrowSyntaxErrorAtom(JSContext *ctx, JSAtom atom, const char *fmt, ...)
+static JSIValue __attribute__((format(printf, 3, 4))) __JSI_ThrowSyntaxErrorAtom(JSIContext *ctx, JSAtom atom, const char *fmt, ...)
 {
     char buf[ATOM_GET_STR_BUF_SIZE];
     return JSI_ThrowSyntaxError(ctx, fmt,
@@ -8305,7 +8305,7 @@ static JSValue __attribute__((format(printf, 3, 4))) __JSI_ThrowSyntaxErrorAtom(
 #define JSI_ThrowTypeErrorAtom(ctx, fmt, atom) __JSI_ThrowTypeErrorAtom(ctx, atom, fmt, "")
 #define JSI_ThrowSyntaxErrorAtom(ctx, fmt, atom) __JSI_ThrowSyntaxErrorAtom(ctx, atom, fmt, "")
 
-static int JSI_ThrowTypeErrorReadOnly(JSContext *ctx, int flags, JSAtom atom)
+static int JSI_ThrowTypeErrorReadOnly(JSIContext *ctx, int flags, JSAtom atom)
 {
     if ((flags & JSI_PROP_THROW) ||
         ((flags & JSI_PROP_THROW_STRICT) && is_strict_mode(ctx))) {
@@ -8316,9 +8316,9 @@ static int JSI_ThrowTypeErrorReadOnly(JSContext *ctx, int flags, JSAtom atom)
     }
 }
 
-JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowReferenceError(JSContext *ctx, const char *fmt, ...)
+JSIValue __attribute__((format(printf, 2, 3))) JSI_ThrowReferenceError(JSIContext *ctx, const char *fmt, ...)
 {
-    JSValue val;
+    JSIValue val;
     va_list ap;
 
     va_start(ap, fmt);
@@ -8327,9 +8327,9 @@ JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowReferenceError(JSContext 
     return val;
 }
 
-JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowRangeError(JSContext *ctx, const char *fmt, ...)
+JSIValue __attribute__((format(printf, 2, 3))) JSI_ThrowRangeError(JSIContext *ctx, const char *fmt, ...)
 {
-    JSValue val;
+    JSIValue val;
     va_list ap;
 
     va_start(ap, fmt);
@@ -8338,9 +8338,9 @@ JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowRangeError(JSContext *ctx
     return val;
 }
 
-JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowInternalError(JSContext *ctx, const char *fmt, ...)
+JSIValue __attribute__((format(printf, 2, 3))) JSI_ThrowInternalError(JSIContext *ctx, const char *fmt, ...)
 {
-    JSValue val;
+    JSIValue val;
     va_list ap;
 
     va_start(ap, fmt);
@@ -8349,7 +8349,7 @@ JSValue __attribute__((format(printf, 2, 3))) JSI_ThrowInternalError(JSContext *
     return val;
 }
 
-JSValue JSI_ThrowOutOfMemory(JSContext *ctx)
+JSIValue JSI_ThrowOutOfMemory(JSIContext *ctx)
 {
     JSRuntime *rt = ctx->rt;
     if (!rt->in_out_of_memory) {
@@ -8360,29 +8360,29 @@ JSValue JSI_ThrowOutOfMemory(JSContext *ctx)
     return JSI_EXCEPTION;
 }
 
-static JSValue JSI_ThrowStackOverflow(JSContext *ctx)
+static JSIValue JSI_ThrowStackOverflow(JSIContext *ctx)
 {
     return JSI_ThrowInternalError(ctx, "stack overflow");
 }
 
-static JSValue JSI_ThrowTypeErrorNotAnObject(JSContext *ctx)
+static JSIValue JSI_ThrowTypeErrorNotAnObject(JSIContext *ctx)
 {
     return JSI_ThrowTypeError(ctx, "not an object");
 }
 
-static JSValue JSI_ThrowTypeErrorNotASymbol(JSContext *ctx)
+static JSIValue JSI_ThrowTypeErrorNotASymbol(JSIContext *ctx)
 {
     return JSI_ThrowTypeError(ctx, "not a symbol");
 }
 
-static JSValue JSI_ThrowReferenceErrorNotDefined(JSContext *ctx, JSAtom name)
+static JSIValue JSI_ThrowReferenceErrorNotDefined(JSIContext *ctx, JSAtom name)
 {
     char buf[ATOM_GET_STR_BUF_SIZE];
     return JSI_ThrowReferenceError(ctx, "'%s' is not defined",
                                   JSI_AtomGetStr(ctx, buf, sizeof(buf), name));
 }
 
-static JSValue JSI_ThrowReferenceErrorUninitialized(JSContext *ctx, JSAtom name)
+static JSIValue JSI_ThrowReferenceErrorUninitialized(JSIContext *ctx, JSAtom name)
 {
     char buf[ATOM_GET_STR_BUF_SIZE];
     return JSI_ThrowReferenceError(ctx, "%s is not initialized",
@@ -8390,7 +8390,7 @@ static JSValue JSI_ThrowReferenceErrorUninitialized(JSContext *ctx, JSAtom name)
                                   JSI_AtomGetStr(ctx, buf, sizeof(buf), name));
 }
 
-static JSValue JSI_ThrowReferenceErrorUninitialized2(JSContext *ctx,
+static JSIValue JSI_ThrowReferenceErrorUninitialized2(JSIContext *ctx,
                                                     JSFunctionBytecode *b,
                                                     int idx, BOOL is_ref)
 {
@@ -8405,7 +8405,7 @@ static JSValue JSI_ThrowReferenceErrorUninitialized2(JSContext *ctx,
     return JSI_ThrowReferenceErrorUninitialized(ctx, atom);
 }
 
-static JSValue JSI_ThrowTypeErrorInvalidClass(JSContext *ctx, int class_id)
+static JSIValue JSI_ThrowTypeErrorInvalidClass(JSIContext *ctx, int class_id)
 {
     JSRuntime *rt = ctx->rt;
     JSAtom name;
@@ -8413,13 +8413,13 @@ static JSValue JSI_ThrowTypeErrorInvalidClass(JSContext *ctx, int class_id)
     return JSI_ThrowTypeErrorAtom(ctx, "%s object expected", name);
 }
 
-static void JSI_ThrowInterrupted(JSContext *ctx)
+static void JSI_ThrowInterrupted(JSIContext *ctx)
 {
     JSI_ThrowInternalError(ctx, "interrupted");
     JSI_SetUncatchableException(ctx, TRUE);
 }
 
-static no_inline __exception int __jsi_poll_interrupts(JSContext *ctx)
+static no_inline __exception int __jsi_poll_interrupts(JSIContext *ctx)
 {
     JSRuntime *rt = ctx->rt;
     ctx->interrupt_counter = JSI_INTERRUPT_COUNTER_INIT;
@@ -8432,7 +8432,7 @@ static no_inline __exception int __jsi_poll_interrupts(JSContext *ctx)
     return 0;
 }
 
-static inline __exception int jsi_poll_interrupts(JSContext *ctx)
+static inline __exception int jsi_poll_interrupts(JSIContext *ctx)
 {
     if (unlikely(--ctx->interrupt_counter <= 0)) {
         return __jsi_poll_interrupts(ctx);
@@ -8441,7 +8441,7 @@ static inline __exception int jsi_poll_interrupts(JSContext *ctx)
     }
 }
 
-static void JSI_SetImmutablePrototype(JSContext *ctx, JSValueConst obj)
+static void JSI_SetImmutablePrototype(JSIContext *ctx, JSIValueConst obj)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(obj) != JSI_TAG_OBJECT)
@@ -8452,8 +8452,8 @@ static void JSI_SetImmutablePrototype(JSContext *ctx, JSValueConst obj)
 
 /* Return -1 (exception) or TRUE/FALSE. 'throw_flag' = FALSE indicates
    that it is called from Reflect.setPrototypeOf(). */
-static int JSI_SetPrototypeInternal(JSContext *ctx, JSValueConst obj,
-                                   JSValueConst proto_val,
+static int JSI_SetPrototypeInternal(JSIContext *ctx, JSIValueConst obj,
+                                   JSIValueConst proto_val,
                                    BOOL throw_flag)
 {
     JSObject *proto, *p, *p1;
@@ -8543,13 +8543,13 @@ static int JSI_SetPrototypeInternal(JSContext *ctx, JSValueConst obj,
 }
 
 /* return -1 (exception) or TRUE/FALSE */
-int JSI_SetPrototype(JSContext *ctx, JSValueConst obj, JSValueConst proto_val)
+int JSI_SetPrototype(JSIContext *ctx, JSIValueConst obj, JSIValueConst proto_val)
 {
     return JSI_SetPrototypeInternal(ctx, obj, proto_val, TRUE);
 }
 
 /* Only works for primitive types, otherwise return JSI_NULL. */
-static JSValueConst JSI_GetPrototypePrimitive(JSContext *ctx, JSValueConst val)
+static JSIValueConst JSI_GetPrototypePrimitive(JSIContext *ctx, JSIValueConst val)
 {
     switch(JSI_VALUE_GET_NORM_TAG(val)) {
     case JSI_TAG_INT:
@@ -8576,9 +8576,9 @@ static JSValueConst JSI_GetPrototypePrimitive(JSContext *ctx, JSValueConst val)
 }
 
 /* Return an Object, JSI_NULL or JSI_EXCEPTION in case of exotic object. */
-JSValue JSI_GetPrototype(JSContext *ctx, JSValueConst obj)
+JSIValue JSI_GetPrototype(JSIContext *ctx, JSIValueConst obj)
 {
-    JSValue val;
+    JSIValue val;
     if (JSI_VALUE_GET_TAG(obj) == JSI_TAG_OBJECT) {
         JSObject *p;
         p = JSI_VALUE_GET_OBJ(obj);
@@ -8599,19 +8599,19 @@ JSValue JSI_GetPrototype(JSContext *ctx, JSValueConst obj)
     return val;
 }
 
-static JSValue JSI_GetPrototypeFree(JSContext *ctx, JSValue obj)
+static JSIValue JSI_GetPrototypeFree(JSIContext *ctx, JSIValue obj)
 {
-    JSValue obj1;
+    JSIValue obj1;
     obj1 = JSI_GetPrototype(ctx, obj);
     JSI_FreeValue(ctx, obj);
     return obj1;
 }
 
 /* return TRUE, FALSE or (-1) in case of exception */
-static int JSI_OrdinaryIsInstanceOf(JSContext *ctx, JSValueConst val,
-                                   JSValueConst obj)
+static int JSI_OrdinaryIsInstanceOf(JSIContext *ctx, JSIValueConst val,
+                                   JSIValueConst obj)
 {
-    JSValue obj_proto;
+    JSIValue obj_proto;
     JSObject *proto;
     const JSObject *p, *proto1;
     BOOL ret;
@@ -8641,7 +8641,7 @@ static int JSI_OrdinaryIsInstanceOf(JSContext *ctx, JSValueConst val,
         if (!proto1) {
             /* slow case if exotic object in the prototype chain */
             if (unlikely(p->is_exotic && !p->fast_array)) {
-                JSValue obj1;
+                JSIValue obj1;
                 obj1 = JSI_DupValue(ctx, JSI_MKPTR(JSI_TAG_OBJECT, (JSObject *)p));
                 for(;;) {
                     obj1 = JSI_GetPrototypeFree(ctx, obj1);
@@ -8682,9 +8682,9 @@ done:
 }
 
 /* return TRUE, FALSE or (-1) in case of exception */
-int JSI_IsInstanceOf(JSContext *ctx, JSValueConst val, JSValueConst obj)
+int JSI_IsInstanceOf(JSIContext *ctx, JSIValueConst val, JSIValueConst obj)
 {
-    JSValue method;
+    JSIValue method;
 
     if (!JSI_IsObject(obj))
         goto fail;
@@ -8692,7 +8692,7 @@ int JSI_IsInstanceOf(JSContext *ctx, JSValueConst val, JSValueConst obj)
     if (JSI_IsException(method))
         return -1;
     if (!JSI_IsNull(method) && !JSI_IsUndefined(method)) {
-        JSValue ret;
+        JSIValue ret;
         ret = JSI_CallFree(ctx, method, obj, 1, &val);
         return JSI_ToBoolFree(ctx, ret);
     }
@@ -8707,7 +8707,7 @@ int JSI_IsInstanceOf(JSContext *ctx, JSValueConst val, JSValueConst obj)
 }
 
 /* return the value associated to the autoinit property or an exception */
-typedef JSValue JSAutoInitFunc(JSContext *ctx, JSObject *p, JSAtom atom, void *opaque);
+typedef JSIValue JSAutoInitFunc(JSIContext *ctx, JSObject *p, JSAtom atom, void *opaque);
 
 static JSAutoInitFunc *jsi_autoinit_func_table[] = {
     jsi_instantiate_prototype, /* JSI_AUTOINIT_ID_PROTOTYPE */
@@ -8716,11 +8716,11 @@ static JSAutoInitFunc *jsi_autoinit_func_table[] = {
 };
 
 /* warning: 'prs' is reallocated after it */
-static int JSI_AutoInitProperty(JSContext *ctx, JSObject *p, JSAtom prop,
+static int JSI_AutoInitProperty(JSIContext *ctx, JSObject *p, JSAtom prop,
                                JSProperty *pr, JSShapeProperty *prs)
 {
-    JSValue val;
-    JSContext *realm;
+    JSIValue val;
+    JSIContext *realm;
     JSAutoInitFunc *func;
     JSAutoInitIDEnum id;
     
@@ -8749,8 +8749,8 @@ static int JSI_AutoInitProperty(JSContext *ctx, JSObject *p, JSAtom prop,
     return 0;
 }
 
-JSValue JSI_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
-                               JSAtom prop, JSValueConst this_obj,
+JSIValue JSI_GetPropertyInternal(JSIContext *ctx, JSIValueConst obj,
+                               JSAtom prop, JSIValueConst this_obj,
                                bool throw_ref_error)
 {
     JSObject *p;
@@ -8815,13 +8815,13 @@ JSValue JSI_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
                     if (unlikely(!pr->u.getset.getter)) {
                         return JSI_UNDEFINED;
                     } else {
-                        JSValue func = JSI_MKPTR(JSI_TAG_OBJECT, pr->u.getset.getter);
+                        JSIValue func = JSI_MKPTR(JSI_TAG_OBJECT, pr->u.getset.getter);
                         /* Note: the field could be removed in the getter */
                         func = JSI_DupValue(ctx, func);
                         return JSI_CallFree(ctx, func, this_obj, 0, NULL);
                     }
                 } else if ((prs->flags & JSI_PROP_TMASK) == JSI_PROP_VARREF) {
-                    JSValue val = *pr->u.var_ref->pvalue;
+                    JSIValue val = *pr->u.var_ref->pvalue;
                     if (unlikely(JSI_IsUninitialized(val)))
                         return JSI_ThrowReferenceErrorUninitialized(ctx, prs->atom);
                     return JSI_DupValue(ctx, val);
@@ -8859,7 +8859,7 @@ JSValue JSI_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
                 const JSClassExoticMethods *em = ctx->rt->class_array[p->class_id].exotic;
                 if (em) {
                     if (em->get_property) {
-                        JSValue obj1, retval;
+                        JSIValue obj1, retval;
                         /* XXX: should pass throw_ref_error */
                         /* Note: if 'p' is a prototype, it can be
                            freed in the called function */
@@ -8871,7 +8871,7 @@ JSValue JSI_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
                     if (em->get_own_property) {
                         JSPropertyDescriptor desc;
                         int ret;
-                        JSValue obj1;
+                        JSIValue obj1;
 
                         /* Note: if 'p' is a prototype, it can be
                            freed in the called function */
@@ -8903,7 +8903,7 @@ JSValue JSI_GetPropertyInternal(JSContext *ctx, JSValueConst obj,
     }
 }
 
-static JSValue JSI_ThrowTypeErrorPrivateNotFound(JSContext *ctx, JSAtom atom)
+static JSIValue JSI_ThrowTypeErrorPrivateNotFound(JSIContext *ctx, JSAtom atom)
 {
     return JSI_ThrowTypeErrorAtom(ctx, "private class field '%s' does not exist",
                                  atom);
@@ -8912,12 +8912,12 @@ static JSValue JSI_ThrowTypeErrorPrivateNotFound(JSContext *ctx, JSAtom atom)
 
 /* add a private brand field to 'home_obj' if not already present and
    if obj is != null add a private brand to it */
-static int JSI_AddBrand(JSContext *ctx, JSValueConst obj, JSValueConst home_obj)
+static int JSI_AddBrand(JSIContext *ctx, JSIValueConst obj, JSIValueConst home_obj)
 {
     JSObject *p, *p1;
     JSShapeProperty *prs;
     JSProperty *pr;
-    JSValue brand;
+    JSIValue brand;
     JSAtom brand_atom;
 
     if (unlikely(JSI_VALUE_GET_TAG(home_obj) != JSI_TAG_OBJECT)) {
@@ -8963,12 +8963,12 @@ static int JSI_AddBrand(JSContext *ctx, JSValueConst obj, JSValueConst home_obj)
 
 /* return a boolean telling if the brand of the home object of 'func'
    is present on 'obj' or -1 in case of exception */
-static int JSI_CheckBrand(JSContext *ctx, JSValueConst obj, JSValueConst func)
+static int JSI_CheckBrand(JSIContext *ctx, JSIValueConst obj, JSIValueConst func)
 {
     JSObject *p, *p1, *home_obj;
     JSShapeProperty *prs;
     JSProperty *pr;
-    JSValueConst brand;
+    JSIValueConst brand;
 
     /* get the home object of 'func' */
     if (unlikely(JSI_VALUE_GET_TAG(func) != JSI_TAG_OBJECT))
@@ -8996,12 +8996,12 @@ static int JSI_CheckBrand(JSContext *ctx, JSValueConst obj, JSValueConst func)
         return -1;
     }
     p = JSI_VALUE_GET_OBJ(obj);
-    prs = find_own_property(&pr, p, jsi_symbol_to_atom(ctx, (JSValue)brand));
+    prs = find_own_property(&pr, p, jsi_symbol_to_atom(ctx, (JSIValue)brand));
     return (prs != NULL);
 }
 
-static uint32_t jsi_string_obj_get_length(JSContext *ctx,
-                                         JSValueConst obj)
+static uint32_t jsi_string_obj_get_length(JSIContext *ctx,
+                                         JSIValueConst obj)
 {
     JSObject *p;
     uint32_t len = 0;
@@ -9017,7 +9017,7 @@ static uint32_t jsi_string_obj_get_length(JSContext *ctx,
 
 static int num_keys_cmp(const void *p1, const void *p2, void *opaque)
 {
-    JSContext *ctx = opaque;
+    JSIContext *ctx = opaque;
     JSAtom atom1 = ((const JSPropertyEnum *)p1)->atom;
     JSAtom atom2 = ((const JSPropertyEnum *)p2)->atom;
     uint32_t v1, v2;
@@ -9034,7 +9034,7 @@ static int num_keys_cmp(const void *p1, const void *p2, void *opaque)
         return 1;
 }
 
-void JSI_FreePropertyEnum(JSContext *ctx, JSPropertyEnum *tab, uint32_t len)
+void JSI_FreePropertyEnum(JSIContext *ctx, JSPropertyEnum *tab, uint32_t len)
 {
     uint32_t i;
     if (tab) {
@@ -9046,7 +9046,7 @@ void JSI_FreePropertyEnum(JSContext *ctx, JSPropertyEnum *tab, uint32_t len)
 
 /* return < 0 in case if exception, 0 if OK. ptab and its atoms must
    be freed by the user. */
-static int __exception JSI_GetOwnPropertyNamesInternal(JSContext *ctx,
+static int __exception JSI_GetOwnPropertyNamesInternal(JSIContext *ctx,
                                                       JSPropertyEnum **ptab,
                                                       uint32_t *plen,
                                                       JSObject *p, int flags)
@@ -9251,8 +9251,8 @@ static int __exception JSI_GetOwnPropertyNamesInternal(JSContext *ctx,
     return 0;
 }
 
-int JSI_GetOwnPropertyNames(JSContext *ctx, JSPropertyEnum **ptab,
-                           uint32_t *plen, JSValueConst obj, int flags)
+int JSI_GetOwnPropertyNames(JSIContext *ctx, JSPropertyEnum **ptab,
+                           uint32_t *plen, JSIValueConst obj, int flags)
 {
     if (JSI_VALUE_GET_TAG(obj) != JSI_TAG_OBJECT) {
         JSI_ThrowTypeErrorNotAnObject(ctx);
@@ -9265,7 +9265,7 @@ int JSI_GetOwnPropertyNames(JSContext *ctx, JSPropertyEnum **ptab,
 /* Return -1 if exception,
    FALSE if the property does not exist, TRUE if it exists. If TRUE is
    returned, the property descriptor 'desc' is filled present. */
-static int JSI_GetOwnPropertyInternal(JSContext *ctx, JSPropertyDescriptor *desc,
+static int JSI_GetOwnPropertyInternal(JSIContext *ctx, JSPropertyDescriptor *desc,
                                      JSObject *p, JSAtom prop)
 {
     JSShapeProperty *prs;
@@ -9287,7 +9287,7 @@ retry:
                     if (pr->u.getset.setter)
                         desc->setter = JSI_DupValue(ctx, JSI_MKPTR(JSI_TAG_OBJECT, pr->u.getset.setter));
                 } else if ((prs->flags & JSI_PROP_TMASK) == JSI_PROP_VARREF) {
-                    JSValue val = *pr->u.var_ref->pvalue;
+                    JSIValue val = *pr->u.var_ref->pvalue;
                     if (unlikely(JSI_IsUninitialized(val))) {
                         JSI_ThrowReferenceErrorUninitialized(ctx, prs->atom);
                         return -1;
@@ -9343,8 +9343,8 @@ retry:
     return FALSE;
 }
 
-int JSI_GetOwnProperty(JSContext *ctx, JSPropertyDescriptor *desc,
-                      JSValueConst obj, JSAtom prop)
+int JSI_GetOwnProperty(JSIContext *ctx, JSPropertyDescriptor *desc,
+                      JSIValueConst obj, JSAtom prop)
 {
     if (JSI_VALUE_GET_TAG(obj) != JSI_TAG_OBJECT) {
         JSI_ThrowTypeErrorNotAnObject(ctx);
@@ -9354,7 +9354,7 @@ int JSI_GetOwnProperty(JSContext *ctx, JSPropertyDescriptor *desc,
 }
 
 /* return -1 if exception (exotic object only) or TRUE/FALSE */
-int JSI_IsExtensible(JSContext *ctx, JSValueConst obj)
+int JSI_IsExtensible(JSIContext *ctx, JSIValueConst obj)
 {
     JSObject *p;
 
@@ -9371,7 +9371,7 @@ int JSI_IsExtensible(JSContext *ctx, JSValueConst obj)
 }
 
 /* return -1 if exception (exotic object only) or TRUE/FALSE */
-int JSI_PreventExtensions(JSContext *ctx, JSValueConst obj)
+int JSI_PreventExtensions(JSIContext *ctx, JSIValueConst obj)
 {
     JSObject *p;
 
@@ -9389,11 +9389,11 @@ int JSI_PreventExtensions(JSContext *ctx, JSValueConst obj)
 }
 
 /* return -1 if exception otherwise TRUE or FALSE */
-int JSI_HasProperty(JSContext *ctx, JSValueConst obj, JSAtom prop)
+int JSI_HasProperty(JSIContext *ctx, JSIValueConst obj, JSAtom prop)
 {
     JSObject *p;
     int ret;
-    JSValue obj1;
+    JSIValue obj1;
 
     if (unlikely(JSI_VALUE_GET_TAG(obj) != JSI_TAG_OBJECT))
         return FALSE;
@@ -9425,14 +9425,14 @@ int JSI_HasProperty(JSContext *ctx, JSValueConst obj, JSAtom prop)
 }
 
 /* val must be a symbol */
-static JSAtom jsi_symbol_to_atom(JSContext *ctx, JSValue val)
+static JSAtom jsi_symbol_to_atom(JSIContext *ctx, JSIValue val)
 {
     JSAtomStruct *p = JSI_VALUE_GET_PTR(val);
     return jsi_get_atom_index(ctx->rt, p);
 }
 
 /* return JSI_ATOM_NULL in case of exception */
-JSAtom JSI_ValueToAtom(JSContext *ctx, JSValueConst val)
+JSAtom JSI_ValueToAtom(JSIContext *ctx, JSIValueConst val)
 {
     JSAtom atom;
     uint32_t tag;
@@ -9445,7 +9445,7 @@ JSAtom JSI_ValueToAtom(JSContext *ctx, JSValueConst val)
         JSAtomStruct *p = JSI_VALUE_GET_PTR(val);
         atom = JSI_DupAtom(ctx, jsi_get_atom_index(ctx->rt, p));
     } else {
-        JSValue str;
+        JSIValue str;
         str = JSI_ToPropertyKey(ctx, val);
         if (JSI_IsException(str))
             return JSI_ATOM_NULL;
@@ -9458,11 +9458,11 @@ JSAtom JSI_ValueToAtom(JSContext *ctx, JSValueConst val)
     return atom;
 }
 
-static JSValue JSI_GetPropertyValue(JSContext *ctx, JSValueConst this_obj,
-                                   JSValue prop)
+static JSIValue JSI_GetPropertyValue(JSIContext *ctx, JSIValueConst this_obj,
+                                   JSIValue prop)
 {
     JSAtom atom;
-    JSValue ret;
+    JSIValue ret;
 
     if (likely(JSI_VALUE_GET_TAG(this_obj) == JSI_TAG_OBJECT &&
                JSI_VALUE_GET_TAG(prop) == JSI_TAG_INT)) {
@@ -9498,7 +9498,7 @@ static JSValue JSI_GetPropertyValue(JSContext *ctx, JSValueConst this_obj,
     }
 }
 
-JSValue JSI_GetPropertyUint32(JSContext *ctx, JSValueConst this_obj,
+JSIValue JSI_GetPropertyUint32(JSIContext *ctx, JSIValueConst this_obj,
                              uint32_t idx)
 {
     return JSI_GetPropertyValue(ctx, this_obj, JSI_NewUint32(ctx, idx));
@@ -9509,9 +9509,9 @@ JSValue JSI_GetPropertyUint32(JSContext *ctx, JSValueConst this_obj,
    TRUE if property exists, stored into *pval,
    FALSE if proprty does not exist.
  */
-static int JSI_TryGetPropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx, JSValue *pval)
+static int JSI_TryGetPropertyInt64(JSIContext *ctx, JSIValueConst obj, int64_t idx, JSIValue *pval)
 {
-    JSValue val = JSI_UNDEFINED;
+    JSIValue val = JSI_UNDEFINED;
     JSAtom prop;
     int present;
 
@@ -9540,10 +9540,10 @@ static int JSI_TryGetPropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx
     return present;
 }
 
-static JSValue JSI_GetPropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx)
+static JSIValue JSI_GetPropertyInt64(JSIContext *ctx, JSIValueConst obj, int64_t idx)
 {
     JSAtom prop;
-    JSValue val;
+    JSIValue val;
 
     if ((uint64_t)idx <= INT32_MAX) {
         /* fast path for fast arrays */
@@ -9558,11 +9558,11 @@ static JSValue JSI_GetPropertyInt64(JSContext *ctx, JSValueConst obj, int64_t id
     return val;
 }
 
-JSValue JSI_GetPropertyStr(JSContext *ctx, JSValueConst this_obj,
+JSIValue JSI_GetPropertyStr(JSIContext *ctx, JSIValueConst this_obj,
                           const char *prop)
 {
     JSAtom atom;
-    JSValue ret;
+    JSIValue ret;
     atom = JSI_NewAtom(ctx, prop);
     if (atom == JSI_ATOM_NULL)
         return JSI_EXCEPTION;
@@ -9573,7 +9573,7 @@ JSValue JSI_GetPropertyStr(JSContext *ctx, JSValueConst this_obj,
 
 /* Note: the property value is not initialized. Return NULL if memory
    error. */
-static JSProperty *add_property(JSContext *ctx,
+static JSProperty *add_property(JSIContext *ctx,
                                 JSObject *p, JSAtom prop, int prop_flags)
 {
     JSShape *sh, *new_sh;
@@ -9616,12 +9616,12 @@ static JSProperty *add_property(JSContext *ctx,
 
 /* can be called on Array or Arguments objects. return < 0 if
    memory alloc error. */
-static no_inline __exception int convert_fast_array_to_array(JSContext *ctx,
+static no_inline __exception int convert_fast_array_to_array(JSIContext *ctx,
                                                              JSObject *p)
 {
     JSProperty *pr;
     JSShape *sh;
-    JSValue *tab;
+    JSIValue *tab;
     uint32_t i, len, new_count;
 
     if (jsi_shape_prepare_update(ctx, p, NULL))
@@ -9650,7 +9650,7 @@ static no_inline __exception int convert_fast_array_to_array(JSContext *ctx,
     return 0;
 }
 
-static int delete_property(JSContext *ctx, JSObject *p, JSAtom atom)
+static int delete_property(JSIContext *ctx, JSObject *p, JSAtom atom)
 {
     JSShape *sh;
     JSShapeProperty *pr, *lpr, *prop;
@@ -9736,15 +9736,15 @@ static int delete_property(JSContext *ctx, JSObject *p, JSAtom atom)
     return TRUE;
 }
 
-static int call_setter(JSContext *ctx, JSObject *setter,
-                       JSValueConst this_obj, JSValue val, int flags)
+static int call_setter(JSIContext *ctx, JSObject *setter,
+                       JSIValueConst this_obj, JSIValue val, int flags)
 {
-    JSValue ret, func;
+    JSIValue ret, func;
     if (likely(setter)) {
         func = JSI_MKPTR(JSI_TAG_OBJECT, setter);
         /* Note: the field could be removed in the setter */
         func = JSI_DupValue(ctx, func);
-        ret = JSI_CallFree(ctx, func, this_obj, 1, (JSValueConst *)&val);
+        ret = JSI_CallFree(ctx, func, this_obj, 1, (JSIValueConst *)&val);
         JSI_FreeValue(ctx, val);
         if (JSI_IsException(ret))
             return -1;
@@ -9762,7 +9762,7 @@ static int call_setter(JSContext *ctx, JSObject *setter,
 }
 
 /* set the array length and remove the array elements if necessary. */
-static int set_array_length(JSContext *ctx, JSObject *p, JSValue val,
+static int set_array_length(JSIContext *ctx, JSObject *p, JSIValue val,
                             int flags)
 {
     uint32_t len, idx, cur_len;
@@ -9853,14 +9853,14 @@ static int set_array_length(JSContext *ctx, JSObject *p, JSValue val,
 }
 
 /* return -1 if exception */
-static int expand_fast_array(JSContext *ctx, JSObject *p, uint32_t new_len)
+static int expand_fast_array(JSIContext *ctx, JSObject *p, uint32_t new_len)
 {
     uint32_t new_size;
     size_t slack;
-    JSValue *new_array_prop;
+    JSIValue *new_array_prop;
     /* XXX: potential arithmetic overflow */
     new_size = max_int(new_len, p->u.array.u1.size * 3 / 2);
-    new_array_prop = jsi_realloc2(ctx, p->u.array.u.values, sizeof(JSValue) * new_size, &slack);
+    new_array_prop = jsi_realloc2(ctx, p->u.array.u.values, sizeof(JSIValue) * new_size, &slack);
     if (!new_array_prop)
         return -1;
     new_size += slack / sizeof(*new_array_prop);
@@ -9871,8 +9871,8 @@ static int expand_fast_array(JSContext *ctx, JSObject *p, uint32_t new_len)
 
 /* Preconditions: 'p' must be of class JSI_CLASS_ARRAY, p->fast_array =
    TRUE and p->extensible = TRUE */
-static int add_fast_array_element(JSContext *ctx, JSObject *p,
-                                  JSValue val, int flags)
+static int add_fast_array_element(JSIContext *ctx, JSObject *p,
+                                  JSIValue val, int flags)
 {
     uint32_t new_len, array_len;
     /* extend the array by one */
@@ -9904,9 +9904,9 @@ static int add_fast_array_element(JSContext *ctx, JSObject *p,
 /* Allocate a new fast array. Its 'length' property is set to zero. It
    maximum size is 2^31-1 elements. For convenience, 'len' is a 64 bit
    integer. WARNING: the content of the array is not initialized. */
-static JSValue jsi_allocate_fast_array(JSContext *ctx, int64_t len)
+static JSIValue jsi_allocate_fast_array(JSIContext *ctx, int64_t len)
 {
-    JSValue arr;
+    JSIValue arr;
     JSObject *p;
 
     if (len > INT32_MAX)
@@ -9925,7 +9925,7 @@ static JSValue jsi_allocate_fast_array(JSContext *ctx, int64_t len)
     return arr;
 }
 
-static void jsi_free_desc(JSContext *ctx, JSPropertyDescriptor *desc)
+static void jsi_free_desc(JSIContext *ctx, JSPropertyDescriptor *desc)
 {
     JSI_FreeValue(ctx, desc->getter);
     JSI_FreeValue(ctx, desc->setter);
@@ -9938,8 +9938,8 @@ static void jsi_free_desc(JSContext *ctx, JSPropertyDescriptor *desc)
    the new property is not added and an error is raised. 'this_obj' is
    the receiver. If obj != this_obj, then obj must be an object
    (Reflect.set case). */
-int JSI_SetPropertyInternal(JSContext *ctx, JSValueConst obj,
-                           JSAtom prop, JSValue val, JSValueConst this_obj, int flags)
+int JSI_SetPropertyInternal(JSIContext *ctx, JSIValueConst obj,
+                           JSAtom prop, JSIValue val, JSIValueConst this_obj, int flags)
 {
     JSObject *p, *p1;
     JSShapeProperty *prs;
@@ -10031,7 +10031,7 @@ int JSI_SetPropertyInternal(JSContext *ctx, JSValueConst obj,
             } else {
                 const JSClassExoticMethods *em = ctx->rt->class_array[p1->class_id].exotic;
                 if (em) {
-                    JSValue obj1;
+                    JSIValue obj1;
                     if (em->set_property) {
                         /* set_property can free the prototype */
                         obj1 = JSI_DupValue(ctx, JSI_MKPTR(JSI_TAG_OBJECT, p1));
@@ -10186,8 +10186,8 @@ int JSI_SetPropertyInternal(JSContext *ctx, JSValueConst obj,
 }
 
 /* flags can be JSI_PROP_THROW or JSI_PROP_THROW_STRICT */
-static int JSI_SetPropertyValue(JSContext *ctx, JSValueConst this_obj,
-                               JSValue prop, JSValue val, int flags)
+static int JSI_SetPropertyValue(JSIContext *ctx, JSIValueConst this_obj,
+                               JSIValue prop, JSIValue val, int flags)
 {
     if (likely(JSI_VALUE_GET_TAG(this_obj) == JSI_TAG_OBJECT &&
                JSI_VALUE_GET_TAG(prop) == JSI_TAG_INT)) {
@@ -10254,15 +10254,15 @@ static int JSI_SetPropertyValue(JSContext *ctx, JSValueConst this_obj,
     }
 }
 
-int JSI_SetPropertyUint32(JSContext *ctx, JSValueConst this_obj,
-                         uint32_t idx, JSValue val)
+int JSI_SetPropertyUint32(JSIContext *ctx, JSIValueConst this_obj,
+                         uint32_t idx, JSIValue val)
 {
     return JSI_SetPropertyValue(ctx, this_obj, JSI_NewUint32(ctx, idx), val,
                                JSI_PROP_THROW);
 }
 
-int JSI_SetPropertyInt64(JSContext *ctx, JSValueConst this_obj,
-                        int64_t idx, JSValue val)
+int JSI_SetPropertyInt64(JSIContext *ctx, JSIValueConst this_obj,
+                        int64_t idx, JSIValue val)
 {
     JSAtom prop;
     int res;
@@ -10282,8 +10282,8 @@ int JSI_SetPropertyInt64(JSContext *ctx, JSValueConst this_obj,
     return res;
 }
 
-int JSI_SetPropertyStr(JSContext *ctx, JSValueConst this_obj,
-                      const char *prop, JSValue val)
+int JSI_SetPropertyStr(JSIContext *ctx, JSIValueConst this_obj,
+                      const char *prop, JSIValue val)
 {
     JSAtom atom;
     int ret;
@@ -10308,9 +10308,9 @@ static int get_prop_flags(int flags, int def_flags)
     return (flags & mask) | (def_flags & ~mask);
 }
 
-static int JSI_CreateProperty(JSContext *ctx, JSObject *p,
-                             JSAtom prop, JSValueConst val,
-                             JSValueConst getter, JSValueConst setter,
+static int JSI_CreateProperty(JSIContext *ctx, JSObject *p,
+                             JSAtom prop, JSIValueConst val,
+                             JSIValueConst getter, JSIValueConst setter,
                              int flags)
 {
     JSProperty *pr;
@@ -10443,7 +10443,7 @@ static BOOL check_define_prop_flags(int prop_flags, int flags)
 }
 
 /* ensure that the shape can be safely modified */
-static int jsi_shape_prepare_update(JSContext *ctx, JSObject *p,
+static int jsi_shape_prepare_update(JSIContext *ctx, JSObject *p,
                                    JSShapeProperty **pprs)
 {
     JSShape *sh;
@@ -10470,7 +10470,7 @@ static int jsi_shape_prepare_update(JSContext *ctx, JSObject *p,
     return 0;
 }
 
-static int jsi_update_property_flags(JSContext *ctx, JSObject *p,
+static int jsi_update_property_flags(JSIContext *ctx, JSObject *p,
                                     JSShapeProperty **pprs, int flags)
 {
     if (flags != (*pprs)->flags) {
@@ -10491,9 +10491,9 @@ static int jsi_update_property_flags(JSContext *ctx, JSObject *p,
    define_own_property callback.
    return -1 (exception), FALSE or TRUE.
 */
-int JSI_DefineProperty(JSContext *ctx, JSValueConst this_obj,
-                      JSAtom prop, JSValueConst val,
-                      JSValueConst getter, JSValueConst setter, int flags)
+int JSI_DefineProperty(JSIContext *ctx, JSIValueConst this_obj,
+                      JSAtom prop, JSIValueConst val,
+                      JSIValueConst getter, JSIValueConst setter, int flags)
 {
     JSObject *p;
     JSShapeProperty *prs;
@@ -10517,7 +10517,7 @@ int JSI_DefineProperty(JSContext *ctx, JSValueConst this_obj,
                 return -1;
             }
             /* this code relies on the fact that Uint32 are never allocated */
-            val = (JSValueConst)JSI_NewUint32(ctx, array_length);
+            val = (JSIValueConst)JSI_NewUint32(ctx, array_length);
             /* prs may have been modified */
             prs = find_own_property(&pr, p, prop);
             assert(prs != NULL);
@@ -10631,7 +10631,7 @@ int JSI_DefineProperty(JSContext *ctx, JSValueConst this_obj,
                     /* if writable is set to false, no longer a
                        reference (for mapped arguments) */
                     if ((flags & (JSI_PROP_HAS_WRITABLE | JSI_PROP_WRITABLE)) == JSI_PROP_HAS_WRITABLE) {
-                        JSValue val1;
+                        JSIValue val1;
                         if (p->class_id == JSI_CLASS_MODULE_NS) {
                             return JSI_ThrowTypeErrorOrFalse(ctx, flags, "module namespace properties have writable = false");
                         }
@@ -10720,7 +10720,7 @@ int JSI_DefineProperty(JSContext *ctx, JSValueConst this_obj,
     return JSI_CreateProperty(ctx, p, prop, val, getter, setter, flags);
 }
 
-static int JSI_DefineAutoInitProperty(JSContext *ctx, JSValueConst this_obj,
+static int JSI_DefineAutoInitProperty(JSIContext *ctx, JSIValueConst this_obj,
                                      JSAtom prop, JSAutoInitIDEnum id,
                                      void *opaque, int flags)
 {
@@ -10751,8 +10751,8 @@ static int JSI_DefineAutoInitProperty(JSContext *ctx, JSValueConst this_obj,
 }
 
 /* shortcut to add or redefine a new property value */
-int JSI_DefinePropertyValue(JSContext *ctx, JSValueConst this_obj,
-                           JSAtom prop, JSValue val, int flags)
+int JSI_DefinePropertyValue(JSIContext *ctx, JSIValueConst this_obj,
+                           JSAtom prop, JSIValue val, int flags)
 {
     int ret;
     ret = JSI_DefineProperty(ctx, this_obj, prop, val, JSI_UNDEFINED, JSI_UNDEFINED,
@@ -10761,8 +10761,8 @@ int JSI_DefinePropertyValue(JSContext *ctx, JSValueConst this_obj,
     return ret;
 }
 
-int JSI_DefinePropertyValueValue(JSContext *ctx, JSValueConst this_obj,
-                                JSValue prop, JSValue val, int flags)
+int JSI_DefinePropertyValueValue(JSIContext *ctx, JSIValueConst this_obj,
+                                JSIValue prop, JSIValue val, int flags)
 {
     JSAtom atom;
     int ret;
@@ -10777,22 +10777,22 @@ int JSI_DefinePropertyValueValue(JSContext *ctx, JSValueConst this_obj,
     return ret;
 }
 
-int JSI_DefinePropertyValueUint32(JSContext *ctx, JSValueConst this_obj,
-                                 uint32_t idx, JSValue val, int flags)
+int JSI_DefinePropertyValueUint32(JSIContext *ctx, JSIValueConst this_obj,
+                                 uint32_t idx, JSIValue val, int flags)
 {
     return JSI_DefinePropertyValueValue(ctx, this_obj, JSI_NewUint32(ctx, idx),
                                        val, flags);
 }
 
-int JSI_DefinePropertyValueInt64(JSContext *ctx, JSValueConst this_obj,
-                                int64_t idx, JSValue val, int flags)
+int JSI_DefinePropertyValueInt64(JSIContext *ctx, JSIValueConst this_obj,
+                                int64_t idx, JSIValue val, int flags)
 {
     return JSI_DefinePropertyValueValue(ctx, this_obj, JSI_NewInt64(ctx, idx),
                                        val, flags);
 }
 
-int JSI_DefinePropertyValueStr(JSContext *ctx, JSValueConst this_obj,
-                              const char *prop, JSValue val, int flags)
+int JSI_DefinePropertyValueStr(JSIContext *ctx, JSIValueConst this_obj,
+                              const char *prop, JSIValue val, int flags)
 {
     JSAtom atom;
     int ret;
@@ -10807,8 +10807,8 @@ int JSI_DefinePropertyValueStr(JSContext *ctx, JSValueConst this_obj,
 }
 
 /* shortcut to add getter & setter */
-int JSI_DefinePropertyGetSet(JSContext *ctx, JSValueConst this_obj,
-                            JSAtom prop, JSValue getter, JSValue setter,
+int JSI_DefinePropertyGetSet(JSIContext *ctx, JSIValueConst this_obj,
+                            JSAtom prop, JSIValue getter, JSIValue setter,
                             int flags)
 {
     int ret;
@@ -10820,8 +10820,8 @@ int JSI_DefinePropertyGetSet(JSContext *ctx, JSValueConst this_obj,
     return ret;
 }
 
-static int JSI_CreateDataPropertyUint32(JSContext *ctx, JSValueConst this_obj,
-                                       int64_t idx, JSValue val, int flags)
+static int JSI_CreateDataPropertyUint32(JSIContext *ctx, JSIValueConst this_obj,
+                                       int64_t idx, JSIValue val, int flags)
 {
     return JSI_DefinePropertyValueValue(ctx, this_obj, JSI_NewInt64(ctx, idx),
                                        val, flags | JSI_PROP_CONFIGURABLE |
@@ -10830,11 +10830,11 @@ static int JSI_CreateDataPropertyUint32(JSContext *ctx, JSValueConst this_obj,
 
 
 /* return TRUE if 'obj' has a non empty 'name' string */
-static BOOL jsi_object_has_name(JSContext *ctx, JSValueConst obj)
+static BOOL jsi_object_has_name(JSIContext *ctx, JSIValueConst obj)
 {
     JSProperty *pr;
     JSShapeProperty *prs;
-    JSValueConst val;
+    JSIValueConst val;
     JSString *p;
 
     prs = find_own_property(&pr, JSI_VALUE_GET_OBJ(obj), JSI_ATOM_name);
@@ -10849,7 +10849,7 @@ static BOOL jsi_object_has_name(JSContext *ctx, JSValueConst obj)
     return (p->len != 0);
 }
 
-static int JSI_DefineObjectName(JSContext *ctx, JSValueConst obj,
+static int JSI_DefineObjectName(JSIContext *ctx, JSIValueConst obj,
                                JSAtom name, int flags)
 {
     if (name != JSI_ATOM_NULL
@@ -10861,13 +10861,13 @@ static int JSI_DefineObjectName(JSContext *ctx, JSValueConst obj,
     return 0;
 }
 
-static int JSI_DefineObjectNameComputed(JSContext *ctx, JSValueConst obj,
-                                       JSValueConst str, int flags)
+static int JSI_DefineObjectNameComputed(JSIContext *ctx, JSIValueConst obj,
+                                       JSIValueConst str, int flags)
 {
     if (JSI_IsObject(obj) &&
         !jsi_object_has_name(ctx, obj)) {
         JSAtom prop;
-        JSValue name_str;
+        JSIValue name_str;
         prop = JSI_ValueToAtom(ctx, str);
         if (prop == JSI_ATOM_NULL)
             return -1;
@@ -10884,14 +10884,14 @@ static int JSI_DefineObjectNameComputed(JSContext *ctx, JSValueConst obj,
 #define DEFINE_GLOBAL_LEX_VAR (1 << 7)
 #define DEFINE_GLOBAL_FUNC_VAR (1 << 6)
 
-static JSValue JSI_ThrowSyntaxErrorVarRedeclaration(JSContext *ctx, JSAtom prop)
+static JSIValue JSI_ThrowSyntaxErrorVarRedeclaration(JSIContext *ctx, JSAtom prop)
 {
     return JSI_ThrowSyntaxErrorAtom(ctx, "redeclaration of '%s'", prop);
 }
 
 /* flags is 0, DEFINE_GLOBAL_LEX_VAR or DEFINE_GLOBAL_FUNC_VAR */
 /* XXX: could support exotic global object. */
-static int JSI_CheckDefineGlobalVar(JSContext *ctx, JSAtom prop, int flags)
+static int JSI_CheckDefineGlobalVar(JSIContext *ctx, JSAtom prop, int flags)
 {
     JSObject *p;
     JSShapeProperty *prs;
@@ -10933,12 +10933,12 @@ static int JSI_CheckDefineGlobalVar(JSContext *ctx, JSAtom prop, int flags)
 /* def_flags is (0, DEFINE_GLOBAL_LEX_VAR) |
    JSI_PROP_CONFIGURABLE | JSI_PROP_WRITABLE */
 /* XXX: could support exotic global object. */
-static int JSI_DefineGlobalVar(JSContext *ctx, JSAtom prop, int def_flags)
+static int JSI_DefineGlobalVar(JSIContext *ctx, JSAtom prop, int def_flags)
 {
     JSObject *p;
     JSShapeProperty *prs;
     JSProperty *pr;
-    JSValue val;
+    JSIValue val;
     int flags;
 
     if (def_flags & DEFINE_GLOBAL_LEX_VAR) {
@@ -10966,8 +10966,8 @@ static int JSI_DefineGlobalVar(JSContext *ctx, JSAtom prop, int def_flags)
 
 /* 'def_flags' is 0 or JSI_PROP_CONFIGURABLE. */
 /* XXX: could support exotic global object. */
-static int JSI_DefineGlobalFunction(JSContext *ctx, JSAtom prop,
-                                   JSValueConst func, int def_flags)
+static int JSI_DefineGlobalFunction(JSIContext *ctx, JSAtom prop,
+                                   JSIValueConst func, int def_flags)
 {
 
     JSObject *p;
@@ -10987,7 +10987,7 @@ static int JSI_DefineGlobalFunction(JSContext *ctx, JSAtom prop,
     return 0;
 }
 
-static JSValue JSI_GetGlobalVar(JSContext *ctx, JSAtom prop,
+static JSIValue JSI_GetGlobalVar(JSIContext *ctx, JSAtom prop,
                                BOOL throw_ref_error)
 {
     JSObject *p;
@@ -11008,7 +11008,7 @@ static JSValue JSI_GetGlobalVar(JSContext *ctx, JSAtom prop,
 }
 
 /* construct a reference to a global variable */
-static int JSI_GetGlobalVarRef(JSContext *ctx, JSAtom prop, JSValue *sp)
+static int JSI_GetGlobalVarRef(JSIContext *ctx, JSAtom prop, JSIValue *sp)
 {
     JSObject *p;
     JSShapeProperty *prs;
@@ -11045,7 +11045,7 @@ static int JSI_GetGlobalVarRef(JSContext *ctx, JSAtom prop, JSValue *sp)
 }
 
 /* use for strict variable access: test if the variable exists */
-static int JSI_CheckGlobalVar(JSContext *ctx, JSAtom prop)
+static int JSI_CheckGlobalVar(JSIContext *ctx, JSAtom prop)
 {
     JSObject *p;
     JSShapeProperty *prs;
@@ -11068,7 +11068,7 @@ static int JSI_CheckGlobalVar(JSContext *ctx, JSAtom prop)
    flag = 1: initialize lexical variable
    flag = 2: normal variable write, strict check was done before
 */
-static int JSI_SetGlobalVar(JSContext *ctx, JSAtom prop, JSValue val,
+static int JSI_SetGlobalVar(JSIContext *ctx, JSAtom prop, JSIValue val,
                            int flag)
 {
     JSObject *p;
@@ -11105,7 +11105,7 @@ static int JSI_SetGlobalVar(JSContext *ctx, JSAtom prop, JSValue val,
 }
 
 /* return -1, FALSE or TRUE */
-static int JSI_DeleteGlobalVar(JSContext *ctx, JSAtom prop)
+static int JSI_DeleteGlobalVar(JSIContext *ctx, JSAtom prop)
 {
     JSObject *p;
     JSShapeProperty *prs;
@@ -11130,9 +11130,9 @@ static int JSI_DeleteGlobalVar(JSContext *ctx, JSAtom prop)
 /* return -1, FALSE or TRUE. return FALSE if not configurable or
    invalid object. return -1 in case of exception.
    flags can be 0, JSI_PROP_THROW or JSI_PROP_THROW_STRICT */
-int JSI_DeleteProperty(JSContext *ctx, JSValueConst obj, JSAtom prop, int flags)
+int JSI_DeleteProperty(JSIContext *ctx, JSIValueConst obj, JSAtom prop, int flags)
 {
-    JSValue obj1;
+    JSIValue obj1;
     JSObject *p;
     int res;
 
@@ -11152,7 +11152,7 @@ int JSI_DeleteProperty(JSContext *ctx, JSValueConst obj, JSAtom prop, int flags)
     return FALSE;
 }
 
-int JSI_DeletePropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx, int flags)
+int JSI_DeletePropertyInt64(JSIContext *ctx, JSIValueConst obj, int64_t idx, int flags)
 {
     JSAtom prop;
     int res;
@@ -11169,7 +11169,7 @@ int JSI_DeletePropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx, int f
     return res;
 }
 
-BOOL JSI_IsFunction(JSContext *ctx, JSValueConst val)
+BOOL JSI_IsFunction(JSIContext *ctx, JSIValueConst val)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(val) != JSI_TAG_OBJECT)
@@ -11183,7 +11183,7 @@ BOOL JSI_IsFunction(JSContext *ctx, JSValueConst val)
     }
 }
 
-BOOL JSI_IsCFunction(JSContext *ctx, JSValueConst val, JSCFunction *func, int magic)
+BOOL JSI_IsCFunction(JSIContext *ctx, JSIValueConst val, JSCFunction *func, int magic)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(val) != JSI_TAG_OBJECT)
@@ -11195,7 +11195,7 @@ BOOL JSI_IsCFunction(JSContext *ctx, JSValueConst val, JSCFunction *func, int ma
         return FALSE;
 }
 
-BOOL JSI_IsConstructor(JSContext *ctx, JSValueConst val)
+BOOL JSI_IsConstructor(JSIContext *ctx, JSIValueConst val)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(val) != JSI_TAG_OBJECT)
@@ -11204,7 +11204,7 @@ BOOL JSI_IsConstructor(JSContext *ctx, JSValueConst val)
     return p->is_constructor;
 }
 
-BOOL JSI_SetConstructorBit(JSContext *ctx, JSValueConst func_obj, BOOL val)
+BOOL JSI_SetConstructorBit(JSIContext *ctx, JSIValueConst func_obj, BOOL val)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(func_obj) != JSI_TAG_OBJECT)
@@ -11214,7 +11214,7 @@ BOOL JSI_SetConstructorBit(JSContext *ctx, JSValueConst func_obj, BOOL val)
     return TRUE;
 }
 
-BOOL JSI_IsError(JSContext *ctx, JSValueConst val)
+BOOL JSI_IsError(JSIContext *ctx, JSIValueConst val)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(val) != JSI_TAG_OBJECT)
@@ -11224,12 +11224,12 @@ BOOL JSI_IsError(JSContext *ctx, JSValueConst val)
 }
 
 /* must be called after JSI_Throw() */
-void JSI_SetUncatchableException(JSContext *ctx, BOOL flag)
+void JSI_SetUncatchableException(JSIContext *ctx, BOOL flag)
 {
     ctx->rt->current_exception_is_uncatchable = flag;
 }
 
-void JSI_SetOpaque(JSValue obj, void *opaque)
+void JSI_SetOpaque(JSIValue obj, void *opaque)
 {
    JSObject *p;
     if (JSI_VALUE_GET_TAG(obj) == JSI_TAG_OBJECT) {
@@ -11239,7 +11239,7 @@ void JSI_SetOpaque(JSValue obj, void *opaque)
 }
 
 /* return NULL if not an object of class class_id */
-void *JSI_GetOpaque(JSValueConst obj, JSClassID class_id)
+void *JSI_GetOpaque(JSIValueConst obj, JSClassID class_id)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(obj) != JSI_TAG_OBJECT)
@@ -11250,7 +11250,7 @@ void *JSI_GetOpaque(JSValueConst obj, JSClassID class_id)
     return p->u.opaque;
 }
 
-void *JSI_GetOpaque2(JSContext *ctx, JSValueConst obj, JSClassID class_id)
+void *JSI_GetOpaque2(JSIContext *ctx, JSIValueConst obj, JSClassID class_id)
 {
     void *p = JSI_GetOpaque(obj, class_id);
     if (unlikely(!p)) {
@@ -11259,7 +11259,7 @@ void *JSI_GetOpaque2(JSContext *ctx, JSValueConst obj, JSClassID class_id)
     return p;
 }
 
-void *JSI_GetAnyOpaque(JSValueConst obj, JSClassID *class_id)
+void *JSI_GetAnyOpaque(JSIValueConst obj, JSClassID *class_id)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(obj) != JSI_TAG_OBJECT) {
@@ -11271,13 +11271,13 @@ void *JSI_GetAnyOpaque(JSValueConst obj, JSClassID *class_id)
     return p->u.opaque;
 }
 
-static JSValue JSI_ToPrimitiveFree(JSContext *ctx, JSValue val, int hint)
+static JSIValue JSI_ToPrimitiveFree(JSIContext *ctx, JSIValue val, int hint)
 {
     int i;
     BOOL force_ordinary;
 
     JSAtom method_name;
-    JSValue method, ret;
+    JSIValue method, ret;
     if (JSI_VALUE_GET_TAG(val) != JSI_TAG_OBJECT)
         return val;
     force_ordinary = hint & HINT_FORCE_ORDINARY;
@@ -11290,7 +11290,7 @@ static JSValue JSI_ToPrimitiveFree(JSContext *ctx, JSValue val, int hint)
            test262 use null as a non callable converter */
         if (!JSI_IsUndefined(method) && !JSI_IsNull(method)) {
             JSAtom atom;
-            JSValue arg;
+            JSIValue arg;
             switch(hint) {
             case HINT_STRING:
                 atom = JSI_ATOM_string;
@@ -11304,7 +11304,7 @@ static JSValue JSI_ToPrimitiveFree(JSContext *ctx, JSValue val, int hint)
                 break;
             }
             arg = JSI_AtomToString(ctx, atom);
-            ret = JSI_CallFree(ctx, method, val, 1, (JSValueConst *)&arg);
+            ret = JSI_CallFree(ctx, method, val, 1, (JSIValueConst *)&arg);
             JSI_FreeValue(ctx, arg);
             if (JSI_IsException(ret))
                 goto exception;
@@ -11345,12 +11345,12 @@ exception:
     return JSI_EXCEPTION;
 }
 
-static JSValue JSI_ToPrimitive(JSContext *ctx, JSValueConst val, int hint)
+static JSIValue JSI_ToPrimitive(JSIContext *ctx, JSIValueConst val, int hint)
 {
     return JSI_ToPrimitiveFree(ctx, JSI_DupValue(ctx, val), hint);
 }
 
-void JSI_SetIsHTMLDDA(JSContext *ctx, JSValueConst obj)
+void JSI_SetIsHTMLDDA(JSIContext *ctx, JSIValueConst obj)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(obj) != JSI_TAG_OBJECT)
@@ -11359,7 +11359,7 @@ void JSI_SetIsHTMLDDA(JSContext *ctx, JSValueConst obj)
     p->is_HTMLDDA = TRUE;
 }
 
-static inline BOOL JSI_IsHTMLDDA(JSContext *ctx, JSValueConst obj)
+static inline BOOL JSI_IsHTMLDDA(JSIContext *ctx, JSIValueConst obj)
 {
     JSObject *p;
     if (JSI_VALUE_GET_TAG(obj) != JSI_TAG_OBJECT)
@@ -11368,7 +11368,7 @@ static inline BOOL JSI_IsHTMLDDA(JSContext *ctx, JSValueConst obj)
     return p->is_HTMLDDA;
 }
 
-static int JSI_ToBoolFree(JSContext *ctx, JSValue val)
+static int JSI_ToBoolFree(JSIContext *ctx, JSIValue val)
 {
     uint32_t tag = JSI_VALUE_GET_TAG(val);
     switch(tag) {
@@ -11411,7 +11411,7 @@ static int JSI_ToBoolFree(JSContext *ctx, JSValue val)
     }
 }
 
-int JSI_ToBool(JSContext *ctx, JSValueConst val)
+int JSI_ToBool(JSIContext *ctx, JSIValueConst val)
 {
     return JSI_ToBoolFree(ctx, JSI_DupValue(ctx, val));
 }
@@ -11875,7 +11875,7 @@ static const jsi_limb_t radix_base_table[JSI_RADIX_MAX - 1] = {
 /* return an exception in case of memory error. Return JSI_NAN if
    invalid syntax */
 /* XXX: directly use jsi_atod() */
-static JSValue jsi_atof2(JSContext *ctx, const char *str, const char **pp,
+static JSIValue jsi_atof2(JSIContext *ctx, const char *str, const char **pp,
                        int radix, int flags)
 {
     // printf("jsi_atof2 %s\n",str);
@@ -11899,7 +11899,7 @@ static JSValue jsi_atof2(JSContext *ctx, const char *str, const char **pp,
 
 }
 // #ifdef KALL
-static JSValue jsi_atof(JSContext *ctx, const char *str, const char **pp,
+static JSIValue jsi_atof(JSIContext *ctx, const char *str, const char **pp,
                        int radix, int flags)
 {
     const char *p, *p_start;
@@ -11909,7 +11909,7 @@ static JSValue jsi_atof(JSContext *ctx, const char *str, const char **pp,
     char buf1[64], *buf;
     int i, j, len;
     BOOL buf_allocated = FALSE;
-    JSValue val;
+    JSIValue val;
     // JSATODTempMem atod_mem;
     
     /* optional separator between digits */
@@ -12087,11 +12087,11 @@ typedef enum JSToNumberHintEnum {
     TON_FLAG_NUMERIC,
 } JSToNumberHintEnum;
 
-static JSValue JSI_ToNumberHintFree(JSContext *ctx, JSValue val,
+static JSIValue JSI_ToNumberHintFree(JSIContext *ctx, JSIValue val,
                                    JSToNumberHintEnum flag)
 {
     uint32_t tag;
-    JSValue ret;
+    JSIValue ret;
 
  redo:
     tag = JSI_VALUE_GET_NORM_TAG(val);
@@ -12152,32 +12152,32 @@ static JSValue JSI_ToNumberHintFree(JSContext *ctx, JSValue val,
     return ret;
 }
 
-static JSValue JSI_ToNumberFree(JSContext *ctx, JSValue val)
+static JSIValue JSI_ToNumberFree(JSIContext *ctx, JSIValue val)
 {
     return JSI_ToNumberHintFree(ctx, val, TON_FLAG_NUMBER);
 }
 
-static JSValue JSI_ToNumericFree(JSContext *ctx, JSValue val)
+static JSIValue JSI_ToNumericFree(JSIContext *ctx, JSIValue val)
 {
     return JSI_ToNumberHintFree(ctx, val, TON_FLAG_NUMERIC);
 }
 
-static JSValue JSI_ToNumeric(JSContext *ctx, JSValueConst val)
+static JSIValue JSI_ToNumeric(JSIContext *ctx, JSIValueConst val)
 {
     return JSI_ToNumericFree(ctx, JSI_DupValue(ctx, val));
 }
 
 
-static JSValue JSI_ToNumber(JSContext *ctx, JSValueConst val)
+static JSIValue JSI_ToNumber(JSIContext *ctx, JSIValueConst val)
 {
     return JSI_ToNumberFree(ctx, JSI_DupValue(ctx, val));
 }
 
 /* same as JSI_ToNumber() but return 0 in case of NaN/Undefined */
-static __maybe_unused JSValue JSI_ToIntegerFree(JSContext *ctx, JSValue val)
+static __maybe_unused JSIValue JSI_ToIntegerFree(JSIContext *ctx, JSIValue val)
 {
     uint32_t tag;
-    JSValue ret;
+    JSIValue ret;
 
  redo:
     tag = JSI_VALUE_GET_NORM_TAG(val);
@@ -12198,7 +12198,7 @@ static __maybe_unused JSValue JSI_ToIntegerFree(JSContext *ctx, JSValue val)
 }
 
 /* Note: the integer value is satured to 32 bits */
-static int JSI_ToInt32SatFree(JSContext *ctx, int *pres, JSValue val)
+static int JSI_ToInt32SatFree(JSIContext *ctx, int *pres, JSIValue val)
 {
     uint32_t tag;
     int ret;
@@ -12227,12 +12227,12 @@ static int JSI_ToInt32SatFree(JSContext *ctx, int *pres, JSValue val)
     return 0;
 }
 
-int JSI_ToInt32Sat(JSContext *ctx, int *pres, JSValueConst val)
+int JSI_ToInt32Sat(JSIContext *ctx, int *pres, JSIValueConst val)
 {
     return JSI_ToInt32SatFree(ctx, pres, JSI_DupValue(ctx, val));
 }
 
-int JSI_ToInt32Clamp(JSContext *ctx, int *pres, JSValueConst val,
+int JSI_ToInt32Clamp(JSIContext *ctx, int *pres, JSIValueConst val,
                     int min, int max, int min_offset)
 {
     int res = JSI_ToInt32SatFree(ctx, pres, JSI_DupValue(ctx, val));
@@ -12249,7 +12249,7 @@ int JSI_ToInt32Clamp(JSContext *ctx, int *pres, JSValueConst val,
     return res;
 }
 
-static int JSI_ToInt64SatFree(JSContext *ctx, int64_t *pres, JSValue val)
+static int JSI_ToInt64SatFree(JSIContext *ctx, int64_t *pres, JSIValue val)
 {
     uint32_t tag;
 
@@ -12275,12 +12275,12 @@ static int JSI_ToInt64SatFree(JSContext *ctx, int64_t *pres, JSValue val)
     }
 }
 
-int JSI_ToInt64Sat(JSContext *ctx, int64_t *pres, JSValueConst val)
+int JSI_ToInt64Sat(JSIContext *ctx, int64_t *pres, JSIValueConst val)
 {
     return JSI_ToInt64SatFree(ctx, pres, JSI_DupValue(ctx, val));
 }
 
-int JSI_ToInt64Clamp(JSContext *ctx, int64_t *pres, JSValueConst val,
+int JSI_ToInt64Clamp(JSIContext *ctx, int64_t *pres, JSIValueConst val,
                     int64_t min, int64_t max, int64_t neg_offset)
 {
     int res = JSI_ToInt64SatFree(ctx, pres, JSI_DupValue(ctx, val));
@@ -12297,7 +12297,7 @@ int JSI_ToInt64Clamp(JSContext *ctx, int64_t *pres, JSValueConst val,
 
 /* Same as JSI_ToInt32Free() but with a 64 bit result. Return (<0, 0)
    in case of exception */
-static int JSI_ToInt64Free(JSContext *ctx, int64_t *pres, JSValue val)
+static int JSI_ToInt64Free(JSIContext *ctx, int64_t *pres, JSIValue val)
 {
     uint32_t tag;
     int64_t ret;
@@ -12323,18 +12323,18 @@ static int JSI_ToInt64Free(JSContext *ctx, int64_t *pres, JSValue val)
     return 0;
 }
 
-int JSI_ToInt64(JSContext *ctx, int64_t *pres, JSValueConst val)
+int JSI_ToInt64(JSIContext *ctx, int64_t *pres, JSIValueConst val)
 {
     return JSI_ToInt64Free(ctx, pres, JSI_DupValue(ctx, val));
 }
 
-int JSI_ToInt64Ext(JSContext *ctx, int64_t *pres, JSValueConst val)
+int JSI_ToInt64Ext(JSIContext *ctx, int64_t *pres, JSIValueConst val)
 {
     return JSI_ToInt64(ctx, pres, val);
 }
 
 /* return (<0, 0) in case of exception */
-static int JSI_ToInt32Free(JSContext *ctx, int32_t *pres, JSValue val)
+static int JSI_ToInt32Free(JSIContext *ctx, int32_t *pres, JSIValue val)
 {
     uint32_t tag;
     int32_t ret;
@@ -12360,17 +12360,17 @@ static int JSI_ToInt32Free(JSContext *ctx, int32_t *pres, JSValue val)
     return 0;
 }
 
-int JSI_ToInt32(JSContext *ctx, int32_t *pres, JSValueConst val)
+int JSI_ToInt32(JSIContext *ctx, int32_t *pres, JSIValueConst val)
 {
     return JSI_ToInt32Free(ctx, pres, JSI_DupValue(ctx, val));
 }
 
-static inline int JSI_ToUint32Free(JSContext *ctx, uint32_t *pres, JSValue val)
+static inline int JSI_ToUint32Free(JSIContext *ctx, uint32_t *pres, JSIValue val)
 {
     return JSI_ToInt32Free(ctx, (int32_t *)pres, val);
 }
 
-static int JSI_ToUint8ClampFree(JSContext *ctx, int32_t *pres, JSValue val)
+static int JSI_ToUint8ClampFree(JSIContext *ctx, int32_t *pres, JSIValue val)
 {
     uint32_t tag;
     int res;
@@ -12397,8 +12397,8 @@ static int JSI_ToUint8ClampFree(JSContext *ctx, int32_t *pres, JSValue val)
     return 0;
 }
 
-static __exception int JSI_ToArrayLengthFree(JSContext *ctx, uint32_t *plen,
-                                            JSValue val, BOOL is_array_ctor)
+static __exception int JSI_ToArrayLengthFree(JSIContext *ctx, uint32_t *plen,
+                                            JSIValue val, BOOL is_array_ctor)
 {
     uint32_t tag, len;
 
@@ -12455,7 +12455,7 @@ static __exception int JSI_ToArrayLengthFree(JSContext *ctx, uint32_t *plen,
 #define MAX_SAFE_INTEGER (((int64_t)1 << 53) - 1)
 
 
-int JSI_ToIndex(JSContext *ctx, uint64_t *plen, JSValueConst val)
+int JSI_ToIndex(JSIContext *ctx, uint64_t *plen, JSIValueConst val)
 {
     int64_t v;
     if (JSI_ToInt64Sat(ctx, &v, val))
@@ -12471,8 +12471,8 @@ int JSI_ToIndex(JSContext *ctx, uint64_t *plen, JSValueConst val)
 
 /* convert a value to a length between 0 and MAX_SAFE_INTEGER.
    return -1 for exception */
-static __exception int JSI_ToLengthFree(JSContext *ctx, int64_t *plen,
-                                       JSValue val)
+static __exception int JSI_ToLengthFree(JSIContext *ctx, int64_t *plen,
+                                       JSIValue val)
 {
     int res = JSI_ToInt64Clamp(ctx, plen, val, 0, MAX_SAFE_INTEGER, 0);
     JSI_FreeValue(ctx, val);
@@ -12480,14 +12480,14 @@ static __exception int JSI_ToLengthFree(JSContext *ctx, int64_t *plen,
 }
 
 /* Note: can return an exception */
-static int JSI_NumberIsInteger(JSContext *ctx, JSValueConst val)
+static int JSI_NumberIsInteger(JSIContext *ctx, JSIValueConst val)
 {
     if (!JSI_IsNumber(val))
         return FALSE;
     return TRUE;
 }
 
-static BOOL JSI_NumberIsNegativeOrMinusZero(JSContext *ctx, JSValueConst val)
+static BOOL JSI_NumberIsNegativeOrMinusZero(JSIContext *ctx, JSIValueConst val)
 {
     uint32_t tag;
 
@@ -12506,7 +12506,7 @@ static BOOL JSI_NumberIsNegativeOrMinusZero(JSContext *ctx, JSValueConst val)
 
 
 
-static JSValue JSI_ToStringInternal(JSContext *ctx, JSValueConst val, BOOL is_ToPropertyKey)
+static JSIValue JSI_ToStringInternal(JSIContext *ctx, JSIValueConst val, BOOL is_ToPropertyKey)
 {
     uint32_t tag;
     char buf[32];
@@ -12535,7 +12535,7 @@ static JSValue JSI_ToStringInternal(JSContext *ctx, JSValueConst val, BOOL is_To
         return JSI_EXCEPTION;
     case JSI_TAG_OBJECT:
         {
-            JSValue val1, ret;
+            JSIValue val1, ret;
             val1 = JSI_ToPrimitive(ctx, val, HINT_STRING);
             if (JSI_IsException(val1))
                 return val1;
@@ -12557,32 +12557,32 @@ static JSValue JSI_ToStringInternal(JSContext *ctx, JSValueConst val, BOOL is_To
     }
 }
 
-JSValue JSI_ToString(JSContext *ctx, JSValueConst val)
+JSIValue JSI_ToString(JSIContext *ctx, JSIValueConst val)
 {
     return JSI_ToStringInternal(ctx, val, FALSE);
 }
 
-static JSValue JSI_ToStringFree(JSContext *ctx, JSValue val)
+static JSIValue JSI_ToStringFree(JSIContext *ctx, JSIValue val)
 {
-    JSValue ret;
+    JSIValue ret;
     ret = JSI_ToString(ctx, val);
     JSI_FreeValue(ctx, val);
     return ret;
 }
 
-static JSValue JSI_ToLocaleStringFree(JSContext *ctx, JSValue val)
+static JSIValue JSI_ToLocaleStringFree(JSIContext *ctx, JSIValue val)
 {
     if (JSI_IsUndefined(val) || JSI_IsNull(val))
         return JSI_ToStringFree(ctx, val);
     return JSI_InvokeFree(ctx, val, JSI_ATOM_toLocaleString, 0, NULL);
 }
 
-JSValue JSI_ToPropertyKey(JSContext *ctx, JSValueConst val)
+JSIValue JSI_ToPropertyKey(JSIContext *ctx, JSIValueConst val)
 {
     return JSI_ToStringInternal(ctx, val, TRUE);
 }
 
-static JSValue JSI_ToStringCheckObject(JSContext *ctx, JSValueConst val)
+static JSIValue JSI_ToStringCheckObject(JSIContext *ctx, JSIValueConst val)
 {
     uint32_t tag = JSI_VALUE_GET_TAG(val);
     if (tag == JSI_TAG_NULL || tag == JSI_TAG_UNDEFINED)
@@ -12590,9 +12590,9 @@ static JSValue JSI_ToStringCheckObject(JSContext *ctx, JSValueConst val)
     return JSI_ToString(ctx, val);
 }
 
-static JSValue JSI_ToQuotedString(JSContext *ctx, JSValueConst val1)
+static JSIValue JSI_ToQuotedString(JSIContext *ctx, JSIValueConst val1)
 {
-    JSValue val;
+    JSIValue val;
     JSString *p;
     int i;
     uint32_t c;
@@ -12661,7 +12661,7 @@ static JSValue JSI_ToQuotedString(JSContext *ctx, JSValueConst val1)
 
 typedef struct {
     JSRuntime *rt;
-    JSContext *ctx; /* may be NULL */
+    JSIContext *ctx; /* may be NULL */
     JSPrintValueOptions options;
     JSPrintValueWrite *write_func;
     void *write_opaque;
@@ -12669,7 +12669,7 @@ typedef struct {
     JSObject *print_stack[JSI_PRINT_MAX_DEPTH]; /* level values */
 } JSPrintValueState;
 
-static void jsi_print_value(JSPrintValueState *s, JSValueConst val);
+static void jsi_print_value(JSPrintValueState *s, JSIValueConst val);
 
 static void jsi_putc(JSPrintValueState *s, char c)
 {
@@ -12693,7 +12693,7 @@ static void __attribute__((format(printf, 2, 3))) jsi_printf(JSPrintValueState *
 }
 
 
-static uint32_t jsi_string_get_length(JSValueConst val)
+static uint32_t jsi_string_get_length(JSIValueConst val)
 {
     if (JSI_VALUE_GET_TAG(val) == JSI_TAG_STRING) {
         JSString *p = JSI_VALUE_GET_STRING(val);
@@ -12721,7 +12721,7 @@ static void jsi_dump_char(JSPrintValueState *s, int c, int sep)
     }
 }
 
-static void jsi_print_string_rec(JSPrintValueState *s, JSValueConst val,
+static void jsi_print_string_rec(JSPrintValueState *s, JSIValueConst val,
                                 int sep, uint32_t pos)
 {
     if (JSI_VALUE_GET_TAG(val) == JSI_TAG_STRING) {
@@ -12742,7 +12742,7 @@ static void jsi_print_string_rec(JSPrintValueState *s, JSValueConst val,
     }
 }
 
-static void jsi_print_string(JSPrintValueState *s, JSValueConst val)
+static void jsi_print_string(JSPrintValueState *s, JSIValueConst val)
 {
     int sep;
     if (s->options.raw_dump && JSI_VALUE_GET_TAG(val) == JSI_TAG_STRING) {
@@ -12761,7 +12761,7 @@ static void jsi_print_string(JSPrintValueState *s, JSValueConst val)
     }
 }
 
-static void jsi_print_raw_string2(JSPrintValueState *s, JSValueConst val, BOOL remove_last_lf)
+static void jsi_print_raw_string2(JSPrintValueState *s, JSIValueConst val, BOOL remove_last_lf)
 {
     const char *cstr;
     size_t len;
@@ -12774,7 +12774,7 @@ static void jsi_print_raw_string2(JSPrintValueState *s, JSValueConst val, BOOL r
     }
 }
 
-static void jsi_print_raw_string(JSPrintValueState *s, JSValueConst val)
+static void jsi_print_raw_string(JSPrintValueState *s, JSIValueConst val)
 {
     jsi_print_raw_string2(s, val, FALSE);
 }
@@ -12824,7 +12824,7 @@ static uint32_t jsi_print_array_get_length(JSObject *p)
 {
     JSProperty *pr;
     JSShapeProperty *prs;
-    JSValueConst val;
+    JSIValueConst val;
 
     prs = find_own_property(&pr, p, JSI_ATOM_length);
     if (!prs)
@@ -12914,7 +12914,7 @@ static void jsi_print_object(JSPrintValueState *s, JSObject *p)
         comma_state = 2;
     } else if (0) {
     } else if (p->class_id == JSI_CLASS_ERROR && s->ctx && !s->options.raw_dump) {
-        JSValue str = jsi_error_toString(s->ctx, JSI_MKPTR(JSI_TAG_OBJECT, p), 0, NULL);
+        JSIValue str = jsi_error_toString(s->ctx, JSI_MKPTR(JSI_TAG_OBJECT, p), 0, NULL);
         if (JSI_IsException(str))
             goto default_obj;
         jsi_print_raw_string(s, str);
@@ -13036,7 +13036,7 @@ static int jsi_print_stack_index(JSPrintValueState *s, JSObject *p)
     return -1;
 }
 
-static void jsi_print_value(JSPrintValueState *s, JSValueConst val)
+static void jsi_print_value(JSPrintValueState *s, JSIValueConst val)
 {
     uint32_t tag = JSI_VALUE_GET_NORM_TAG(val);
     const char *str;
@@ -13129,9 +13129,9 @@ void JSI_PrintValueSetDefaultOptions(JSPrintValueOptions *options)
     options->max_item_count = 100;
 }
 
-static void JSI_PrintValueInternal(JSRuntime *rt, JSContext *ctx, 
+static void JSI_PrintValueInternal(JSRuntime *rt, JSIContext *ctx, 
                                   JSPrintValueWrite *write_func, void *write_opaque,
-                                  JSValueConst val, const JSPrintValueOptions *options)
+                                  JSIValueConst val, const JSPrintValueOptions *options)
 {
     JSPrintValueState ss, *s = &ss;
     if (options)
@@ -13155,13 +13155,13 @@ static void JSI_PrintValueInternal(JSRuntime *rt, JSContext *ctx,
 }
 
 void JSI_PrintValueRT(JSRuntime *rt, JSPrintValueWrite *write_func, void *write_opaque,
-                     JSValueConst val, const JSPrintValueOptions *options)
+                     JSIValueConst val, const JSPrintValueOptions *options)
 {
     JSI_PrintValueInternal(rt, NULL, write_func, write_opaque, val, options);
 }
 
-void JSI_PrintValue(JSContext *ctx, JSPrintValueWrite *write_func, void *write_opaque,
-                   JSValueConst val, const JSPrintValueOptions *options)
+void JSI_PrintValue(JSIContext *ctx, JSPrintValueWrite *write_func, void *write_opaque,
+                   JSIValueConst val, const JSPrintValueOptions *options)
 {
     JSI_PrintValueInternal(ctx->rt, ctx, write_func, write_opaque, val, options);
 }
@@ -13172,7 +13172,7 @@ static void jsi_dump_value_write(void *opaque, const char *buf, size_t len)
     fwrite(buf, 1, len, fo);
 }
 
-static __maybe_unused void print_atom(JSContext *ctx, JSAtom atom)
+static __maybe_unused void print_atom(JSIContext *ctx, JSAtom atom)
 {
     JSPrintValueState ss, *s = &ss;
     memset(s, 0, sizeof(*s));
@@ -13183,14 +13183,14 @@ static __maybe_unused void print_atom(JSContext *ctx, JSAtom atom)
     jsi_print_atom(s, atom);
 }
 
-static __maybe_unused void JSI_DumpValue(JSContext *ctx, const char *str, JSValueConst val)
+static __maybe_unused void JSI_DumpValue(JSIContext *ctx, const char *str, JSIValueConst val)
 {
     printf("%s=", str);
     JSI_PrintValue(ctx, jsi_dump_value_write, stdout, val, NULL);
     printf("\n");
 }
 
-static __maybe_unused void JSI_DumpValueRT(JSRuntime *rt, const char *str, JSValueConst val)
+static __maybe_unused void JSI_DumpValueRT(JSRuntime *rt, const char *str, JSIValueConst val)
 {
     printf("%s=", str);
     JSI_PrintValueRT(rt, jsi_dump_value_write, stdout, val, NULL);
@@ -13269,7 +13269,7 @@ static __maybe_unused void JSI_DumpGCObject(JSRuntime *rt, JSGCObjectHeader *p)
 
 /* return -1 if exception (proxy case) or TRUE/FALSE */
 // TODO: should take flags to make proxy resolution and exceptions optional
-int JSI_IsArray(JSContext *ctx, JSValueConst val)
+int JSI_IsArray(JSIContext *ctx, JSIValueConst val)
 {
     if (JSI_VALUE_GET_TAG(val) == JSI_TAG_OBJECT) {
         JSObject *p = JSI_VALUE_GET_OBJ(val);
@@ -13284,11 +13284,11 @@ int JSI_IsArray(JSContext *ctx, JSValueConst val)
 /* XXX: merge with JSI_ToInt64Free with a specific flag ? */
 
 
-static no_inline __exception int jsi_unary_arith_slow(JSContext *ctx,
-                                                     JSValue *sp,
+static no_inline __exception int jsi_unary_arith_slow(JSIContext *ctx,
+                                                     JSIValue *sp,
                                                      OPCodeEnum op)
 {
-    JSValue op1;
+    JSIValue op1;
     int64_t v;
     uint32_t tag;
     JSBigIntBuf buf1;
@@ -13362,10 +13362,10 @@ static no_inline __exception int jsi_unary_arith_slow(JSContext *ctx,
     return -1;
 }
 
-static __exception int jsi_post_inc_slow(JSContext *ctx,
-                                        JSValue *sp, OPCodeEnum op)
+static __exception int jsi_post_inc_slow(JSIContext *ctx,
+                                        JSIValue *sp, OPCodeEnum op)
 {
-    JSValue op1;
+    JSIValue op1;
 
     /* XXX: allow custom operators */
     op1 = sp[-1];
@@ -13379,9 +13379,9 @@ static __exception int jsi_post_inc_slow(JSContext *ctx,
     return jsi_unary_arith_slow(ctx, sp + 1, op - OP_post_dec + OP_dec);
 }
 
-static no_inline int jsi_not_slow(JSContext *ctx, JSValue *sp)
+static no_inline int jsi_not_slow(JSIContext *ctx, JSIValue *sp)
 {
-    JSValue op1;
+    JSIValue op1;
 
     op1 = sp[-1];
     op1 = JSI_ToNumericFree(ctx, op1);
@@ -13399,10 +13399,10 @@ static no_inline int jsi_not_slow(JSContext *ctx, JSValue *sp)
     return -1;
 }
 
-static no_inline __exception int jsi_binary_arith_slow(JSContext *ctx, JSValue *sp,
+static no_inline __exception int jsi_binary_arith_slow(JSIContext *ctx, JSIValue *sp,
                                                       OPCodeEnum op)
 {
-    JSValue op1, op2;
+    JSIValue op1, op2;
     uint32_t tag1, tag2;
     // double d1, d2;
 
@@ -13471,9 +13471,9 @@ static inline BOOL tag_is_string(uint32_t tag)
     return tag == JSI_TAG_STRING || tag == JSI_TAG_STRING_ROPE;
 }
 // #ifdef KALL
-static no_inline __exception int jsi_add_slow(JSContext *ctx, JSValue *sp)
+static no_inline __exception int jsi_add_slow(JSIContext *ctx, JSIValue *sp)
 {
-    JSValue op1, op2;
+    JSIValue op1, op2;
     uint32_t tag1, tag2;
     op1 = sp[-2];
     op2 = sp[-1];
@@ -13540,11 +13540,11 @@ static no_inline __exception int jsi_add_slow(JSContext *ctx, JSValue *sp)
     return -1;
 }
 // #endif
-static no_inline __exception int jsi_binary_logic_slow(JSContext *ctx,
-                                                      JSValue *sp,
+static no_inline __exception int jsi_binary_logic_slow(JSIContext *ctx,
+                                                      JSIValue *sp,
                                                       OPCodeEnum op)
 {
-    JSValue op1, op2;
+    JSIValue op1, op2;
     uint32_t tag1, tag2;
     uint32_t v1, v2, r;
 
@@ -13582,10 +13582,10 @@ static no_inline __exception int jsi_binary_logic_slow(JSContext *ctx,
 /* op1 and op2 must be numeric types and at least one must be a
    bigint. No exception is generated. */
 
-static no_inline int jsi_relational_slow(JSContext *ctx, JSValue *sp,
+static no_inline int jsi_relational_slow(JSIContext *ctx, JSIValue *sp,
                                         OPCodeEnum op)
 {
-    JSValue op1, op2;
+    JSIValue op1, op2;
     int res;
     uint32_t tag1, tag2;
 
@@ -13698,10 +13698,10 @@ static BOOL tag_is_number(uint32_t tag)
     return (tag == JSI_TAG_INT);
 }
 
-static no_inline __exception int jsi_eq_slow(JSContext *ctx, JSValue *sp,
+static no_inline __exception int jsi_eq_slow(JSIContext *ctx, JSIValue *sp,
                                             BOOL is_neq)
 {
-    JSValue op1, op2;
+    JSIValue op1, op2;
     int res;
     uint32_t tag1, tag2;
 
@@ -13786,9 +13786,9 @@ static no_inline __exception int jsi_eq_slow(JSContext *ctx, JSValue *sp,
     return -1;
 }
 
-static no_inline int jsi_shr_slow(JSContext *ctx, JSValue *sp)
+static no_inline int jsi_shr_slow(JSIContext *ctx, JSIValue *sp)
 {
-    JSValue op1, op2;
+    JSIValue op1, op2;
     uint32_t v1, v2, r;
 
     op1 = sp[-2];
@@ -13821,8 +13821,8 @@ static no_inline int jsi_shr_slow(JSContext *ctx, JSValue *sp)
     return -1;
 }
 
-/* XXX: Should take JSValueConst arguments */
-static BOOL jsi_strict_eq2(JSContext *ctx, JSValue op1, JSValue op2,
+/* XXX: Should take JSIValueConst arguments */
+static BOOL jsi_strict_eq2(JSIContext *ctx, JSIValue op1, JSIValue op2,
                           JSStrictEqModeEnum eq_mode)
 {
     BOOL res;
@@ -13905,43 +13905,43 @@ static BOOL jsi_strict_eq2(JSContext *ctx, JSValue op1, JSValue op2,
     return res;
 }
 
-static BOOL jsi_strict_eq(JSContext *ctx, JSValueConst op1, JSValueConst op2)
+static BOOL jsi_strict_eq(JSIContext *ctx, JSIValueConst op1, JSIValueConst op2)
 {
     return jsi_strict_eq2(ctx,
                          JSI_DupValue(ctx, op1), JSI_DupValue(ctx, op2),
                          JSI_EQ_STRICT);
 }
 
-BOOL JSI_StrictEq(JSContext *ctx, JSValueConst op1, JSValueConst op2)
+BOOL JSI_StrictEq(JSIContext *ctx, JSIValueConst op1, JSIValueConst op2)
 {
     return jsi_strict_eq(ctx, op1, op2);
 }
 
-static BOOL jsi_same_value(JSContext *ctx, JSValueConst op1, JSValueConst op2)
+static BOOL jsi_same_value(JSIContext *ctx, JSIValueConst op1, JSIValueConst op2)
 {
     return jsi_strict_eq2(ctx,
                          JSI_DupValue(ctx, op1), JSI_DupValue(ctx, op2),
                          JSI_EQ_SAME_VALUE);
 }
 
-BOOL JSI_SameValue(JSContext *ctx, JSValueConst op1, JSValueConst op2)
+BOOL JSI_SameValue(JSIContext *ctx, JSIValueConst op1, JSIValueConst op2)
 {
     return jsi_same_value(ctx, op1, op2);
 }
 
-static BOOL jsi_same_value_zero(JSContext *ctx, JSValueConst op1, JSValueConst op2)
+static BOOL jsi_same_value_zero(JSIContext *ctx, JSIValueConst op1, JSIValueConst op2)
 {
     return jsi_strict_eq2(ctx,
                          JSI_DupValue(ctx, op1), JSI_DupValue(ctx, op2),
                          JSI_EQ_SAME_VALUE_ZERO);
 }
 
-BOOL JSI_SameValueZero(JSContext *ctx, JSValueConst op1, JSValueConst op2)
+BOOL JSI_SameValueZero(JSIContext *ctx, JSIValueConst op1, JSIValueConst op2)
 {
     return jsi_same_value_zero(ctx, op1, op2);
 }
 
-static no_inline int jsi_strict_eq_slow(JSContext *ctx, JSValue *sp,
+static no_inline int jsi_strict_eq_slow(JSIContext *ctx, JSIValue *sp,
                                        BOOL is_neq)
 {
     BOOL res;
@@ -13950,9 +13950,9 @@ static no_inline int jsi_strict_eq_slow(JSContext *ctx, JSValue *sp,
     return 0;
 }
 
-static __exception int jsi_operator_in(JSContext *ctx, JSValue *sp)
+static __exception int jsi_operator_in(JSIContext *ctx, JSIValue *sp)
 {
-    JSValue op1, op2;
+    JSIValue op1, op2;
     JSAtom atom;
     int ret;
 
@@ -13976,9 +13976,9 @@ static __exception int jsi_operator_in(JSContext *ctx, JSValue *sp)
     return 0;
 }
 
-static __exception int jsi_operator_private_in(JSContext *ctx, JSValue *sp)
+static __exception int jsi_operator_private_in(JSIContext *ctx, JSIValue *sp)
 {
-    JSValue op1, op2;
+    JSIValue op1, op2;
     int ret;
 
     op1 = sp[-2]; /* object */
@@ -14013,10 +14013,10 @@ static __exception int jsi_operator_private_in(JSContext *ctx, JSValue *sp)
     return 0;
 }
 
-static __exception int jsi_has_unscopable(JSContext *ctx, JSValueConst obj,
+static __exception int jsi_has_unscopable(JSIContext *ctx, JSIValueConst obj,
                                          JSAtom atom)
 {
-    JSValue arr, val;
+    JSIValue arr, val;
     int ret;
 
     arr = JSI_GetProperty(ctx, obj, JSI_ATOM_Symbol_unscopables);
@@ -14031,9 +14031,9 @@ static __exception int jsi_has_unscopable(JSContext *ctx, JSValueConst obj,
     return ret;
 }
 
-static __exception int jsi_operator_instanceof(JSContext *ctx, JSValue *sp)
+static __exception int jsi_operator_instanceof(JSIContext *ctx, JSIValue *sp)
 {
-    JSValue op1, op2;
+    JSIValue op1, op2;
     BOOL ret;
 
     op1 = sp[-2];
@@ -14047,7 +14047,7 @@ static __exception int jsi_operator_instanceof(JSContext *ctx, JSValue *sp)
     return 0;
 }
 
-static __exception int jsi_operator_typeof(JSContext *ctx, JSValueConst op1)
+static __exception int jsi_operator_typeof(JSIContext *ctx, JSIValueConst op1)
 {
     JSAtom atom;
     uint32_t tag;
@@ -14093,9 +14093,9 @@ static __exception int jsi_operator_typeof(JSContext *ctx, JSValueConst op1)
     return atom;
 }
 
-static __exception int jsi_operator_delete(JSContext *ctx, JSValue *sp)
+static __exception int jsi_operator_delete(JSIContext *ctx, JSIValue *sp)
 {
-    JSValue op1, op2;
+    JSIValue op1, op2;
     JSAtom atom;
     int ret;
 
@@ -14117,8 +14117,8 @@ static __exception int jsi_operator_delete(JSContext *ctx, JSValue *sp)
 /* XXX: not 100% compatible, but mozilla seems to use a similar
    implementation to ensure that caller in non strict mode does not
    throw (ES5 compatibility) */
-static JSValue jsi_throw_type_error(JSContext *ctx, JSValueConst this_val,
-                                   int argc, JSValueConst *argv)
+static JSIValue jsi_throw_type_error(JSIContext *ctx, JSIValueConst this_val,
+                                   int argc, JSIValueConst *argv)
 {
     JSFunctionBytecode *b = JSI_GetFunctionBytecode(this_val);
     if (!b || (b->jsi_mode & JSI_MODE_STRICT) || !b->has_prototype || argc >= 1) {
@@ -14127,8 +14127,8 @@ static JSValue jsi_throw_type_error(JSContext *ctx, JSValueConst this_val,
     return JSI_UNDEFINED;
 }
 
-static JSValue jsi_function_proto_fileName(JSContext *ctx,
-                                          JSValueConst this_val)
+static JSIValue jsi_function_proto_fileName(JSIContext *ctx,
+                                          JSIValueConst this_val)
 {
     JSFunctionBytecode *b = JSI_GetFunctionBytecode(this_val);
     if (b && b->has_debug) {
@@ -14137,8 +14137,8 @@ static JSValue jsi_function_proto_fileName(JSContext *ctx,
     return JSI_UNDEFINED;
 }
 
-static JSValue jsi_function_proto_lineNumber(JSContext *ctx,
-                                            JSValueConst this_val, int is_col)
+static JSIValue jsi_function_proto_lineNumber(JSIContext *ctx,
+                                            JSIValueConst this_val, int is_col)
 {
     JSFunctionBytecode *b = JSI_GetFunctionBytecode(this_val);
     if (b && b->has_debug) {
@@ -14152,10 +14152,10 @@ static JSValue jsi_function_proto_lineNumber(JSContext *ctx,
     return JSI_UNDEFINED;
 }
 
-static int jsi_arguments_define_own_property(JSContext *ctx,
-                                            JSValueConst this_obj,
-                                            JSAtom prop, JSValueConst val,
-                                            JSValueConst getter, JSValueConst setter, int flags)
+static int jsi_arguments_define_own_property(JSIContext *ctx,
+                                            JSIValueConst this_obj,
+                                            JSAtom prop, JSIValueConst val,
+                                            JSIValueConst getter, JSIValueConst setter, int flags)
 {
     JSObject *p;
     uint32_t idx;
@@ -14175,9 +14175,9 @@ static const JSClassExoticMethods jsi_arguments_exotic_methods = {
     .define_own_property = jsi_arguments_define_own_property,
 };
 
-static JSValue jsi_build_arguments(JSContext *ctx, int argc, JSValueConst *argv)
+static JSIValue jsi_build_arguments(JSIContext *ctx, int argc, JSIValueConst *argv)
 {
-    JSValue val, *tab;
+    JSIValue val, *tab;
     JSProperty *pr;
     JSObject *p;
     int i;
@@ -14220,18 +14220,18 @@ static JSValue jsi_build_arguments(JSContext *ctx, int argc, JSValueConst *argv)
     JSI_FreeValue(ctx, val);
     return JSI_EXCEPTION;
 }
-static JSVarRef *get_var_ref(JSContext *ctx, JSStackFrame *sf,
+static JSVarRef *get_var_ref(JSIContext *ctx, JSStackFrame *sf,
                              int var_idx, BOOL is_arg);
 
 #define GLOBAL_VAR_OFFSET 0x40000000
 #define ARGUMENT_VAR_OFFSET 0x20000000
 
 /* legacy arguments object: add references to the function arguments */
-static JSValue jsi_build_mapped_arguments(JSContext *ctx, int argc,
-                                         JSValueConst *argv,
+static JSIValue jsi_build_mapped_arguments(JSIContext *ctx, int argc,
+                                         JSIValueConst *argv,
                                          JSStackFrame *sf, int arg_count)
 {
-    JSValue val;
+    JSIValue val;
     JSProperty *pr;
     JSObject *p;
     int i;
@@ -14284,9 +14284,9 @@ static JSValue jsi_build_mapped_arguments(JSContext *ctx, int argc,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_build_rest(JSContext *ctx, int first, int argc, JSValueConst *argv)
+static JSIValue jsi_build_rest(JSIContext *ctx, int first, int argc, JSIValueConst *argv)
 {
-    JSValue val;
+    JSIValue val;
     int i, ret;
 
     val = JSI_NewArray(ctx);
@@ -14304,12 +14304,12 @@ static JSValue jsi_build_rest(JSContext *ctx, int first, int argc, JSValueConst 
     return val;
 }
 
-static JSValue build_for_in_iterator(JSContext *ctx, JSValue obj)
+static JSIValue build_for_in_iterator(JSIContext *ctx, JSIValue obj)
 {
     JSObject *p, *p1;
     JSPropertyEnum *tab_atom;
     int i;
-    JSValue enum_obj;
+    JSIValue enum_obj;
     JSForInIterator *it;
     uint32_t tag, tab_atom_count;
 
@@ -14368,7 +14368,7 @@ static JSValue build_for_in_iterator(JSContext *ctx, JSValue obj)
 }
 
 /* obj -> enum_obj */
-static __exception int jsi_for_in_start(JSContext *ctx, JSValue *sp)
+static __exception int jsi_for_in_start(JSIContext *ctx, JSIValue *sp)
 {
     sp[-1] = build_for_in_iterator(ctx, sp[-1]);
     if (JSI_IsException(sp[-1]))
@@ -14377,14 +14377,14 @@ static __exception int jsi_for_in_start(JSContext *ctx, JSValue *sp)
 }
 
 /* return -1 if exception, 0 if slow case, 1 if the enumeration is finished */
-static __exception int jsi_for_in_prepare_prototype_chain_enum(JSContext *ctx,
-                                                              JSValueConst enum_obj)
+static __exception int jsi_for_in_prepare_prototype_chain_enum(JSIContext *ctx,
+                                                              JSIValueConst enum_obj)
 {
     JSObject *p;
     JSForInIterator *it;
     JSPropertyEnum *tab_atom;
     uint32_t tab_atom_count, i;
-    JSValue obj1;
+    JSIValue obj1;
 
     p = JSI_VALUE_GET_OBJ(enum_obj);
     it = p->u.for_in_iterator;
@@ -14440,9 +14440,9 @@ static __exception int jsi_for_in_prepare_prototype_chain_enum(JSContext *ctx,
 }
 
 /* enum_obj -> enum_obj value done */
-static __exception int jsi_for_in_next(JSContext *ctx, JSValue *sp)
+static __exception int jsi_for_in_next(JSIContext *ctx, JSIValue *sp)
 {
-    JSValueConst enum_obj;
+    JSIValueConst enum_obj;
     JSObject *p;
     JSAtom prop;
     JSForInIterator *it;
@@ -14534,10 +14534,10 @@ static __exception int jsi_for_in_next(JSContext *ctx, JSValue *sp)
     return 0;
 }
 
-static JSValue JSI_GetIterator2(JSContext *ctx, JSValueConst obj,
-                               JSValueConst method)
+static JSIValue JSI_GetIterator2(JSIContext *ctx, JSIValueConst obj,
+                               JSIValueConst method)
 {
-    JSValue enum_obj;
+    JSIValue enum_obj;
 
     enum_obj = JSI_Call(ctx, method, obj, 0, NULL);
     if (JSI_IsException(enum_obj))
@@ -14549,9 +14549,9 @@ static JSValue JSI_GetIterator2(JSContext *ctx, JSValueConst obj,
     return enum_obj;
 }
 
-static JSValue JSI_GetIterator(JSContext *ctx, JSValueConst obj, BOOL is_async)
+static JSIValue JSI_GetIterator(JSIContext *ctx, JSIValueConst obj, BOOL is_async)
 {
-    JSValue method, ret, sync_iter;
+    JSIValue method, ret, sync_iter;
 
     if (is_async) {
         method = JSI_GetProperty(ctx, obj, JSI_ATOM_Symbol_asyncIterator);
@@ -14584,11 +14584,11 @@ static JSValue JSI_GetIterator(JSContext *ctx, JSValueConst obj, BOOL is_async)
 }
 
 /* return *pdone = 2 if the iterator object is not parsed */
-static JSValue JSI_IteratorNext2(JSContext *ctx, JSValueConst enum_obj,
-                                JSValueConst method,
-                                int argc, JSValueConst *argv, int *pdone)
+static JSIValue JSI_IteratorNext2(JSIContext *ctx, JSIValueConst enum_obj,
+                                JSIValueConst method,
+                                int argc, JSIValueConst *argv, int *pdone)
 {
-    JSValue obj;
+    JSIValue obj;
 
     /* fast path for the built-in iterators (avoid creating the
        intermediate result object) */
@@ -14597,7 +14597,7 @@ static JSValue JSI_IteratorNext2(JSContext *ctx, JSValueConst enum_obj,
         if (p->class_id == JSI_CLASS_C_FUNCTION &&
             p->u.cfunc.cproto == JSI_CFUNC_iterator_next) {
             JSCFunctionType func;
-            JSValueConst args[1];
+            JSIValueConst args[1];
 
             /* in case the function expects one argument */
             if (argc == 0) {
@@ -14625,11 +14625,11 @@ static JSValue JSI_IteratorNext2(JSContext *ctx, JSValueConst enum_obj,
 }
 
 /* Note: always return JSI_UNDEFINED when *pdone = TRUE. */
-static JSValue JSI_IteratorNext(JSContext *ctx, JSValueConst enum_obj,
-                               JSValueConst method,
-                               int argc, JSValueConst *argv, BOOL *pdone)
+static JSIValue JSI_IteratorNext(JSIContext *ctx, JSIValueConst enum_obj,
+                               JSIValueConst method,
+                               int argc, JSIValueConst *argv, BOOL *pdone)
 {
-    JSValue obj, value, done_val;
+    JSIValue obj, value, done_val;
     int done;
 
     obj = JSI_IteratorNext2(ctx, enum_obj, method, argc, argv, &done);
@@ -14661,10 +14661,10 @@ static JSValue JSI_IteratorNext(JSContext *ctx, JSValueConst enum_obj,
 }
 
 /* return < 0 in case of exception */
-static int JSI_IteratorClose(JSContext *ctx, JSValueConst enum_obj,
+static int JSI_IteratorClose(JSIContext *ctx, JSIValueConst enum_obj,
                             BOOL is_exception_pending)
 {
-    JSValue method, ret, ex_obj;
+    JSIValue method, ret, ex_obj;
     int res;
 
     if (is_exception_pending) {
@@ -14701,10 +14701,10 @@ static int JSI_IteratorClose(JSContext *ctx, JSValueConst enum_obj,
 }
 
 /* obj -> enum_rec (3 slots) */
-static __exception int jsi_for_of_start(JSContext *ctx, JSValue *sp,
+static __exception int jsi_for_of_start(JSIContext *ctx, JSIValue *sp,
                                        BOOL is_async)
 {
-    JSValue op1, obj, method;
+    JSIValue op1, obj, method;
     op1 = sp[-1];
     obj = JSI_GetIterator(ctx, op1, is_async);
     if (JSI_IsException(obj))
@@ -14722,9 +14722,9 @@ static __exception int jsi_for_of_start(JSContext *ctx, JSValue *sp,
    objs. If 'done' is true or in case of exception, 'enum_rec' is set
    to undefined. If 'done' is true, 'value' is always set to
    undefined. */
-static __exception int jsi_for_of_next(JSContext *ctx, JSValue *sp, int offset)
+static __exception int jsi_for_of_next(JSIContext *ctx, JSIValue *sp, int offset)
 {
-    JSValue value = JSI_UNDEFINED;
+    JSIValue value = JSI_UNDEFINED;
     int done = 1;
 
     if (likely(!JSI_IsUndefined(sp[offset]))) {
@@ -14749,9 +14749,9 @@ static __exception int jsi_for_of_next(JSContext *ctx, JSValue *sp, int offset)
     return 0;
 }
 
-static __exception int jsi_for_await_of_next(JSContext *ctx, JSValue *sp)
+static __exception int jsi_for_await_of_next(JSIContext *ctx, JSIValue *sp)
 {
-    JSValue obj, iter, next;
+    JSIValue obj, iter, next;
 
     sp[-1] = JSI_UNDEFINED; /* disable the catch offset so that
                               exceptions do not close the iterator */
@@ -14764,10 +14764,10 @@ static __exception int jsi_for_await_of_next(JSContext *ctx, JSValue *sp)
     return 0;
 }
 
-static JSValue JSI_IteratorGetCompleteValue(JSContext *ctx, JSValueConst obj,
+static JSIValue JSI_IteratorGetCompleteValue(JSIContext *ctx, JSIValueConst obj,
                                            BOOL *pdone)
 {
-    JSValue done_val, value;
+    JSIValue done_val, value;
     BOOL done;
     done_val = JSI_GetProperty(ctx, obj, JSI_ATOM_done);
     if (JSI_IsException(done_val))
@@ -14783,9 +14783,9 @@ static JSValue JSI_IteratorGetCompleteValue(JSContext *ctx, JSValueConst obj,
     return JSI_EXCEPTION;
 }
 
-static __exception int jsi_iterator_get_value_done(JSContext *ctx, JSValue *sp)
+static __exception int jsi_iterator_get_value_done(JSIContext *ctx, JSIValue *sp)
 {
-    JSValue obj, value;
+    JSIValue obj, value;
     BOOL done;
     obj = sp[-1];
     if (!JSI_IsObject(obj)) {
@@ -14804,11 +14804,11 @@ static __exception int jsi_iterator_get_value_done(JSContext *ctx, JSValue *sp)
     return 0;
 }
 
-static JSValue jsi_create_iterator_result(JSContext *ctx,
-                                         JSValue val,
+static JSIValue jsi_create_iterator_result(JSIContext *ctx,
+                                         JSIValue val,
                                          BOOL done)
 {
-    JSValue obj;
+    JSIValue obj;
     obj = JSI_NewObject(ctx);
     if (JSI_IsException(obj)) {
         JSI_FreeValue(ctx, val);
@@ -14827,14 +14827,14 @@ static JSValue jsi_create_iterator_result(JSContext *ctx,
     return obj;
 }
 
-static JSValue jsi_array_iterator_next(JSContext *ctx, JSValueConst this_val,
-                                      int argc, JSValueConst *argv,
+static JSIValue jsi_array_iterator_next(JSIContext *ctx, JSIValueConst this_val,
+                                      int argc, JSIValueConst *argv,
                                       BOOL *pdone, int magic);
 
-static JSValue jsi_create_array_iterator(JSContext *ctx, JSValueConst this_val,
-                                        int argc, JSValueConst *argv, int magic);
+static JSIValue jsi_create_array_iterator(JSIContext *ctx, JSIValueConst this_val,
+                                        int argc, JSIValueConst *argv, int magic);
 
-static BOOL jsi_is_fast_array(JSContext *ctx, JSValueConst obj)
+static BOOL jsi_is_fast_array(JSIContext *ctx, JSIValueConst obj)
 {
     /* Try and handle fast arrays explicitly */
     if (JSI_VALUE_GET_TAG(obj) == JSI_TAG_OBJECT) {
@@ -14846,9 +14846,9 @@ static BOOL jsi_is_fast_array(JSContext *ctx, JSValueConst obj)
     return FALSE;
 }
 
-/* Access an Array's internal JSValue array if available */
-static BOOL jsi_get_fast_array(JSContext *ctx, JSValueConst obj,
-                              JSValue **arrpp, uint32_t *countp)
+/* Access an Array's internal JSIValue array if available */
+static BOOL jsi_get_fast_array(JSIContext *ctx, JSIValueConst obj,
+                              JSIValue **arrpp, uint32_t *countp)
 {
     /* Try and handle fast arrays explicitly */
     if (JSI_VALUE_GET_TAG(obj) == JSI_TAG_OBJECT) {
@@ -14862,11 +14862,11 @@ static BOOL jsi_get_fast_array(JSContext *ctx, JSValueConst obj,
     return FALSE;
 }
 
-static __exception int jsi_append_enumerate(JSContext *ctx, JSValue *sp)
+static __exception int jsi_append_enumerate(JSIContext *ctx, JSIValue *sp)
 {
-    JSValue iterator, enumobj, method, value;
+    JSIValue iterator, enumobj, method, value;
     int is_array_iterator;
-    JSValue *arrp;
+    JSIValue *arrp;
     uint32_t i, count32, pos;
 
     if (JSI_VALUE_GET_TAG(sp[-2]) != JSI_TAG_INT) {
@@ -14942,14 +14942,14 @@ exception:
     return -1;
 }
 
-static __exception int JSI_CopyDataProperties(JSContext *ctx,
-                                             JSValueConst target,
-                                             JSValueConst source,
-                                             JSValueConst excluded,
+static __exception int JSI_CopyDataProperties(JSIContext *ctx,
+                                             JSIValueConst target,
+                                             JSIValueConst source,
+                                             JSIValueConst excluded,
                                              BOOL setprop)
 {
     JSPropertyEnum *tab_atom;
-    JSValue val;
+    JSIValue val;
     uint32_t i, tab_atom_count;
     JSObject *p;
     JSObject *pexcl = NULL;
@@ -15018,17 +15018,17 @@ static __exception int JSI_CopyDataProperties(JSContext *ctx,
 }
 
 /* only valid inside C functions */
-static JSValueConst JSI_GetActiveFunction(JSContext *ctx)
+static JSIValueConst JSI_GetActiveFunction(JSIContext *ctx)
 {
     return ctx->rt->current_stack_frame->cur_func;
 }
 
-static JSVarRef *get_var_ref(JSContext *ctx, JSStackFrame *sf,
+static JSVarRef *get_var_ref(JSIContext *ctx, JSStackFrame *sf,
                              int var_idx, BOOL is_arg)
 {
     JSVarRef *var_ref;
     struct list_head *el;
-    JSValue *pvalue;
+    JSIValue *pvalue;
 
     if (is_arg)
         pvalue = &sf->arg_buf[var_idx];
@@ -15068,7 +15068,7 @@ static JSVarRef *get_var_ref(JSContext *ctx, JSStackFrame *sf,
     return var_ref;
 }
 
-static JSValue jsi_closure2(JSContext *ctx, JSValue func_obj,
+static JSIValue jsi_closure2(JSIContext *ctx, JSIValue func_obj,
                            JSFunctionBytecode *b,
                            JSVarRef **cur_var_refs,
                            JSStackFrame *sf)
@@ -15108,9 +15108,9 @@ static JSValue jsi_closure2(JSContext *ctx, JSValue func_obj,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_instantiate_prototype(JSContext *ctx, JSObject *p, JSAtom atom, void *opaque)
+static JSIValue jsi_instantiate_prototype(JSIContext *ctx, JSObject *p, JSAtom atom, void *opaque)
 {
-    JSValue obj, this_val;
+    JSIValue obj, this_val;
     int ret;
 
     this_val = JSI_MKPTR(JSI_TAG_OBJECT, p);
@@ -15136,12 +15136,12 @@ static const uint16_t func_kind_to_class_id[] = {
     [JSI_FUNC_ASYNC_GENERATOR] = JSI_CLASS_ASYNC_GENERATOR_FUNCTION,
 };
 
-static JSValue jsi_closure(JSContext *ctx, JSValue bfunc,
+static JSIValue jsi_closure(JSIContext *ctx, JSIValue bfunc,
                           JSVarRef **cur_var_refs,
                           JSStackFrame *sf)
 {
     JSFunctionBytecode *b;
-    JSValue func_obj;
+    JSIValue func_obj;
     JSAtom name_atom;
 
     b = JSI_VALUE_GET_PTR(bfunc);
@@ -15162,7 +15162,7 @@ static JSValue jsi_closure(JSContext *ctx, JSValue bfunc,
                                b->defined_arg_count);
 
     if (b->func_kind & JSI_FUNC_GENERATOR) {
-        JSValue proto;
+        JSIValue proto;
         int proto_class_id;
         /* generators have a prototype field which is used as
            prototype for the generator object */
@@ -15193,13 +15193,13 @@ static JSValue jsi_closure(JSContext *ctx, JSValue bfunc,
 
 #define JSI_DEFINE_CLASS_HAS_HERITAGE     (1 << 0)
 
-static int jsi_op_define_class(JSContext *ctx, JSValue *sp,
+static int jsi_op_define_class(JSIContext *ctx, JSIValue *sp,
                               JSAtom class_name, int class_flags,
                               JSVarRef **cur_var_refs,
                               JSStackFrame *sf, BOOL is_computed_name)
 {
-    JSValue bfunc, parent_class, proto = JSI_UNDEFINED;
-    JSValue ctor = JSI_UNDEFINED, parent_proto = JSI_UNDEFINED;
+    JSIValue bfunc, parent_class, proto = JSI_UNDEFINED;
+    JSIValue ctor = JSI_UNDEFINED, parent_proto = JSI_UNDEFINED;
     JSFunctionBytecode *b;
 
     parent_class = sp[-2];
@@ -15305,9 +15305,9 @@ static void close_var_refs(JSRuntime *rt, JSStackFrame *sf)
     }
 }
 
-static void close_lexical_var(JSContext *ctx, JSStackFrame *sf, int var_idx)
+static void close_lexical_var(JSIContext *ctx, JSStackFrame *sf, int var_idx)
 {
-    JSValue *pvalue;
+    JSIValue *pvalue;
     struct list_head *el, *el1;
     JSVarRef *var_ref;
 
@@ -15329,16 +15329,16 @@ static void close_lexical_var(JSContext *ctx, JSStackFrame *sf, int var_idx)
 #define JSI_CALL_FLAG_COPY_ARGV   (1 << 1)
 #define JSI_CALL_FLAG_GENERATOR   (1 << 2)
 
-static JSValue jsi_call_c_function(JSContext *ctx, JSValueConst func_obj,
-                                  JSValueConst this_obj,
-                                  int argc, JSValueConst *argv, int flags)
+static JSIValue jsi_call_c_function(JSIContext *ctx, JSIValueConst func_obj,
+                                  JSIValueConst this_obj,
+                                  int argc, JSIValueConst *argv, int flags)
 {
     JSRuntime *rt = ctx->rt;
     JSCFunctionType func;
     JSObject *p;
     JSStackFrame sf_s, *sf = &sf_s, *prev_sf;
-    JSValue ret_val;
-    JSValueConst *arg_buf;
+    JSIValue ret_val;
+    JSIValueConst *arg_buf;
     int arg_count, i;
     JSCFunctionEnum cproto;
 
@@ -15355,7 +15355,7 @@ static JSValue jsi_call_c_function(JSContext *ctx, JSValueConst func_obj,
     rt->current_stack_frame = sf;
     ctx = p->u.cfunc.realm; /* change the current realm */
     sf->jsi_mode = 0;
-    sf->cur_func = (JSValue)func_obj;
+    sf->cur_func = (JSIValue)func_obj;
     sf->arg_count = argc;
     arg_buf = argv;
 
@@ -15368,7 +15368,7 @@ static JSValue jsi_call_c_function(JSContext *ctx, JSValueConst func_obj,
             arg_buf[i] = JSI_UNDEFINED;
         sf->arg_count = arg_count;
     }
-    sf->arg_buf = (JSValue*)arg_buf;
+    sf->arg_buf = (JSIValue*)arg_buf;
 
     func = p->u.cfunc.c_function;
     switch(cproto) {
@@ -15458,21 +15458,21 @@ static JSValue jsi_call_c_function(JSContext *ctx, JSValueConst func_obj,
     return ret_val;
 }
 
-static JSValue jsi_call_bound_function(JSContext *ctx, JSValueConst func_obj,
-                                      JSValueConst this_obj,
-                                      int argc, JSValueConst *argv, int flags)
+static JSIValue jsi_call_bound_function(JSIContext *ctx, JSIValueConst func_obj,
+                                      JSIValueConst this_obj,
+                                      int argc, JSIValueConst *argv, int flags)
 {
     JSObject *p;
     JSBoundFunction *bf;
-    JSValueConst *arg_buf, new_target;
+    JSIValueConst *arg_buf, new_target;
     int arg_count, i;
 
     p = JSI_VALUE_GET_OBJ(func_obj);
     bf = p->u.bound_function;
     arg_count = bf->argc + argc;
-    if (jsi_check_stack_overflow(ctx->rt, sizeof(JSValue) * arg_count))
+    if (jsi_check_stack_overflow(ctx->rt, sizeof(JSIValue) * arg_count))
         return JSI_ThrowStackOverflow(ctx);
-    arg_buf = alloca(sizeof(JSValue) * arg_count);
+    arg_buf = alloca(sizeof(JSIValue) * arg_count);
     for(i = 0; i < bf->argc; i++) {
         arg_buf[i] = bf->argv[i];
     }
@@ -15508,18 +15508,18 @@ typedef enum {
 #define FUNC_RET_INITIAL_YIELD 3
 
 /* argv[] is modified if (flags & JSI_CALL_FLAG_COPY_ARGV) = 0. */
-static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
-                               JSValueConst this_obj, JSValueConst new_target,
-                               int argc, JSValue *argv, int flags)
+static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
+                               JSIValueConst this_obj, JSIValueConst new_target,
+                               int argc, JSIValue *argv, int flags)
 {
     JSRuntime *rt = caller_ctx->rt;
-    JSContext *ctx;
+    JSIContext *ctx;
     JSObject *p;
     JSFunctionBytecode *b;
     JSStackFrame sf_s, *sf = &sf_s;
     const uint8_t *pc;
     int opcode, arg_allocated_size, i;
-    JSValue *local_buf, *stack_buf, *var_buf, *arg_buf, *sp, ret_val, *pval;
+    JSIValue *local_buf, *stack_buf, *var_buf, *arg_buf, *sp, ret_val, *pval;
     JSVarRef **var_refs;
     size_t alloca_size;
 
@@ -15582,7 +15582,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             return JSI_ThrowTypeError(caller_ctx, "not a function");
         }
         return call_func(caller_ctx, func_obj, this_obj, argc,
-                         (JSValueConst *)argv, flags);
+                         (JSIValueConst *)argv, flags);
     }
     b = p->u.func.function_bytecode;
 
@@ -15592,7 +15592,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         arg_allocated_size = 0;
     }
 
-    alloca_size = sizeof(JSValue) * (arg_allocated_size + b->var_count +
+    alloca_size = sizeof(JSIValue) * (arg_allocated_size + b->var_count +
                                      b->stack_size);
     if (jsi_check_stack_overflow(rt, alloca_size))
         return JSI_ThrowStackOverflow(caller_ctx);
@@ -15600,7 +15600,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
     sf->jsi_mode = b->jsi_mode;
     arg_buf = argv;
     sf->arg_count = argc;
-    sf->cur_func = (JSValue)func_obj;
+    sf->cur_func = (JSIValue)func_obj;
     init_list_head(&sf->var_ref_list);
     var_refs = p->u.func.var_refs;
 
@@ -15631,7 +15631,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
  restart:
     for(;;) {
         int call_argc;
-        JSValue *call_argv;
+        JSIValue *call_argv;
 
         SWITCH(pc) {
         CASE(OP_push_i32):
@@ -15679,7 +15679,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_get_length):
             {
-                JSValue val;
+                JSIValue val;
 
                 sf->cur_pc = pc;
                 val = JSI_GetProperty(ctx, sp[-1], JSI_ATOM_length);
@@ -15703,7 +15703,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_push_this):
             /* OP_push_this is only called at the start of a function */
             {
-                JSValue val;
+                JSIValue val;
                 if (!(b->jsi_mode & JSI_MODE_STRICT)) {
                     uint32_t tag = JSI_VALUE_GET_TAG(this_obj);
                     if (likely(tag == JSI_TAG_OBJECT))
@@ -15738,12 +15738,12 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                 int arg = *pc++;
                 switch(arg) {
                 case OP_SPECIAL_OBJECT_ARGUMENTS:
-                    *sp++ = jsi_build_arguments(ctx, argc, (JSValueConst *)argv);
+                    *sp++ = jsi_build_arguments(ctx, argc, (JSIValueConst *)argv);
                     if (unlikely(JSI_IsException(sp[-1])))
                         goto exception;
                     break;
                 case OP_SPECIAL_OBJECT_MAPPED_ARGUMENTS:
-                    *sp++ = jsi_build_mapped_arguments(ctx, argc, (JSValueConst *)argv,
+                    *sp++ = jsi_build_mapped_arguments(ctx, argc, (JSIValueConst *)argv,
                                                       sf, min_int(argc, b->arg_count));
                     if (unlikely(JSI_IsException(sp[-1])))
                         goto exception;
@@ -15783,7 +15783,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             {
                 int first = get_u16(pc);
                 pc += 2;
-                *sp++ = jsi_build_rest(ctx, first, argc, (JSValueConst *)argv);
+                *sp++ = jsi_build_rest(ctx, first, argc, (JSIValueConst *)argv);
                 if (unlikely(JSI_IsException(sp[-1])))
                     goto exception;
             }
@@ -15847,7 +15847,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_perm3): /* obj a b -> a obj b (213) */
             {
-                JSValue tmp;
+                JSIValue tmp;
                 tmp = sp[-2];
                 sp[-2] = sp[-3];
                 sp[-3] = tmp;
@@ -15855,7 +15855,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_rot3l): /* x a b -> a b x (231) */
             {
-                JSValue tmp;
+                JSIValue tmp;
                 tmp = sp[-3];
                 sp[-3] = sp[-2];
                 sp[-2] = sp[-1];
@@ -15864,7 +15864,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_rot4l): /* x a b c -> a b c x */
             {
-                JSValue tmp;
+                JSIValue tmp;
                 tmp = sp[-4];
                 sp[-4] = sp[-3];
                 sp[-3] = sp[-2];
@@ -15874,7 +15874,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_rot5l): /* x a b c d -> a b c d x */
             {
-                JSValue tmp;
+                JSIValue tmp;
                 tmp = sp[-5];
                 sp[-5] = sp[-4];
                 sp[-4] = sp[-3];
@@ -15885,7 +15885,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_rot3r): /* a b x -> x a b (312) */
             {
-                JSValue tmp;
+                JSIValue tmp;
                 tmp = sp[-1];
                 sp[-1] = sp[-2];
                 sp[-2] = sp[-3];
@@ -15894,7 +15894,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_perm4): /* obj prop a b -> a obj prop b */
             {
-                JSValue tmp;
+                JSIValue tmp;
                 tmp = sp[-2];
                 sp[-2] = sp[-3];
                 sp[-3] = sp[-4];
@@ -15903,7 +15903,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_perm5): /* this obj prop a b -> a this obj prop b */
             {
-                JSValue tmp;
+                JSIValue tmp;
                 tmp = sp[-2];
                 sp[-2] = sp[-3];
                 sp[-3] = sp[-4];
@@ -15913,7 +15913,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_swap): /* a b -> b a */
             {
-                JSValue tmp;
+                JSIValue tmp;
                 tmp = sp[-2];
                 sp[-2] = sp[-1];
                 sp[-1] = tmp;
@@ -15921,7 +15921,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_swap2): /* a b c d -> c d a b */
             {
-                JSValue tmp1, tmp2;
+                JSIValue tmp1, tmp2;
                 tmp1 = sp[-4];
                 tmp2 = sp[-3];
                 sp[-4] = sp[-2];
@@ -15933,7 +15933,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_fclosure):
             {
-                JSValue bfunc = JSI_DupValue(ctx, b->cpool[get_u32(pc)]);
+                JSIValue bfunc = JSI_DupValue(ctx, b->cpool[get_u32(pc)]);
                 pc += 4;
                 *sp++ = jsi_closure(ctx, bfunc, var_refs, sf);
                 if (unlikely(JSI_IsException(sp[-1])))
@@ -16036,7 +16036,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                 pc += 2;
                 sf->cur_pc = pc;
 
-                ret_val = jsi_function_apply(ctx, sp[-3], 2, (JSValueConst *)&sp[-2], magic);
+                ret_val = jsi_function_apply(ctx, sp[-3], 2, (JSIValueConst *)&sp[-2], magic);
                 if (unlikely(JSI_IsException(ret_val)))
                     goto exception;
                 JSI_FreeValue(ctx, sp[-3]);
@@ -16075,14 +16075,14 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_init_ctor):
             {
-                JSValue super, ret;
+                JSIValue super, ret;
                 sf->cur_pc = pc;
                 if (JSI_IsUndefined(new_target))
                     goto non_ctor_call;
                 super = JSI_GetPrototype(ctx, func_obj);
                 if (JSI_IsException(super))
                     goto exception;
-                ret = JSI_CallConstructor2(ctx, super, new_target, argc, (JSValueConst *)argv);
+                ret = JSI_CallConstructor2(ctx, super, new_target, argc, (JSIValueConst *)argv);
                 JSI_FreeValue(ctx, super);
                 if (JSI_IsException(ret))
                     goto exception;
@@ -16145,7 +16145,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_eval):
             {
-                JSValueConst obj;
+                JSIValueConst obj;
                 int scope_idx;
                 call_argc = get_u16(pc);
                 scope_idx = get_u16(pc + 2) + ARG_SCOPE_END;
@@ -16176,8 +16176,8 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             {
                 int scope_idx;
                 uint32_t len;
-                JSValue *tab;
-                JSValueConst obj;
+                JSIValue *tab;
+                JSIValueConst obj;
 
                 scope_idx = get_u16(pc) + ARG_SCOPE_END;
                 pc += 2;
@@ -16194,7 +16194,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                                             JSI_EVAL_TYPE_DIRECT, scope_idx);
                 } else {
                     ret_val = JSI_Call(ctx, sp[-2], JSI_UNDEFINED, len,
-                                      (JSValueConst *)tab);
+                                      (JSIValueConst *)tab);
                 }
                 free_arg_list(ctx, tab, len);
                 if (unlikely(JSI_IsException(ret_val)))
@@ -16209,7 +16209,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_get_super):
             {
-                JSValue proto;
+                JSIValue proto;
                 sf->cur_pc = pc;
                 proto = JSI_GetPrototype(ctx, sp[-1]);
                 if (JSI_IsException(proto))
@@ -16238,7 +16238,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_get_var_undef):
         CASE(OP_get_var):
             {
-                JSValue val;
+                JSIValue val;
                 JSAtom atom;
                 atom = get_u32(pc);
                 pc += 4;
@@ -16425,7 +16425,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_get_var_ref):
             {
                 int idx;
-                JSValue val;
+                JSIValue val;
                 idx = get_u16(pc);
                 pc += 2;
                 val = *var_refs[idx]->pvalue;
@@ -16453,7 +16453,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_get_var_ref_check):
             {
                 int idx;
-                JSValue val;
+                JSIValue val;
                 idx = get_u16(pc);
                 pc += 2;
                 val = *var_refs[idx]->pvalue;
@@ -16625,7 +16625,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_if_true):
             {
                 int res;
-                JSValue op1;
+                JSIValue op1;
 
                 op1 = sp[-1];
                 pc += 4;
@@ -16645,7 +16645,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_if_false):
             {
                 int res;
-                JSValue op1;
+                JSIValue op1;
 
                 op1 = sp[-1];
                 pc += 4;
@@ -16667,7 +16667,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_if_true8):
             {
                 int res;
-                JSValue op1;
+                JSIValue op1;
 
                 op1 = sp[-1];
                 pc += 1;
@@ -16687,7 +16687,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_if_false8):
             {
                 int res;
-                JSValue op1;
+                JSIValue op1;
 
                 op1 = sp[-1];
                 pc += 1;
@@ -16726,7 +16726,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_ret):
             {
-                JSValue op1;
+                JSIValue op1;
                 uint32_t pos;
                 op1 = sp[-1];
                 if (unlikely(JSI_VALUE_GET_TAG(op1) != JSI_TAG_INT))
@@ -16811,7 +16811,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_nip_catch):
             {
-                JSValue ret_val;
+                JSIValue ret_val;
                 /* catch_offset ... ret_val -> ret_eval */
                 ret_val = *--sp;
                 while (sp > stack_buf &&
@@ -16830,10 +16830,10 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_iterator_next):
             /* stack: iter_obj next catch_offset val */
             {
-                JSValue ret;
+                JSIValue ret;
                 sf->cur_pc = pc;
                 ret = JSI_Call(ctx, sp[-3], sp[-4],
-                              1, (JSValueConst *)(sp - 1));
+                              1, (JSIValueConst *)(sp - 1));
                 if (JSI_IsException(ret))
                     goto exception;
                 JSI_FreeValue(ctx, sp[-1]);
@@ -16844,7 +16844,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_iterator_call):
             /* stack: iter_obj next catch_offset val */
             {
-                JSValue method, ret;
+                JSIValue method, ret;
                 BOOL ret_flag;
                 int flags;
                 flags = *pc++;
@@ -16862,7 +16862,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                                           0, NULL);
                     } else {
                         ret = JSI_CallFree(ctx, method, sp[-4],
-                                          1, (JSValueConst *)(sp - 1));
+                                          1, (JSIValueConst *)(sp - 1));
                     }
                     if (JSI_IsException(ret))
                         goto exception;
@@ -16878,7 +16878,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_lnot):
             {
                 int res;
-                JSValue op1;
+                JSIValue op1;
 
                 op1 = sp[-1];
                 if ((uint32_t)JSI_VALUE_GET_TAG(op1) <= JSI_TAG_UNDEFINED) {
@@ -16892,7 +16892,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_get_field):
             {
-                JSValue val;
+                JSIValue val;
                 JSAtom atom;
                 atom = get_u32(pc);
                 pc += 4;
@@ -16908,7 +16908,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_get_field2):
             {
-                JSValue val;
+                JSIValue val;
                 JSAtom atom;
                 atom = get_u32(pc);
                 pc += 4;
@@ -16941,7 +16941,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_private_symbol):
             {
                 JSAtom atom;
-                JSValue val;
+                JSIValue val;
 
                 atom = get_u32(pc);
                 pc += 4;
@@ -16990,7 +16990,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_set_proto):
             {
-                JSValue proto;
+                JSIValue proto;
                 sf->cur_pc = pc;
                 proto = sp[-1];
                 if (JSI_IsObject(proto) || JSI_IsNull(proto)) {
@@ -17007,8 +17007,8 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_define_method):
         CASE(OP_define_method_computed):
             {
-                JSValue getter, setter, value;
-                JSValueConst obj;
+                JSIValue getter, setter, value;
+                JSIValueConst obj;
                 JSAtom atom;
                 int flags, ret, op_flags;
                 BOOL is_computed;
@@ -17082,7 +17082,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_get_array_el):
             {
-                JSValue val;
+                JSIValue val;
 
                 sf->cur_pc = pc;
                 val = JSI_GetPropertyValue(ctx, sp[-2], sp[-1]);
@@ -17096,7 +17096,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_get_array_el2):
             {
-                JSValue val;
+                JSIValue val;
 
                 sf->cur_pc = pc;
                 val = JSI_GetPropertyValue(ctx, sp[-2], sp[-1]);
@@ -17108,7 +17108,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_get_array_el3):
             {
-                JSValue val;
+                JSIValue val;
 
                 switch (JSI_VALUE_GET_TAG(sp[-2])) {
                 case JSI_TAG_INT:
@@ -17140,7 +17140,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             
         CASE(OP_get_ref_value):
             {
-                JSValue val;
+                JSIValue val;
                 JSAtom atom;
                 int ret;
                 
@@ -17178,7 +17178,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_get_super_value):
             {
-                JSValue val;
+                JSIValue val;
                 JSAtom atom;
                 sf->cur_pc = pc;
                 atom = JSI_ValueToAtom(ctx, sp[-1]);
@@ -17311,7 +17311,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_add):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17345,8 +17345,8 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_add_loc):
             {
-                JSValue op2;
-                JSValue *pv;
+                JSIValue op2;
+                JSIValue *pv;
                 int idx;
                 idx = *pc;
                 pc += 1;
@@ -17376,7 +17376,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                         set_value(ctx, pv, op2);
                     }
                 } else {
-                    JSValue ops[2];
+                    JSIValue ops[2];
                 add_loc_slow:
                     /* In case of exception, jsi_add_slow frees ops[0]
                        and ops[1], so we must duplicate *pv */
@@ -17392,7 +17392,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_sub):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17416,7 +17416,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_mul):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17440,7 +17440,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_div):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17466,7 +17466,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_mod):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17503,7 +17503,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_plus):
             {
-                JSValue op1;
+                JSIValue op1;
                 uint32_t tag;
                 op1 = sp[-1];
                 tag = JSI_VALUE_GET_TAG(op1);
@@ -17517,7 +17517,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_neg):
             {
-                JSValue op1;
+                JSIValue op1;
                 uint32_t tag;
                 int val;
                 op1 = sp[-1];
@@ -17535,7 +17535,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_inc):
             {
-                JSValue op1;
+                JSIValue op1;
                 int val;
                 op1 = sp[-1];
                 if (JSI_VALUE_GET_TAG(op1) == JSI_TAG_INT) {
@@ -17553,7 +17553,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_dec):
             {
-                JSValue op1;
+                JSIValue op1;
                 int val;
                 op1 = sp[-1];
                 if (JSI_VALUE_GET_TAG(op1) == JSI_TAG_INT) {
@@ -17578,7 +17578,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_inc_loc):
             {
-                JSValue op1;
+                JSIValue op1;
                 int val;
                 int idx;
                 idx = *pc;
@@ -17604,7 +17604,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_dec_loc):
             {
-                JSValue op1;
+                JSIValue op1;
                 int val;
                 int idx;
                 idx = *pc;
@@ -17630,7 +17630,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_not):
             {
-                JSValue op1;
+                JSIValue op1;
                 op1 = sp[-1];
                 if (JSI_VALUE_GET_TAG(op1) == JSI_TAG_INT) {
                     sp[-1] = JSI_NewInt32(ctx, ~JSI_VALUE_GET_INT(op1));
@@ -17644,7 +17644,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_shl):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17664,7 +17664,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_shr):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17685,7 +17685,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_sar):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17705,7 +17705,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_and):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17723,7 +17723,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_or):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17741,7 +17741,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_xor):
             {
-                JSValue op1, op2;
+                JSIValue op1, op2;
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
@@ -17762,7 +17762,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 #define OP_CMP(opcode, binary_op, slow_call)              \
             CASE(opcode):                                 \
                 {                                         \
-                JSValue op1, op2;                         \
+                JSIValue op1, op2;                         \
                 op1 = sp[-2];                             \
                 op2 = sp[-1];                                   \
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {           \
@@ -17806,7 +17806,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             BREAK;
         CASE(OP_typeof):
             {
-                JSValue op1;
+                JSIValue op1;
                 JSAtom atom;
 
                 op1 = sp[-1];
@@ -17884,7 +17884,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             {
                 JSAtom atom;
                 int32_t diff;
-                JSValue obj, val;
+                JSIValue obj, val;
                 int ret, is_with;
                 atom = get_u32(pc);
                 diff = get_u32(pc + 4);
@@ -18058,7 +18058,7 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
     }
     if (!rt->current_exception_is_uncatchable) {
         while (sp > stack_buf) {
-            JSValue val = *--sp;
+            JSIValue val = *--sp;
             JSI_FreeValue(ctx, val);
             if (JSI_VALUE_GET_TAG(val) == JSI_TAG_CATCH_OFFSET) {
                 int pos = JSI_VALUE_GET_INT(val);
@@ -18099,28 +18099,28 @@ static JSValue JSI_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
     return ret_val;
 }
 
-JSValue JSI_Call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj,
-                int argc, JSValueConst *argv)
+JSIValue JSI_Call(JSIContext *ctx, JSIValueConst func_obj, JSIValueConst this_obj,
+                int argc, JSIValueConst *argv)
 {
     return JSI_CallInternal(ctx, func_obj, this_obj, JSI_UNDEFINED,
-                           argc, (JSValue *)argv, JSI_CALL_FLAG_COPY_ARGV);
+                           argc, (JSIValue *)argv, JSI_CALL_FLAG_COPY_ARGV);
 }
 
-static JSValue JSI_CallFree(JSContext *ctx, JSValue func_obj, JSValueConst this_obj,
-                           int argc, JSValueConst *argv)
+static JSIValue JSI_CallFree(JSIContext *ctx, JSIValue func_obj, JSIValueConst this_obj,
+                           int argc, JSIValueConst *argv)
 {
-    JSValue res = JSI_CallInternal(ctx, func_obj, this_obj, JSI_UNDEFINED,
-                                  argc, (JSValue *)argv, JSI_CALL_FLAG_COPY_ARGV);
+    JSIValue res = JSI_CallInternal(ctx, func_obj, this_obj, JSI_UNDEFINED,
+                                  argc, (JSIValue *)argv, JSI_CALL_FLAG_COPY_ARGV);
     JSI_FreeValue(ctx, func_obj);
     return res;
 }
 
 /* warning: the refcount of the context is not incremented. Return
    NULL in case of exception (case of revoked proxy only) */
-static JSContext *JSI_GetFunctionRealm(JSContext *ctx, JSValueConst func_obj)
+static JSIContext *JSI_GetFunctionRealm(JSIContext *ctx, JSIValueConst func_obj)
 {
     JSObject *p;
-    JSContext *realm;
+    JSIContext *realm;
 
     if (JSI_VALUE_GET_TAG(func_obj) != JSI_TAG_OBJECT)
         return ctx;
@@ -18152,11 +18152,11 @@ static JSContext *JSI_GetFunctionRealm(JSContext *ctx, JSValueConst func_obj)
     return realm;
 }
 
-static JSValue jsi_create_from_ctor(JSContext *ctx, JSValueConst ctor,
+static JSIValue jsi_create_from_ctor(JSIContext *ctx, JSIValueConst ctor,
                                    int class_id)
 {
-    JSValue proto, obj;
-    JSContext *realm;
+    JSIValue proto, obj;
+    JSIContext *realm;
 
     if (JSI_IsUndefined(ctor)) {
         proto = JSI_DupValue(ctx, ctx->class_proto[class_id]);
@@ -18178,10 +18178,10 @@ static JSValue jsi_create_from_ctor(JSContext *ctx, JSValueConst ctor,
 }
 
 /* argv[] is modified if (flags & JSI_CALL_FLAG_COPY_ARGV) = 0. */
-static JSValue JSI_CallConstructorInternal(JSContext *ctx,
-                                          JSValueConst func_obj,
-                                          JSValueConst new_target,
-                                          int argc, JSValue *argv, int flags)
+static JSIValue JSI_CallConstructorInternal(JSIContext *ctx,
+                                          JSIValueConst func_obj,
+                                          JSIValueConst new_target,
+                                          int argc, JSIValue *argv, int flags)
 {
     JSObject *p;
     JSFunctionBytecode *b;
@@ -18202,14 +18202,14 @@ static JSValue JSI_CallConstructorInternal(JSContext *ctx,
             return JSI_ThrowTypeError(ctx, "not a function");
         }
         return call_func(ctx, func_obj, new_target, argc,
-                         (JSValueConst *)argv, flags);
+                         (JSIValueConst *)argv, flags);
     }
 
     b = p->u.func.function_bytecode;
     if (b->is_derived_class_constructor) {
         return JSI_CallInternal(ctx, func_obj, JSI_UNDEFINED, new_target, argc, argv, flags);
     } else {
-        JSValue obj, ret;
+        JSIValue obj, ret;
         /* legacy constructor behavior */
         obj = jsi_create_from_ctor(ctx, new_target, JSI_CLASS_OBJECT);
         if (JSI_IsException(obj))
@@ -18226,45 +18226,45 @@ static JSValue JSI_CallConstructorInternal(JSContext *ctx,
     }
 }
 
-JSValue JSI_CallConstructor2(JSContext *ctx, JSValueConst func_obj,
-                            JSValueConst new_target,
-                            int argc, JSValueConst *argv)
+JSIValue JSI_CallConstructor2(JSIContext *ctx, JSIValueConst func_obj,
+                            JSIValueConst new_target,
+                            int argc, JSIValueConst *argv)
 {
     return JSI_CallConstructorInternal(ctx, func_obj, new_target,
-                                      argc, (JSValue *)argv,
+                                      argc, (JSIValue *)argv,
                                       JSI_CALL_FLAG_COPY_ARGV);
 }
 
-JSValue JSI_CallConstructor(JSContext *ctx, JSValueConst func_obj,
-                           int argc, JSValueConst *argv)
+JSIValue JSI_CallConstructor(JSIContext *ctx, JSIValueConst func_obj,
+                           int argc, JSIValueConst *argv)
 {
     return JSI_CallConstructorInternal(ctx, func_obj, func_obj,
-                                      argc, (JSValue *)argv,
+                                      argc, (JSIValue *)argv,
                                       JSI_CALL_FLAG_COPY_ARGV);
 }
 
-JSValue JSI_Invoke(JSContext *ctx, JSValueConst this_val, JSAtom atom,
-                  int argc, JSValueConst *argv)
+JSIValue JSI_Invoke(JSIContext *ctx, JSIValueConst this_val, JSAtom atom,
+                  int argc, JSIValueConst *argv)
 {
-    JSValue func_obj;
+    JSIValue func_obj;
     func_obj = JSI_GetProperty(ctx, this_val, atom);
     if (JSI_IsException(func_obj))
         return func_obj;
     return JSI_CallFree(ctx, func_obj, this_val, argc, argv);
 }
 
-static JSValue JSI_InvokeFree(JSContext *ctx, JSValue this_val, JSAtom atom,
-                             int argc, JSValueConst *argv)
+static JSIValue JSI_InvokeFree(JSIContext *ctx, JSIValue this_val, JSAtom atom,
+                             int argc, JSIValueConst *argv)
 {
-    JSValue res = JSI_Invoke(ctx, this_val, atom, argc, argv);
+    JSIValue res = JSI_Invoke(ctx, this_val, atom, argc, argv);
     JSI_FreeValue(ctx, this_val);
     return res;
 }
 
 /* JSAsyncFunctionState (used by generator and async functions) */
-static JSAsyncFunctionState *async_func_init(JSContext *ctx,
-                                             JSValueConst func_obj, JSValueConst this_obj,
-                                             int argc, JSValueConst *argv)
+static JSAsyncFunctionState *async_func_init(JSIContext *ctx,
+                                             JSIValueConst func_obj, JSIValueConst this_obj,
+                                             int argc, JSIValueConst *argv)
 {
     JSAsyncFunctionState *s;
     JSObject *p;
@@ -18286,7 +18286,7 @@ static JSAsyncFunctionState *async_func_init(JSContext *ctx,
     sf->cur_pc = b->byte_code_buf;
     arg_buf_len = max_int(b->arg_count, argc);
     local_count = arg_buf_len + b->var_count + b->stack_size;
-    sf->arg_buf = jsi_malloc(ctx, sizeof(JSValue) * max_int(local_count, 1));
+    sf->arg_buf = jsi_malloc(ctx, sizeof(JSIValue) * max_int(local_count, 1));
     if (!sf->arg_buf) {
         jsi_free(ctx, s);
         return NULL;
@@ -18311,7 +18311,7 @@ static JSAsyncFunctionState *async_func_init(JSContext *ctx,
 static void async_func_free_frame(JSRuntime *rt, JSAsyncFunctionState *s)
 {
     JSStackFrame *sf = &s->frame;
-    JSValue *sp;
+    JSIValue *sp;
 
     if (sf->arg_buf) {
         /* cannot free the function if it is running */
@@ -18326,11 +18326,11 @@ static void async_func_free_frame(JSRuntime *rt, JSAsyncFunctionState *s)
     JSI_FreeValueRT(rt, s->this_val);
 }
 
-static JSValue async_func_resume(JSContext *ctx, JSAsyncFunctionState *s)
+static JSIValue async_func_resume(JSIContext *ctx, JSAsyncFunctionState *s)
 {
     JSRuntime *rt = ctx->rt;
     JSStackFrame *sf = &s->frame;
-    JSValue func_obj, ret;
+    JSIValue func_obj, ret;
 
     assert(!s->is_completed);
     if (jsi_check_stack_overflow(ctx->rt, 0)) {
@@ -18415,7 +18415,7 @@ static void free_generator_stack_rt(JSRuntime *rt, JSGeneratorData *s)
     s->state = JSI_GENERATOR_STATE_COMPLETED;
 }
 
-static void jsi_generator_finalizer(JSRuntime *rt, JSValue obj)
+static void jsi_generator_finalizer(JSRuntime *rt, JSIValue obj)
 {
     JSGeneratorData *s = JSI_GetOpaque(obj, JSI_CLASS_GENERATOR);
 
@@ -18425,12 +18425,12 @@ static void jsi_generator_finalizer(JSRuntime *rt, JSValue obj)
     }
 }
 
-static void free_generator_stack(JSContext *ctx, JSGeneratorData *s)
+static void free_generator_stack(JSIContext *ctx, JSGeneratorData *s)
 {
     free_generator_stack_rt(ctx->rt, s);
 }
 
-static void jsi_generator_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_generator_mark(JSRuntime *rt, JSIValueConst val,
                               JSI_MarkFunc *mark_func)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
@@ -18446,13 +18446,13 @@ static void jsi_generator_mark(JSRuntime *rt, JSValueConst val,
 #define GEN_MAGIC_RETURN 1
 #define GEN_MAGIC_THROW  2
 
-static JSValue jsi_generator_next(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv,
+static JSIValue jsi_generator_next(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv,
                                  BOOL *pdone, int magic)
 {
     JSGeneratorData *s = JSI_GetOpaque(this_val, JSI_CLASS_GENERATOR);
     JSStackFrame *sf;
-    JSValue ret, func_ret;
+    JSIValue ret, func_ret;
 
     *pdone = TRUE;
     if (!s)
@@ -18528,12 +18528,12 @@ static JSValue jsi_generator_next(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue jsi_generator_function_call(JSContext *ctx, JSValueConst func_obj,
-                                          JSValueConst this_obj,
-                                          int argc, JSValueConst *argv,
+static JSIValue jsi_generator_function_call(JSIContext *ctx, JSIValueConst func_obj,
+                                          JSIValueConst this_obj,
+                                          int argc, JSIValueConst *argv,
                                           int flags)
 {
-    JSValue obj, func_ret;
+    JSIValue obj, func_ret;
     JSGeneratorData *s;
 
     s = jsi_mallocz(ctx, sizeof(*s));
@@ -18565,7 +18565,7 @@ static JSValue jsi_generator_function_call(JSContext *ctx, JSValueConst func_obj
 
 /* AsyncFunction */
 
-static void jsi_async_function_resolve_finalizer(JSRuntime *rt, JSValue val)
+static void jsi_async_function_resolve_finalizer(JSRuntime *rt, JSIValue val)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
     JSAsyncFunctionState *s = p->u.async_function_data;
@@ -18574,7 +18574,7 @@ static void jsi_async_function_resolve_finalizer(JSRuntime *rt, JSValue val)
     }
 }
 
-static void jsi_async_function_resolve_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_async_function_resolve_mark(JSRuntime *rt, JSIValueConst val,
                                            JSI_MarkFunc *mark_func)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
@@ -18584,9 +18584,9 @@ static void jsi_async_function_resolve_mark(JSRuntime *rt, JSValueConst val,
     }
 }
 
-static int jsi_async_function_resolve_create(JSContext *ctx,
+static int jsi_async_function_resolve_create(JSIContext *ctx,
                                             JSAsyncFunctionState *s,
-                                            JSValue *resolving_funcs)
+                                            JSIValue *resolving_funcs)
 {
     int i;
     JSObject *p;
@@ -18624,10 +18624,10 @@ typedef struct JSAsyncGeneratorRequest {
     struct list_head link;
     /* completion */
     int completion_type; /* GEN_MAGIC_x */
-    JSValue result;
+    JSIValue result;
     /* promise capability */
-    JSValue promise;
-    JSValue resolving_funcs[2];
+    JSIValue promise;
+    JSIValue resolving_funcs[2];
 } JSAsyncGeneratorRequest;
 
 typedef struct JSAsyncGeneratorData {
@@ -18657,7 +18657,7 @@ static void jsi_async_generator_free(JSRuntime *rt,
     jsi_free_rt(rt, s);
 }
 
-static void jsi_async_generator_finalizer(JSRuntime *rt, JSValue obj)
+static void jsi_async_generator_finalizer(JSRuntime *rt, JSIValue obj)
 {
     JSAsyncGeneratorData *s = JSI_GetOpaque(obj, JSI_CLASS_ASYNC_GENERATOR);
 
@@ -18666,7 +18666,7 @@ static void jsi_async_generator_finalizer(JSRuntime *rt, JSValue obj)
     }
 }
 
-static void jsi_async_generator_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_async_generator_mark(JSRuntime *rt, JSIValueConst val,
                                     JSI_MarkFunc *mark_func)
 {
     JSAsyncGeneratorData *s = JSI_GetOpaque(val, JSI_CLASS_ASYNC_GENERATOR);
@@ -18689,13 +18689,13 @@ static void jsi_async_generator_mark(JSRuntime *rt, JSValueConst val,
 
 
 
-static void jsi_async_generator_resolve_or_reject(JSContext *ctx,
+static void jsi_async_generator_resolve_or_reject(JSIContext *ctx,
                                                  JSAsyncGeneratorData *s,
-                                                 JSValueConst result,
+                                                 JSIValueConst result,
                                                  int is_reject)
 {
     JSAsyncGeneratorRequest *next;
-    JSValue ret;
+    JSIValue ret;
 
     next = list_entry(s->queue.next, JSAsyncGeneratorRequest, link);
     list_del(&next->link);
@@ -18709,26 +18709,26 @@ static void jsi_async_generator_resolve_or_reject(JSContext *ctx,
     jsi_free(ctx, next);
 }
 
-static void jsi_async_generator_resolve(JSContext *ctx,
+static void jsi_async_generator_resolve(JSIContext *ctx,
                                        JSAsyncGeneratorData *s,
-                                       JSValueConst value,
+                                       JSIValueConst value,
                                        BOOL done)
 {
-    JSValue result;
+    JSIValue result;
     result = jsi_create_iterator_result(ctx, JSI_DupValue(ctx, value), done);
     /* XXX: better exception handling ? */
     jsi_async_generator_resolve_or_reject(ctx, s, result, 0);
     JSI_FreeValue(ctx, result);
  }
 
-static void jsi_async_generator_reject(JSContext *ctx,
+static void jsi_async_generator_reject(JSIContext *ctx,
                                        JSAsyncGeneratorData *s,
-                                       JSValueConst exception)
+                                       JSIValueConst exception)
 {
     jsi_async_generator_resolve_or_reject(ctx, s, exception, 1);
 }
 
-static void jsi_async_generator_complete(JSContext *ctx,
+static void jsi_async_generator_complete(JSIContext *ctx,
                                         JSAsyncGeneratorData *s)
 {
     if (s->state != JSI_ASYNC_GENERATOR_STATE_COMPLETED) {
@@ -18929,7 +18929,7 @@ typedef enum JSParseExportEnum {
 } JSParseExportEnum;
 
 typedef struct JSFunctionDef {
-    JSContext *ctx;
+    JSIContext *ctx;
     struct JSFunctionDef *parent;
     int parent_cpool_idx; /* index in the constant pool of the parent
                              or -1 if none */
@@ -19008,7 +19008,7 @@ typedef struct JSFunctionDef {
     BlockEnv *top_break; /* break/continue label stack */
 
     /* constant pool (strings, functions, numbers) */
-    JSValue *cpool;
+    JSIValue *cpool;
     int cpool_count;
     int cpool_size;
 
@@ -19047,11 +19047,11 @@ typedef struct JSToken {
     const uint8_t *ptr; /* position in the source */
     union {
         struct {
-            JSValue str;
+            JSIValue str;
             int sep;
         } str;
         struct {
-            JSValue val;
+            JSIValue val;
         } num;
         struct {
             JSAtom atom;
@@ -19059,14 +19059,14 @@ typedef struct JSToken {
             BOOL is_reserved;
         } ident;
         struct {
-            JSValue body;
-            JSValue flags;
+            JSIValue body;
+            JSIValue flags;
         } regexp;
     } u;
 } JSToken;
 
 typedef struct JSParseState {
-    JSContext *ctx;
+    JSIContext *ctx;
     const char *filename;
     JSToken token;
     BOOL got_lf; /* true if got line feed before the current token */
@@ -19268,7 +19268,7 @@ static int get_line_col_cached(GetLineColCache *s, int *pcol_num, const uint8_t 
 /* 'ptr' is the position of the error in the source */
 static int jsi_parse_error_v(JSParseState *s, const uint8_t *ptr, const char *fmt, va_list ap)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     int line_num, col_num;
     line_num = get_line_col(&col_num, s->buf_start, ptr - s->buf_start);
     JSI_ThrowError2(ctx, JSI_SYNTAX_ERROR, fmt, ap, FALSE);
@@ -19452,7 +19452,7 @@ static __exception int jsi_parse_template_part(JSParseState *s, const uint8_t *p
 {
     uint32_t c;
     StringBuffer b_s, *b = &b_s;
-    JSValue str;
+    JSIValue str;
 
     /* p points to the first byte of the template part */
     if (string_buffer_init(s->ctx, b, 32))
@@ -19519,7 +19519,7 @@ static __exception int jsi_parse_string(JSParseState *s, int sep,
     uint32_t c;
     StringBuffer b_s, *b = &b_s;
     const uint8_t *p_escape;
-    JSValue str;
+    JSIValue str;
 
     /* string */
     if (string_buffer_init(s->ctx, b, 32))
@@ -19660,7 +19660,7 @@ static __exception int jsi_parse_regexp(JSParseState *s)
     StringBuffer b_s, *b = &b_s;
     StringBuffer b2_s, *b2 = &b2_s;
     uint32_t c;
-    JSValue body_str, flags_str;
+    JSIValue body_str, flags_str;
 
     p = s->buf_ptr;
     p++;
@@ -19761,7 +19761,7 @@ static __exception int jsi_parse_regexp(JSParseState *s)
     return -1;
 }
 
-static __exception int ident_realloc(JSContext *ctx, char **pbuf, size_t *psize,
+static __exception int ident_realloc(JSIContext *ctx, char **pbuf, size_t *psize,
                                      char *static_buf)
 {
     char *buf, *new_buf;
@@ -20057,7 +20057,7 @@ static __exception int next_token(JSParseState *s)
         /* number */
     parse_number:
         {
-            JSValue ret;
+            JSIValue ret;
             const uint8_t *p1;
             int flags;
             flags = ATOD_ACCEPT_BIN_OCT | ATOD_ACCEPT_LEGACY_OCTAL |
@@ -21002,7 +21002,7 @@ static int emit_goto(JSParseState *s, int opcode, int label)
 }
 
 /* return the constant pool index. 'val' is not duplicated. */
-static int cpool_add(JSParseState *s, JSValue val)
+static int cpool_add(JSParseState *s, JSIValue val)
 {
     JSFunctionDef *fd = s->cur_func;
 
@@ -21013,7 +21013,7 @@ static int cpool_add(JSParseState *s, JSValue val)
     return fd->cpool_count - 1;
 }
 
-static __exception int emit_push_const(JSParseState *s, JSValueConst val,
+static __exception int emit_push_const(JSParseState *s, JSIValueConst val,
                                        BOOL as_atom)
 {
     int idx;
@@ -21040,7 +21040,7 @@ static __exception int emit_push_const(JSParseState *s, JSValueConst val,
 
 /* return the variable index or -1 if not found,
    add ARGUMENT_VAR_OFFSET for argument variables */
-static int find_arg(JSContext *ctx, JSFunctionDef *fd, JSAtom name)
+static int find_arg(JSIContext *ctx, JSFunctionDef *fd, JSAtom name)
 {
     int i;
     for(i = fd->arg_count; i-- > 0;) {
@@ -21050,7 +21050,7 @@ static int find_arg(JSContext *ctx, JSFunctionDef *fd, JSAtom name)
     return -1;
 }
 
-static int find_var(JSContext *ctx, JSFunctionDef *fd, JSAtom name)
+static int find_var(JSIContext *ctx, JSFunctionDef *fd, JSAtom name)
 {
     int i;
     for(i = fd->var_count; i-- > 0;) {
@@ -21061,7 +21061,7 @@ static int find_var(JSContext *ctx, JSFunctionDef *fd, JSAtom name)
 }
 
 /* find a variable declaration in a given scope */
-static int find_var_in_scope(JSContext *ctx, JSFunctionDef *fd,
+static int find_var_in_scope(JSIContext *ctx, JSFunctionDef *fd,
                              JSAtom name, int scope_level)
 {
     int scope_idx;
@@ -21077,7 +21077,7 @@ static int find_var_in_scope(JSContext *ctx, JSFunctionDef *fd,
 
 /* return true if scope == parent_scope or if scope is a child of
    parent_scope */
-static BOOL is_child_scope(JSContext *ctx, JSFunctionDef *fd,
+static BOOL is_child_scope(JSIContext *ctx, JSFunctionDef *fd,
                            int scope, int parent_scope)
 {
     while (scope >= 0) {
@@ -21089,7 +21089,7 @@ static BOOL is_child_scope(JSContext *ctx, JSFunctionDef *fd,
 }
 
 /* find a 'var' declaration in the same scope or a child scope */
-static int find_var_in_child_scope(JSContext *ctx, JSFunctionDef *fd,
+static int find_var_in_child_scope(JSIContext *ctx, JSFunctionDef *fd,
                                    JSAtom name, int scope_level)
 {
     int i;
@@ -21126,7 +21126,7 @@ static JSGlobalVar *find_lexical_global_var(JSFunctionDef *fd, JSAtom name)
         return NULL;
 }
 
-static int find_lexical_decl(JSContext *ctx, JSFunctionDef *fd, JSAtom name,
+static int find_lexical_decl(JSIContext *ctx, JSFunctionDef *fd, JSAtom name,
                              int scope_idx, BOOL check_catch_var)
 {
     while (scope_idx >= 0) {
@@ -21213,7 +21213,7 @@ static void close_scopes(JSParseState *s, int scope, int scope_stop)
 }
 
 /* return the variable index or -1 if error */
-static int add_var(JSContext *ctx, JSFunctionDef *fd, JSAtom name)
+static int add_var(JSIContext *ctx, JSFunctionDef *fd, JSAtom name)
 {
     JSVarDef *vd;
 
@@ -21232,7 +21232,7 @@ static int add_var(JSContext *ctx, JSFunctionDef *fd, JSAtom name)
     return fd->var_count - 1;
 }
 
-static int add_scope_var(JSContext *ctx, JSFunctionDef *fd, JSAtom name,
+static int add_scope_var(JSIContext *ctx, JSFunctionDef *fd, JSAtom name,
                          JSVarKindEnum var_kind)
 {
     int idx = add_var(ctx, fd, name);
@@ -21247,7 +21247,7 @@ static int add_scope_var(JSContext *ctx, JSFunctionDef *fd, JSAtom name,
     return idx;
 }
 
-static int add_func_var(JSContext *ctx, JSFunctionDef *fd, JSAtom name)
+static int add_func_var(JSIContext *ctx, JSFunctionDef *fd, JSAtom name)
 {
     int idx = fd->func_var_idx;
     if (idx < 0 && (idx = add_var(ctx, fd, name)) >= 0) {
@@ -21259,7 +21259,7 @@ static int add_func_var(JSContext *ctx, JSFunctionDef *fd, JSAtom name)
     return idx;
 }
 
-static int add_arguments_var(JSContext *ctx, JSFunctionDef *fd)
+static int add_arguments_var(JSIContext *ctx, JSFunctionDef *fd)
 {
     int idx = fd->arguments_var_idx;
     if (idx < 0 && (idx = add_var(ctx, fd, JSI_ATOM_arguments)) >= 0) {
@@ -21270,7 +21270,7 @@ static int add_arguments_var(JSContext *ctx, JSFunctionDef *fd)
 
 /* add an argument definition in the argument scope. Only needed when
    "eval()" may be called in the argument scope. Return 0 if OK. */
-static int add_arguments_arg(JSContext *ctx, JSFunctionDef *fd)
+static int add_arguments_arg(JSIContext *ctx, JSFunctionDef *fd)
 {
     int idx;
     if (fd->arguments_arg_idx < 0) {
@@ -21293,7 +21293,7 @@ static int add_arguments_arg(JSContext *ctx, JSFunctionDef *fd)
     return 0;
 }
 
-static int add_arg(JSContext *ctx, JSFunctionDef *fd, JSAtom name)
+static int add_arg(JSIContext *ctx, JSFunctionDef *fd, JSAtom name)
 {
     JSVarDef *vd;
 
@@ -21313,7 +21313,7 @@ static int add_arg(JSContext *ctx, JSFunctionDef *fd, JSAtom name)
 }
 
 /* add a global variable definition */
-static JSGlobalVar *add_global_var(JSContext *ctx, JSFunctionDef *s,
+static JSGlobalVar *add_global_var(JSIContext *ctx, JSFunctionDef *s,
                                      JSAtom name)
 {
     JSGlobalVar *hf;
@@ -21345,7 +21345,7 @@ typedef enum {
 static int define_var(JSParseState *s, JSFunctionDef *fd, JSAtom name,
                       JSVarDefEnum var_def_type)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     JSVarDef *vd;
     int idx;
 
@@ -21474,7 +21474,7 @@ static int define_var(JSParseState *s, JSFunctionDef *fd, JSAtom name,
 static int add_private_class_field(JSParseState *s, JSFunctionDef *fd,
                                    JSAtom name, JSVarKindEnum var_kind, BOOL is_static)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     JSVarDef *vd;
     int idx;
 
@@ -21514,7 +21514,7 @@ static JSExportEntry *add_export_entry(JSParseState *s, JSModuleDef *m,
                                        JSExportTypeEnum export_type);
 
 /* Note: all the fields are already sealed except length */
-static int seal_template_obj(JSContext *ctx, JSValueConst obj)
+static int seal_template_obj(JSIContext *ctx, JSIValueConst obj)
 {
     JSObject *p;
     JSShapeProperty *prs;
@@ -21532,8 +21532,8 @@ static int seal_template_obj(JSContext *ctx, JSValueConst obj)
 
 static __exception int jsi_parse_template(JSParseState *s, int call, int *argc)
 {
-    JSContext *ctx = s->ctx;
-    JSValue raw_array, template_object;
+    JSIContext *ctx = s->ctx;
+    JSIValue raw_array, template_object;
     JSToken cooked;
     int depth, ret;
 
@@ -21740,7 +21740,7 @@ static int __exception jsi_parse_property_name(JSParseState *s,
         if (next_token(s))
             goto fail1;
     } else if (s->token.val == TOK_NUMBER) {
-        JSValue val;
+        JSIValue val;
         val = s->token.u.num.val;
         name = JSI_ValueToAtom(s->ctx, val);
         if (name == JSI_ATOM_NULL)
@@ -22130,7 +22130,7 @@ static __exception int jsi_parse_object_literal(JSParseState *s)
 
 static __exception int jsi_parse_postfix_expr(JSParseState *s, int parse_flags);
 static void emit_class_field_init(JSParseState *s);
-static JSFunctionDef *jsi_new_function_def(JSContext *ctx,
+static JSFunctionDef *jsi_new_function_def(JSIContext *ctx,
                                           JSFunctionDef *parent,
                                           BOOL is_eval,
                                           BOOL is_func_expr,
@@ -22201,7 +22201,7 @@ static __exception int jsi_parse_class_default_ctor(JSParseState *s,
 }
 
 /* find field in the current scope */
-static int find_private_class_field(JSContext *ctx, JSFunctionDef *fd,
+static int find_private_class_field(JSIContext *ctx, JSFunctionDef *fd,
                                     JSAtom name, int scope_level)
 {
     int idx;
@@ -22245,7 +22245,7 @@ static void emit_class_field_init(JSParseState *s)
 }
 
 /* build a private setter function name from the private getter name */
-static JSAtom get_private_setter_name(JSContext *ctx, JSAtom name)
+static JSAtom get_private_setter_name(JSIContext *ctx, JSAtom name)
 {
     return jsi_atom_concat_str(ctx, name, "<set>");
 }
@@ -22312,7 +22312,7 @@ static void emit_class_init_end(JSParseState *s, ClassFieldsDef *cf)
 static __exception int jsi_parse_class(JSParseState *s, BOOL is_class_expr,
                                       JSParseExportEnum export_flag)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     JSFunctionDef *fd = s->cur_func;
     JSAtom name = JSI_ATOM_NULL, class_name = JSI_ATOM_NULL, class_name1;
     JSAtom class_var_name = JSI_ATOM_NULL;
@@ -23747,7 +23747,7 @@ static __exception int jsi_parse_postfix_expr(JSParseState *s, int parse_flags)
     switch(s->token.val) {
     case TOK_NUMBER:
         {
-            JSValue val;
+            JSIValue val;
             val = s->token.u.num.val;
 
             if (JSI_VALUE_GET_TAG(val) == JSI_TAG_INT) {
@@ -24245,7 +24245,7 @@ static __exception int jsi_parse_postfix_expr(JSParseState *s, int parse_flags)
                     return jsi_parse_error(s, "expecting field name");
                 }
                 if (get_prev_opcode(fd) == OP_get_super) {
-                    JSValue val;
+                    JSIValue val;
                     int ret;
                     val = JSI_AtomToValue(s->ctx, s->token.u.ident.atom);
                     ret = emit_push_const(s, val, 1);
@@ -24321,7 +24321,7 @@ static __exception int jsi_parse_delete(JSParseState *s)
     case OP_get_field:
     case OP_get_field_opt_chain:
         {
-            JSValue val;
+            JSIValue val;
             int ret, opt_chain_label, next_label;
             if (opcode == OP_get_field_opt_chain) {
                 opt_chain_label = get_u32(fd->byte_code.buf +
@@ -25281,7 +25281,7 @@ static __exception int jsi_parse_block(JSParseState *s)
 static __exception int jsi_parse_var(JSParseState *s, int parse_flags, int tok,
                                     BOOL export_flag)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     JSFunctionDef *fd = s->cur_func;
     JSAtom name = JSI_ATOM_NULL;
 
@@ -25428,7 +25428,7 @@ static int is_let(JSParseState *s, int decl_mask)
 static __exception int jsi_parse_for_in_of(JSParseState *s, int label_name,
                                           BOOL is_async)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     JSFunctionDef *fd = s->cur_func;
     JSAtom var_name;
     BOOL has_initializer, is_for_of, has_destructuring;
@@ -25659,7 +25659,7 @@ static void set_eval_ret_undefined(JSParseState *s)
 static __exception int jsi_parse_statement_or_decl(JSParseState *s,
                                                   int decl_mask)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     JSAtom label_name;
     int tok;
 
@@ -26418,7 +26418,7 @@ fail:
 }
 
 /* 'name' is freed. The module is referenced by 'ctx->loaded_modules' */
-static JSModuleDef *jsi_new_module_def(JSContext *ctx, JSAtom name)
+static JSModuleDef *jsi_new_module_def(JSIContext *ctx, JSAtom name)
 {
     JSModuleDef *m;
     m = jsi_mallocz(ctx, sizeof(*m));
@@ -26509,7 +26509,7 @@ static void jsi_free_module_def(JSRuntime *rt, JSModuleDef *m)
     JSI_FreeValueRT(rt, m->resolving_funcs[1]);
     JSI_FreeValueRT(rt, m->private_value);
     /* during the GC the finalizers are called in an arbitrary
-       order so the module may no longer be referenced by the JSContext list */
+       order so the module may no longer be referenced by the JSIContext list */
     if (m->link.next) {
         list_del(&m->link);
     }
@@ -26521,7 +26521,7 @@ static void jsi_free_module_def(JSRuntime *rt, JSModuleDef *m)
     }
 }
 
-static int add_req_module_entry(JSContext *ctx, JSModuleDef *m,
+static int add_req_module_entry(JSIContext *ctx, JSModuleDef *m,
                                 JSAtom module_name)
 {
     JSReqModuleEntry *rme;
@@ -26538,7 +26538,7 @@ static int add_req_module_entry(JSContext *ctx, JSModuleDef *m,
     return m->req_module_entries_count - 1;
 }
 
-static JSExportEntry *find_export_entry(JSContext *ctx, JSModuleDef *m,
+static JSExportEntry *find_export_entry(JSIContext *ctx, JSModuleDef *m,
                                         JSAtom export_name)
 {
     JSExportEntry *me;
@@ -26551,7 +26551,7 @@ static JSExportEntry *find_export_entry(JSContext *ctx, JSModuleDef *m,
     return NULL;
 }
 
-static JSExportEntry *add_export_entry2(JSContext *ctx,
+static JSExportEntry *add_export_entry2(JSIContext *ctx,
                                         JSParseState *s, JSModuleDef *m,
                                        JSAtom local_name, JSAtom export_name,
                                        JSExportTypeEnum export_type)
@@ -26590,7 +26590,7 @@ static JSExportEntry *add_export_entry(JSParseState *s, JSModuleDef *m,
                              export_type);
 }
 
-static int add_star_export_entry(JSContext *ctx, JSModuleDef *m,
+static int add_star_export_entry(JSIContext *ctx, JSModuleDef *m,
                                  int req_module_idx)
 {
     JSStarExportEntry *se;
@@ -26606,7 +26606,7 @@ static int add_star_export_entry(JSContext *ctx, JSModuleDef *m,
 }
 
 /* create a C module */
-JSModuleDef *JSI_NewCModule(JSContext *ctx, const char *name_str,
+JSModuleDef *JSI_NewCModule(JSIContext *ctx, const char *name_str,
                            JSModuleInitFunc *func)
 {
     JSModuleDef *m;
@@ -26621,7 +26621,7 @@ JSModuleDef *JSI_NewCModule(JSContext *ctx, const char *name_str,
     return m;
 }
 
-int JSI_AddModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name)
+int JSI_AddModuleExport(JSIContext *ctx, JSModuleDef *m, const char *export_name)
 {
     JSExportEntry *me;
     JSAtom name;
@@ -26637,8 +26637,8 @@ int JSI_AddModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name)
         return 0;
 }
 
-int JSI_SetModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name,
-                       JSValue val)
+int JSI_SetModuleExport(JSIContext *ctx, JSModuleDef *m, const char *export_name,
+                       JSIValue val)
 {
     JSExportEntry *me;
     JSAtom name;
@@ -26656,13 +26656,13 @@ int JSI_SetModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name,
     return -1;
 }
 
-int JSI_SetModulePrivateValue(JSContext *ctx, JSModuleDef *m, JSValue val)
+int JSI_SetModulePrivateValue(JSIContext *ctx, JSModuleDef *m, JSIValue val)
 {
     set_value(ctx, &m->private_value, val);
     return 0;
 }
 
-JSValue JSI_GetModulePrivateValue(JSContext *ctx, JSModuleDef *m)
+JSIValue JSI_GetModulePrivateValue(JSIContext *ctx, JSModuleDef *m)
 {
     return JSI_DupValue(ctx, m->private_value);
 }
@@ -26692,7 +26692,7 @@ void JSI_SetModuleLoaderFunc2(JSRuntime *rt,
 }
 
 /* default module filename normalizer */
-static char *jsi_default_module_normalize_name(JSContext *ctx,
+static char *jsi_default_module_normalize_name(JSIContext *ctx,
                                               const char *base_name,
                                               const char *name)
 {
@@ -26752,7 +26752,7 @@ static char *jsi_default_module_normalize_name(JSContext *ctx,
     return filename;
 }
 
-static JSModuleDef *jsi_find_loaded_module(JSContext *ctx, JSAtom name)
+static JSModuleDef *jsi_find_loaded_module(JSIContext *ctx, JSAtom name)
 {
     struct list_head *el;
     JSModuleDef *m;
@@ -26767,10 +26767,10 @@ static JSModuleDef *jsi_find_loaded_module(JSContext *ctx, JSAtom name)
 }
 
 /* return NULL in case of exception (e.g. module could not be loaded) */
-static JSModuleDef *jsi_host_resolve_imported_module(JSContext *ctx,
+static JSModuleDef *jsi_host_resolve_imported_module(JSIContext *ctx,
                                                     const char *base_cname,
                                                     const char *cname1,
-                                                    JSValueConst attributes)
+                                                    JSIValueConst attributes)
 {
     JSRuntime *rt = ctx->rt;
     JSModuleDef *m;
@@ -26819,10 +26819,10 @@ static JSModuleDef *jsi_host_resolve_imported_module(JSContext *ctx,
     return m;
 }
 
-static JSModuleDef *jsi_host_resolve_imported_module_atom(JSContext *ctx,
+static JSModuleDef *jsi_host_resolve_imported_module_atom(JSIContext *ctx,
                                                          JSAtom base_module_name,
                                                          JSAtom module_name1,
-                                                         JSValueConst attributes)
+                                                         JSIValueConst attributes)
 {
     const char *base_cname, *cname;
     JSModuleDef *m;
@@ -26864,7 +26864,7 @@ static int find_resolve_entry(JSResolveState *s,
     return -1;
 }
 
-static int add_resolve_entry(JSContext *ctx, JSResolveState *s,
+static int add_resolve_entry(JSIContext *ctx, JSResolveState *s,
                              JSModuleDef *m, JSAtom name)
 {
     JSResolveEntry *re;
@@ -26887,7 +26887,7 @@ typedef enum JSResolveResultEnum {
     JSI_RESOLVE_RES_AMBIGUOUS,
 } JSResolveResultEnum;
 
-static JSResolveResultEnum jsi_resolve_export1(JSContext *ctx,
+static JSResolveResultEnum jsi_resolve_export1(JSIContext *ctx,
                                               JSModuleDef **pmodule,
                                               JSExportEntry **pme,
                                               JSModuleDef *m,
@@ -26964,7 +26964,7 @@ static JSResolveResultEnum jsi_resolve_export1(JSContext *ctx,
 /* If the return value is JSI_RESOLVE_RES_FOUND, return the module
   (*pmodule) and the corresponding local export entry
   (*pme). Otherwise return (NULL, NULL) */
-static JSResolveResultEnum jsi_resolve_export(JSContext *ctx,
+static JSResolveResultEnum jsi_resolve_export(JSIContext *ctx,
                                              JSModuleDef **pmodule,
                                              JSExportEntry **pme,
                                              JSModuleDef *m,
@@ -26987,7 +26987,7 @@ static JSResolveResultEnum jsi_resolve_export(JSContext *ctx,
     return ret;
 }
 
-static void jsi_resolve_export_throw_error(JSContext *ctx,
+static void jsi_resolve_export_throw_error(JSIContext *ctx,
                                           JSResolveResultEnum res,
                                           JSModuleDef *m, JSAtom export_name)
 {
@@ -27051,7 +27051,7 @@ static int find_exported_name(GetExportNamesState *s, JSAtom name)
     return -1;
 }
 
-static __exception int get_exported_names(JSContext *ctx,
+static __exception int get_exported_names(JSIContext *ctx,
                                           GetExportNamesState *s,
                                           JSModuleDef *m, BOOL from_star)
 {
@@ -27101,7 +27101,7 @@ static __exception int get_exported_names(JSContext *ctx,
 }
 
 /* Unfortunately, the spec gives a different behavior from GetOwnProperty ! */
-static int jsi_module_ns_has(JSContext *ctx, JSValueConst obj, JSAtom atom)
+static int jsi_module_ns_has(JSIContext *ctx, JSIValueConst obj, JSAtom atom)
 {
     return (find_own_property1(JSI_VALUE_GET_OBJ(obj), atom) != NULL);
 }
@@ -27112,10 +27112,10 @@ static const JSClassExoticMethods jsi_module_ns_exotic_methods = {
 
 static int exported_names_cmp(const void *p1, const void *p2, void *opaque)
 {
-    JSContext *ctx = opaque;
+    JSIContext *ctx = opaque;
     const ExportedNameEntry *me1 = p1;
     const ExportedNameEntry *me2 = p2;
-    JSValue str1, str2;
+    JSIValue str1, str2;
     int ret;
 
     /* XXX: should avoid allocation memory in atom comparison */
@@ -27133,7 +27133,7 @@ static int exported_names_cmp(const void *p1, const void *p2, void *opaque)
     return ret;
 }
 
-static JSValue jsi_module_ns_autoinit(JSContext *ctx, JSObject *p, JSAtom atom,
+static JSIValue jsi_module_ns_autoinit(JSIContext *ctx, JSObject *p, JSAtom atom,
                                      void *opaque)
 {
     JSModuleDef *m = opaque;
@@ -27162,9 +27162,9 @@ static JSValue jsi_module_ns_autoinit(JSContext *ctx, JSObject *p, JSAtom atom,
     }
 }
 
-static JSValue jsi_build_module_ns(JSContext *ctx, JSModuleDef *m)
+static JSIValue jsi_build_module_ns(JSIContext *ctx, JSModuleDef *m)
 {
-    JSValue obj;
+    JSIValue obj;
     JSObject *p;
     GetExportNamesState s_s, *s = &s_s;
     int i, ret;
@@ -27266,10 +27266,10 @@ static JSValue jsi_build_module_ns(JSContext *ctx, JSModuleDef *m)
     return JSI_EXCEPTION;
 }
 
-JSValue JSI_GetModuleNamespace(JSContext *ctx, JSModuleDef *m)
+JSIValue JSI_GetModuleNamespace(JSIContext *ctx, JSModuleDef *m)
 {
     if (JSI_IsUndefined(m->module_ns)) {
-        JSValue val;
+        JSIValue val;
         val = jsi_build_module_ns(ctx, m);
         if (JSI_IsException(val))
             return JSI_EXCEPTION;
@@ -27279,7 +27279,7 @@ JSValue JSI_GetModuleNamespace(JSContext *ctx, JSModuleDef *m)
 }
 
 /* Load all the required modules for module 'm' */
-static int jsi_resolve_module(JSContext *ctx, JSModuleDef *m)
+static int jsi_resolve_module(JSIContext *ctx, JSModuleDef *m)
 {
     int i;
     JSModuleDef *m1;
@@ -27310,7 +27310,7 @@ static int jsi_resolve_module(JSContext *ctx, JSModuleDef *m)
     return 0;
 }
 
-static JSVarRef *jsi_create_module_var(JSContext *ctx, BOOL is_lexical)
+static JSVarRef *jsi_create_module_var(JSIContext *ctx, BOOL is_lexical)
 {
     JSVarRef *var_ref;
     var_ref = jsi_malloc(ctx, sizeof(JSVarRef));
@@ -27328,12 +27328,12 @@ static JSVarRef *jsi_create_module_var(JSContext *ctx, BOOL is_lexical)
 }
 
 /* Create the <eval> function associated with the module */
-static int jsi_create_module_bytecode_function(JSContext *ctx, JSModuleDef *m)
+static int jsi_create_module_bytecode_function(JSIContext *ctx, JSModuleDef *m)
 {
     JSFunctionBytecode *b;
     int i;
     JSVarRef **var_refs;
-    JSValue func_obj, bfunc;
+    JSIValue func_obj, bfunc;
     JSObject *p;
 
     bfunc = m->func_obj;
@@ -27380,7 +27380,7 @@ static int jsi_create_module_bytecode_function(JSContext *ctx, JSModuleDef *m)
 }
 
 /* must be done before jsi_link_module() because of cyclic references */
-static int jsi_create_module_function(JSContext *ctx, JSModuleDef *m)
+static int jsi_create_module_function(JSIContext *ctx, JSModuleDef *m)
 {
     BOOL is_c_module;
     int i;
@@ -27422,7 +27422,7 @@ static int jsi_create_module_function(JSContext *ctx, JSModuleDef *m)
 
 /* Prepare a module to be executed by resolving all the imported
    variables. */
-static int jsi_inner_module_linking(JSContext *ctx, JSModuleDef *m,
+static int jsi_inner_module_linking(JSIContext *ctx, JSModuleDef *m,
                                    JSModuleDef **pstack_top, int index)
 {
     int i;
@@ -27431,7 +27431,7 @@ static int jsi_inner_module_linking(JSContext *ctx, JSModuleDef *m,
     JSVarRef **var_refs, *var_ref;
     JSObject *p;
     BOOL is_c_module;
-    JSValue ret_val;
+    JSIValue ret_val;
 
     if (jsi_check_stack_overflow(ctx->rt, 0)) {
         JSI_ThrowStackOverflow(ctx);
@@ -27526,7 +27526,7 @@ static int jsi_inner_module_linking(JSContext *ctx, JSModuleDef *m,
 #endif
             m1 = m->req_module_entries[mi->req_module_idx].module;
             if (mi->is_star) {
-                JSValue val;
+                JSIValue val;
                 /* name space import */
                 val = JSI_GetModuleNamespace(ctx, m1);
                 if (JSI_IsException(val))
@@ -27548,7 +27548,7 @@ static int jsi_inner_module_linking(JSContext *ctx, JSModuleDef *m,
                     goto fail;
                 }
                 if (res_me->local_name == JSI_ATOM__star_) {
-                    JSValue val;
+                    JSIValue val;
                     JSModuleDef *m2;
                     /* name space import from */
                     m2 = res_m->req_module_entries[res_me->u.req_module_idx].module;
@@ -27621,7 +27621,7 @@ static int jsi_inner_module_linking(JSContext *ctx, JSModuleDef *m,
 
 /* Prepare a module to be executed by resolving all the imported
    variables. */
-static int jsi_link_module(JSContext *ctx, JSModuleDef *m)
+static int jsi_link_module(JSIContext *ctx, JSModuleDef *m)
 {
     JSModuleDef *stack_top, *m1;
 
@@ -27654,7 +27654,7 @@ static int jsi_link_module(JSContext *ctx, JSModuleDef *m)
 
 /* return JSI_ATOM_NULL if the name cannot be found. Only works with
    not striped bytecode functions. */
-JSAtom JSI_GetScriptOrModuleName(JSContext *ctx, int n_stack_levels)
+JSAtom JSI_GetScriptOrModuleName(JSIContext *ctx, int n_stack_levels)
 {
     JSStackFrame *sf;
     JSFunctionBytecode *b;
@@ -27689,14 +27689,14 @@ JSAtom JSI_GetScriptOrModuleName(JSContext *ctx, int n_stack_levels)
     }
 }
 
-JSAtom JSI_GetModuleName(JSContext *ctx, JSModuleDef *m)
+JSAtom JSI_GetModuleName(JSIContext *ctx, JSModuleDef *m)
 {
     return JSI_DupAtom(ctx, m->module_name);
 }
 
-JSValue JSI_GetImportMeta(JSContext *ctx, JSModuleDef *m)
+JSIValue JSI_GetImportMeta(JSIContext *ctx, JSModuleDef *m)
 {
-    JSValue obj;
+    JSIValue obj;
     /* allocate meta_obj only if requested to save memory */
     obj = m->meta_obj;
     if (JSI_IsUndefined(obj)) {
@@ -27708,7 +27708,7 @@ JSValue JSI_GetImportMeta(JSContext *ctx, JSModuleDef *m)
     return JSI_DupValue(ctx, obj);
 }
 
-static JSValue jsi_import_meta(JSContext *ctx)
+static JSIValue jsi_import_meta(JSIContext *ctx)
 {
     JSAtom filename;
     JSModuleDef *m;
@@ -27729,17 +27729,17 @@ static JSValue jsi_import_meta(JSContext *ctx)
     return JSI_GetImportMeta(ctx, m);
 }
 
-static JSValue JSI_NewModuleValue(JSContext *ctx, JSModuleDef *m)
+static JSIValue JSI_NewModuleValue(JSIContext *ctx, JSModuleDef *m)
 {
     return JSI_DupValue(ctx, JSI_MKPTR(JSI_TAG_MODULE, m));
 }
 
-static JSValue jsi_load_module_rejected(JSContext *ctx, JSValueConst this_val,
-                                       int argc, JSValueConst *argv, int magic, JSValue *func_data)
+static JSIValue jsi_load_module_rejected(JSIContext *ctx, JSIValueConst this_val,
+                                       int argc, JSIValueConst *argv, int magic, JSIValue *func_data)
 {
-    JSValueConst *resolving_funcs = (JSValueConst *)func_data;
-    JSValueConst error;
-    JSValue ret;
+    JSIValueConst *resolving_funcs = (JSIValueConst *)func_data;
+    JSIValueConst error;
+    JSIValue ret;
 
     /* XXX: check if the test is necessary */
     if (argc >= 1)
@@ -27752,22 +27752,22 @@ static JSValue jsi_load_module_rejected(JSContext *ctx, JSValueConst this_val,
     return JSI_UNDEFINED;
 }
 
-static JSValue jsi_load_module_fulfilled(JSContext *ctx, JSValueConst this_val,
-                                        int argc, JSValueConst *argv, int magic, JSValue *func_data)
+static JSIValue jsi_load_module_fulfilled(JSIContext *ctx, JSIValueConst this_val,
+                                        int argc, JSIValueConst *argv, int magic, JSIValue *func_data)
 {
-    JSValueConst *resolving_funcs = (JSValueConst *)func_data;
+    JSIValueConst *resolving_funcs = (JSIValueConst *)func_data;
     JSModuleDef *m = JSI_VALUE_GET_PTR(func_data[2]);
-    JSValue ret, ns;
+    JSIValue ret, ns;
 
     /* return the module namespace */
     ns = JSI_GetModuleNamespace(ctx, m);
     if (JSI_IsException(ns)) {
-        JSValue err = JSI_GetException(ctx);
-        jsi_load_module_rejected(ctx, JSI_UNDEFINED, 1, (JSValueConst *)&err, 0, func_data);
+        JSIValue err = JSI_GetException(ctx);
+        jsi_load_module_rejected(ctx, JSI_UNDEFINED, 1, (JSIValueConst *)&err, 0, func_data);
         return JSI_UNDEFINED;
     }
     ret = JSI_Call(ctx, resolving_funcs[0], JSI_UNDEFINED,
-                   1, (JSValueConst *)&ns);
+                   1, (JSIValueConst *)&ns);
     JSI_FreeValue(ctx, ret);
     JSI_FreeValue(ctx, ns);
     return JSI_UNDEFINED;
@@ -27779,15 +27779,15 @@ static JSValue jsi_load_module_fulfilled(JSContext *ctx, JSValueConst this_val,
 
 
 
-static void jsi_set_module_evaluated(JSContext *ctx, JSModuleDef *m)
+static void jsi_set_module_evaluated(JSIContext *ctx, JSModuleDef *m)
 {
     m->status = JSI_MODULE_STATUS_EVALUATED;
     if (!JSI_IsUndefined(m->promise)) {
-        JSValue value, ret_val;
+        JSIValue value, ret_val;
         assert(m->cycle_root == m);
         value = JSI_UNDEFINED;
         ret_val = JSI_Call(ctx, m->resolving_funcs[0], JSI_UNDEFINED,
-                          1, (JSValueConst *)&value);
+                          1, (JSIValueConst *)&value);
         JSI_FreeValue(ctx, ret_val);
     }
 }
@@ -27809,7 +27809,7 @@ static BOOL find_in_exec_module_list(ExecModuleList *exec_list, JSModuleDef *m)
     return FALSE;
 }
 
-static int gather_available_ancestors(JSContext *ctx, JSModuleDef *module,
+static int gather_available_ancestors(JSIContext *ctx, JSModuleDef *module,
                                       ExecModuleList *exec_list)
 {
     int i;
@@ -27850,10 +27850,10 @@ static int exec_module_list_cmp(const void *p1, const void *p2, void *opaque)
         (m1->async_evaluation_timestamp < m2->async_evaluation_timestamp);
 }
 
-static int jsi_execute_sync_module(JSContext *ctx, JSModuleDef *m,
-                                  JSValue *pvalue);
+static int jsi_execute_sync_module(JSIContext *ctx, JSModuleDef *m,
+                                  JSIValue *pvalue);
 #ifdef DUMP_MODULE_EXEC
-static void jsi_dump_module(JSContext *ctx, const char *str, JSModuleDef *m)
+static void jsi_dump_module(JSIContext *ctx, const char *str, JSModuleDef *m)
 {
     char buf1[ATOM_GET_STR_BUF_SIZE];
     static const char *module_status_str[] = { "unlinked", "linking", "linked", "evaluating", "evaluating_async", "evaluated" };
@@ -27861,11 +27861,11 @@ static void jsi_dump_module(JSContext *ctx, const char *str, JSModuleDef *m)
 }
 #endif
 
-static JSValue jsi_async_module_execution_rejected(JSContext *ctx, JSValueConst this_val,
-                                                  int argc, JSValueConst *argv, int magic, JSValue *func_data)
+static JSIValue jsi_async_module_execution_rejected(JSIContext *ctx, JSIValueConst this_val,
+                                                  int argc, JSIValueConst *argv, int magic, JSIValue *func_data)
 {
     JSModuleDef *module = JSI_VALUE_GET_PTR(func_data[0]);
-    JSValueConst error = argv[0];
+    JSIValueConst error = argv[0];
     int i;
 
 #ifdef DUMP_MODULE_EXEC
@@ -27890,14 +27890,14 @@ static JSValue jsi_async_module_execution_rejected(JSContext *ctx, JSValueConst 
 
     for(i = 0; i < module->async_parent_modules_count; i++) {
         JSModuleDef *m = module->async_parent_modules[i];
-        JSValue m_obj = JSI_NewModuleValue(ctx, m);
+        JSIValue m_obj = JSI_NewModuleValue(ctx, m);
         jsi_async_module_execution_rejected(ctx, JSI_UNDEFINED, 1, &error, 0,
                                            &m_obj);
         JSI_FreeValue(ctx, m_obj);
     }
 
     if (!JSI_IsUndefined(module->promise)) {
-        JSValue ret_val;
+        JSIValue ret_val;
         assert(module->cycle_root == module);
         ret_val = JSI_Call(ctx, module->resolving_funcs[1], JSI_UNDEFINED,
                           1, &error);
@@ -27918,7 +27918,7 @@ static JSValue jsi_async_module_execution_rejected(JSContext *ctx, JSValueConst 
 
 static __exception int jsi_parse_with_clause(JSParseState *s, JSReqModuleEntry *rme)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     JSAtom key;
     int ret;
     const uint8_t *key_token_ptr;
@@ -27951,7 +27951,7 @@ static __exception int jsi_parse_with_clause(JSParseState *s, JSReqModuleEntry *
             return -1;
         }
         if (JSI_IsUndefined(rme->attributes)) {
-            JSValue attributes = JSI_NewObjectProto(ctx, JSI_NULL);
+            JSIValue attributes = JSI_NewObjectProto(ctx, JSI_NULL);
             if (JSI_IsException(attributes)) {
                 JSI_FreeAtom(ctx, key);
                 return -1;
@@ -28023,7 +28023,7 @@ static __exception int jsi_parse_from_clause(JSParseState *s, JSModuleDef *m)
 
 static __exception int jsi_parse_export(JSParseState *s)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     JSModuleDef *m = s->cur_func->module;
     JSAtom local_name, export_name;
     int first_export, idx, i, tok;
@@ -28180,7 +28180,7 @@ static __exception int jsi_parse_export(JSParseState *s)
     return jsi_parse_expect_semi(s);
 }
 
-static int add_closure_var(JSContext *ctx, JSFunctionDef *s,
+static int add_closure_var(JSIContext *ctx, JSFunctionDef *s,
                            BOOL is_local, BOOL is_arg,
                            int var_idx, JSAtom var_name,
                            BOOL is_const, BOOL is_lexical,
@@ -28189,7 +28189,7 @@ static int add_closure_var(JSContext *ctx, JSFunctionDef *s,
 static int add_import(JSParseState *s, JSModuleDef *m,
                       JSAtom local_name, JSAtom import_name, BOOL is_star)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     int i, var_idx;
     JSImportEntry *mi;
 
@@ -28222,7 +28222,7 @@ static int add_import(JSParseState *s, JSModuleDef *m,
 
 static __exception int jsi_parse_import(JSParseState *s)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     JSModuleDef *m = s->cur_func->module;
     JSAtom local_name, import_name, module_name;
     int first_import, i, idx;
@@ -28383,7 +28383,7 @@ static __exception int jsi_parse_source_element(JSParseState *s)
     return 0;
 }
 
-static JSFunctionDef *jsi_new_function_def(JSContext *ctx,
+static JSFunctionDef *jsi_new_function_def(JSIContext *ctx,
                                           JSFunctionDef *parent,
                                           BOOL is_eval,
                                           BOOL is_func_expr,
@@ -28483,7 +28483,7 @@ static void free_bytecode_atoms(JSRuntime *rt,
     }
 }
 
-static void jsi_free_function_def(JSContext *ctx, JSFunctionDef *fd)
+static void jsi_free_function_def(JSIContext *ctx, JSFunctionDef *fd)
 {
     int i;
     struct list_head *el, *el1;
@@ -28569,12 +28569,12 @@ static void print_lines(const char *source, int line, int line1) {
     }
 }
 
-static void dump_byte_code(JSContext *ctx, int pass,
+static void dump_byte_code(JSIContext *ctx, int pass,
                            const uint8_t *tab, int len,
                            const JSVarDef *args, int arg_count,
                            const JSVarDef *vars, int var_count,
                            const JSClosureVar *closure_var, int closure_var_count,
-                           const JSValue *cpool, uint32_t cpool_count,
+                           const JSIValue *cpool, uint32_t cpool_count,
                            const char *source,
                            const LabelSlot *label_slots, JSFunctionBytecode *b)
 {
@@ -28846,7 +28846,7 @@ static void dump_byte_code(JSContext *ctx, int pass,
     jsi_free(ctx, bits);
 }
 
-static __maybe_unused void dump_pc2line(JSContext *ctx, const uint8_t *buf, int len)
+static __maybe_unused void dump_pc2line(JSIContext *ctx, const uint8_t *buf, int len)
 {
     const uint8_t *p_end, *p;
     int pc, v, line_num, col_num, ret;
@@ -28906,7 +28906,7 @@ static __maybe_unused void dump_pc2line(JSContext *ctx, const uint8_t *buf, int 
  fail: ;
 }
 
-static __maybe_unused void jsi_dump_function_bytecode(JSContext *ctx, JSFunctionBytecode *b)
+static __maybe_unused void jsi_dump_function_bytecode(JSIContext *ctx, JSFunctionBytecode *b)
 {
     int i;
     char atom_buf[ATOM_GET_STR_BUF_SIZE];
@@ -28980,7 +28980,7 @@ static __maybe_unused void jsi_dump_function_bytecode(JSContext *ctx, JSFunction
 }
 #endif
 
-static int add_closure_var(JSContext *ctx, JSFunctionDef *s,
+static int add_closure_var(JSIContext *ctx, JSFunctionDef *s,
                            BOOL is_local, BOOL is_arg,
                            int var_idx, JSAtom var_name,
                            BOOL is_const, BOOL is_lexical,
@@ -29009,7 +29009,7 @@ static int add_closure_var(JSContext *ctx, JSFunctionDef *s,
     return s->closure_var_count - 1;
 }
 
-static int find_closure_var(JSContext *ctx, JSFunctionDef *s,
+static int find_closure_var(JSIContext *ctx, JSFunctionDef *s,
                             JSAtom var_name)
 {
     int i;
@@ -29024,7 +29024,7 @@ static int find_closure_var(JSContext *ctx, JSFunctionDef *s,
 /* 'fd' must be a parent of 's'. Create in 's' a closure referencing a
    local variable (is_local = TRUE) or a closure (is_local = FALSE) in
    'fd' */
-static int get_closure_var2(JSContext *ctx, JSFunctionDef *s,
+static int get_closure_var2(JSIContext *ctx, JSFunctionDef *s,
                             JSFunctionDef *fd, BOOL is_local,
                             BOOL is_arg, int var_idx, JSAtom var_name,
                             BOOL is_const, BOOL is_lexical,
@@ -29050,7 +29050,7 @@ static int get_closure_var2(JSContext *ctx, JSFunctionDef *s,
                            is_const, is_lexical, var_kind);
 }
 
-static int get_closure_var(JSContext *ctx, JSFunctionDef *s,
+static int get_closure_var(JSIContext *ctx, JSFunctionDef *s,
                            JSFunctionDef *fd, BOOL is_arg,
                            int var_idx, JSAtom var_name,
                            BOOL is_const, BOOL is_lexical,
@@ -29089,7 +29089,7 @@ static BOOL can_opt_put_global_ref_value(const uint8_t *bc_buf, int pos)
              opcode == OP_rot3l));
 }
 
-static int optimize_scope_make_ref(JSContext *ctx, JSFunctionDef *s,
+static int optimize_scope_make_ref(JSIContext *ctx, JSFunctionDef *s,
                                    DynBuf *bc, uint8_t *bc_buf,
                                    LabelSlot *ls, int pos_next,
                                    int get_op, int var_idx)
@@ -29133,7 +29133,7 @@ static int optimize_scope_make_ref(JSContext *ctx, JSFunctionDef *s,
     return pos_next;
 }
 
-static int optimize_scope_make_global_ref(JSContext *ctx, JSFunctionDef *s,
+static int optimize_scope_make_global_ref(JSIContext *ctx, JSFunctionDef *s,
                                           DynBuf *bc, uint8_t *bc_buf,
                                           LabelSlot *ls, int pos_next,
                                           JSAtom var_name)
@@ -29202,7 +29202,7 @@ static int optimize_scope_make_global_ref(JSContext *ctx, JSFunctionDef *s,
     return pos_next;
 }
 
-static int add_var_this(JSContext *ctx, JSFunctionDef *fd)
+static int add_var_this(JSIContext *ctx, JSFunctionDef *fd)
 {
     int idx;
     idx = add_var(ctx, fd, JSI_ATOM_this);
@@ -29215,7 +29215,7 @@ static int add_var_this(JSContext *ctx, JSFunctionDef *fd)
     return idx;
 }
 
-static int resolve_pseudo_var(JSContext *ctx, JSFunctionDef *s,
+static int resolve_pseudo_var(JSIContext *ctx, JSFunctionDef *s,
                                JSAtom var_name)
 {
     int var_idx;
@@ -29256,7 +29256,7 @@ static int resolve_pseudo_var(JSContext *ctx, JSFunctionDef *s,
 
 /* test if 'var_name' is in the variable object on the stack. If is it
    the case, handle it and jump to 'label_done' */
-static void var_object_test(JSContext *ctx, JSFunctionDef *s,
+static void var_object_test(JSIContext *ctx, JSFunctionDef *s,
                             JSAtom var_name, int op, DynBuf *bc,
                             int *plabel_done, BOOL is_with)
 {
@@ -29276,7 +29276,7 @@ static void var_object_test(JSContext *ctx, JSFunctionDef *s,
 }
 
 /* return the position of the next opcode */
-static int resolve_scope_var(JSContext *ctx, JSFunctionDef *s,
+static int resolve_scope_var(JSIContext *ctx, JSFunctionDef *s,
                              JSAtom var_name, int scope_level, int op,
                              DynBuf *bc, uint8_t *bc_buf,
                              LabelSlot *ls, int pos_next)
@@ -29715,7 +29715,7 @@ done:
 }
 
 /* search in all scopes */
-static int find_private_class_field_all(JSContext *ctx, JSFunctionDef *fd,
+static int find_private_class_field_all(JSIContext *ctx, JSFunctionDef *fd,
                                         JSAtom name, int scope_level)
 {
     int idx;
@@ -29740,7 +29740,7 @@ static void get_loc_or_ref(DynBuf *bc, BOOL is_ref, int idx)
     dbuf_jsi_put_u16(bc, idx);
 }
 
-static int resolve_scope_private_field1(JSContext *ctx,
+static int resolve_scope_private_field1(JSIContext *ctx,
                                         BOOL *pis_ref, int *pvar_kind,
                                         JSFunctionDef *s,
                                         JSAtom var_name, int scope_level)
@@ -29802,7 +29802,7 @@ static int resolve_scope_private_field1(JSContext *ctx,
 }
 
 
-static void mark_eval_captured_variables(JSContext *ctx, JSFunctionDef *s,
+static void mark_eval_captured_variables(JSIContext *ctx, JSFunctionDef *s,
                                          int scope_level)
 {
     int idx;
@@ -29826,7 +29826,7 @@ static BOOL is_var_in_arg_scope(const JSVarDef *vd)
             vd->var_kind == JSI_VAR_FUNCTION_NAME);
 }
 
-static void add_eval_variables(JSContext *ctx, JSFunctionDef *s)
+static void add_eval_variables(JSIContext *ctx, JSFunctionDef *s)
 {
     JSFunctionDef *fd;
     JSVarDef *vd;
@@ -29960,7 +29960,7 @@ static void add_eval_variables(JSContext *ctx, JSFunctionDef *s)
     }
 }
 
-static void set_closure_from_var(JSContext *ctx, JSClosureVar *cv,
+static void set_closure_from_var(JSIContext *ctx, JSClosureVar *cv,
                                  JSVarDef *vd, int var_idx)
 {
     cv->is_local = TRUE;
@@ -29974,7 +29974,7 @@ static void set_closure_from_var(JSContext *ctx, JSClosureVar *cv,
 
 /* for direct eval compilation: add references to the variables of the
    calling function */
-static __exception int add_closure_variables(JSContext *ctx, JSFunctionDef *s,
+static __exception int add_closure_variables(JSIContext *ctx, JSFunctionDef *s,
                                              JSFunctionBytecode *b, int scope_idx)
 {
     int i, count;
@@ -30185,7 +30185,7 @@ static BOOL code_match(CodeContext *s, int pos, ...)
     return ret;
 }
 
-static void instantiate_hoisted_definitions(JSContext *ctx, JSFunctionDef *s, DynBuf *bc)
+static void instantiate_hoisted_definitions(JSIContext *ctx, JSFunctionDef *s, DynBuf *bc)
 {
     int i, idx, label_next = -1;
 
@@ -30397,7 +30397,7 @@ static int get_label_pos(JSFunctionDef *s, int label)
 
 /* convert global variable accesses to local variables or closure
    variables when necessary */
-static __exception int resolve_variables(JSContext *ctx, JSFunctionDef *s)
+static __exception int resolve_variables(JSIContext *ctx, JSFunctionDef *s)
 {
     int pos, pos_next, bc_len, op, len, i, idx, line_num;
     uint8_t *bc_buf;
@@ -30819,7 +30819,7 @@ static void compute_pc2line_info(JSFunctionDef *s)
     }
 }
 
-static RelocEntry *add_reloc(JSContext *ctx, LabelSlot *ls, uint32_t addr, int size)
+static RelocEntry *add_reloc(JSIContext *ctx, LabelSlot *ls, uint32_t addr, int size)
 {
     RelocEntry *re;
     re = jsi_malloc(ctx, sizeof(*re));
@@ -30995,7 +30995,7 @@ static void put_short_code(DynBuf *bc_out, int op, int idx)
 }
 
 /* peephole optimizations and resolve goto/labels */
-static __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s)
+static __exception int resolve_labels(JSIContext *ctx, JSFunctionDef *s)
 {
     int pos, pos_next, bc_len, op, op1, len, i, line_num;
     const uint8_t *bc_buf;
@@ -31888,7 +31888,7 @@ typedef struct StackSizeState {
 } StackSizeState;
 
 /* 'op' is only used for error indication */
-static __exception int ss_check(JSContext *ctx, StackSizeState *s,
+static __exception int ss_check(JSIContext *ctx, StackSizeState *s,
                                 int pos, int op, int stack_len, int catch_pos)
 {
     if ((unsigned)pos >= s->bc_len) {
@@ -31929,7 +31929,7 @@ static __exception int ss_check(JSContext *ctx, StackSizeState *s,
     return 0;
 }
 
-static __exception int compute_stack_size(JSContext *ctx,
+static __exception int compute_stack_size(JSIContext *ctx,
                                           JSFunctionDef *fd,
                                           int *pstack_size)
 {
@@ -32130,7 +32130,7 @@ static __exception int compute_stack_size(JSContext *ctx,
     return -1;
 }
 
-static int add_module_variables(JSContext *ctx, JSFunctionDef *fd)
+static int add_module_variables(JSIContext *ctx, JSFunctionDef *fd)
 {
     int i, idx;
     JSModuleDef *m = fd->module;
@@ -32167,9 +32167,9 @@ static int add_module_variables(JSContext *ctx, JSFunctionDef *fd)
 /* create a function object from a function definition. The function
    definition is freed. All the child functions are also created. It
    must be done this way to resolve all the variables. */
-static JSValue jsi_create_function(JSContext *ctx, JSFunctionDef *fd)
+static JSIValue jsi_create_function(JSIContext *ctx, JSFunctionDef *fd)
 {
-    JSValue func_obj;
+    JSIValue func_obj;
     JSFunctionBytecode *b;
     struct list_head *el, *el1;
     int stack_size, scope, idx;
@@ -32616,7 +32616,7 @@ static __exception int jsi_parse_function_decl2(JSParseState *s,
                                                JSParseExportEnum export_flag,
                                                JSFunctionDef **pfd)
 {
-    JSContext *ctx = s->ctx;
+    JSIContext *ctx = s->ctx;
     JSFunctionDef *fd = s->cur_func;
     BOOL is_expr;
     int func_idx, lexical_func_idx = -1;
@@ -33238,7 +33238,7 @@ static __exception int jsi_parse_program(JSParseState *s)
     return 0;
 }
 
-static void jsi_parse_init(JSContext *ctx, JSParseState *s,
+static void jsi_parse_init(JSIContext *ctx, JSParseState *s,
                           const char *input, size_t input_len,
                           const char *filename)
 {
@@ -33256,11 +33256,11 @@ static void jsi_parse_init(JSContext *ctx, JSParseState *s,
     s->get_line_col_cache.col_num = 0;
 }
 
-static JSValue JSI_EvalFunctionInternal(JSContext *ctx, JSValue fun_obj,
-                                       JSValueConst this_obj,
+static JSIValue JSI_EvalFunctionInternal(JSIContext *ctx, JSIValue fun_obj,
+                                       JSIValueConst this_obj,
                                        JSVarRef **var_refs, JSStackFrame *sf)
 {
-    JSValue ret_val;
+    JSIValue ret_val;
     uint32_t tag;
 
     tag = JSI_VALUE_GET_TAG(fun_obj);
@@ -33275,19 +33275,19 @@ static JSValue JSI_EvalFunctionInternal(JSContext *ctx, JSValue fun_obj,
     return ret_val;
 }
 
-JSValue JSI_EvalFunction(JSContext *ctx, JSValue fun_obj)
+JSIValue JSI_EvalFunction(JSIContext *ctx, JSIValue fun_obj)
 {
     return JSI_EvalFunctionInternal(ctx, fun_obj, ctx->global_obj, NULL, NULL);
 }
 
 /* 'input' must be zero terminated i.e. input[input_len] = '\0'. */
-static JSValue __JSI_EvalInternal(JSContext *ctx, JSValueConst this_obj,
+static JSIValue __JSI_EvalInternal(JSIContext *ctx, JSIValueConst this_obj,
                                  const char *input, size_t input_len,
                                  const char *filename, int flags, int scope_idx)
 {
     JSParseState s1, *s = &s1;
     int err, jsi_mode, eval_type;
-    JSValue fun_obj, ret_val;
+    JSIValue fun_obj, ret_val;
     JSStackFrame *sf;
     JSVarRef **var_refs;
     JSFunctionBytecode *b;
@@ -33397,13 +33397,13 @@ static JSValue __JSI_EvalInternal(JSContext *ctx, JSValueConst this_obj,
 }
 
 /* the indirection is needed to make 'eval' optional */
-static JSValue JSI_EvalInternal(JSContext *ctx, JSValueConst this_obj,
+static JSIValue JSI_EvalInternal(JSIContext *ctx, JSIValueConst this_obj,
                                const char *input, size_t input_len,
                                const char *filename, int flags, int scope_idx)
 {
     BOOL backtrace_barrier = ((flags & JSI_EVAL_FLAG_BACKTRACE_BARRIER) != 0);
     int saved_jsi_mode = 0;
-    JSValue ret;
+    JSIValue ret;
     
     if (unlikely(!ctx->eval_internal)) {
         return JSI_ThrowTypeError(ctx, "eval is not supported");
@@ -33419,10 +33419,10 @@ static JSValue JSI_EvalInternal(JSContext *ctx, JSValueConst this_obj,
     return ret;
 }
 
-static JSValue JSI_EvalObject(JSContext *ctx, JSValueConst this_obj,
-                             JSValueConst val, int flags, int scope_idx)
+static JSIValue JSI_EvalObject(JSIContext *ctx, JSIValueConst this_obj,
+                             JSIValueConst val, int flags, int scope_idx)
 {
-    JSValue ret;
+    JSIValue ret;
     const char *str;
     size_t len;
 
@@ -33437,12 +33437,12 @@ static JSValue JSI_EvalObject(JSContext *ctx, JSValueConst this_obj,
 
 }
 
-JSValue JSI_EvalThis(JSContext *ctx, JSValueConst this_obj,
+JSIValue JSI_EvalThis(JSIContext *ctx, JSIValueConst this_obj,
                     const char *input, size_t input_len,
                     const char *filename, int eval_flags)
 {
     int eval_type = eval_flags & JSI_EVAL_TYPE_MASK;
-    JSValue ret;
+    JSIValue ret;
 
     assert(eval_type == JSI_EVAL_TYPE_GLOBAL ||
            eval_type == JSI_EVAL_TYPE_MODULE);
@@ -33451,14 +33451,14 @@ JSValue JSI_EvalThis(JSContext *ctx, JSValueConst this_obj,
     return ret;
 }
 
-JSValue JSI_Eval(JSContext *ctx, const char *input, size_t input_len,
+JSIValue JSI_Eval(JSIContext *ctx, const char *input, size_t input_len,
                 const char *filename, int eval_flags)
 {
     return JSI_EvalThis(ctx, ctx->global_obj, input, input_len, filename,
                        eval_flags);
 }
 
-int JSI_ResolveModule(JSContext *ctx, JSValueConst obj)
+int JSI_ResolveModule(JSIContext *ctx, JSIValueConst obj)
 {
     if (JSI_VALUE_GET_TAG(obj) == JSI_TAG_MODULE) {
         JSModuleDef *m = JSI_VALUE_GET_PTR(obj);
@@ -33497,7 +33497,7 @@ static uint32_t jsi_object_list_get_hash(JSObject *p, uint32_t hash_size)
     return ((uintptr_t)p * 3163) & (hash_size - 1);
 }
 
-static int jsi_object_list_resize_hash(JSContext *ctx, JSObjectList *s,
+static int jsi_object_list_resize_hash(JSIContext *ctx, JSObjectList *s,
                                  uint32_t new_hash_size)
 {
     JSObjectListEntry *e;
@@ -33524,7 +33524,7 @@ static int jsi_object_list_resize_hash(JSContext *ctx, JSObjectList *s,
 
 /* the reference count of 'obj' is not modified. Return 0 if OK, -1 if
    memory error */
-static int jsi_object_list_add(JSContext *ctx, JSObjectList *s, JSObject *obj)
+static int jsi_object_list_add(JSIContext *ctx, JSObjectList *s, JSObject *obj)
 {
     JSObjectListEntry *e;
     uint32_t h, new_hash_size;
@@ -33549,7 +33549,7 @@ static int jsi_object_list_add(JSContext *ctx, JSObjectList *s, JSObject *obj)
 }
 
 /* return -1 if not present or the object index */
-static int jsi_object_list_find(JSContext *ctx, JSObjectList *s, JSObject *obj)
+static int jsi_object_list_find(JSIContext *ctx, JSObjectList *s, JSObject *obj)
 {
     JSObjectListEntry *e;
     uint32_t h, p;
@@ -33568,7 +33568,7 @@ static int jsi_object_list_find(JSContext *ctx, JSObjectList *s, JSObject *obj)
     return -1;
 }
 
-static void jsi_object_list_end(JSContext *ctx, JSObjectList *s)
+static void jsi_object_list_end(JSIContext *ctx, JSObjectList *s)
 {
     jsi_free(ctx, s->object_tab);
     jsi_free(ctx, s->hash_table);
@@ -33581,14 +33581,14 @@ static void jsi_object_list_end(JSContext *ctx, JSObjectList *s)
 /*******************************************************************/
 /* runtime functions & objects */
 
-static JSValue jsi_string_constructor(JSContext *ctx, JSValueConst this_val,
-                                     int argc, JSValueConst *argv);
-static JSValue jsi_boolean_constructor(JSContext *ctx, JSValueConst this_val,
-                                      int argc, JSValueConst *argv);
-static JSValue jsi_number_constructor(JSContext *ctx, JSValueConst this_val,
-                                     int argc, JSValueConst *argv);
+static JSIValue jsi_string_constructor(JSIContext *ctx, JSIValueConst this_val,
+                                     int argc, JSIValueConst *argv);
+static JSIValue jsi_boolean_constructor(JSIContext *ctx, JSIValueConst this_val,
+                                      int argc, JSIValueConst *argv);
+static JSIValue jsi_number_constructor(JSIContext *ctx, JSIValueConst this_val,
+                                     int argc, JSIValueConst *argv);
 
-static int check_function(JSContext *ctx, JSValueConst obj)
+static int check_function(JSIContext *ctx, JSIValueConst obj)
 {
     if (likely(JSI_IsFunction(ctx, obj)))
         return 0;
@@ -33596,13 +33596,13 @@ static int check_function(JSContext *ctx, JSValueConst obj)
     return -1;
 }
 
-static int check_exception_free(JSContext *ctx, JSValue obj)
+static int check_exception_free(JSIContext *ctx, JSIValue obj)
 {
     JSI_FreeValue(ctx, obj);
     return JSI_IsException(obj);
 }
 
-static JSAtom find_atom(JSContext *ctx, const char *name)
+static JSAtom find_atom(JSIContext *ctx, const char *name)
 {
     JSAtom atom;
     int len;
@@ -33625,11 +33625,11 @@ static JSAtom find_atom(JSContext *ctx, const char *name)
     return atom;
 }
 
-static JSValue JSI_InstantiateFunctionListItem2(JSContext *ctx, JSObject *p,
+static JSIValue JSI_InstantiateFunctionListItem2(JSIContext *ctx, JSObject *p,
                                                JSAtom atom, void *opaque)
 {
     const JSCFunctionListEntry *e = opaque;
-    JSValue val;
+    JSIValue val;
 
     switch(e->def_type) {
     case JSI_DEF_CFUNC:
@@ -33649,11 +33649,11 @@ static JSValue JSI_InstantiateFunctionListItem2(JSContext *ctx, JSObject *p,
     return val;
 }
 
-static int JSI_InstantiateFunctionListItem(JSContext *ctx, JSValueConst obj,
+static int JSI_InstantiateFunctionListItem(JSIContext *ctx, JSIValueConst obj,
                                           JSAtom atom,
                                           const JSCFunctionListEntry *e)
 {
-    JSValue val;
+    JSIValue val;
     int prop_flags = e->prop_flags;
 
     switch(e->def_type) {
@@ -33697,7 +33697,7 @@ static int JSI_InstantiateFunctionListItem(JSContext *ctx, JSValueConst obj,
     case JSI_DEF_CGETSET: /* XXX: use autoinit again ? */
     case JSI_DEF_CGETSET_MAGIC:
         {
-            JSValue getter, setter;
+            JSIValue getter, setter;
             char buf[64];
 
             getter = JSI_UNDEFINED;
@@ -33739,7 +33739,7 @@ static int JSI_InstantiateFunctionListItem(JSContext *ctx, JSValueConst obj,
     return 0;
 }
 
-int JSI_SetPropertyFunctionList(JSContext *ctx, JSValueConst obj,
+int JSI_SetPropertyFunctionList(JSIContext *ctx, JSIValueConst obj,
                                const JSCFunctionListEntry *tab, int len)
 {
     int i, ret;
@@ -33760,9 +33760,9 @@ int JSI_SetPropertyFunctionList(JSContext *ctx, JSValueConst obj,
 
 
 /* Note: 'func_obj' is not necessarily a constructor */
-static void JSI_SetConstructor2(JSContext *ctx,
-                               JSValueConst func_obj,
-                               JSValueConst proto,
+static void JSI_SetConstructor2(JSIContext *ctx,
+                               JSIValueConst func_obj,
+                               JSIValueConst proto,
                                int proto_flags, int ctor_flags)
 {
     JSI_DefinePropertyValue(ctx, func_obj, JSI_ATOM_prototype,
@@ -33774,17 +33774,17 @@ static void JSI_SetConstructor2(JSContext *ctx,
     set_cycle_flag(ctx, proto);
 }
 
-void JSI_SetConstructor(JSContext *ctx, JSValueConst func_obj,
-                       JSValueConst proto)
+void JSI_SetConstructor(JSIContext *ctx, JSIValueConst func_obj,
+                       JSIValueConst proto)
 {
     JSI_SetConstructor2(ctx, func_obj, proto,
                        0, JSI_PROP_WRITABLE | JSI_PROP_CONFIGURABLE);
 }
 
-static void JSI_NewGlobalCConstructor2(JSContext *ctx,
-                                      JSValue func_obj,
+static void JSI_NewGlobalCConstructor2(JSIContext *ctx,
+                                      JSIValue func_obj,
                                       const char *name,
-                                      JSValueConst proto)
+                                      JSIValueConst proto)
 {
     JSI_DefinePropertyValueStr(ctx, ctx->global_obj, name,
                            JSI_DupValue(ctx, func_obj),
@@ -33793,38 +33793,38 @@ static void JSI_NewGlobalCConstructor2(JSContext *ctx,
     JSI_FreeValue(ctx, func_obj);
 }
 
-static JSValueConst JSI_NewGlobalCConstructor(JSContext *ctx, const char *name,
+static JSIValueConst JSI_NewGlobalCConstructor(JSIContext *ctx, const char *name,
                                              JSCFunction *func, int length,
-                                             JSValueConst proto)
+                                             JSIValueConst proto)
 {
-    JSValue func_obj;
+    JSIValue func_obj;
     func_obj = JSI_NewCFunction2(ctx, func, name, length, JSI_CFUNC_constructor_or_func, 0);
     JSI_NewGlobalCConstructor2(ctx, func_obj, name, proto);
     return func_obj;
 }
 
-static JSValueConst JSI_NewGlobalCConstructorOnly(JSContext *ctx, const char *name,
+static JSIValueConst JSI_NewGlobalCConstructorOnly(JSIContext *ctx, const char *name,
                                                  JSCFunction *func, int length,
-                                                 JSValueConst proto)
+                                                 JSIValueConst proto)
 {
-    JSValue func_obj;
+    JSIValue func_obj;
     func_obj = JSI_NewCFunction2(ctx, func, name, length, JSI_CFUNC_constructor, 0);
     JSI_NewGlobalCConstructor2(ctx, func_obj, name, proto);
     return func_obj;
 }
 
-static JSValue jsi_global_eval(JSContext *ctx, JSValueConst this_val,
-                              int argc, JSValueConst *argv)
+static JSIValue jsi_global_eval(JSIContext *ctx, JSIValueConst this_val,
+                              int argc, JSIValueConst *argv)
 {
     return JSI_EvalObject(ctx, ctx->global_obj, argv[0], JSI_EVAL_TYPE_INDIRECT, -1);
 }
 
 /* Object class */
 
-static JSValue JSI_ToObject(JSContext *ctx, JSValueConst val)
+static JSIValue JSI_ToObject(JSIContext *ctx, JSIValueConst val)
 {
     int tag = JSI_VALUE_GET_NORM_TAG(val);
-    JSValue obj;
+    JSIValue obj;
 
     switch(tag) {
     default:
@@ -33841,7 +33841,7 @@ static JSValue JSI_ToObject(JSContext *ctx, JSValueConst val)
     case JSI_TAG_STRING_ROPE:
         /* XXX: should call the string constructor */
         {
-            JSValue str;
+            JSIValue str;
             str = JSI_ToString(ctx, val); /* ensure that we never store a rope */
             if (JSI_IsException(str))
                 return JSI_EXCEPTION;
@@ -33866,17 +33866,17 @@ static JSValue JSI_ToObject(JSContext *ctx, JSValueConst val)
     }
 }
 
-static JSValue JSI_ToObjectFree(JSContext *ctx, JSValue val)
+static JSIValue JSI_ToObjectFree(JSIContext *ctx, JSIValue val)
 {
-    JSValue obj = JSI_ToObject(ctx, val);
+    JSIValue obj = JSI_ToObject(ctx, val);
     JSI_FreeValue(ctx, val);
     return obj;
 }
 
-static int jsi_obj_to_desc(JSContext *ctx, JSPropertyDescriptor *d,
-                          JSValueConst desc)
+static int jsi_obj_to_desc(JSIContext *ctx, JSPropertyDescriptor *d,
+                          JSIValueConst desc)
 {
-    JSValue val, getter, setter;
+    JSIValue val, getter, setter;
     int flags;
 
     if (!JSI_IsObject(desc)) {
@@ -33888,7 +33888,7 @@ static int jsi_obj_to_desc(JSContext *ctx, JSPropertyDescriptor *d,
     getter = JSI_UNDEFINED;
     setter = JSI_UNDEFINED;
     if (JSI_HasProperty(ctx, desc, JSI_ATOM_enumerable)) {
-        JSValue prop = JSI_GetProperty(ctx, desc, JSI_ATOM_enumerable);
+        JSIValue prop = JSI_GetProperty(ctx, desc, JSI_ATOM_enumerable);
         if (JSI_IsException(prop))
             goto fail;
         flags |= JSI_PROP_HAS_ENUMERABLE;
@@ -33896,7 +33896,7 @@ static int jsi_obj_to_desc(JSContext *ctx, JSPropertyDescriptor *d,
             flags |= JSI_PROP_ENUMERABLE;
     }
     if (JSI_HasProperty(ctx, desc, JSI_ATOM_configurable)) {
-        JSValue prop = JSI_GetProperty(ctx, desc, JSI_ATOM_configurable);
+        JSIValue prop = JSI_GetProperty(ctx, desc, JSI_ATOM_configurable);
         if (JSI_IsException(prop))
             goto fail;
         flags |= JSI_PROP_HAS_CONFIGURABLE;
@@ -33910,7 +33910,7 @@ static int jsi_obj_to_desc(JSContext *ctx, JSPropertyDescriptor *d,
             goto fail;
     }
     if (JSI_HasProperty(ctx, desc, JSI_ATOM_writable)) {
-        JSValue prop = JSI_GetProperty(ctx, desc, JSI_ATOM_writable);
+        JSIValue prop = JSI_GetProperty(ctx, desc, JSI_ATOM_writable);
         if (JSI_IsException(prop))
             goto fail;
         flags |= JSI_PROP_HAS_WRITABLE;
@@ -33952,8 +33952,8 @@ static int jsi_obj_to_desc(JSContext *ctx, JSPropertyDescriptor *d,
     return -1;
 }
 
-static __exception int JSI_DefinePropertyDesc(JSContext *ctx, JSValueConst obj,
-                                             JSAtom prop, JSValueConst desc,
+static __exception int JSI_DefinePropertyDesc(JSIContext *ctx, JSIValueConst obj,
+                                             JSAtom prop, JSIValueConst desc,
                                              int flags)
 {
     JSPropertyDescriptor d;
@@ -33968,11 +33968,11 @@ static __exception int JSI_DefinePropertyDesc(JSContext *ctx, JSValueConst obj,
     return ret;
 }
 
-static __exception int JSI_ObjectDefineProperties(JSContext *ctx,
-                                                 JSValueConst obj,
-                                                 JSValueConst properties)
+static __exception int JSI_ObjectDefineProperties(JSIContext *ctx,
+                                                 JSIValueConst obj,
+                                                 JSIValueConst properties)
 {
-    JSValue props, desc;
+    JSIValue props, desc;
     JSObject *p;
     JSPropertyEnum *atoms;
     uint32_t len, i;
@@ -34007,10 +34007,10 @@ exception:
     return ret;
 }
 
-static JSValue jsi_object_constructor(JSContext *ctx, JSValueConst new_target,
-                                     int argc, JSValueConst *argv)
+static JSIValue jsi_object_constructor(JSIContext *ctx, JSIValueConst new_target,
+                                     int argc, JSIValueConst *argv)
 {
-    JSValue ret;
+    JSIValue ret;
     if (!JSI_IsUndefined(new_target) &&
         JSI_VALUE_GET_OBJ(new_target) !=
         JSI_VALUE_GET_OBJ(JSI_GetActiveFunction(ctx))) {
@@ -34030,11 +34030,11 @@ static JSValue jsi_object_constructor(JSContext *ctx, JSValueConst new_target,
     return ret;
 }
 
-static JSValue jsi_object_create(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_object_create(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
-    JSValueConst proto, props;
-    JSValue obj;
+    JSIValueConst proto, props;
+    JSIValue obj;
 
     proto = argv[0];
     if (!JSI_IsObject(proto) && !JSI_IsNull(proto))
@@ -34052,10 +34052,10 @@ static JSValue jsi_object_create(JSContext *ctx, JSValueConst this_val,
     return obj;
 }
 
-static JSValue jsi_object_getPrototypeOf(JSContext *ctx, JSValueConst this_val,
-                                        int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_object_getPrototypeOf(JSIContext *ctx, JSIValueConst this_val,
+                                        int argc, JSIValueConst *argv, int magic)
 {
-    JSValueConst val;
+    JSIValueConst val;
 
     val = argv[0];
     if (JSI_VALUE_GET_TAG(val) != JSI_TAG_OBJECT) {
@@ -34068,10 +34068,10 @@ static JSValue jsi_object_getPrototypeOf(JSContext *ctx, JSValueConst this_val,
     return JSI_GetPrototype(ctx, val);
 }
 
-static JSValue jsi_object_setPrototypeOf(JSContext *ctx, JSValueConst this_val,
-                                        int argc, JSValueConst *argv)
+static JSIValue jsi_object_setPrototypeOf(JSIContext *ctx, JSIValueConst this_val,
+                                        int argc, JSIValueConst *argv)
 {
-    JSValueConst obj;
+    JSIValueConst obj;
     obj = argv[0];
     if (JSI_SetPrototypeInternal(ctx, obj, argv[1], TRUE) < 0)
         return JSI_EXCEPTION;
@@ -34079,10 +34079,10 @@ static JSValue jsi_object_setPrototypeOf(JSContext *ctx, JSValueConst this_val,
 }
 
 /* magic = 1 if called as Reflect.defineProperty */
-static JSValue jsi_object_defineProperty(JSContext *ctx, JSValueConst this_val,
-                                        int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_object_defineProperty(JSIContext *ctx, JSIValueConst this_val,
+                                        int argc, JSIValueConst *argv, int magic)
 {
-    JSValueConst obj, prop, desc;
+    JSIValueConst obj, prop, desc;
     int ret, flags;
     JSAtom atom;
 
@@ -34109,11 +34109,11 @@ static JSValue jsi_object_defineProperty(JSContext *ctx, JSValueConst this_val,
     }
 }
 
-static JSValue jsi_object_defineProperties(JSContext *ctx, JSValueConst this_val,
-                                          int argc, JSValueConst *argv)
+static JSIValue jsi_object_defineProperties(JSIContext *ctx, JSIValueConst this_val,
+                                          int argc, JSIValueConst *argv)
 {
     // defineProperties(obj, properties)
-    JSValueConst obj = argv[0];
+    JSIValueConst obj = argv[0];
 
     if (JSI_ObjectDefineProperties(ctx, obj, argv[1]))
         return JSI_EXCEPTION;
@@ -34122,11 +34122,11 @@ static JSValue jsi_object_defineProperties(JSContext *ctx, JSValueConst this_val
 }
 
 /* magic = 1 if called as __defineSetter__ */
-static JSValue jsi_object___defineGetter__(JSContext *ctx, JSValueConst this_val,
-                                          int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_object___defineGetter__(JSIContext *ctx, JSIValueConst this_val,
+                                          int argc, JSIValueConst *argv, int magic)
 {
-    JSValue obj;
-    JSValueConst prop, value, get, set;
+    JSIValue obj;
+    JSIValueConst prop, value, get, set;
     int ret, flags;
     JSAtom atom;
 
@@ -34168,12 +34168,12 @@ static JSValue jsi_object___defineGetter__(JSContext *ctx, JSValueConst this_val
     }
 }
 
-static JSValue jsi_object_getOwnPropertyDescriptor(JSContext *ctx, JSValueConst this_val,
-                                                  int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_object_getOwnPropertyDescriptor(JSIContext *ctx, JSIValueConst this_val,
+                                                  int argc, JSIValueConst *argv, int magic)
 {
-    JSValueConst prop;
+    JSIValueConst prop;
     JSAtom atom;
-    JSValue ret, obj;
+    JSIValue ret, obj;
     JSPropertyDescriptor desc;
     int res, flags;
 
@@ -34232,11 +34232,11 @@ exception:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_object_getOwnPropertyDescriptors(JSContext *ctx, JSValueConst this_val,
-                                                   int argc, JSValueConst *argv)
+static JSIValue jsi_object_getOwnPropertyDescriptors(JSIContext *ctx, JSIValueConst this_val,
+                                                   int argc, JSIValueConst *argv)
 {
     //getOwnPropertyDescriptors(obj)
-    JSValue obj, r;
+    JSIValue obj, r;
     JSObject *p;
     JSPropertyEnum *props;
     uint32_t len, i;
@@ -34254,8 +34254,8 @@ static JSValue jsi_object_getOwnPropertyDescriptors(JSContext *ctx, JSValueConst
     if (JSI_IsException(r))
         goto exception;
     for(i = 0; i < len; i++) {
-        JSValue atomValue, desc;
-        JSValueConst args[2];
+        JSIValue atomValue, desc;
+        JSIValueConst args[2];
 
         atomValue = JSI_AtomToValue(ctx, props[i].atom);
         if (JSI_IsException(atomValue))
@@ -34283,10 +34283,10 @@ exception:
     return JSI_EXCEPTION;
 }
 
-static JSValue JSI_GetOwnPropertyNames2(JSContext *ctx, JSValueConst obj1,
+static JSIValue JSI_GetOwnPropertyNames2(JSIContext *ctx, JSIValueConst obj1,
                                        int flags, int kind)
 {
-    JSValue obj, r, val, key, value;
+    JSIValue obj, r, val, key, value;
     JSObject *p;
     JSPropertyEnum *atoms;
     uint32_t len, i, j;
@@ -34362,31 +34362,31 @@ done:
     return r;
 }
 
-static JSValue jsi_object_getOwnPropertyNames(JSContext *ctx, JSValueConst this_val,
-                                             int argc, JSValueConst *argv)
+static JSIValue jsi_object_getOwnPropertyNames(JSIContext *ctx, JSIValueConst this_val,
+                                             int argc, JSIValueConst *argv)
 {
     return JSI_GetOwnPropertyNames2(ctx, argv[0],
                                    JSI_GPN_STRING_MASK, JSI_ITERATOR_KIND_KEY);
 }
 
-static JSValue jsi_object_getOwnPropertySymbols(JSContext *ctx, JSValueConst this_val,
-                                             int argc, JSValueConst *argv)
+static JSIValue jsi_object_getOwnPropertySymbols(JSIContext *ctx, JSIValueConst this_val,
+                                             int argc, JSIValueConst *argv)
 {
     return JSI_GetOwnPropertyNames2(ctx, argv[0],
                                    JSI_GPN_SYMBOL_MASK, JSI_ITERATOR_KIND_KEY);
 }
 
-static JSValue jsi_object_keys(JSContext *ctx, JSValueConst this_val,
-                              int argc, JSValueConst *argv, int kind)
+static JSIValue jsi_object_keys(JSIContext *ctx, JSIValueConst this_val,
+                              int argc, JSIValueConst *argv, int kind)
 {
     return JSI_GetOwnPropertyNames2(ctx, argv[0],
                                    JSI_GPN_ENUM_ONLY | JSI_GPN_STRING_MASK, kind);
 }
 
-static JSValue jsi_object_isExtensible(JSContext *ctx, JSValueConst this_val,
-                                      int argc, JSValueConst *argv, int reflect)
+static JSIValue jsi_object_isExtensible(JSIContext *ctx, JSIValueConst this_val,
+                                      int argc, JSIValueConst *argv, int reflect)
 {
-    JSValueConst obj;
+    JSIValueConst obj;
     int ret;
 
     obj = argv[0];
@@ -34403,10 +34403,10 @@ static JSValue jsi_object_isExtensible(JSContext *ctx, JSValueConst this_val,
         return JSI_NewBool(ctx, ret);
 }
 
-static JSValue jsi_object_preventExtensions(JSContext *ctx, JSValueConst this_val,
-                                           int argc, JSValueConst *argv, int reflect)
+static JSIValue jsi_object_preventExtensions(JSIContext *ctx, JSIValueConst this_val,
+                                           int argc, JSIValueConst *argv, int reflect)
 {
-    JSValueConst obj;
+    JSIValueConst obj;
     int ret;
 
     obj = argv[0];
@@ -34428,10 +34428,10 @@ static JSValue jsi_object_preventExtensions(JSContext *ctx, JSValueConst this_va
     }
 }
 
-static JSValue jsi_object_hasOwnProperty(JSContext *ctx, JSValueConst this_val,
-                                        int argc, JSValueConst *argv)
+static JSIValue jsi_object_hasOwnProperty(JSIContext *ctx, JSIValueConst this_val,
+                                        int argc, JSIValueConst *argv)
 {
-    JSValue obj;
+    JSIValue obj;
     JSAtom atom;
     JSObject *p;
     BOOL ret;
@@ -34454,10 +34454,10 @@ static JSValue jsi_object_hasOwnProperty(JSContext *ctx, JSValueConst this_val,
         return JSI_NewBool(ctx, ret);
 }
 
-static JSValue jsi_object_hasOwn(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_object_hasOwn(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
-    JSValue obj;
+    JSIValue obj;
     JSAtom atom;
     JSObject *p;
     BOOL ret;
@@ -34480,16 +34480,16 @@ static JSValue jsi_object_hasOwn(JSContext *ctx, JSValueConst this_val,
         return JSI_NewBool(ctx, ret);
 }
 
-static JSValue jsi_object_valueOf(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
+static JSIValue jsi_object_valueOf(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv)
 {
     return JSI_ToObject(ctx, this_val);
 }
 
-static JSValue jsi_object_toString(JSContext *ctx, JSValueConst this_val,
-                                  int argc, JSValueConst *argv)
+static JSIValue jsi_object_toString(JSIContext *ctx, JSIValueConst this_val,
+                                  int argc, JSIValueConst *argv)
 {
-    JSValue obj, tag;
+    JSIValue obj, tag;
     int is_array;
     JSAtom atom;
     JSObject *p;
@@ -34540,17 +34540,17 @@ static JSValue jsi_object_toString(JSContext *ctx, JSValueConst this_val,
     return JSI_ConcatString3(ctx, "[object ", tag, "]");
 }
 
-static JSValue jsi_object_toLocaleString(JSContext *ctx, JSValueConst this_val,
-                                        int argc, JSValueConst *argv)
+static JSIValue jsi_object_toLocaleString(JSIContext *ctx, JSIValueConst this_val,
+                                        int argc, JSIValueConst *argv)
 {
     return JSI_Invoke(ctx, this_val, JSI_ATOM_toString, 0, NULL);
 }
 
-static JSValue jsi_object_assign(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_object_assign(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
     // Object.assign(obj, source1)
-    JSValue obj, s;
+    JSIValue obj, s;
     int i;
 
     s = JSI_UNDEFINED;
@@ -34574,10 +34574,10 @@ exception:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_object_seal(JSContext *ctx, JSValueConst this_val,
-                              int argc, JSValueConst *argv, int freeze_flag)
+static JSIValue jsi_object_seal(JSIContext *ctx, JSIValueConst this_val,
+                              int argc, JSIValueConst *argv, int freeze_flag)
 {
-    JSValueConst obj = argv[0];
+    JSIValueConst obj = argv[0];
     JSObject *p;
     JSPropertyEnum *props;
     uint32_t len, i;
@@ -34625,10 +34625,10 @@ static JSValue jsi_object_seal(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_object_isSealed(JSContext *ctx, JSValueConst this_val,
-                                  int argc, JSValueConst *argv, int is_frozen)
+static JSIValue jsi_object_isSealed(JSIContext *ctx, JSIValueConst this_val,
+                                  int argc, JSIValueConst *argv, int is_frozen)
 {
-    JSValueConst obj = argv[0];
+    JSIValueConst obj = argv[0];
     JSObject *p;
     JSPropertyEnum *props;
     uint32_t len, i;
@@ -34671,11 +34671,11 @@ exception:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_object_fromEntries(JSContext *ctx, JSValueConst this_val,
-                                     int argc, JSValueConst *argv)
+static JSIValue jsi_object_fromEntries(JSIContext *ctx, JSIValueConst this_val,
+                                     int argc, JSIValueConst *argv)
 {
-    JSValue obj, iter, next_method = JSI_UNDEFINED;
-    JSValueConst iterable;
+    JSIValue obj, iter, next_method = JSI_UNDEFINED;
+    JSIValueConst iterable;
     BOOL done;
 
     /*  RequireObjectCoercible() not necessary because it is tested in
@@ -34694,7 +34694,7 @@ static JSValue jsi_object_fromEntries(JSContext *ctx, JSValueConst this_val,
         goto fail;
 
     for(;;) {
-        JSValue key, value, item;
+        JSIValue key, value, item;
         item = JSI_IteratorNext(ctx, iter, next_method, 0, NULL, &done);
         if (JSI_IsException(item))
             goto fail;
@@ -34739,8 +34739,8 @@ static JSValue jsi_object_fromEntries(JSContext *ctx, JSValueConst this_val,
 
 #if 0
 /* Note: corresponds to ECMA spec: CreateDataPropertyOrThrow() */
-static JSValue jsi_object___setOwnProperty(JSContext *ctx, JSValueConst this_val,
-                                          int argc, JSValueConst *argv)
+static JSIValue jsi_object___setOwnProperty(JSIContext *ctx, JSIValueConst this_val,
+                                          int argc, JSIValueConst *argv)
 {
     int ret;
     ret = JSI_DefinePropertyValueValue(ctx, argv[0], JSI_DupValue(ctx, argv[1]),
@@ -34752,14 +34752,14 @@ static JSValue jsi_object___setOwnProperty(JSContext *ctx, JSValueConst this_val
         return JSI_NewBool(ctx, ret);
 }
 
-static JSValue jsi_object___toObject(JSContext *ctx, JSValueConst this_val,
-                                    int argc, JSValueConst *argv)
+static JSIValue jsi_object___toObject(JSIContext *ctx, JSIValueConst this_val,
+                                    int argc, JSIValueConst *argv)
 {
     return JSI_ToObject(ctx, argv[0]);
 }
 
-static JSValue jsi_object___toPrimitive(JSContext *ctx, JSValueConst this_val,
-                                       int argc, JSValueConst *argv)
+static JSIValue jsi_object___toPrimitive(JSIContext *ctx, JSIValueConst this_val,
+                                       int argc, JSIValueConst *argv)
 {
     int hint = HINT_NONE;
 
@@ -34771,8 +34771,8 @@ static JSValue jsi_object___toPrimitive(JSContext *ctx, JSValueConst this_val,
 #endif
 
 /* return an empty string if not an object */
-static JSValue jsi_object___getClass(JSContext *ctx, JSValueConst this_val,
-                                    int argc, JSValueConst *argv)
+static JSIValue jsi_object___getClass(JSIContext *ctx, JSIValueConst this_val,
+                                    int argc, JSIValueConst *argv)
 {
     JSAtom atom;
     JSObject *p;
@@ -34790,56 +34790,56 @@ static JSValue jsi_object___getClass(JSContext *ctx, JSValueConst this_val,
     return JSI_AtomToString(ctx, atom);
 }
 
-static JSValue jsi_object_is(JSContext *ctx, JSValueConst this_val,
-                            int argc, JSValueConst *argv)
+static JSIValue jsi_object_is(JSIContext *ctx, JSIValueConst this_val,
+                            int argc, JSIValueConst *argv)
 {
     return JSI_NewBool(ctx, jsi_same_value(ctx, argv[0], argv[1]));
 }
 
 #if 0
-static JSValue jsi_object___getObjectData(JSContext *ctx, JSValueConst this_val,
-                                         int argc, JSValueConst *argv)
+static JSIValue jsi_object___getObjectData(JSIContext *ctx, JSIValueConst this_val,
+                                         int argc, JSIValueConst *argv)
 {
     return JSI_GetObjectData(ctx, argv[0]);
 }
 
-static JSValue jsi_object___setObjectData(JSContext *ctx, JSValueConst this_val,
-                                         int argc, JSValueConst *argv)
+static JSIValue jsi_object___setObjectData(JSIContext *ctx, JSIValueConst this_val,
+                                         int argc, JSIValueConst *argv)
 {
     if (JSI_SetObjectData(ctx, argv[0], JSI_DupValue(ctx, argv[1])))
         return JSI_EXCEPTION;
     return JSI_DupValue(ctx, argv[1]);
 }
 
-static JSValue jsi_object___toPropertyKey(JSContext *ctx, JSValueConst this_val,
-                                         int argc, JSValueConst *argv)
+static JSIValue jsi_object___toPropertyKey(JSIContext *ctx, JSIValueConst this_val,
+                                         int argc, JSIValueConst *argv)
 {
     return JSI_ToPropertyKey(ctx, argv[0]);
 }
 
-static JSValue jsi_object___isObject(JSContext *ctx, JSValueConst this_val,
-                                    int argc, JSValueConst *argv)
+static JSIValue jsi_object___isObject(JSIContext *ctx, JSIValueConst this_val,
+                                    int argc, JSIValueConst *argv)
 {
     return JSI_NewBool(ctx, JSI_IsObject(argv[0]));
 }
 
-static JSValue jsi_object___isSameValueZero(JSContext *ctx, JSValueConst this_val,
-                                           int argc, JSValueConst *argv)
+static JSIValue jsi_object___isSameValueZero(JSIContext *ctx, JSIValueConst this_val,
+                                           int argc, JSIValueConst *argv)
 {
     return JSI_NewBool(ctx, jsi_same_value_zero(ctx, argv[0], argv[1]));
 }
 
-static JSValue jsi_object___isConstructor(JSContext *ctx, JSValueConst this_val,
-                                         int argc, JSValueConst *argv)
+static JSIValue jsi_object___isConstructor(JSIContext *ctx, JSIValueConst this_val,
+                                         int argc, JSIValueConst *argv)
 {
     return JSI_NewBool(ctx, JSI_IsConstructor(ctx, argv[0]));
 }
 #endif
 
-static JSValue JSI_SpeciesConstructor(JSContext *ctx, JSValueConst obj,
-                                     JSValueConst defaultConstructor)
+static JSIValue JSI_SpeciesConstructor(JSIContext *ctx, JSIValueConst obj,
+                                     JSIValueConst defaultConstructor)
 {
-    JSValue ctor, species;
+    JSIValue ctor, species;
 
     if (!JSI_IsObject(obj))
         return JSI_ThrowTypeErrorNotAnObject(ctx);
@@ -34866,16 +34866,16 @@ static JSValue JSI_SpeciesConstructor(JSContext *ctx, JSValueConst obj,
 }
 
 #if 0
-static JSValue jsi_object___speciesConstructor(JSContext *ctx, JSValueConst this_val,
-                                              int argc, JSValueConst *argv)
+static JSIValue jsi_object___speciesConstructor(JSIContext *ctx, JSIValueConst this_val,
+                                              int argc, JSIValueConst *argv)
 {
     return JSI_SpeciesConstructor(ctx, argv[0], argv[1]);
 }
 #endif
 
-static JSValue jsi_object_get___proto__(JSContext *ctx, JSValueConst this_val)
+static JSIValue jsi_object_get___proto__(JSIContext *ctx, JSIValueConst this_val)
 {
-    JSValue val, ret;
+    JSIValue val, ret;
 
     val = JSI_ToObject(ctx, this_val);
     if (JSI_IsException(val))
@@ -34885,8 +34885,8 @@ static JSValue jsi_object_get___proto__(JSContext *ctx, JSValueConst this_val)
     return ret;
 }
 
-static JSValue jsi_object_set___proto__(JSContext *ctx, JSValueConst this_val,
-                                       JSValueConst proto)
+static JSIValue jsi_object_set___proto__(JSIContext *ctx, JSIValueConst this_val,
+                                       JSIValueConst proto)
 {
     if (JSI_IsUndefined(this_val) || JSI_IsNull(this_val))
         return JSI_ThrowTypeErrorNotAnObject(ctx);
@@ -34898,11 +34898,11 @@ static JSValue jsi_object_set___proto__(JSContext *ctx, JSValueConst this_val,
         return JSI_UNDEFINED;
 }
 
-static JSValue jsi_object_isPrototypeOf(JSContext *ctx, JSValueConst this_val,
-                                       int argc, JSValueConst *argv)
+static JSIValue jsi_object_isPrototypeOf(JSIContext *ctx, JSIValueConst this_val,
+                                       int argc, JSIValueConst *argv)
 {
-    JSValue obj, v1;
-    JSValueConst v;
+    JSIValue obj, v1;
+    JSIValueConst v;
     int res;
 
     v = argv[0];
@@ -34938,10 +34938,10 @@ exception:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_object_propertyIsEnumerable(JSContext *ctx, JSValueConst this_val,
-                                              int argc, JSValueConst *argv)
+static JSIValue jsi_object_propertyIsEnumerable(JSIContext *ctx, JSIValueConst this_val,
+                                              int argc, JSIValueConst *argv)
 {
-    JSValue obj = JSI_UNDEFINED, res = JSI_EXCEPTION;
+    JSIValue obj = JSI_UNDEFINED, res = JSI_EXCEPTION;
     JSAtom prop;
     JSPropertyDescriptor desc;
     int has_prop;
@@ -34969,10 +34969,10 @@ exception:
     return res;
 }
 
-static JSValue jsi_object___lookupGetter__(JSContext *ctx, JSValueConst this_val,
-                                          int argc, JSValueConst *argv, int setter)
+static JSIValue jsi_object___lookupGetter__(JSIContext *ctx, JSIValueConst this_val,
+                                          int argc, JSIValueConst *argv, int setter)
 {
-    JSValue obj, res = JSI_EXCEPTION;
+    JSIValue obj, res = JSI_EXCEPTION;
     JSAtom prop = JSI_ATOM_NULL;
     JSPropertyDescriptor desc;
     int has_prop;
@@ -35066,19 +35066,19 @@ static const JSCFunctionListEntry jsi_object_proto_funcs[] = {
 
 /* Function class */
 
-static JSValue jsi_function_proto(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
+static JSIValue jsi_function_proto(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv)
 {
     return JSI_UNDEFINED;
 }
 
 /* XXX: add a specific eval mode so that Function("}), ({") is rejected */
-static JSValue jsi_function_constructor(JSContext *ctx, JSValueConst new_target,
-                                       int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_function_constructor(JSIContext *ctx, JSIValueConst new_target,
+                                       int argc, JSIValueConst *argv, int magic)
 {
     JSFunctionKindEnum func_kind = magic;
     int i, n, ret;
-    JSValue s, proto, obj = JSI_UNDEFINED;
+    JSIValue s, proto, obj = JSI_UNDEFINED;
     StringBuffer b_s, *b = &b_s;
 
     string_buffer_init(ctx, b, 0);
@@ -35122,7 +35122,7 @@ static JSValue jsi_function_constructor(JSContext *ctx, JSValueConst new_target,
         if (JSI_IsException(proto))
             goto fail1;
         if (!JSI_IsObject(proto)) {
-            JSContext *realm;
+            JSIContext *realm;
             JSI_FreeValue(ctx, proto);
             realm = JSI_GetFunctionRealm(ctx, new_target);
             if (!realm)
@@ -35143,10 +35143,10 @@ static JSValue jsi_function_constructor(JSContext *ctx, JSValueConst new_target,
     return JSI_EXCEPTION;
 }
 
-static __exception int jsi_get_length32(JSContext *ctx, uint32_t *pres,
-                                       JSValueConst obj)
+static __exception int jsi_get_length32(JSIContext *ctx, uint32_t *pres,
+                                       JSIValueConst obj)
 {
-    JSValue len_val;
+    JSIValue len_val;
     len_val = JSI_GetProperty(ctx, obj, JSI_ATOM_length);
     if (JSI_IsException(len_val)) {
         *pres = 0;
@@ -35155,10 +35155,10 @@ static __exception int jsi_get_length32(JSContext *ctx, uint32_t *pres,
     return JSI_ToUint32Free(ctx, pres, len_val);
 }
 
-static __exception int jsi_get_length64(JSContext *ctx, int64_t *pres,
-                                       JSValueConst obj)
+static __exception int jsi_get_length64(JSIContext *ctx, int64_t *pres,
+                                       JSIValueConst obj)
 {
-    JSValue len_val;
+    JSIValue len_val;
     len_val = JSI_GetProperty(ctx, obj, JSI_ATOM_length);
     if (JSI_IsException(len_val)) {
         *pres = 0;
@@ -35167,7 +35167,7 @@ static __exception int jsi_get_length64(JSContext *ctx, int64_t *pres,
     return JSI_ToLengthFree(ctx, pres, len_val);
 }
 
-static void free_arg_list(JSContext *ctx, JSValue *tab, uint32_t len)
+static void free_arg_list(JSIContext *ctx, JSIValue *tab, uint32_t len)
 {
     uint32_t i;
     for(i = 0; i < len; i++) {
@@ -35177,12 +35177,12 @@ static void free_arg_list(JSContext *ctx, JSValue *tab, uint32_t len)
 }
 
 /* XXX: should use ValueArray */
-static JSValue *build_arg_list(JSContext *ctx, uint32_t *plen,
-                               JSValueConst array_arg)
+static JSIValue *build_arg_list(JSIContext *ctx, uint32_t *plen,
+                               JSIValueConst array_arg)
 {
     uint32_t len, i;
     int64_t len64;
-    JSValue *tab, ret;
+    JSIValue *tab, ret;
     JSObject *p;
 
     if (JSI_VALUE_GET_TAG(array_arg) != JSI_TAG_OBJECT) {
@@ -35225,12 +35225,12 @@ static JSValue *build_arg_list(JSContext *ctx, uint32_t *plen,
 
 /* magic value: 0 = normal apply, 1 = apply for constructor, 2 =
    Reflect.apply */
-static JSValue jsi_function_apply(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_function_apply(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv, int magic)
 {
-    JSValueConst this_arg, array_arg;
+    JSIValueConst this_arg, array_arg;
     uint32_t len;
-    JSValue *tab, ret;
+    JSIValue *tab, ret;
 
     if (check_function(ctx, this_val))
         return JSI_EXCEPTION;
@@ -35244,16 +35244,16 @@ static JSValue jsi_function_apply(JSContext *ctx, JSValueConst this_val,
     if (!tab)
         return JSI_EXCEPTION;
     if (magic & 1) {
-        ret = JSI_CallConstructor2(ctx, this_val, this_arg, len, (JSValueConst *)tab);
+        ret = JSI_CallConstructor2(ctx, this_val, this_arg, len, (JSIValueConst *)tab);
     } else {
-        ret = JSI_Call(ctx, this_val, this_arg, len, (JSValueConst *)tab);
+        ret = JSI_Call(ctx, this_val, this_arg, len, (JSIValueConst *)tab);
     }
     free_arg_list(ctx, tab, len);
     return ret;
 }
 
-static JSValue jsi_function_call(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_function_call(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
     if (argc <= 0) {
         return JSI_Call(ctx, this_val, JSI_UNDEFINED, 0, NULL);
@@ -35262,11 +35262,11 @@ static JSValue jsi_function_call(JSContext *ctx, JSValueConst this_val,
     }
 }
 
-static JSValue jsi_function_bind(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_function_bind(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
     JSBoundFunction *bf;
-    JSValue func_obj, name1, len_val;
+    JSIValue func_obj, name1, len_val;
     JSObject *p;
     int arg_count, i, ret;
 
@@ -35280,7 +35280,7 @@ static JSValue jsi_function_bind(JSContext *ctx, JSValueConst this_val,
     p = JSI_VALUE_GET_OBJ(func_obj);
     p->is_constructor = JSI_IsConstructor(ctx, this_val);
     arg_count = max_int(0, argc - 1);
-    bf = jsi_malloc(ctx, sizeof(*bf) + arg_count * sizeof(JSValue));
+    bf = jsi_malloc(ctx, sizeof(*bf) + arg_count * sizeof(JSIValue));
     if (!bf)
         goto exception;
     bf->func_obj = JSI_DupValue(ctx, this_val);
@@ -35336,8 +35336,8 @@ static JSValue jsi_function_bind(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_function_toString(JSContext *ctx, JSValueConst this_val,
-                                    int argc, JSValueConst *argv)
+static JSIValue jsi_function_toString(JSIContext *ctx, JSIValueConst this_val,
+                                    int argc, JSIValueConst *argv)
 {
     JSObject *p;
     JSFunctionKindEnum func_kind = JSI_FUNC_NORMAL;
@@ -35354,7 +35354,7 @@ static JSValue jsi_function_toString(JSContext *ctx, JSValueConst this_val,
         func_kind = b->func_kind;
     }
     {
-        JSValue name;
+        JSIValue name;
         const char *pref, *suff;
 
         switch(func_kind) {
@@ -35380,8 +35380,8 @@ static JSValue jsi_function_toString(JSContext *ctx, JSValueConst this_val,
     }
 }
 
-static JSValue jsi_function_hasInstance(JSContext *ctx, JSValueConst this_val,
-                                       int argc, JSValueConst *argv)
+static JSIValue jsi_function_hasInstance(JSIContext *ctx, JSIValueConst this_val,
+                                       int argc, JSIValueConst *argv)
 {
     int ret;
     ret = JSI_OrdinaryIsInstanceOf(ctx, argv[0], this_val);
@@ -35404,10 +35404,10 @@ static const JSCFunctionListEntry jsi_function_proto_funcs[] = {
 
 /* Error class */
 
-static JSValue iterator_to_array(JSContext *ctx, JSValueConst items)
+static JSIValue iterator_to_array(JSIContext *ctx, JSIValueConst items)
 {
-    JSValue iter, next_method = JSI_UNDEFINED;
-    JSValue v, r = JSI_UNDEFINED;
+    JSIValue iter, next_method = JSI_UNDEFINED;
+    JSIValue v, r = JSI_UNDEFINED;
     int64_t k;
     BOOL done;
 
@@ -35442,11 +35442,11 @@ static JSValue iterator_to_array(JSContext *ctx, JSValueConst items)
     goto done;
 }
 
-static JSValue jsi_error_constructor(JSContext *ctx, JSValueConst new_target,
-                                    int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_error_constructor(JSIContext *ctx, JSIValueConst new_target,
+                                    int argc, JSIValueConst *argv, int magic)
 {
-    JSValue obj, msg, proto;
-    JSValueConst message, options;
+    JSIValue obj, msg, proto;
+    JSIValueConst message, options;
     int arg_index;
 
     if (JSI_IsUndefined(new_target))
@@ -35455,8 +35455,8 @@ static JSValue jsi_error_constructor(JSContext *ctx, JSValueConst new_target,
     if (JSI_IsException(proto))
         return proto;
     if (!JSI_IsObject(proto)) {
-        JSContext *realm;
-        JSValueConst proto1;
+        JSIContext *realm;
+        JSIValueConst proto1;
 
         JSI_FreeValue(ctx, proto);
         realm = JSI_GetFunctionRealm(ctx, new_target);
@@ -35491,7 +35491,7 @@ static JSValue jsi_error_constructor(JSContext *ctx, JSValueConst new_target,
             if (present < 0)
                 goto exception;
             if (present) {
-                JSValue cause = JSI_GetProperty(ctx, options, JSI_ATOM_cause);
+                JSIValue cause = JSI_GetProperty(ctx, options, JSI_ATOM_cause);
                 if (JSI_IsException(cause))
                     goto exception;
                 JSI_DefinePropertyValue(ctx, obj, JSI_ATOM_cause, cause,
@@ -35501,7 +35501,7 @@ static JSValue jsi_error_constructor(JSContext *ctx, JSValueConst new_target,
     }
 
     if (magic == JSI_AGGREGATE_ERROR) {
-        JSValue error_list = iterator_to_array(ctx, argv[0]);
+        JSIValue error_list = iterator_to_array(ctx, argv[0]);
         if (JSI_IsException(error_list))
             goto exception;
         JSI_DefinePropertyValue(ctx, obj, JSI_ATOM_errors, error_list,
@@ -35516,10 +35516,10 @@ static JSValue jsi_error_constructor(JSContext *ctx, JSValueConst new_target,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_error_toString(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
+static JSIValue jsi_error_toString(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv)
 {
-    JSValue name, msg;
+    JSIValue name, msg;
 
     if (!JSI_IsObject(this_val))
         return JSI_ThrowTypeErrorNotAnObject(ctx);
@@ -35551,8 +35551,8 @@ static const JSCFunctionListEntry jsi_error_proto_funcs[] = {
     JSI_PROP_STRING_DEF("message", "", JSI_PROP_WRITABLE | JSI_PROP_CONFIGURABLE ),
 };
 
-static JSValue jsi_error_isError(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_error_isError(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
     return JSI_NewBool(ctx, JSI_IsError(ctx, argv[0]));
 }
@@ -35564,10 +35564,10 @@ static const JSCFunctionListEntry jsi_error_funcs[] = {
 /* AggregateError */
 
 /* used by C code. */
-static JSValue jsi_aggregate_error_constructor(JSContext *ctx,
-                                              JSValueConst errors)
+static JSIValue jsi_aggregate_error_constructor(JSIContext *ctx,
+                                              JSIValueConst errors)
 {
-    JSValue obj;
+    JSIValue obj;
 
     obj = JSI_NewObjectProtoClass(ctx,
                                  ctx->native_error_proto[JSI_AGGREGATE_ERROR],
@@ -35581,13 +35581,13 @@ static JSValue jsi_aggregate_error_constructor(JSContext *ctx,
 
 /* Array */
 
-static int JSI_CopySubArray(JSContext *ctx,
-                           JSValueConst obj, int64_t to_pos,
+static int JSI_CopySubArray(JSIContext *ctx,
+                           JSIValueConst obj, int64_t to_pos,
                            int64_t from_pos, int64_t count, int dir)
 {
     JSObject *p;
     int64_t i, from, to, len;
-    JSValue val;
+    JSIValue val;
     int fromPresent;
 
     p = NULL;
@@ -35651,10 +35651,10 @@ static int JSI_CopySubArray(JSContext *ctx,
     return -1;
 }
 
-static JSValue jsi_array_constructor(JSContext *ctx, JSValueConst new_target,
-                                    int argc, JSValueConst *argv)
+static JSIValue jsi_array_constructor(JSIContext *ctx, JSIValueConst new_target,
+                                    int argc, JSIValueConst *argv)
 {
-    JSValue obj;
+    JSIValue obj;
     int i;
 
     obj = jsi_create_from_ctor(ctx, new_target, JSI_CLASS_ARRAY);
@@ -35678,13 +35678,13 @@ fail:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_from(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv)
+static JSIValue jsi_array_from(JSIContext *ctx, JSIValueConst this_val,
+                             int argc, JSIValueConst *argv)
 {
     // from(items, mapfn = void 0, this_arg = void 0)
-    JSValueConst items = argv[0], mapfn, this_arg;
-    JSValueConst args[2];
-    JSValue iter, r, v, v2, arrayLike, next_method, enum_obj;
+    JSIValueConst items = argv[0], mapfn, this_arg;
+    JSIValueConst args[2];
+    JSIValue iter, r, v, v2, arrayLike, next_method, enum_obj;
     int64_t k, len;
     int done, mapping;
 
@@ -35797,15 +35797,15 @@ static JSValue jsi_array_from(JSContext *ctx, JSValueConst this_val,
     return r;
 }
 
-static JSValue jsi_array_of(JSContext *ctx, JSValueConst this_val,
-                           int argc, JSValueConst *argv)
+static JSIValue jsi_array_of(JSIContext *ctx, JSIValueConst this_val,
+                           int argc, JSIValueConst *argv)
 {
-    JSValue obj, args[1];
+    JSIValue obj, args[1];
     int i;
 
     if (JSI_IsConstructor(ctx, this_val)) {
         args[0] = JSI_NewInt32(ctx, argc);
-        obj = JSI_CallConstructor(ctx, this_val, 1, (JSValueConst *)args);
+        obj = JSI_CallConstructor(ctx, this_val, 1, (JSIValueConst *)args);
     } else {
         obj = JSI_NewArray(ctx);
     }
@@ -35825,8 +35825,8 @@ static JSValue jsi_array_of(JSContext *ctx, JSValueConst this_val,
     return obj;
 }
 
-static JSValue jsi_array_isArray(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_array_isArray(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
     int ret;
     ret = JSI_IsArray(ctx, argv[0]);
@@ -35836,18 +35836,18 @@ static JSValue jsi_array_isArray(JSContext *ctx, JSValueConst this_val,
         return JSI_NewBool(ctx, ret);
 }
 
-static JSValue jsi_get_this(JSContext *ctx,
-                           JSValueConst this_val)
+static JSIValue jsi_get_this(JSIContext *ctx,
+                           JSIValueConst this_val)
 {
     return JSI_DupValue(ctx, this_val);
 }
 
-static JSValue JSI_ArraySpeciesCreate(JSContext *ctx, JSValueConst obj,
-                                     JSValueConst len_val)
+static JSIValue JSI_ArraySpeciesCreate(JSIContext *ctx, JSIValueConst obj,
+                                     JSIValueConst len_val)
 {
-    JSValue ctor, ret, species;
+    JSIValue ctor, ret, species;
     int res;
-    JSContext *realm;
+    JSIContext *realm;
 
     res = JSI_IsArray(ctx, obj);
     if (res < 0)
@@ -35895,9 +35895,9 @@ static const JSCFunctionListEntry jsi_array_funcs[] = {
     JSI_CGETSET_DEF("[Symbol.species]", jsi_get_this, NULL ),
 };
 
-static int JSI_isConcatSpreadable(JSContext *ctx, JSValueConst obj)
+static int JSI_isConcatSpreadable(JSIContext *ctx, JSIValueConst obj)
 {
-    JSValue val;
+    JSIValue val;
 
     if (!JSI_IsObject(obj))
         return FALSE;
@@ -35909,12 +35909,12 @@ static int JSI_isConcatSpreadable(JSContext *ctx, JSValueConst obj)
     return JSI_IsArray(ctx, obj);
 }
 
-static JSValue jsi_array_at(JSContext *ctx, JSValueConst this_val,
-                           int argc, JSValueConst *argv)
+static JSIValue jsi_array_at(JSIContext *ctx, JSIValueConst this_val,
+                           int argc, JSIValueConst *argv)
 {
-    JSValue obj, ret;
+    JSIValue obj, ret;
     int64_t len, idx;
-    JSValue *arrp;
+    JSIValue *arrp;
     uint32_t count;
 
     obj = JSI_ToObject(ctx, this_val);
@@ -35944,10 +35944,10 @@ static JSValue jsi_array_at(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_with(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv)
+static JSIValue jsi_array_with(JSIContext *ctx, JSIValueConst this_val,
+                             int argc, JSIValueConst *argv)
 {
-    JSValue arr, obj, ret, *arrp, *pval;
+    JSIValue arr, obj, ret, *arrp, *pval;
     JSObject *p;
     int64_t i, len, idx;
     uint32_t count32;
@@ -36009,11 +36009,11 @@ exception:
     return ret;
 }
 
-static JSValue jsi_array_concat(JSContext *ctx, JSValueConst this_val,
-                               int argc, JSValueConst *argv)
+static JSIValue jsi_array_concat(JSIContext *ctx, JSIValueConst this_val,
+                               int argc, JSIValueConst *argv)
 {
-    JSValue obj, arr, val;
-    JSValueConst e;
+    JSIValue obj, arr, val;
+    JSIValueConst e;
     int64_t len, k, n;
     int i, res;
 
@@ -36083,12 +36083,12 @@ exception:
 #define special_TA       8
 
 
-static JSValue jsi_array_every(JSContext *ctx, JSValueConst this_val,
-                              int argc, JSValueConst *argv, int special)
+static JSIValue jsi_array_every(JSIContext *ctx, JSIValueConst this_val,
+                              int argc, JSIValueConst *argv, int special)
 {
-    JSValue obj, val, index_val, res, ret;
-    JSValueConst args[3];
-    JSValueConst func, this_arg;
+    JSIValue obj, val, index_val, res, ret;
+    JSIValueConst args[3];
+    JSIValueConst func, this_arg;
     int64_t len, k, n;
     int present;
 
@@ -36212,12 +36212,12 @@ exception:
 #define special_reduce       0
 #define special_reduceRight  1
 
-static JSValue jsi_array_reduce(JSContext *ctx, JSValueConst this_val,
-                               int argc, JSValueConst *argv, int special)
+static JSIValue jsi_array_reduce(JSIContext *ctx, JSIValueConst this_val,
+                               int argc, JSIValueConst *argv, int special)
 {
-    JSValue obj, val, index_val, acc, acc1;
-    JSValueConst args[4];
-    JSValueConst func;
+    JSIValue obj, val, index_val, acc, acc1;
+    JSIValueConst args[4];
+    JSIValueConst func;
     int64_t len, k, k1;
     int present;
 
@@ -36298,10 +36298,10 @@ exception:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_fill(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv)
+static JSIValue jsi_array_fill(JSIContext *ctx, JSIValueConst this_val,
+                             int argc, JSIValueConst *argv)
 {
-    JSValue obj;
+    JSIValue obj;
     int64_t len, start, end;
 
     obj = JSI_ToObject(ctx, this_val);
@@ -36334,12 +36334,12 @@ static JSValue jsi_array_fill(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_includes(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
+static JSIValue jsi_array_includes(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv)
 {
-    JSValue obj, val;
+    JSIValue obj, val;
     int64_t len, n;
-    JSValue *arrp;
+    JSIValue *arrp;
     uint32_t count;
     int res;
 
@@ -36384,12 +36384,12 @@ static JSValue jsi_array_includes(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_indexOf(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_array_indexOf(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
-    JSValue obj, val;
+    JSIValue obj, val;
     int64_t len, n, res;
-    JSValue *arrp;
+    JSIValue *arrp;
     uint32_t count;
 
     obj = JSI_ToObject(ctx, this_val);
@@ -36433,10 +36433,10 @@ static JSValue jsi_array_indexOf(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_lastIndexOf(JSContext *ctx, JSValueConst this_val,
-                                    int argc, JSValueConst *argv)
+static JSIValue jsi_array_lastIndexOf(JSIContext *ctx, JSIValueConst this_val,
+                                    int argc, JSIValueConst *argv)
 {
-    JSValue obj, val;
+    JSIValue obj, val;
     int64_t len, n, res;
     int present;
 
@@ -36479,12 +36479,12 @@ enum {
     ArrayFindLastIndex,
 };
 
-static JSValue jsi_array_find(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv, int mode)
+static JSIValue jsi_array_find(JSIContext *ctx, JSIValueConst this_val,
+                             int argc, JSIValueConst *argv, int mode)
 {
-    JSValueConst func, this_arg;
-    JSValueConst args[3];
-    JSValue obj, val, index_val, res;
+    JSIValueConst func, this_arg;
+    JSIValueConst args[3];
+    JSIValue obj, val, index_val, res;
     int64_t len, k, end;
     int dir;
 
@@ -36552,10 +36552,10 @@ exception:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_toString(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
+static JSIValue jsi_array_toString(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv)
 {
-    JSValue obj, method, ret;
+    JSIValue obj, method, ret;
 
     obj = JSI_ToObject(ctx, this_val);
     if (JSI_IsException(obj))
@@ -36575,10 +36575,10 @@ static JSValue jsi_array_toString(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue jsi_array_join(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv, int toLocaleString)
+static JSIValue jsi_array_join(JSIContext *ctx, JSIValueConst this_val,
+                             int argc, JSIValueConst *argv, int toLocaleString)
 {
-    JSValue obj, sep = JSI_UNDEFINED, el;
+    JSIValue obj, sep = JSI_UNDEFINED, el;
     StringBuffer b_s, *b = &b_s;
     JSString *p = NULL;
     int64_t i, n;
@@ -36632,12 +36632,12 @@ exception:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_pop(JSContext *ctx, JSValueConst this_val,
-                            int argc, JSValueConst *argv, int shift)
+static JSIValue jsi_array_pop(JSIContext *ctx, JSIValueConst this_val,
+                            int argc, JSIValueConst *argv, int shift)
 {
-    JSValue obj, res = JSI_UNDEFINED;
+    JSIValue obj, res = JSI_UNDEFINED;
     int64_t len, newLen;
-    JSValue *arrp;
+    JSIValue *arrp;
     uint32_t count32;
 
     obj = JSI_ToObject(ctx, this_val);
@@ -36685,10 +36685,10 @@ static JSValue jsi_array_pop(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_push(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv, int unshift)
+static JSIValue jsi_array_push(JSIContext *ctx, JSIValueConst this_val,
+                             int argc, JSIValueConst *argv, int unshift)
 {
-    JSValue obj;
+    JSIValue obj;
     int i;
     int64_t len, from, newLen;
 
@@ -36722,11 +36722,11 @@ static JSValue jsi_array_push(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_reverse(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_array_reverse(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
-    JSValue obj, lval, hval;
-    JSValue *arrp;
+    JSIValue obj, lval, hval;
+    JSIValue *arrp;
     int64_t len, l, h;
     int l_present, h_present;
     uint32_t count32;
@@ -36795,10 +36795,10 @@ static JSValue jsi_array_reverse(JSContext *ctx, JSValueConst this_val,
 // leaves holes in sparse arrays intact whereas a.toReversed() replaces them
 // with undefined, thus in effect creating a dense array.
 // Does not use Array[@@species], always returns a base Array.
-static JSValue jsi_array_toReversed(JSContext *ctx, JSValueConst this_val,
-                                   int argc, JSValueConst *argv)
+static JSIValue jsi_array_toReversed(JSIContext *ctx, JSIValueConst this_val,
+                                   int argc, JSIValueConst *argv)
 {
-    JSValue arr, obj, ret, *arrp, *pval;
+    JSIValue arr, obj, ret, *arrp, *pval;
     JSObject *p;
     int64_t i, len;
     uint32_t count32;
@@ -36846,13 +36846,13 @@ exception:
     return ret;
 }
 
-static JSValue jsi_array_slice(JSContext *ctx, JSValueConst this_val,
-                              int argc, JSValueConst *argv, int splice)
+static JSIValue jsi_array_slice(JSIContext *ctx, JSIValueConst this_val,
+                              int argc, JSIValueConst *argv, int splice)
 {
-    JSValue obj, arr, val, len_val;
+    JSIValue obj, arr, val, len_val;
     int64_t len, start, k, final, n, count, del_count, new_len;
     int kPresent;
-    JSValue *arrp;
+    JSIValue *arrp;
     uint32_t count32, i, item_count;
 
     arr = JSI_UNDEFINED;
@@ -36953,10 +36953,10 @@ static JSValue jsi_array_slice(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_toSpliced(JSContext *ctx, JSValueConst this_val,
-                                  int argc, JSValueConst *argv)
+static JSIValue jsi_array_toSpliced(JSIContext *ctx, JSIValueConst this_val,
+                                  int argc, JSIValueConst *argv)
 {
-    JSValue arr, obj, ret, *arrp, *pval, *last;
+    JSIValue arr, obj, ret, *arrp, *pval, *last;
     JSObject *p;
     int64_t i, j, len, newlen, start, add, del;
     uint32_t count32;
@@ -37039,10 +37039,10 @@ exception:
     return ret;
 }
 
-static JSValue jsi_array_copyWithin(JSContext *ctx, JSValueConst this_val,
-                                   int argc, JSValueConst *argv)
+static JSIValue jsi_array_copyWithin(JSIContext *ctx, JSIValueConst this_val,
+                                   int argc, JSIValueConst *argv)
 {
-    JSValue obj;
+    JSIValue obj;
     int64_t len, from, to, final, count;
 
     obj = JSI_ToObject(ctx, this_val);
@@ -37074,13 +37074,13 @@ static JSValue jsi_array_copyWithin(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static int64_t JSI_FlattenIntoArray(JSContext *ctx, JSValueConst target,
-                                   JSValueConst source, int64_t sourceLen,
+static int64_t JSI_FlattenIntoArray(JSIContext *ctx, JSIValueConst target,
+                                   JSIValueConst source, int64_t sourceLen,
                                    int64_t targetIndex, int depth,
-                                   JSValueConst mapperFunction,
-                                   JSValueConst thisArg)
+                                   JSIValueConst mapperFunction,
+                                   JSIValueConst thisArg)
 {
-    JSValue element;
+    JSIValue element;
     int64_t sourceIndex, elementLen;
     int present, is_array;
 
@@ -37096,10 +37096,10 @@ static int64_t JSI_FlattenIntoArray(JSContext *ctx, JSValueConst target,
         if (!present)
             continue;
         if (!JSI_IsUndefined(mapperFunction)) {
-            JSValueConst args[3] = { element, JSI_NewInt64(ctx, sourceIndex), source };
+            JSIValueConst args[3] = { element, JSI_NewInt64(ctx, sourceIndex), source };
             element = JSI_Call(ctx, mapperFunction, thisArg, 3, args);
-            JSI_FreeValue(ctx, (JSValue)args[0]);
-            JSI_FreeValue(ctx, (JSValue)args[1]);
+            JSI_FreeValue(ctx, (JSIValue)args[0]);
+            JSI_FreeValue(ctx, (JSIValue)args[1]);
             if (JSI_IsException(element))
                 return -1;
         }
@@ -37136,11 +37136,11 @@ fail:
     return -1;
 }
 
-static JSValue jsi_array_flatten(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv, int map)
+static JSIValue jsi_array_flatten(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv, int map)
 {
-    JSValue obj, arr;
-    JSValueConst mapperFunction, thisArg;
+    JSIValue obj, arr;
+    JSIValueConst mapperFunction, thisArg;
     int64_t sourceLen;
     int depthNum;
 
@@ -37183,23 +37183,23 @@ exception:
 /* Array sort */
 
 typedef struct ValueSlot {
-    JSValue val;
+    JSIValue val;
     JSString *str;
     int64_t pos;
 } ValueSlot;
 
 struct array_sort_context {
-    JSContext *ctx;
+    JSIContext *ctx;
     int exception;
     int has_method;
-    JSValueConst method;
+    JSIValueConst method;
 };
 
 static int jsi_array_cmp_generic(const void *a, const void *b, void *opaque) {
     struct array_sort_context *psc = opaque;
-    JSContext *ctx = psc->ctx;
-    JSValueConst argv[2];
-    JSValue res;
+    JSIContext *ctx = psc->ctx;
+    JSIValueConst argv[2];
+    JSIValue res;
     ValueSlot *ap = (ValueSlot *)(void *)a;
     ValueSlot *bp = (ValueSlot *)(void *)b;
     int cmp;
@@ -37232,13 +37232,13 @@ static int jsi_array_cmp_generic(const void *a, const void *b, void *opaque) {
          * tested in test262/test/built-ins/Array/prototype/sort/bug_596_1.js
          */
         if (!ap->str) {
-            JSValue str = JSI_ToString(ctx, ap->val);
+            JSIValue str = JSI_ToString(ctx, ap->val);
             if (JSI_IsException(str))
                 goto exception;
             ap->str = JSI_VALUE_GET_STRING(str);
         }
         if (!bp->str) {
-            JSValue str = JSI_ToString(ctx, bp->val);
+            JSIValue str = JSI_ToString(ctx, bp->val);
             if (JSI_IsException(str))
                 goto exception;
             bp->str = JSI_VALUE_GET_STRING(str);
@@ -37256,11 +37256,11 @@ exception:
     return 0;
 }
 
-static JSValue jsi_array_sort(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv)
+static JSIValue jsi_array_sort(JSIContext *ctx, JSIValueConst this_val,
+                             int argc, JSIValueConst *argv)
 {
     struct array_sort_context asc = { ctx, 0, 0, argv[0] };
-    JSValue obj = JSI_UNDEFINED;
+    JSIValue obj = JSI_UNDEFINED;
     ValueSlot *array = NULL;
     size_t array_size = 0, pos = 0, n = 0;
     int64_t i, len, undefined_count = 0;
@@ -37346,10 +37346,10 @@ fail:
 // leaves holes in sparse arrays intact whereas a.toSorted() replaces them
 // with undefined, thus in effect creating a dense array.
 // Does not use Array[@@species], always returns a base Array.
-static JSValue jsi_array_toSorted(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
+static JSIValue jsi_array_toSorted(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv)
 {
-    JSValue arr, obj, ret, *arrp, *pval;
+    JSIValue arr, obj, ret, *arrp, *pval;
     JSObject *p;
     int64_t i, len;
     uint32_t count32;
@@ -37405,12 +37405,12 @@ exception:
 }
 
 typedef struct JSArrayIteratorData {
-    JSValue obj;
+    JSIValue obj;
     JSIteratorKindEnum kind;
     uint32_t idx;
 } JSArrayIteratorData;
 
-static void jsi_array_iterator_finalizer(JSRuntime *rt, JSValue val)
+static void jsi_array_iterator_finalizer(JSRuntime *rt, JSIValue val)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
     JSArrayIteratorData *it = p->u.array_iterator_data;
@@ -37420,7 +37420,7 @@ static void jsi_array_iterator_finalizer(JSRuntime *rt, JSValue val)
     }
 }
 
-static void jsi_array_iterator_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_array_iterator_mark(JSRuntime *rt, JSIValueConst val,
                                    JSI_MarkFunc *mark_func)
 {
     JSObject *p = JSI_VALUE_GET_OBJ(val);
@@ -37430,9 +37430,9 @@ static void jsi_array_iterator_mark(JSRuntime *rt, JSValueConst val,
     }
 }
 
-static JSValue jsi_create_array(JSContext *ctx, int len, JSValueConst *tab)
+static JSIValue jsi_create_array(JSIContext *ctx, int len, JSIValueConst *tab)
 {
-    JSValue obj;
+    JSIValue obj;
     int i;
 
     obj = JSI_NewArray(ctx);
@@ -37447,10 +37447,10 @@ static JSValue jsi_create_array(JSContext *ctx, int len, JSValueConst *tab)
     return obj;
 }
 
-static JSValue jsi_create_array_iterator(JSContext *ctx, JSValueConst this_val,
-                                        int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_create_array_iterator(JSIContext *ctx, JSIValueConst this_val,
+                                        int argc, JSIValueConst *argv, int magic)
 {
-    JSValue enum_obj, arr;
+    JSIValue enum_obj, arr;
     JSArrayIteratorData *it;
     JSIteratorKindEnum kind;
     int class_id;
@@ -37484,13 +37484,13 @@ static JSValue jsi_create_array_iterator(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_array_iterator_next(JSContext *ctx, JSValueConst this_val,
-                                      int argc, JSValueConst *argv,
+static JSIValue jsi_array_iterator_next(JSIContext *ctx, JSIValueConst this_val,
+                                      int argc, JSIValueConst *argv,
                                       BOOL *pdone, int magic)
 {
     JSArrayIteratorData *it;
     uint32_t len, idx;
-    JSValue val, obj;
+    JSIValue val, obj;
     JSObject *p;
 
     it = JSI_GetOpaque2(ctx, this_val, JSI_CLASS_ARRAY_ITERATOR);
@@ -37525,8 +37525,8 @@ static JSValue jsi_array_iterator_next(JSContext *ctx, JSValueConst this_val,
         if (it->kind == JSI_ITERATOR_KIND_VALUE) {
             return val;
         } else {
-            JSValueConst args[2];
-            JSValue num;
+            JSIValueConst args[2];
+            JSIValue num;
             num = JSI_NewUint32(ctx, idx);
             args[0] = num;
             args[1] = val;
@@ -37538,8 +37538,8 @@ static JSValue jsi_array_iterator_next(JSContext *ctx, JSValueConst this_val,
     }
 }
 
-static JSValue jsi_iterator_proto_iterator(JSContext *ctx, JSValueConst this_val,
-                                          int argc, JSValueConst *argv)
+static JSIValue jsi_iterator_proto_iterator(JSIContext *ctx, JSIValueConst this_val,
+                                          int argc, JSIValueConst *argv)
 {
     return JSI_DupValue(ctx, this_val);
 }
@@ -37597,10 +37597,10 @@ static const JSCFunctionListEntry jsi_array_iterator_proto_funcs[] = {
 
 /* Number */
 
-static JSValue jsi_number_constructor(JSContext *ctx, JSValueConst new_target,
-                                     int argc, JSValueConst *argv)
+static JSIValue jsi_number_constructor(JSIContext *ctx, JSIValueConst new_target,
+                                     int argc, JSIValueConst *argv)
 {
-    JSValue val, obj;
+    JSIValue val, obj;
     if (argc == 0) {
         val = JSI_NewInt32(ctx, 0);
     } else {
@@ -37623,14 +37623,14 @@ static JSValue jsi_number_constructor(JSContext *ctx, JSValueConst new_target,
 }
 
 #if 0
-static JSValue jsi_number___toInteger(JSContext *ctx, JSValueConst this_val,
-                                     int argc, JSValueConst *argv)
+static JSIValue jsi_number___toInteger(JSIContext *ctx, JSIValueConst this_val,
+                                     int argc, JSIValueConst *argv)
 {
     return JSI_ToIntegerFree(ctx, JSI_DupValue(ctx, argv[0]));
 }
 
-static JSValue jsi_number___toLength(JSContext *ctx, JSValueConst this_val,
-                                    int argc, JSValueConst *argv)
+static JSIValue jsi_number___toLength(JSIContext *ctx, JSIValueConst this_val,
+                                    int argc, JSIValueConst *argv)
 {
     int64_t v;
     if (JSI_ToLengthFree(ctx, &v, JSI_DupValue(ctx, argv[0])))
@@ -37640,8 +37640,8 @@ static JSValue jsi_number___toLength(JSContext *ctx, JSValueConst this_val,
 #endif
 
 
-static JSValue jsi_number_isInteger(JSContext *ctx, JSValueConst this_val,
-                                   int argc, JSValueConst *argv)
+static JSIValue jsi_number_isInteger(JSIContext *ctx, JSIValueConst this_val,
+                                   int argc, JSIValueConst *argv)
 {
     int ret;
     ret = JSI_NumberIsInteger(ctx, argv[0]);
@@ -37659,7 +37659,7 @@ static const JSCFunctionListEntry jsi_number_funcs[] = {
     JSI_CFUNC_DEF("isInteger", 1, jsi_number_isInteger ),
 };
 
-static JSValue jsi_thisNumberValue(JSContext *ctx, JSValueConst this_val)
+static JSIValue jsi_thisNumberValue(JSIContext *ctx, JSIValueConst this_val)
 {
     if (JSI_IsNumber(this_val))
         return JSI_DupValue(ctx, this_val);
@@ -37674,13 +37674,13 @@ static JSValue jsi_thisNumberValue(JSContext *ctx, JSValueConst this_val)
     return JSI_ThrowTypeError(ctx, "not a number");
 }
 
-static JSValue jsi_number_valueOf(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
+static JSIValue jsi_number_valueOf(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv)
 {
     return jsi_thisNumberValue(ctx, this_val);
 }
 
-static int jsi_get_radix(JSContext *ctx, JSValueConst val)
+static int jsi_get_radix(JSIContext *ctx, JSIValueConst val)
 {
     int radix;
     if (JSI_ToInt32Sat(ctx, &radix, val))
@@ -37692,10 +37692,10 @@ static int jsi_get_radix(JSContext *ctx, JSValueConst val)
     return radix;
 }
 
-static JSValue jsi_number_toString(JSContext *ctx, JSValueConst this_val,
-                                  int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_number_toString(JSIContext *ctx, JSIValueConst this_val,
+                                  int argc, JSIValueConst *argv, int magic)
 {
-    JSValue val;
+    JSIValue val;
     int base, flags;
     // double d;
 
@@ -37731,12 +37731,12 @@ static const JSCFunctionListEntry jsi_number_proto_funcs[] = {
     JSI_CFUNC_DEF("valueOf", 0, jsi_number_valueOf ),
 };
 
-static JSValue jsi_parseInt(JSContext *ctx, JSValueConst this_val,
-                           int argc, JSValueConst *argv)
+static JSIValue jsi_parseInt(JSIContext *ctx, JSIValueConst this_val,
+                           int argc, JSIValueConst *argv)
 {
     const char *str, *p;
     int radix, flags;
-    JSValue ret;
+    JSIValue ret;
     char *end;
     int effective_radix;
 
@@ -37789,12 +37789,12 @@ static JSValue jsi_parseInt(JSContext *ctx, JSValueConst this_val,
 }
 
 #ifdef KALL
-static JSValue jsi_parseInt(JSContext *ctx, JSValueConst this_val,
-                           int argc, JSValueConst *argv)
+static JSIValue jsi_parseInt(JSIContext *ctx, JSIValueConst this_val,
+                           int argc, JSIValueConst *argv)
 {
     const char *str, *p;
     int radix, flags;
-    JSValue ret;
+    JSIValue ret;
 
     str = JSI_ToCString(ctx, argv[0]);
     if (!str)
@@ -37817,10 +37817,10 @@ static JSValue jsi_parseInt(JSContext *ctx, JSValueConst this_val,
 #endif
 
 /* Boolean */
-static JSValue jsi_boolean_constructor(JSContext *ctx, JSValueConst new_target,
-                                     int argc, JSValueConst *argv)
+static JSIValue jsi_boolean_constructor(JSIContext *ctx, JSIValueConst new_target,
+                                     int argc, JSIValueConst *argv)
 {
-    JSValue val, obj;
+    JSIValue val, obj;
     val = JSI_NewBool(ctx, JSI_ToBool(ctx, argv[0]));
     if (!JSI_IsUndefined(new_target)) {
         obj = jsi_create_from_ctor(ctx, new_target, JSI_CLASS_BOOLEAN);
@@ -37832,7 +37832,7 @@ static JSValue jsi_boolean_constructor(JSContext *ctx, JSValueConst new_target,
     }
 }
 
-static JSValue jsi_thisBooleanValue(JSContext *ctx, JSValueConst this_val)
+static JSIValue jsi_thisBooleanValue(JSIContext *ctx, JSIValueConst this_val)
 {
     if (JSI_VALUE_GET_TAG(this_val) == JSI_TAG_BOOL)
         return JSI_DupValue(ctx, this_val);
@@ -37847,18 +37847,18 @@ static JSValue jsi_thisBooleanValue(JSContext *ctx, JSValueConst this_val)
     return JSI_ThrowTypeError(ctx, "not a boolean");
 }
 
-static JSValue jsi_boolean_toString(JSContext *ctx, JSValueConst this_val,
-                                   int argc, JSValueConst *argv)
+static JSIValue jsi_boolean_toString(JSIContext *ctx, JSIValueConst this_val,
+                                   int argc, JSIValueConst *argv)
 {
-    JSValue val = jsi_thisBooleanValue(ctx, this_val);
+    JSIValue val = jsi_thisBooleanValue(ctx, this_val);
     if (JSI_IsException(val))
         return val;
     return JSI_AtomToString(ctx, JSI_VALUE_GET_BOOL(val) ?
                        JSI_ATOM_true : JSI_ATOM_false);
 }
 
-static JSValue jsi_boolean_valueOf(JSContext *ctx, JSValueConst this_val,
-                                  int argc, JSValueConst *argv)
+static JSIValue jsi_boolean_valueOf(JSIContext *ctx, JSIValueConst this_val,
+                                  int argc, JSIValueConst *argv)
 {
     return jsi_thisBooleanValue(ctx, this_val);
 }
@@ -37870,9 +37870,9 @@ static const JSCFunctionListEntry jsi_boolean_proto_funcs[] = {
 
 /* String */
 
-static int jsi_string_get_own_property(JSContext *ctx,
+static int jsi_string_get_own_property(JSIContext *ctx,
                                       JSPropertyDescriptor *desc,
-                                      JSValueConst obj, JSAtom prop)
+                                      JSIValueConst obj, JSAtom prop)
 {
     JSObject *p;
     JSString *p1;
@@ -37899,11 +37899,11 @@ static int jsi_string_get_own_property(JSContext *ctx,
     return FALSE;
 }
 
-static int jsi_string_define_own_property(JSContext *ctx,
-                                         JSValueConst this_obj,
-                                         JSAtom prop, JSValueConst val,
-                                         JSValueConst getter,
-                                         JSValueConst setter, int flags)
+static int jsi_string_define_own_property(JSIContext *ctx,
+                                         JSIValueConst this_obj,
+                                         JSAtom prop, JSIValueConst val,
+                                         JSIValueConst getter,
+                                         JSIValueConst setter, int flags)
 {
     uint32_t idx;
     JSObject *p;
@@ -37939,8 +37939,8 @@ static int jsi_string_define_own_property(JSContext *ctx,
     }
 }
 
-static int jsi_string_delete_property(JSContext *ctx,
-                                     JSValueConst obj, JSAtom prop)
+static int jsi_string_delete_property(JSIContext *ctx,
+                                     JSIValueConst obj, JSAtom prop)
 {
     uint32_t idx;
 
@@ -37959,10 +37959,10 @@ static const JSClassExoticMethods jsi_string_exotic_methods = {
     .delete_property = jsi_string_delete_property,
 };
 
-static JSValue jsi_string_constructor(JSContext *ctx, JSValueConst new_target,
-                                     int argc, JSValueConst *argv)
+static JSIValue jsi_string_constructor(JSIContext *ctx, JSIValueConst new_target,
+                                     int argc, JSIValueConst *argv)
 {
-    JSValue val, obj;
+    JSIValue val, obj;
     if (argc == 0) {
         val = JSI_AtomToString(ctx, JSI_ATOM_empty_string);
     } else {
@@ -37991,7 +37991,7 @@ static JSValue jsi_string_constructor(JSContext *ctx, JSValueConst new_target,
     }
 }
 
-static JSValue jsi_thisStringValue(JSContext *ctx, JSValueConst this_val)
+static JSIValue jsi_thisStringValue(JSIContext *ctx, JSIValueConst this_val)
 {
     if (JSI_VALUE_GET_TAG(this_val) == JSI_TAG_STRING ||
         JSI_VALUE_GET_TAG(this_val) == JSI_TAG_STRING_ROPE)
@@ -38007,8 +38007,8 @@ static JSValue jsi_thisStringValue(JSContext *ctx, JSValueConst this_val)
     return JSI_ThrowTypeError(ctx, "not a string");
 }
 
-static JSValue jsi_string_fromCharCode(JSContext *ctx, JSValueConst this_val,
-                                      int argc, JSValueConst *argv)
+static JSIValue jsi_string_fromCharCode(JSIContext *ctx, JSIValueConst this_val,
+                                      int argc, JSIValueConst *argv)
 {
     int i;
     StringBuffer b_s, *b = &b_s;
@@ -38025,8 +38025,8 @@ static JSValue jsi_string_fromCharCode(JSContext *ctx, JSValueConst this_val,
     return string_buffer_end(b);
 }
 
-static JSValue jsi_string_fromCodePoint(JSContext *ctx, JSValueConst this_val,
-                                       int argc, JSValueConst *argv)
+static JSIValue jsi_string_fromCodePoint(JSIContext *ctx, JSIValueConst this_val,
+                                       int argc, JSIValueConst *argv)
 {
     int64_t d;
     int i, c;
@@ -38057,11 +38057,11 @@ static JSValue jsi_string_fromCodePoint(JSContext *ctx, JSValueConst this_val,
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_string_raw(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv)
+static JSIValue jsi_string_raw(JSIContext *ctx, JSIValueConst this_val,
+                             int argc, JSIValueConst *argv)
 {
     // raw(temp,...a)
-    JSValue cooked, val, raw;
+    JSIValue cooked, val, raw;
     StringBuffer b_s, *b = &b_s;
     int64_t i, n;
 
@@ -38098,8 +38098,8 @@ exception:
 }
 
 /* only used in test262 */
-JSValue jsi_string_codePointRange(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
+JSIValue jsi_string_codePointRange(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv)
 {
     uint32_t start, end, i, n;
     StringBuffer b_s, *b = &b_s;
@@ -38125,8 +38125,8 @@ JSValue jsi_string_codePointRange(JSContext *ctx, JSValueConst this_val,
 }
 
 #if 0
-static JSValue jsi_string___isSpace(JSContext *ctx, JSValueConst this_val,
-                                   int argc, JSValueConst *argv)
+static JSIValue jsi_string___isSpace(JSIContext *ctx, JSIValueConst this_val,
+                                   int argc, JSIValueConst *argv)
 {
     int c;
     if (JSI_ToInt32(ctx, &c, argv[0]))
@@ -38135,10 +38135,10 @@ static JSValue jsi_string___isSpace(JSContext *ctx, JSValueConst this_val,
 }
 #endif
 
-static JSValue jsi_string_charCodeAt(JSContext *ctx, JSValueConst this_val,
-                                     int argc, JSValueConst *argv)
+static JSIValue jsi_string_charCodeAt(JSIContext *ctx, JSIValueConst this_val,
+                                     int argc, JSIValueConst *argv)
 {
-    JSValue val, ret;
+    JSIValue val, ret;
     JSString *p;
     int idx, c;
 
@@ -38160,10 +38160,10 @@ static JSValue jsi_string_charCodeAt(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue jsi_string_charAt(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv, int is_at)
+static JSIValue jsi_string_charAt(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv, int is_at)
 {
-    JSValue val, ret;
+    JSIValue val, ret;
     JSString *p;
     int idx, c;
 
@@ -38190,10 +38190,10 @@ static JSValue jsi_string_charAt(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue jsi_string_codePointAt(JSContext *ctx, JSValueConst this_val,
-                                     int argc, JSValueConst *argv)
+static JSIValue jsi_string_codePointAt(JSIContext *ctx, JSIValueConst this_val,
+                                     int argc, JSIValueConst *argv)
 {
-    JSValue val, ret;
+    JSIValue val, ret;
     JSString *p;
     int idx, c;
 
@@ -38215,10 +38215,10 @@ static JSValue jsi_string_codePointAt(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue jsi_string_concat(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_string_concat(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
-    JSValue r;
+    JSIValue r;
     int i;
 
     /* XXX: Use more efficient method */
@@ -38312,10 +38312,10 @@ static int jsi_string_find_invalid_codepoint(JSString *p)
     return -1;
 }
 
-static JSValue jsi_string_isWellFormed(JSContext *ctx, JSValueConst this_val,
-                                      int argc, JSValueConst *argv)
+static JSIValue jsi_string_isWellFormed(JSIContext *ctx, JSIValueConst this_val,
+                                      int argc, JSIValueConst *argv)
 {
-    JSValue str;
+    JSIValue str;
     JSString *p;
     BOOL ret;
 
@@ -38328,10 +38328,10 @@ static JSValue jsi_string_isWellFormed(JSContext *ctx, JSValueConst this_val,
     return JSI_NewBool(ctx, ret);
 }
 
-static JSValue jsi_string_toWellFormed(JSContext *ctx, JSValueConst this_val,
-                                      int argc, JSValueConst *argv)
+static JSIValue jsi_string_toWellFormed(JSIContext *ctx, JSIValueConst this_val,
+                                      int argc, JSIValueConst *argv)
 {
-    JSValue str, ret;
+    JSIValue str, ret;
     JSString *p;
     int i;
 
@@ -38365,10 +38365,10 @@ static JSValue jsi_string_toWellFormed(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue jsi_string_indexOf(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv, int lastIndexOf)
+static JSIValue jsi_string_indexOf(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv, int lastIndexOf)
 {
-    JSValue str, v;
+    JSIValue str, v;
     int i, len, v_len, pos, start, stop, ret, inc;
     JSString *p;
     JSString *p1;
@@ -38426,10 +38426,10 @@ fail:
 
 /* return < 0 if exception or TRUE/FALSE */
 
-static JSValue jsi_string_includes(JSContext *ctx, JSValueConst this_val,
-                                  int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_string_includes(JSIContext *ctx, JSIValueConst this_val,
+                                  int argc, JSIValueConst *argv, int magic)
 {
-    JSValue str, v = JSI_UNDEFINED;
+    JSIValue str, v = JSI_UNDEFINED;
     int i, len, v_len, pos, start, stop, ret;
     JSString *p;
     JSString *p1;
@@ -38486,12 +38486,12 @@ fail:
 
 
 
-static JSValue jsi_string___GetSubstitution(JSContext *ctx, JSValueConst this_val,
-                                           int argc, JSValueConst *argv)
+static JSIValue jsi_string___GetSubstitution(JSIContext *ctx, JSIValueConst this_val,
+                                           int argc, JSIValueConst *argv)
 {
     // GetSubstitution(matched, str, position, captures, namedCaptures, rep)
-    JSValueConst matched, str, captures, namedCaptures, rep;
-    JSValue capture, name, s;
+    JSIValueConst matched, str, captures, namedCaptures, rep;
+    JSIValue capture, name, s;
     uint32_t position, len, matched_len, captures_len;
     int i, j, j0, k, k1;
     int c, c1;
@@ -38595,13 +38595,13 @@ exception:
 }
 
 
-static JSValue jsi_string_split(JSContext *ctx, JSValueConst this_val,
-                               int argc, JSValueConst *argv)
+static JSIValue jsi_string_split(JSIContext *ctx, JSIValueConst this_val,
+                               int argc, JSIValueConst *argv)
 {
     // split(sep, limit)
-    JSValueConst O = this_val, separator = argv[0], limit = argv[1];
-    JSValueConst args[2];
-    JSValue S, A, R, T;
+    JSIValueConst O = this_val, separator = argv[0], limit = argv[1];
+    JSIValueConst args[2];
+    JSIValue S, A, R, T;
     uint32_t lim, lengthA;
     int64_t p, q, s, r, e;
     JSString *sp, *rp;
@@ -38614,7 +38614,7 @@ static JSValue jsi_string_split(JSContext *ctx, JSValueConst this_val,
     R = JSI_UNDEFINED;
 
     if (!JSI_IsUndefined(separator) && !JSI_IsNull(separator)) {
-        JSValue splitter;
+        JSIValue splitter;
         splitter = JSI_GetProperty(ctx, separator, JSI_ATOM_Symbol_split);
         if (JSI_IsException(splitter))
             return JSI_EXCEPTION;
@@ -38685,10 +38685,10 @@ exception:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_string_substring(JSContext *ctx, JSValueConst this_val,
-                                   int argc, JSValueConst *argv)
+static JSIValue jsi_string_substring(JSIContext *ctx, JSIValueConst this_val,
+                                   int argc, JSIValueConst *argv)
 {
-    JSValue str, ret;
+    JSIValue str, ret;
     int a, b, start, end;
     JSString *p;
 
@@ -38719,10 +38719,10 @@ static JSValue jsi_string_substring(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue jsi_string_substr(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_string_substr(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
-    JSValue str, ret;
+    JSIValue str, ret;
     int a, len, n;
     JSString *p;
 
@@ -38747,10 +38747,10 @@ static JSValue jsi_string_substr(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue jsi_string_slice(JSContext *ctx, JSValueConst this_val,
-                               int argc, JSValueConst *argv)
+static JSIValue jsi_string_slice(JSIContext *ctx, JSIValueConst this_val,
+                               int argc, JSIValueConst *argv)
 {
-    JSValue str, ret;
+    JSIValue str, ret;
     int len, start, end;
     JSString *p;
 
@@ -38775,10 +38775,10 @@ static JSValue jsi_string_slice(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue jsi_string_pad(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv, int padEnd)
+static JSIValue jsi_string_pad(JSIContext *ctx, JSIValueConst this_val,
+                             int argc, JSIValueConst *argv, int padEnd)
 {
-    JSValue str, v = JSI_UNDEFINED;
+    JSIValue str, v = JSI_UNDEFINED;
     StringBuffer b_s, *b = &b_s;
     JSString *p, *p1 = NULL;
     int n, len, c = ' ';
@@ -38846,10 +38846,10 @@ fail1:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_string_repeat(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_string_repeat(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
-    JSValue str;
+    JSIValue str;
     StringBuffer b_s, *b = &b_s;
     JSString *p;
     int64_t val;
@@ -38891,10 +38891,10 @@ fail:
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_string_trim(JSContext *ctx, JSValueConst this_val,
-                              int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_string_trim(JSIContext *ctx, JSIValueConst this_val,
+                              int argc, JSIValueConst *argv, int magic)
 {
-    JSValue str, ret;
+    JSIValue str, ret;
     int a, b, len;
     JSString *p;
 
@@ -38917,8 +38917,8 @@ static JSValue jsi_string_trim(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue jsi_string___quote(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
+static JSIValue jsi_string___quote(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv)
 {
     return JSI_ToQuotedString(ctx, this_val);
 }
@@ -38976,10 +38976,10 @@ static BOOL test_final_sigma(JSString *p, int sigma_pos)
     return !lre_jsi_is_cased(c1);
 }
 
-static JSValue jsi_string_toLowerCase(JSContext *ctx, JSValueConst this_val,
-                                     int argc, JSValueConst *argv, int to_lower)
+static JSIValue jsi_string_toLowerCase(JSIContext *ctx, JSIValueConst this_val,
+                                     int argc, JSIValueConst *argv, int to_lower)
 {
-    JSValue val;
+    JSIValue val;
     StringBuffer b_s, *b = &b_s;
     JSString *p;
     int i, c, j, l;
@@ -39017,9 +39017,9 @@ static JSValue jsi_string_toLowerCase(JSContext *ctx, JSValueConst this_val,
 #ifdef CONFIG_ALL_UNICODE
 
 /* return (-1, NULL) if exception, otherwise (len, buf) */
-static int JSI_ToUTF32String(JSContext *ctx, uint32_t **pbuf, JSValueConst val1)
+static int JSI_ToUTF32String(JSIContext *ctx, uint32_t **pbuf, JSIValueConst val1)
 {
-    JSValue val;
+    JSIValue val;
     JSString *p;
     uint32_t *buf;
     int i, j, len;
@@ -39045,7 +39045,7 @@ static int JSI_ToUTF32String(JSContext *ctx, uint32_t **pbuf, JSValueConst val1)
     return -1;
 }
 
-static JSValue JSI_NewUTF32String(JSContext *ctx, const uint32_t *buf, int len)
+static JSIValue JSI_NewUTF32String(JSIContext *ctx, const uint32_t *buf, int len)
 {
     int i;
     StringBuffer b_s, *b = &b_s;
@@ -39061,8 +39061,8 @@ static JSValue JSI_NewUTF32String(JSContext *ctx, const uint32_t *buf, int len)
     return JSI_EXCEPTION;
 }
 
-static int jsi_string_normalize1(JSContext *ctx, uint32_t **pout_buf,
-                                JSValueConst val,
+static int jsi_string_normalize1(JSIContext *ctx, uint32_t **pout_buf,
+                                JSIValueConst val,
                                 UnicodeNormalizationEnum n_type)
 {
     int buf_len, out_len;
@@ -39080,14 +39080,14 @@ static int jsi_string_normalize1(JSContext *ctx, uint32_t **pout_buf,
     return out_len;
 }
 
-static JSValue jsi_string_normalize(JSContext *ctx, JSValueConst this_val,
-                                   int argc, JSValueConst *argv)
+static JSIValue jsi_string_normalize(JSIContext *ctx, JSIValueConst this_val,
+                                   int argc, JSIValueConst *argv)
 {
     const char *form, *p;
     size_t form_len;
     int is_compat, out_len;
     UnicodeNormalizationEnum n_type;
-    JSValue val;
+    JSIValue val;
     uint32_t *out_buf;
 
     val = JSI_ToStringCheckObject(ctx, this_val);
@@ -39154,10 +39154,10 @@ static int jsi_UTF32_compare(const uint32_t *buf1, int buf1_len,
     return res;
 }
 
-static JSValue jsi_string_localeCompare(JSContext *ctx, JSValueConst this_val,
-                                       int argc, JSValueConst *argv)
+static JSIValue jsi_string_localeCompare(JSIContext *ctx, JSIValueConst this_val,
+                                       int argc, JSIValueConst *argv)
 {
-    JSValue a, b;
+    JSIValue a, b;
     int cmp, a_len, b_len;
     uint32_t *a_buf, *b_buf;
 
@@ -39188,10 +39188,10 @@ static JSValue jsi_string_localeCompare(JSContext *ctx, JSValueConst this_val,
     return JSI_NewInt32(ctx, cmp);
 }
 #else /* CONFIG_ALL_UNICODE */
-static JSValue jsi_string_localeCompare(JSContext *ctx, JSValueConst this_val,
-                                       int argc, JSValueConst *argv)
+static JSIValue jsi_string_localeCompare(JSIContext *ctx, JSIValueConst this_val,
+                                       int argc, JSIValueConst *argv)
 {
-    JSValue a, b;
+    JSIValue a, b;
     int cmp;
 
     a = JSI_ToStringCheckObject(ctx, this_val);
@@ -39210,30 +39210,30 @@ static JSValue jsi_string_localeCompare(JSContext *ctx, JSValueConst this_val,
 #endif /* !CONFIG_ALL_UNICODE */
 
 /* also used for String.prototype.valueOf */
-static JSValue jsi_string_toString(JSContext *ctx, JSValueConst this_val,
-                                  int argc, JSValueConst *argv)
+static JSIValue jsi_string_toString(JSIContext *ctx, JSIValueConst this_val,
+                                  int argc, JSIValueConst *argv)
 {
     return jsi_thisStringValue(ctx, this_val);
 }
 
 #if 0
-static JSValue jsi_string___toStringCheckObject(JSContext *ctx, JSValueConst this_val,
-                                               int argc, JSValueConst *argv)
+static JSIValue jsi_string___toStringCheckObject(JSIContext *ctx, JSIValueConst this_val,
+                                               int argc, JSIValueConst *argv)
 {
     return JSI_ToStringCheckObject(ctx, argv[0]);
 }
 
-static JSValue jsi_string___toString(JSContext *ctx, JSValueConst this_val,
-                                    int argc, JSValueConst *argv)
+static JSIValue jsi_string___toString(JSIContext *ctx, JSIValueConst this_val,
+                                    int argc, JSIValueConst *argv)
 {
     return JSI_ToString(ctx, argv[0]);
 }
 
-static JSValue jsi_string___advanceStringIndex(JSContext *ctx, JSValueConst
+static JSIValue jsi_string___advanceStringIndex(JSIContext *ctx, JSIValueConst
                                               this_val,
-                                              int argc, JSValueConst *argv)
+                                              int argc, JSIValueConst *argv)
 {
-    JSValue str;
+    JSIValue str;
     int idx;
     BOOL is_unicode;
     JSString *p;
@@ -39259,8 +39259,8 @@ static JSValue jsi_string___advanceStringIndex(JSContext *ctx, JSValueConst
 
 /* String Iterator */
 
-static JSValue jsi_string_iterator_next(JSContext *ctx, JSValueConst this_val,
-                                       int argc, JSValueConst *argv,
+static JSIValue jsi_string_iterator_next(JSIContext *ctx, JSIValueConst this_val,
+                                       int argc, JSIValueConst *argv,
                                        BOOL *pdone, int magic)
 {
     JSArrayIteratorData *it;
@@ -39312,10 +39312,10 @@ enum {
     magic_string_sup,
 };
 
-static JSValue jsi_string_CreateHTML(JSContext *ctx, JSValueConst this_val,
-                                    int argc, JSValueConst *argv, int magic)
+static JSIValue jsi_string_CreateHTML(JSIContext *ctx, JSIValueConst this_val,
+                                    int argc, JSIValueConst *argv, int magic)
 {
-    JSValue str;
+    JSIValue str;
     const JSString *p;
     StringBuffer b_s, *b = &b_s;
     static struct { const char *tag, *attr; } const defs[] = {
@@ -39333,7 +39333,7 @@ static JSValue jsi_string_CreateHTML(JSContext *ctx, JSValueConst this_val,
     string_buffer_puts8(b, defs[magic].tag);
     if (defs[magic].attr) {
         // r += " " + attr + "=\"" + value + "\"";
-        JSValue value;
+        JSIValue value;
         int i;
 
         string_buffer_putc8(b, ' ');
@@ -39439,7 +39439,7 @@ static const JSCFunctionListEntry jsi_string_proto_normalize[] = {
     JSI_CFUNC_DEF("localeCompare", 1, jsi_string_localeCompare ),
 };
 
-void JSI_AddIntrinsicStringNormalize(JSContext *ctx)
+void JSI_AddIntrinsicStringNormalize(JSIContext *ctx)
 {
     JSI_SetPropertyFunctionList(ctx, ctx->class_proto[JSI_CLASS_STRING], jsi_string_proto_normalize,
                                countof(jsi_string_proto_normalize));
@@ -39475,13 +39475,13 @@ static uint64_t xorshift64star(uint64_t *pstate)
 
 int lre_jsi_check_stack_overflow(void *opaque, size_t alloca_size)
 {
-    JSContext *ctx = opaque;
+    JSIContext *ctx = opaque;
     return jsi_check_stack_overflow(ctx->rt, alloca_size);
 }
 
 int lre_jsi_check_timeout(void *opaque)
 {
-    JSContext *ctx = opaque;
+    JSIContext *ctx = opaque;
     JSRuntime *rt = ctx->rt;
     return (rt->interrupt_handler && 
             rt->interrupt_handler(rt, rt->interrupt_opaque));
@@ -39489,21 +39489,21 @@ int lre_jsi_check_timeout(void *opaque)
 
 void *lre_jsi_realloc(void *opaque, void *ptr, size_t size)
 {
-    JSContext *ctx = opaque;
+    JSIContext *ctx = opaque;
     /* No JS exception is raised here */
     return jsi_realloc_rt(ctx->rt, ptr, size);
 }
 
 typedef struct ValueBuffer {
-    JSContext *ctx;
-    JSValue *arr;
-    JSValue def[4];
+    JSIContext *ctx;
+    JSIValue *arr;
+    JSIValue def[4];
     int len;
     int size;
     int error_status;
 } ValueBuffer;
 
-static int value_buffer_init(JSContext *ctx, ValueBuffer *b)
+static int value_buffer_init(JSIContext *ctx, ValueBuffer *b)
 {
     b->ctx = ctx;
     b->len = 0;
@@ -39523,7 +39523,7 @@ static void value_buffer_free(ValueBuffer *b)
     b->size = 4;
 }
 
-static int value_buffer_append(ValueBuffer *b, JSValue val)
+static int value_buffer_append(ValueBuffer *b, JSIValue val)
 {
     if (b->error_status)
         return -1;
@@ -39531,7 +39531,7 @@ static int value_buffer_append(ValueBuffer *b, JSValue val)
     if (b->len >= b->size) {
         int new_size = (b->len + (b->len >> 1) + 31) & ~16;
         size_t slack;
-        JSValue *new_arr;
+        JSIValue *new_arr;
 
         if (b->arr == b->def) {
             new_arr = jsi_realloc2(b->ctx, NULL, sizeof(*b->arr) * new_size, &slack);
@@ -39561,11 +39561,11 @@ static int value_buffer_append(ValueBuffer *b, JSValue val)
 
 
 
-static JSValue internalize_json_property(JSContext *ctx, JSValueConst holder,
-                                         JSAtom name, JSValueConst reviver)
+static JSIValue internalize_json_property(JSIContext *ctx, JSIValueConst holder,
+                                         JSAtom name, JSIValueConst reviver)
 {
-    JSValue val, new_el, name_val, res;
-    JSValueConst args[2];
+    JSIValue val, new_el, name_val, res;
+    JSIValueConst args[2];
     int ret, is_array;
     uint32_t i, len = 0;
     JSAtom prop;
@@ -39632,16 +39632,16 @@ static JSValue internalize_json_property(JSContext *ctx, JSValueConst holder,
 
 
 typedef struct JSONStringifyContext {
-    JSValueConst replacer_func;
-    JSValue stack;
-    JSValue property_list;
-    JSValue gap;
-    JSValue empty;
+    JSIValueConst replacer_func;
+    JSIValue stack;
+    JSIValue property_list;
+    JSIValue gap;
+    JSIValue empty;
     StringBuffer *b;
 } JSONStringifyContext;
 
-static JSValue JSI_ToQuotedStringFree(JSContext *ctx, JSValue val) {
-    JSValue r = JSI_ToQuotedString(ctx, val);
+static JSIValue JSI_ToQuotedStringFree(JSIContext *ctx, JSIValue val) {
+    JSIValue r = JSI_ToQuotedString(ctx, val);
     JSI_FreeValue(ctx, val);
     return r;
 }
@@ -39654,11 +39654,11 @@ static JSValue JSI_ToQuotedStringFree(JSContext *ctx, JSValue val) {
 
 
 
-static JSValue jsi_create_desc(JSContext *ctx, JSValueConst val,
-                              JSValueConst getter, JSValueConst setter,
+static JSIValue jsi_create_desc(JSIContext *ctx, JSIValueConst val,
+                              JSIValueConst getter, JSIValueConst setter,
                               int flags)
 {
-    JSValue ret;
+    JSIValue ret;
     ret = JSI_NewObject(ctx);
     if (JSI_IsException(ret))
         return ret;
@@ -39721,10 +39721,10 @@ static int find_prop_key(const JSPropertyEnum *tab, int n, JSAtom atom)
 
 /* Symbol */
 
-static JSValue jsi_symbol_constructor(JSContext *ctx, JSValueConst new_target,
-                                     int argc, JSValueConst *argv)
+static JSIValue jsi_symbol_constructor(JSIContext *ctx, JSIValueConst new_target,
+                                     int argc, JSIValueConst *argv)
 {
-    JSValue str;
+    JSIValue str;
     JSString *p;
 
     if (!JSI_IsUndefined(new_target))
@@ -39740,7 +39740,7 @@ static JSValue jsi_symbol_constructor(JSContext *ctx, JSValueConst new_target,
     return JSI_NewSymbol(ctx, p, JSI_ATOM_TYPE_SYMBOL);
 }
 
-static JSValue jsi_thisSymbolValue(JSContext *ctx, JSValueConst this_val)
+static JSIValue jsi_thisSymbolValue(JSIContext *ctx, JSIValueConst this_val)
 {
     if (JSI_VALUE_GET_TAG(this_val) == JSI_TAG_SYMBOL)
         return JSI_DupValue(ctx, this_val);
@@ -39755,28 +39755,28 @@ static JSValue jsi_thisSymbolValue(JSContext *ctx, JSValueConst this_val)
     return JSI_ThrowTypeError(ctx, "not a symbol");
 }
 
-static JSValue jsi_symbol_toString(JSContext *ctx, JSValueConst this_val,
-                                  int argc, JSValueConst *argv)
+static JSIValue jsi_symbol_toString(JSIContext *ctx, JSIValueConst this_val,
+                                  int argc, JSIValueConst *argv)
 {
-    JSValue val, ret;
+    JSIValue val, ret;
     val = jsi_thisSymbolValue(ctx, this_val);
     if (JSI_IsException(val))
         return val;
     /* XXX: use JSI_ToStringInternal() with a flags */
-    ret = jsi_string_constructor(ctx, JSI_UNDEFINED, 1, (JSValueConst *)&val);
+    ret = jsi_string_constructor(ctx, JSI_UNDEFINED, 1, (JSIValueConst *)&val);
     JSI_FreeValue(ctx, val);
     return ret;
 }
 
-static JSValue jsi_symbol_valueOf(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
+static JSIValue jsi_symbol_valueOf(JSIContext *ctx, JSIValueConst this_val,
+                                 int argc, JSIValueConst *argv)
 {
     return jsi_thisSymbolValue(ctx, this_val);
 }
 
-static JSValue jsi_symbol_get_description(JSContext *ctx, JSValueConst this_val)
+static JSIValue jsi_symbol_get_description(JSIContext *ctx, JSIValueConst this_val)
 {
-    JSValue val, ret;
+    JSIValue val, ret;
     JSAtomStruct *p;
 
     val = jsi_thisSymbolValue(ctx, this_val);
@@ -39801,10 +39801,10 @@ static const JSCFunctionListEntry jsi_symbol_proto_funcs[] = {
     JSI_CGETSET_DEF("description", jsi_symbol_get_description, NULL ),
 };
 
-static JSValue jsi_symbol_for(JSContext *ctx, JSValueConst this_val,
-                             int argc, JSValueConst *argv)
+static JSIValue jsi_symbol_for(JSIContext *ctx, JSIValueConst this_val,
+                             int argc, JSIValueConst *argv)
 {
-    JSValue str;
+    JSIValue str;
 
     str = JSI_ToString(ctx, argv[0]);
     if (JSI_IsException(str))
@@ -39812,8 +39812,8 @@ static JSValue jsi_symbol_for(JSContext *ctx, JSValueConst this_val,
     return JSI_NewSymbol(ctx, JSI_VALUE_GET_STRING(str), JSI_ATOM_TYPE_GLOBAL_SYMBOL);
 }
 
-static JSValue jsi_symbol_keyFor(JSContext *ctx, JSValueConst this_val,
-                                int argc, JSValueConst *argv)
+static JSIValue jsi_symbol_keyFor(JSIContext *ctx, JSIValueConst this_val,
+                                int argc, JSIValueConst *argv)
 {
     JSAtomStruct *p;
 
@@ -39898,11 +39898,11 @@ static const JSCFunctionListEntry jsi_async_iterator_proto_funcs[] = {
 /* AsyncFromSyncIteratorPrototype */
 
 typedef struct JSAsyncFromSyncIteratorData {
-    JSValue sync_iter;
-    JSValue next_method;
+    JSIValue sync_iter;
+    JSIValue next_method;
 } JSAsyncFromSyncIteratorData;
 
-static void jsi_async_from_sync_iterator_finalizer(JSRuntime *rt, JSValue val)
+static void jsi_async_from_sync_iterator_finalizer(JSRuntime *rt, JSIValue val)
 {
     JSAsyncFromSyncIteratorData *s =
         JSI_GetOpaque(val, JSI_CLASS_ASYNC_FROM_SYNC_ITERATOR);
@@ -39913,7 +39913,7 @@ static void jsi_async_from_sync_iterator_finalizer(JSRuntime *rt, JSValue val)
     }
 }
 
-static void jsi_async_from_sync_iterator_mark(JSRuntime *rt, JSValueConst val,
+static void jsi_async_from_sync_iterator_mark(JSRuntime *rt, JSIValueConst val,
                                              JSI_MarkFunc *mark_func)
 {
     JSAsyncFromSyncIteratorData *s =
@@ -39924,10 +39924,10 @@ static void jsi_async_from_sync_iterator_mark(JSRuntime *rt, JSValueConst val,
     }
 }
 
-static JSValue JSI_CreateAsyncFromSyncIterator(JSContext *ctx,
-                                              JSValueConst sync_iter)
+static JSIValue JSI_CreateAsyncFromSyncIterator(JSIContext *ctx,
+                                              JSIValueConst sync_iter)
 {
-    JSValue async_iter, next_method;
+    JSIValue async_iter, next_method;
     JSAsyncFromSyncIteratorData *s;
 
     next_method = JSI_GetProperty(ctx, sync_iter, JSI_ATOM_next);
@@ -39950,36 +39950,36 @@ static JSValue JSI_CreateAsyncFromSyncIterator(JSContext *ctx,
     return async_iter;
 }
 
-static JSValue jsi_async_from_sync_iterator_unwrap(JSContext *ctx,
-                                                  JSValueConst this_val,
-                                                  int argc, JSValueConst *argv,
-                                                  int magic, JSValue *func_data)
+static JSIValue jsi_async_from_sync_iterator_unwrap(JSIContext *ctx,
+                                                  JSIValueConst this_val,
+                                                  int argc, JSIValueConst *argv,
+                                                  int magic, JSIValue *func_data)
 {
     return jsi_create_iterator_result(ctx, JSI_DupValue(ctx, argv[0]),
                                      JSI_ToBool(ctx, func_data[0]));
 }
 
-static JSValue jsi_async_from_sync_iterator_unwrap_func_create(JSContext *ctx,
+static JSIValue jsi_async_from_sync_iterator_unwrap_func_create(JSIContext *ctx,
                                                               BOOL done)
 {
-    JSValueConst func_data[1];
+    JSIValueConst func_data[1];
 
-    func_data[0] = (JSValueConst)JSI_NewBool(ctx, done);
+    func_data[0] = (JSIValueConst)JSI_NewBool(ctx, done);
     return JSI_NewCFunctionData(ctx, jsi_async_from_sync_iterator_unwrap,
                                1, 0, 1, func_data);
 }
 
-static JSValue jsi_async_from_sync_iterator_close_wrap(JSContext *ctx,
-                                                      JSValueConst this_val,
-                                                      int argc, JSValueConst *argv,
-                                                      int magic, JSValue *func_data)
+static JSIValue jsi_async_from_sync_iterator_close_wrap(JSIContext *ctx,
+                                                      JSIValueConst this_val,
+                                                      int argc, JSIValueConst *argv,
+                                                      int magic, JSIValue *func_data)
 {
     JSI_Throw(ctx, JSI_DupValue(ctx, argv[0]));
     JSI_IteratorClose(ctx, func_data[0], TRUE);
     return JSI_EXCEPTION;
 }
 
-static JSValue jsi_async_from_sync_iterator_close_wrap_func_create(JSContext *ctx, JSValueConst sync_iter)
+static JSIValue jsi_async_from_sync_iterator_close_wrap_func_create(JSIContext *ctx, JSIValueConst sync_iter)
 {
     return JSI_NewCFunctionData(ctx, jsi_async_from_sync_iterator_close_wrap,
                                1, 0, 1, &sync_iter);
@@ -40027,7 +40027,7 @@ static int isURIReserved(int c) {
     return c < 0x100 && memchr(";/?:@&=+$,#", c, sizeof(";/?:@&=+$,#") - 1) != NULL;
 }
 
-static int __attribute__((format(printf, 2, 3))) jsi_throw_URIError(JSContext *ctx, const char *fmt, ...)
+static int __attribute__((format(printf, 2, 3))) jsi_throw_URIError(JSIContext *ctx, const char *fmt, ...)
 {
     va_list ap;
 
@@ -40037,7 +40037,7 @@ static int __attribute__((format(printf, 2, 3))) jsi_throw_URIError(JSContext *c
     return -1;
 }
 
-static int hex_decode(JSContext *ctx, JSString *p, int k) {
+static int hex_decode(JSIContext *ctx, JSString *p, int k) {
     int c;
 
     if (k >= p->len || string_get(p, k) != '%')
@@ -40077,7 +40077,7 @@ static const JSCFunctionListEntry jsi_global_funcs[] = {
 
 /* eval */
 
-void JSI_AddIntrinsicEval(JSContext *ctx)
+void JSI_AddIntrinsicEval(JSIContext *ctx)
 {
     ctx->eval_internal = __JSI_EvalInternal;
 }
@@ -40097,9 +40097,9 @@ static const char * const native_error_name[JSI_NATIVE_ERROR_COUNT] = {
 
 /* Minimum amount of objects to be able to compile code and display
    error messages. No JSAtom should be allocated by this function. */
-static void JSI_AddIntrinsicBasicObjects(JSContext *ctx)
+static void JSI_AddIntrinsicBasicObjects(JSIContext *ctx)
 {
-    JSValue proto;
+    JSIValue proto;
     int i;
 
     ctx->class_proto[JSI_CLASS_OBJECT] = JSI_NewObjectProto(ctx, JSI_NULL);
@@ -40153,11 +40153,11 @@ static void JSI_AddIntrinsicBasicObjects(JSContext *ctx)
     //    assert(ctx->rt->atom_count == JSI_ATOM_END);
 }
 
-void JSI_AddIntrinsicBaseObjects(JSContext *ctx)
+void JSI_AddIntrinsicBaseObjects(JSIContext *ctx)
 {
     int i;
-    JSValueConst obj, number_obj;
-    JSValue obj1;
+    JSIValueConst obj, number_obj;
+    JSIValue obj1;
 
     ctx->throw_type_error = JSI_NewCFunction(ctx, jsi_throw_type_error, NULL, 0);
 
@@ -40170,7 +40170,7 @@ void JSI_AddIntrinsicBaseObjects(JSContext *ctx)
                       ctx->throw_type_error, ctx->throw_type_error,
                       JSI_PROP_HAS_GET | JSI_PROP_HAS_SET |
                       JSI_PROP_HAS_CONFIGURABLE | JSI_PROP_CONFIGURABLE);
-    JSI_FreeValue(ctx, jsi_object_seal(ctx, JSI_UNDEFINED, 1, (JSValueConst *)&ctx->throw_type_error, 1));
+    JSI_FreeValue(ctx, jsi_object_seal(ctx, JSI_UNDEFINED, 1, (JSIValueConst *)&ctx->throw_type_error, 1));
 
     ctx->global_obj = JSI_NewObject(ctx);
     ctx->global_var_obj = JSI_NewObjectProto(ctx, JSI_NULL);
@@ -40202,7 +40202,7 @@ void JSI_AddIntrinsicBaseObjects(JSContext *ctx)
     /* Used to squelch a -Wcast-function-type warning. */
     JSCFunctionType ft = { .generic_magic = jsi_error_constructor };
     for(i = 0; i < JSI_NATIVE_ERROR_COUNT; i++) {
-        JSValue func_obj;
+        JSIValue func_obj;
         int n_args;
         n_args = 1 + (i == JSI_AGGREGATE_ERROR);
         func_obj = JSI_NewCFunction3(ctx, ft.generic,

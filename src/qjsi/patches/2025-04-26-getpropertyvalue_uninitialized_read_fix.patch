@@ -2,7 +2,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 index caad931..325c6dd 100644
 --- a/quickjs/quickjs.c
 +++ b/quickjs/quickjs.c
-@@ -8367,6 +8367,8 @@ static JSValue JSI_GetPropertyValue(JSContext *ctx, JSValueConst this_obj,
+@@ -8367,6 +8367,8 @@ static JSIValue JSI_GetPropertyValue(JSIContext *ctx, JSIValueConst this_obj,
          uint32_t idx;
          /* fast path for array access */
          p = JSI_VALUE_GET_OBJ(this_obj);

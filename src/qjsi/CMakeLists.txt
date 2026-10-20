@@ -17,13 +17,13 @@ add_library(quickjs-i ${quickjsi_src})
 target_compile_definitions(quickjs-i PRIVATE ${quickjsi_def} )
 set_target_properties(quickjs-i PROPERTIES PUBLIC_HEADER "quickjsi_i.h;quickjs-libc_i.h")
 
-add_library(quickjs-dumpleaks ${quickjsi_src})
-target_compile_definitions(quickjs-dumpleaks PRIVATE ${quickjsi_def} DUMP_LEAKS=1)
+add_library(quickjs-dumpleaks2 ${quickjsi_src})
+target_compile_definitions(quickjs-dumpleaks2 PRIVATE ${quickjsi_def} DUMP_LEAKS=1)
 
 if(UNIX OR MINGW)
   find_package(Threads)
   target_link_libraries(quickjs-i ${CMAKE_DL_LIBS} m Threads::Threads)
-  target_link_libraries(quickjs-dumpleaks ${CMAKE_DL_LIBS} m Threads::Threads)
+  target_link_libraries(quickjs-dumpleaks2 ${CMAKE_DL_LIBS} m Threads::Threads)
 endif()
 
 # install

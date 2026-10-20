@@ -6,14 +6,14 @@
 template<size_t S1, size_t S2>
 class JSScope {
 public:
-    JSScope(JSContext* ctx) : ctx_(ctx) {}
+    JSScope(JSIContext* ctx) : ctx_(ctx) {}
     ~JSScope() {
         for(size_t i=0; i<stringgs_n; i++)
             JSI_FreeCString(ctx_, strings_[i]);
         for(size_t i=0; i<values_n; i++)
             JSI_FreeValue(ctx_, values_[i]);
     }
-    std::string_view toStdStringView(const JSValue& val) {
+    std::string_view toStdStringView(const JSIValue& val) {
         size_t len;
         const char* str = JSI_ToCStringLen(ctx_, &len, val);
         if (str)
@@ -28,7 +28,7 @@ public:
         }
         return "";
     }
-    std::string toStdString(const JSValue& val) {
+    std::string toStdString(const JSIValue& val) {
         size_t len;
         const char* str = JSI_ToCStringLen(ctx_, &len, val);
         if (str)
@@ -44,7 +44,7 @@ public:
         return "";
     }
 
-    void addValue(JSValue val) {
+    void addValue(JSIValue val) {
 
         if(values_n<S2)
         {
@@ -53,9 +53,9 @@ public:
         else throw std::runtime_error("!if(values_n<S2)");
     }
 private:
-    JSContext* ctx_;
+    JSIContext* ctx_;
     const char* strings_[S1];
     size_t stringgs_n=0;
-    JSValue values_[S2];
+    JSIValue values_[S2];
     size_t values_n=0;
 };

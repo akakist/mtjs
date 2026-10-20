@@ -6,7 +6,8 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O3 -march=native  -DNDEBUG -g")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ")
 
 include_directories(..)
-add_executable(test_runner
+include_directories(../../js/api/common)
+add_executable(test_runner0
     test_runner.cpp
     )
-target_link_libraries(test_runner quickjs-i)
+target_link_libraries(test_runner0 quickjs-i)

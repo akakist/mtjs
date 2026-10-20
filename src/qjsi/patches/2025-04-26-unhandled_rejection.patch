@@ -15,8 +15,8 @@ index 325c6dd..0535169 100644
 @@ -49246,6 +49249,7 @@ typedef struct JSPromiseData {
      struct list_head promise_reactions[2];
      BOOL is_handled; /* Note: only useful to debug */
-     JSValue promise_result;
-+    JSContext * ctx;
+     JSIValue promise_result;
++    JSIContext * ctx;
  } JSPromiseData;
  
  typedef struct JSPromiseFunctionDataResolved {
@@ -32,10 +32,10 @@ index 325c6dd..0535169 100644
 +    rt->host_unhandled_promise_rejection_tracker_opaque = opaque;
 +}
 +
- static void fulfill_or_reject_promise(JSContext *ctx, JSValueConst promise,
-                                       JSValueConst value, BOOL is_reject)
+ static void fulfill_or_reject_promise(JSIContext *ctx, JSIValueConst promise,
+                                       JSIValueConst value, BOOL is_reject)
  {
-@@ -49546,6 +49558,14 @@ static void jsi_promise_finalizer(JSRuntime *rt, JSValue val)
+@@ -49546,6 +49558,14 @@ static void jsi_promise_finalizer(JSRuntime *rt, JSIValue val)
  
      if (!s)
          return;
@@ -50,7 +50,7 @@ index 325c6dd..0535169 100644
      for(i = 0; i < 2; i++) {
          list_for_each_safe(el, el1, &s->promise_reactions[i]) {
              JSPromiseReactionData *rd =
-@@ -49596,6 +49616,7 @@ static JSValue jsi_promise_constructor(JSContext *ctx, JSValueConst new_target,
+@@ -49596,6 +49616,7 @@ static JSIValue jsi_promise_constructor(JSIContext *ctx, JSIValueConst new_target,
      s = jsi_mallocz(ctx, sizeof(*s));
      if (!s)
          goto fail;
@@ -62,8 +62,8 @@ diff --git a/quickjs/quickjs.h b/quickjs/quickjs.h
 index 4570c6d..80aacc4 100644
 --- a/quickjs/quickjs.h
 +++ b/quickjs/quickjs.h
-@@ -912,6 +912,7 @@ typedef void JSHostPromiseRejectionTracker(JSContext *ctx, JSValueConst promise,
-                                            JSValueConst reason,
+@@ -912,6 +912,7 @@ typedef void JSHostPromiseRejectionTracker(JSIContext *ctx, JSIValueConst promise,
+                                            JSIValueConst reason,
                                             JSI_BOOL is_handled, void *opaque);
  void JSI_SetHostPromiseRejectionTracker(JSRuntime *rt, JSHostPromiseRejectionTracker *cb, void *opaque);
 +void JSI_SetHostUnhandledPromiseRejectionTracker(JSRuntime *rt, JSHostPromiseRejectionTracker *cb, void *opaque);

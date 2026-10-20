@@ -6,8 +6,8 @@ index fa7c24a..0535169 100644
      return class_id;
  }
  
--JSClassID JSI_GetClassID(JSValue v)
-+JSClassID JSI_GetClassID(JSValueConst v)
+-JSClassID JSI_GetClassID(JSIValue v)
++JSClassID JSI_GetClassID(JSIValueConst v)
  {
      JSObject *p;
      if (JSI_VALUE_GET_TAG(v) != JSI_TAG_OBJECT)
@@ -19,8 +19,8 @@ index 2083f73..80aacc4 100644
  #define JSI_INVALID_CLASS_ID 0
  JSClassID JSI_NewClassID(JSClassID *pclass_id);
  /* Returns the class ID if `v` is an object, otherwise returns JSI_INVALID_CLASS_ID. */
--JSClassID JSI_GetClassID(JSValue v);
-+JSClassID JSI_GetClassID(JSValueConst v);
+-JSClassID JSI_GetClassID(JSIValue v);
++JSClassID JSI_GetClassID(JSIValueConst v);
  int JSI_NewClass(JSRuntime *rt, JSClassID class_id, const JSClassDef *class_def);
  int JSI_IsRegisteredClass(JSRuntime *rt, JSClassID class_id);
  

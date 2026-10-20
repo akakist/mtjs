@@ -2,22 +2,22 @@
 #pragma once
 #include <quickjs_i.h>
 
-class JSValueGuard {
-    JSContext* ctx = nullptr;
-    JSValue val = JSI_UNDEFINED;
+class JSIValueGuard {
+    JSIContext* ctx = nullptr;
+    JSIValue val = JSI_UNDEFINED;
 
 public:
     // Конструкторы
-    JSValueGuard() = default;
+    JSIValueGuard() = default;
 
-    JSValueGuard(JSContext* c, JSValue v) : ctx(c), val(v) {}
+    JSIValueGuard(JSIContext* c, JSIValue v) : ctx(c), val(v) {}
 
     // Конструктор копирования (увеличивает счётчик)
-    JSValueGuard(const JSValueGuard& other)
+    JSIValueGuard(const JSIValueGuard& other)
         : ctx(other.ctx), val(JSI_DupValue(other.ctx, other.val)) {}
 
     // Оператор присваивания (копирование)
-    JSValueGuard& operator=(const JSValueGuard& other) {
+    JSIValueGuard& operator=(const JSIValueGuard& other) {
         if (this != &other) {
             // Освобождаем текущее значение
             if (ctx && !JSI_IsUndefined(val) && !JSI_IsNull(val)) {
@@ -31,17 +31,17 @@ public:
     }
 
     // Деструктор
-    ~JSValueGuard() {
+    ~JSIValueGuard() {
         if (ctx && !JSI_IsUndefined(val) && !JSI_IsNull(val)) {
             JSI_FreeValue(ctx, val);
         }
     }
 
     // Доступ к значению
-    JSValue get() const {
+    JSIValue get() const {
         return val;
     }
-    JSContext* context() const {
+    JSIContext* context() const {
         return ctx;
     }
 
@@ -51,8 +51,8 @@ public:
     }
 
     // Отдать владение (не освобождать при разрушении)
-    JSValue release() {
-        JSValue tmp = val;
+    JSIValue release() {
+        JSIValue tmp = val;
         val = JSI_UNDEFINED;
         ctx = nullptr;
         return tmp;
@@ -68,7 +68,7 @@ public:
     }
 };
 
-inline int operator< (const JSValueGuard &a, const JSValueGuard &b)
+inline int operator< (const JSIValueGuard &a, const JSIValueGuard &b)
 {
     if(a.get().tag != b.get().tag) return a.get().tag < b.get().tag;
     if(a.get().u.ptr != b.get().u.ptr) return  a.get().u.ptr < b.get().u.ptr;

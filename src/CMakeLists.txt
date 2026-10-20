@@ -117,7 +117,7 @@ endif()
 
 
 
-include_directories(.)
+include_directories(. qjsi)
 
 include_directories(megatron mt/main mt/corelib)
 
@@ -149,8 +149,7 @@ if(APPLE)
     
 include_directories(
 )
-link_directories(
-)
+link_directories( qjsi quickjs)
 endif()
 
 include_directories(	src/mtjs
@@ -243,6 +242,7 @@ ADD_SUBDIRECTORY(mt)
 #ADD_SUBDIRECTORY(xpp)
 ADD_SUBDIRECTORY(js)
 ADD_SUBDIRECTORY(quickjs)
+ADD_SUBDIRECTORY(qjsi)
 #ADD_SUBDIRECTORY(bc)
 
 
