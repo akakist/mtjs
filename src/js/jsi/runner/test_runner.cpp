@@ -217,7 +217,7 @@ static json json_from_jsi(JSIContext* ctx, JSIValueConst val) {
     if (JSI_IsBool(val)) return JSI_ToBool(ctx, val) != 0;
     if (JSI_VALUE_GET_TAG(val) == JSI_TAG_INT)
     {
-        printf("val %ld\n",JSI_VALUE_GET_INT(val));
+        // printf("val %ld\n",JSI_VALUE_GET_INT(val));
          return JSI_VALUE_GET_INT(val);
     }
 

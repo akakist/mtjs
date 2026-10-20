@@ -17519,7 +17519,7 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
             {
                 JSIValue op1;
                 uint32_t tag;
-                int val;
+                int64_t val;
                 op1 = sp[-1];
                 tag = JSI_VALUE_GET_TAG(op1);
                 if (tag == JSI_TAG_INT) {
