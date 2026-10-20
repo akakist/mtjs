@@ -38,8 +38,8 @@ JSModuleDef *jsi_init_module_os(JSIContext *ctx, const char *module_name);
 void jsi_std_add_helpers(JSIContext *ctx, int argc, char **argv);
 void jsi_std_loop(JSIContext *ctx);
 JSIValue jsi_std_await(JSIContext *ctx, JSIValue obj);
-void jsi_std_init_handlers(JSRuntime *rt);
-void jsi_std_free_handlers(JSRuntime *rt);
+void jsi_std_init_handlers(JSIRuntime *rt);
+void jsi_std_free_handlers(JSIRuntime *rt);
 void jsi_std_dump_error(JSIContext *ctx);
 uint8_t *jsi_load_file(JSIContext *ctx, size_t *pbuf_len, const char *filename);
 int jsi_module_set_import_meta(JSIContext *ctx, JSIValueConst func_val,
@@ -57,7 +57,7 @@ void jsi_std_eval_binary_json_module(JSIContext *ctx,
 void jsi_std_promise_rejection_tracker(JSIContext *ctx, JSIValueConst promise,
                                       JSIValueConst reason,
                                       JSI_BOOL is_handled, void *opaque);
-void jsi_std_set_worker_new_context_func(JSIContext *(*func)(JSRuntime *rt));
+void jsi_std_set_worker_new_context_func(JSIContext *(*func)(JSIRuntime *rt));
 
 #ifdef __cplusplus
 } /* extern "C" { */

@@ -22,7 +22,7 @@
 // ContractContext
 // ============================================================
 struct ContractContext {
-    JSRuntime* rt = nullptr;
+    JSIRuntime* rt = nullptr;
     JSIContext* ctx = nullptr;
     std::string name;
     std::string path;
@@ -909,7 +909,7 @@ std::vector<std::string> list_directory(const std::string& path) {
 }
 
 int main() {
-    JSRuntime* rt = JSI_NewRuntime();
+    JSIRuntime* rt = JSI_NewRuntime();
     if (!rt) return 1;
     JSIContext* ctx = JSI_NewContext(rt);
     if (!ctx) { JSI_FreeRuntime(rt); return 1; }

@@ -2,7 +2,7 @@ diff --git a/quickjs/quickjs.c b/quickjs/quickjs.c
 index 325c6dd..0535169 100644
 --- a/quickjs/quickjs.c
 +++ b/quickjs/quickjs.c
-@@ -278,6 +278,9 @@ struct JSRuntime {
+@@ -278,6 +278,9 @@ struct JSIRuntime {
      JSHostPromiseRejectionTracker *host_promise_rejection_tracker;
      void *host_promise_rejection_tracker_opaque;
  
@@ -20,11 +20,11 @@ index 325c6dd..0535169 100644
  } JSPromiseData;
  
  typedef struct JSPromiseFunctionDataResolved {
-@@ -49342,6 +49346,14 @@ void JSI_SetHostPromiseRejectionTracker(JSRuntime *rt,
+@@ -49342,6 +49346,14 @@ void JSI_SetHostPromiseRejectionTracker(JSIRuntime *rt,
      rt->host_promise_rejection_tracker_opaque = opaque;
  }
  
-+void JSI_SetHostUnhandledPromiseRejectionTracker(JSRuntime *rt,
++void JSI_SetHostUnhandledPromiseRejectionTracker(JSIRuntime *rt,
 +                                       JSHostPromiseRejectionTracker *cb,
 +                                       void *opaque)
 +{
@@ -35,7 +35,7 @@ index 325c6dd..0535169 100644
  static void fulfill_or_reject_promise(JSIContext *ctx, JSIValueConst promise,
                                        JSIValueConst value, BOOL is_reject)
  {
-@@ -49546,6 +49558,14 @@ static void jsi_promise_finalizer(JSRuntime *rt, JSIValue val)
+@@ -49546,6 +49558,14 @@ static void jsi_promise_finalizer(JSIRuntime *rt, JSIValue val)
  
      if (!s)
          return;
@@ -65,8 +65,8 @@ index 4570c6d..80aacc4 100644
 @@ -912,6 +912,7 @@ typedef void JSHostPromiseRejectionTracker(JSIContext *ctx, JSIValueConst promise,
                                             JSIValueConst reason,
                                             JSI_BOOL is_handled, void *opaque);
- void JSI_SetHostPromiseRejectionTracker(JSRuntime *rt, JSHostPromiseRejectionTracker *cb, void *opaque);
-+void JSI_SetHostUnhandledPromiseRejectionTracker(JSRuntime *rt, JSHostPromiseRejectionTracker *cb, void *opaque);
+ void JSI_SetHostPromiseRejectionTracker(JSIRuntime *rt, JSHostPromiseRejectionTracker *cb, void *opaque);
++void JSI_SetHostUnhandledPromiseRejectionTracker(JSIRuntime *rt, JSHostPromiseRejectionTracker *cb, void *opaque);
  
  /* return != 0 if the JS code needs to be interrupted */
- typedef int JSInterruptHandler(JSRuntime *rt, void *opaque);
+ typedef int JSInterruptHandler(JSIRuntime *rt, void *opaque);

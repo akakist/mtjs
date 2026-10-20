@@ -14,23 +14,23 @@
 #include <cstdlib>
 #include <dirent.h>
 #include <sys/stat.h>
-
+#include "REF.h"
 #include "jsiValueGuard.h"
 #include "jsiscope.h"
 
 // ============================================================
 // ContractContext
 // ============================================================
-struct ContractContext {
-    JSRuntime* rt = nullptr;
+struct ContractContext: public Refcountable {
+    JSIRuntime* rt = nullptr;
     JSIContext* ctx = nullptr;
     std::string name;
-    std::string path;
+    std::string path__1;
     bool in_view = false;
     std::map<std::string, JSIValueGuard> methods;
     std::map<std::string, JSIValueGuard> views;
 
-    ContractContext() = default;
+    ContractContext(void *_rt): Refcountable("ContractContext"), rt((JSIRuntime*)_rt){}
     ContractContext(const ContractContext&) = delete;
     ContractContext& operator=(const ContractContext&) = delete;
 
@@ -66,7 +66,7 @@ struct Granule {
 // Глобальное состояние
 // ============================================================
 std::map<std::string, Granule> granules;
-std::map<std::string, std::shared_ptr<ContractContext>> contract_cache;
+std::map<std::string, REF_getter<ContractContext>> contract_cache;
 
 struct jsiEvent {
     std::string contract;
@@ -479,15 +479,15 @@ void register_api(JSIContext* ctx) {
 // ============================================================
 // Загрузка контракта
 // ============================================================
-std::shared_ptr<ContractContext> load_contract(
+REF_getter<ContractContext> load_contract( JSIRuntime *rt,
     const std::string& name, const std::string& path)
 {
     auto it = contract_cache.find(name);
     if (it != contract_cache.end()) return it->second;
 
-    auto cc = std::make_shared<ContractContext>();
+    REF_getter<ContractContext> cc = new ContractContext(rt);
     cc->name = name;
-    cc->path = path;
+    cc->path__1 = path;
 
     if (!cc->create()) { std::cerr << "cannot create context for " << name << std::endl; return nullptr; }
 
@@ -528,12 +528,12 @@ std::shared_ptr<ContractContext> load_contract(
     return cc;
 }
 
-std::shared_ptr<ContractContext> get_contract(
+REF_getter<ContractContext> get_contract( JSIRuntime* rt,
     const std::string& name, const std::string& contracts_dir)
 {
     auto it = contract_cache.find(name);
     if (it != contract_cache.end()) return it->second;
-    return load_contract(name, contracts_dir + "/" + name + ".js");
+    return load_contract(rt, name, contracts_dir + "/" + name + ".js");
 }
 
 // ============================================================
@@ -737,15 +737,15 @@ static void apply_initial(JSIContext* ctx, const TestCase& tc) {
         granules[key] = Granule{ std::move(s), 0, 0 };
     }
 }
-static bool run_transactions(JSIContext* runner_ctx, TestCase& tc) {
+static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& tc) {
     for (auto& tx : tc.transactions) {
         auto saved = granules;
         auto saved_events = all_events;
         bool tx_aborted = false;
 
         for (auto& cmd : tx.commands) {
-            auto cc = get_contract(cmd.contract, "contracts");
-            if (!cc) { std::cerr << "contract not loaded: " << cmd.contract << std::endl; return false; }
+            auto cc = get_contract(rt, cmd.contract, "contracts");
+            if (!cc.valid()) { std::cerr << "contract not loaded: " << cmd.contract << std::endl; return false; }
             auto mit = cc->methods.find(cmd.method);
             if (mit == cc->methods.end()) {
                 std::cerr << "method not found: " << cmd.contract << "." << cmd.method << std::endl;
@@ -909,7 +909,7 @@ std::vector<std::string> list_directory(const std::string& path) {
 }
 
 int main() {
-    JSRuntime* rt = JSI_NewRuntime();
+    JSIRuntime* rt = JSI_NewRuntime();
     if (!rt) return 1;
     JSIContext* ctx = JSI_NewContext(rt);
     if (!ctx) { JSI_FreeRuntime(rt); return 1; }
@@ -930,12 +930,12 @@ int main() {
         bool load_ok = true;
         for (auto& tx : tc.transactions)
             for (auto& cmd : tx.commands)
-                if (!get_contract(cmd.contract, "contracts")) { load_ok = false; break; }
+                if (!get_contract(rt, cmd.contract, "contracts").valid()) { load_ok = false; break; }
         if (!load_ok) { std::cerr << "  cannot load contracts" << std::endl; failures++; continue; }
 
         apply_initial(ctx, tc);
 
-        if (!run_transactions(ctx, tc)) { failures++; continue; }
+        if (!run_transactions(rt, ctx, tc)) { failures++; continue; }
         if (!compare_emits(all_events, tc.expected_emits)) { failures++; continue; }
         if (!compare_expected(ctx, tc)) { failures++; continue; }
 

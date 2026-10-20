@@ -47,7 +47,7 @@ extern "C" {
 
 #define JSI_BOOL int
 
-typedef struct JSRuntime JSRuntime;
+typedef struct JSIRuntime JSIRuntime;
 typedef struct JSIContext JSIContext;
 typedef struct JSClass JSClass;
 typedef uint32_t JSClassID;
@@ -354,37 +354,37 @@ typedef struct JSMallocFunctions {
 
 typedef struct JSGCObjectHeader JSGCObjectHeader;
 
-JSRuntime *JSI_NewRuntime(void);
+JSIRuntime *JSI_NewRuntime(void);
 /* info lifetime must exceed that of rt */
-void JSI_SetRuntimeInfo(JSRuntime *rt, const char *info);
-void JSI_SetMemoryLimit(JSRuntime *rt, size_t limit);
-void JSI_SetGCThreshold(JSRuntime *rt, size_t gc_threshold);
+void JSI_SetRuntimeInfo(JSIRuntime *rt, const char *info);
+void JSI_SetMemoryLimit(JSIRuntime *rt, size_t limit);
+void JSI_SetGCThreshold(JSIRuntime *rt, size_t gc_threshold);
 /* use 0 to disable maximum stack size check */
-void JSI_SetMaxStackSize(JSRuntime *rt, size_t stack_size);
+void JSI_SetMaxStackSize(JSIRuntime *rt, size_t stack_size);
 /* should be called when changing thread to update the stack top value
    used to check stack overflow. */
-void JSI_UpdateStackTop(JSRuntime *rt);
-JSRuntime *JSI_NewRuntime2(const JSMallocFunctions *mf, void *opaque);
-void JSI_FreeRuntime(JSRuntime *rt);
-void *JSI_GetRuntimeOpaque(JSRuntime *rt);
-void JSI_SetRuntimeOpaque(JSRuntime *rt, void *opaque);
-typedef void JSI_MarkFunc(JSRuntime *rt, JSGCObjectHeader *gp);
-void JSI_MarkValue(JSRuntime *rt, JSIValueConst val, JSI_MarkFunc *mark_func);
-void JSI_RunGC(JSRuntime *rt);
-JSI_BOOL JSI_IsLiveObject(JSRuntime *rt, JSIValueConst obj);
+void JSI_UpdateStackTop(JSIRuntime *rt);
+JSIRuntime *JSI_NewRuntime2(const JSMallocFunctions *mf, void *opaque);
+void JSI_FreeRuntime(JSIRuntime *rt);
+void *JSI_GetRuntimeOpaque(JSIRuntime *rt);
+void JSI_SetRuntimeOpaque(JSIRuntime *rt, void *opaque);
+typedef void JSI_MarkFunc(JSIRuntime *rt, JSGCObjectHeader *gp);
+void JSI_MarkValue(JSIRuntime *rt, JSIValueConst val, JSI_MarkFunc *mark_func);
+void JSI_RunGC(JSIRuntime *rt);
+JSI_BOOL JSI_IsLiveObject(JSIRuntime *rt, JSIValueConst obj);
 
-JSIContext *JSI_NewContext(JSRuntime *rt);
+JSIContext *JSI_NewContext(JSIRuntime *rt);
 void JSI_FreeContext(JSIContext *s);
 JSIContext *JSI_DupContext(JSIContext *ctx);
 void *JSI_GetContextOpaque(JSIContext *ctx);
 void JSI_SetContextOpaque(JSIContext *ctx, void *opaque);
-JSRuntime *JSI_GetRuntime(JSIContext *ctx);
+JSIRuntime *JSI_GetRuntime(JSIContext *ctx);
 void JSI_SetClassProto(JSIContext *ctx, JSClassID class_id, JSIValue obj);
 JSIValue JSI_GetClassProto(JSIContext *ctx, JSClassID class_id);
 
 /* the following functions are used to select the intrinsic object to
    save memory */
-JSIContext *JSI_NewContextRaw(JSRuntime *rt);
+JSIContext *JSI_NewContextRaw(JSIRuntime *rt);
 void JSI_AddIntrinsicBaseObjects(JSIContext *ctx);
 void JSI_AddIntrinsicEval(JSIContext *ctx);
 void JSI_AddIntrinsicStringNormalize(JSIContext *ctx);
@@ -393,11 +393,11 @@ void JSI_AddIntrinsicPromise(JSIContext *ctx);
 JSIValue jsi_string_codePointRange(JSIContext *ctx, JSIValueConst this_val,
                                  int argc, JSIValueConst *argv);
 
-void *jsi_malloc_rt(JSRuntime *rt, size_t size);
-void jsi_free_rt(JSRuntime *rt, void *ptr);
-void *jsi_realloc_rt(JSRuntime *rt, void *ptr, size_t size);
-size_t jsi_malloc_usable_size_rt(JSRuntime *rt, const void *ptr);
-void *jsi_mallocz_rt(JSRuntime *rt, size_t size);
+void *jsi_malloc_rt(JSIRuntime *rt, size_t size);
+void jsi_free_rt(JSIRuntime *rt, void *ptr);
+void *jsi_realloc_rt(JSIRuntime *rt, void *ptr, size_t size);
+size_t jsi_malloc_usable_size_rt(JSIRuntime *rt, const void *ptr);
+void *jsi_mallocz_rt(JSIRuntime *rt, size_t size);
 
 void *jsi_malloc(JSIContext *ctx, size_t size);
 void jsi_free(JSIContext *ctx, void *ptr);
@@ -424,8 +424,8 @@ typedef struct JSMemoryUsage {
     int64_t binary_object_count, binary_object_size;
 } JSMemoryUsage;
 
-void JSI_ComputeMemoryUsage(JSRuntime *rt, JSMemoryUsage *s);
-void JSI_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt);
+void JSI_ComputeMemoryUsage(JSIRuntime *rt, JSMemoryUsage *s);
+void JSI_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSIRuntime *rt);
 
 /* atom support */
 #define JSI_ATOM_NULL 0
@@ -435,7 +435,7 @@ JSAtom JSI_NewAtom(JSIContext *ctx, const char *str);
 JSAtom JSI_NewAtomUInt32(JSIContext *ctx, uint32_t n);
 JSAtom JSI_DupAtom(JSIContext *ctx, JSAtom v);
 void JSI_FreeAtom(JSIContext *ctx, JSAtom v);
-void JSI_FreeAtomRT(JSRuntime *rt, JSAtom v);
+void JSI_FreeAtomRT(JSIRuntime *rt, JSAtom v);
 JSIValue JSI_AtomToValue(JSIContext *ctx, JSAtom atom);
 JSIValue JSI_AtomToString(JSIContext *ctx, JSAtom atom);
 const char *JSI_AtomToCStringLen(JSIContext *ctx, size_t *plen, JSAtom atom);
@@ -500,8 +500,8 @@ typedef struct JSClassExoticMethods {
     int (*prevent_extensions)(JSIContext *ctx, JSIValueConst obj);
 } JSClassExoticMethods;
 
-typedef void JSClassFinalizer(JSRuntime *rt, JSIValue val);
-typedef void JSClassGCMark(JSRuntime *rt, JSIValueConst val,
+typedef void JSClassFinalizer(JSIRuntime *rt, JSIValue val);
+typedef void JSClassGCMark(JSIRuntime *rt, JSIValueConst val,
                            JSI_MarkFunc *mark_func);
 #define JSI_CALL_FLAG_CONSTRUCTOR (1 << 0)
 typedef JSIValue JSClassCall(JSIContext *ctx, JSIValueConst func_obj,
@@ -527,8 +527,8 @@ typedef struct JSClassDef {
 JSClassID JSI_NewClassID(JSClassID *pclass_id);
 /* Returns the class ID if `v` is an object, otherwise returns JSI_INVALID_CLASS_ID. */
 JSClassID JSI_GetClassID(JSIValueConst v);
-int JSI_NewClass(JSRuntime *rt, JSClassID class_id, const JSClassDef *class_def);
-int JSI_IsRegisteredClass(JSRuntime *rt, JSClassID class_id);
+int JSI_NewClass(JSIRuntime *rt, JSClassID class_id, const JSClassDef *class_def);
+int JSI_IsRegisteredClass(JSIRuntime *rt, JSClassID class_id);
 
 /* value handling */
 
@@ -631,8 +631,8 @@ static inline void JSI_FreeValue(JSIContext *ctx, JSIValue v)
         }
     }
 }
-void __JSI_FreeValueRT(JSRuntime *rt, JSIValue v);
-static inline void JSI_FreeValueRT(JSRuntime *rt, JSIValue v)
+void __JSI_FreeValueRT(JSIRuntime *rt, JSIValue v);
+static inline void JSI_FreeValueRT(JSIRuntime *rt, JSIValue v)
 {
     if (JSI_VALUE_HAS_REF_COUNT(v)) {
         JSRefCountHeader *p = (JSRefCountHeader *)JSI_VALUE_GET_PTR(v);
@@ -651,7 +651,7 @@ static inline JSIValue JSI_DupValue(JSIContext *ctx, JSIValueConst v)
     return (JSIValue)v;
 }
 
-static inline JSIValue JSI_DupValueRT(JSRuntime *rt, JSIValueConst v)
+static inline JSIValue JSI_DupValueRT(JSIRuntime *rt, JSIValueConst v)
 {
     if (JSI_VALUE_HAS_REF_COUNT(v)) {
         JSRefCountHeader *p = (JSRefCountHeader *)JSI_VALUE_GET_PTR(v);
@@ -801,7 +801,7 @@ JSIValue JSI_ParseJSON2(JSIContext *ctx, const char *buf, size_t buf_len,
 JSIValue JSI_JSONStringify(JSIContext *ctx, JSIValueConst obj,
                          JSIValueConst replacer, JSIValueConst space0);
 
-typedef void JSFreeArrayBufferDataFunc(JSRuntime *rt, void *opaque, void *ptr);
+typedef void JSFreeArrayBufferDataFunc(JSIRuntime *rt, void *opaque, void *ptr);
 JSIValue JSI_NewArrayBuffer(JSIContext *ctx, uint8_t *buf, size_t len,
                           JSFreeArrayBufferDataFunc *free_func, void *opaque,
                           JSI_BOOL is_shared);
@@ -836,7 +836,7 @@ typedef struct {
     void (*sab_dup)(void *opaque, void *ptr);
     void *sab_opaque;
 } JSSharedArrayBufferFunctions;
-void JSI_SetSharedArrayBufferFunctions(JSRuntime *rt,
+void JSI_SetSharedArrayBufferFunctions(JSIRuntime *rt,
                                       const JSSharedArrayBufferFunctions *sf);
 
 typedef enum JSPromiseStateEnum {
@@ -852,15 +852,15 @@ typedef void JSHostPromiseRejectionTracker(JSIContext *ctx, JSIValueConst promis
                                            JSI_BOOL is_handled, void *opaque);
 
 /* return != 0 if the JS code needs to be interrupted */
-typedef int JSInterruptHandler(JSRuntime *rt, void *opaque);
-void JSI_SetInterruptHandler(JSRuntime *rt, JSInterruptHandler *cb, void *opaque);
+typedef int JSInterruptHandler(JSIRuntime *rt, void *opaque);
+void JSI_SetInterruptHandler(JSIRuntime *rt, JSInterruptHandler *cb, void *opaque);
 /* if can_block is TRUE, Atomics.wait() can be used */
-void JSI_SetCanBlock(JSRuntime *rt, JSI_BOOL can_block);
+void JSI_SetCanBlock(JSIRuntime *rt, JSI_BOOL can_block);
 /* select which debug info is stripped from the compiled code */
 #define JSI_STRIP_SOURCE (1 << 0) /* strip source code */
 #define JSI_STRIP_DEBUG  (1 << 1) /* strip all debug info including source code */
-void JSI_SetStripInfo(JSRuntime *rt, int flags);
-int JSI_GetStripInfo(JSRuntime *rt);
+void JSI_SetStripInfo(JSIRuntime *rt, int flags);
+int JSI_GetStripInfo(JSIRuntime *rt);
 
 /* set the [IsHTMLDDA] internal slot */
 void JSI_SetIsHTMLDDA(JSIContext *ctx, JSIValueConst obj);
@@ -883,12 +883,12 @@ typedef int JSModuleCheckSupportedImportAttributes(JSIContext *ctx, void *opaque
                                                    
 /* module_normalize = NULL is allowed and invokes the default module
    filename normalizer */
-void JSI_SetModuleLoaderFunc(JSRuntime *rt,
+void JSI_SetModuleLoaderFunc(JSIRuntime *rt,
                             JSModuleNormalizeFunc *module_normalize,
                             JSModuleLoaderFunc *module_loader, void *opaque);
 /* same as JSI_SetModuleLoaderFunc but with attributes. if
    module_check_attrs = NULL, no attribute checking is done. */
-void JSI_SetModuleLoaderFunc2(JSRuntime *rt,
+void JSI_SetModuleLoaderFunc2(JSIRuntime *rt,
                              JSModuleNormalizeFunc *module_normalize,
                              JSModuleLoaderFunc2 *module_loader,
                              JSModuleCheckSupportedImportAttributes *module_check_attrs,
@@ -903,8 +903,8 @@ JSIValue JSI_GetModuleNamespace(JSIContext *ctx, JSModuleDef *m);
 typedef JSIValue JSJobFunc(JSIContext *ctx, int argc, JSIValueConst *argv);
 int JSI_EnqueueJob(JSIContext *ctx, JSJobFunc *job_func, int argc, JSIValueConst *argv);
 
-JSI_BOOL JSI_IsJobPending(JSRuntime *rt);
-int JSI_ExecutePendingJob(JSRuntime *rt, JSIContext **pctx);
+JSI_BOOL JSI_IsJobPending(JSIRuntime *rt);
+int JSI_ExecutePendingJob(JSIRuntime *rt, JSIContext **pctx);
 
 /* Object Writer/Reader (currently only used to handle precompiled code) */
 #define JSI_WRITE_OBJ_BYTECODE  (1 << 0) /* allow function/module */
@@ -1089,7 +1089,7 @@ typedef struct {
 typedef void JSPrintValueWrite(void *opaque, const char *buf, size_t len);
 
 void JSI_PrintValueSetDefaultOptions(JSPrintValueOptions *options);
-void JSI_PrintValueRT(JSRuntime *rt, JSPrintValueWrite *write_func, void *write_opaque,
+void JSI_PrintValueRT(JSIRuntime *rt, JSPrintValueWrite *write_func, void *write_opaque,
                      JSIValueConst val, const JSPrintValueOptions *options);
 void JSI_PrintValue(JSIContext *ctx, JSPrintValueWrite *write_func, void *write_opaque,
                    JSIValueConst val, const JSPrintValueOptions *options);
