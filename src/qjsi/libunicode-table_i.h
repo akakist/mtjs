@@ -163,7 +163,7 @@ static const uint16_t case_conv_ext[58] = {
     0x006b, 0x00e5,
 };
 
-static const uint8_t unicode_prop_Cased1_table[193] = {
+static const uint8_t unicode_jsi_prop_Cased1_table[193] = {
     0x40, 0xa9, 0x80, 0x8e, 0x80, 0xfc, 0x80, 0xd3,
     0x80, 0x9b, 0x81, 0x8d, 0x02, 0x80, 0xe1, 0x80,
     0x91, 0x85, 0x9a, 0x01, 0x00, 0x01, 0x11, 0x03,
@@ -191,7 +191,7 @@ static const uint8_t unicode_prop_Cased1_table[193] = {
     0x99,
 };
 
-static const uint8_t unicode_prop_Cased1_index[18] = {
+static const uint8_t unicode_jsi_prop_Cased1_index[18] = {
     0xb9, 0x02, 0x80,  //  002B9 at 36
     0xa0, 0x1e, 0x40,  //  01EA0 at 66
     0x9e, 0xa6, 0x40,  //  0A69E at 98
@@ -200,7 +200,7 @@ static const uint8_t unicode_prop_Cased1_index[18] = {
     0x8a, 0xf1, 0x01,  //  1F18A at 192 (upper bound)
 };
 
-static const uint8_t unicode_prop_Case_Ignorable_table[764] = {
+static const uint8_t unicode_jsi_prop_Case_Ignorable_table[764] = {
     0xa6, 0x05, 0x80, 0x8a, 0x80, 0xa2, 0x00, 0x80,
     0xc6, 0x03, 0x00, 0x03, 0x01, 0x81, 0x41, 0xf6,
     0x40, 0xbf, 0x19, 0x18, 0x88, 0x08, 0x80, 0x40,
@@ -299,7 +299,7 @@ static const uint8_t unicode_prop_Case_Ignorable_table[764] = {
     0xdf, 0xff, 0x40, 0xef,
 };
 
-static const uint8_t unicode_prop_Case_Ignorable_index[72] = {
+static const uint8_t unicode_jsi_prop_Case_Ignorable_index[72] = {
     0xbe, 0x05, 0x00,  //  005BE at 32
     0xfe, 0x07, 0x00,  //  007FE at 64
     0x52, 0x0a, 0xa0,  //  00A52 at 101
@@ -326,7 +326,7 @@ static const uint8_t unicode_prop_Case_Ignorable_index[72] = {
     0xf0, 0x01, 0x0e,  //  E01F0 at 768 (upper bound)
 };
 
-static const uint8_t unicode_prop_ID_Start_table[1133] = {
+static const uint8_t unicode_jsi_prop_ID_Start_table[1133] = {
     0xc0, 0x99, 0x85, 0x99, 0xae, 0x80, 0x89, 0x03,
     0x04, 0x96, 0x80, 0x9e, 0x80, 0x41, 0xc9, 0x83,
     0x8b, 0x8d, 0x26, 0x00, 0x80, 0x40, 0x80, 0x20,
@@ -471,7 +471,7 @@ static const uint8_t unicode_prop_ID_Start_table[1133] = {
     0x53, 0x4a, 0x84, 0x50, 0x5f,
 };
 
-static const uint8_t unicode_prop_ID_Start_index[108] = {
+static const uint8_t unicode_jsi_prop_ID_Start_index[108] = {
     0xf6, 0x03, 0x20,  //  003F6 at 33
     0xa6, 0x07, 0x00,  //  007A6 at 64
     0xa9, 0x09, 0x20,  //  009A9 at 97
@@ -510,7 +510,7 @@ static const uint8_t unicode_prop_ID_Start_index[108] = {
     0xb0, 0x23, 0x03,  //  323B0 at 1152 (upper bound)
 };
 
-static const uint8_t unicode_prop_ID_Continue1_table[695] = {
+static const uint8_t unicode_jsi_prop_ID_Continue1_table[695] = {
     0xaf, 0x89, 0xa4, 0x80, 0xd6, 0x80, 0x42, 0x47,
     0xef, 0x96, 0x80, 0x40, 0xfa, 0x84, 0x41, 0x08,
     0xac, 0x00, 0x01, 0x01, 0x00, 0xc7, 0x8a, 0xaf,
@@ -600,7 +600,7 @@ static const uint8_t unicode_prop_ID_Continue1_table[695] = {
     0x95, 0x89, 0x6c, 0x05, 0x05, 0x40, 0xef,
 };
 
-static const uint8_t unicode_prop_ID_Continue1_index[66] = {
+static const uint8_t unicode_jsi_prop_ID_Continue1_index[66] = {
     0xfa, 0x06, 0x00,  //  006FA at 32
     0x70, 0x09, 0x00,  //  00970 at 64
     0xf0, 0x0a, 0x40,  //  00AF0 at 98
@@ -627,7 +627,7 @@ static const uint8_t unicode_prop_ID_Continue1_index[66] = {
 
 #ifdef CONFIG_ALL_UNICODE
 
-static const uint8_t unicode_cc_table[916] = {
+static const uint8_t unicode_jsi_cc_table[916] = {
     0xb2, 0xcf, 0xd4, 0x00, 0xe8, 0x03, 0xdc, 0x00,
     0xe8, 0x00, 0xd8, 0x04, 0xdc, 0x01, 0xca, 0x03,
     0xdc, 0x01, 0xca, 0x0a, 0xdc, 0x04, 0x01, 0x03,
@@ -745,7 +745,7 @@ static const uint8_t unicode_cc_table[916] = {
     0x3c, 0xc5, 0x00, 0x07,
 };
 
-static const uint8_t unicode_cc_index[87] = {
+static const uint8_t unicode_jsi_cc_index[87] = {
     0x4d, 0x03, 0x00,  //  0034D at 32
     0x97, 0x05, 0x20,  //  00597 at 65
     0xc6, 0x05, 0x00,  //  005C6 at 96
@@ -777,7 +777,7 @@ static const uint8_t unicode_cc_index[87] = {
     0x4b, 0xe9, 0x01,  //  1E94B at 928 (upper bound)
 };
 
-static const uint32_t unicode_decomp_table1[709] = {
+static const uint32_t unicode_jsi_decomp_table1[709] = {
     0x00280081, 0x002a0097, 0x002a8081, 0x002bc097,
     0x002c8115, 0x002d0097, 0x002d4081, 0x002e0097,
     0x002e4115, 0x002f0199, 0x00302016, 0x00400842,
@@ -958,7 +958,7 @@ static const uint32_t unicode_decomp_table1[709] = {
     0xbe69bc10,
 };
 
-static const uint16_t unicode_decomp_table2[709] = {
+static const uint16_t unicode_jsi_decomp_table2[709] = {
     0x0020, 0x0000, 0x0061, 0x0002, 0x0004, 0x0006, 0x03bc, 0x0008,
     0x000a, 0x000c, 0x0015, 0x0095, 0x00a5, 0x00b9, 0x00c1, 0x00c3,
     0x00c7, 0x00cb, 0x00d1, 0x00d7, 0x00dd, 0x00e0, 0x00e6, 0x00f8,
@@ -1050,7 +1050,7 @@ static const uint16_t unicode_decomp_table2[709] = {
     0x21af, 0x21bf, 0x21c5, 0x22bf, 0x23dd,
 };
 
-static const uint8_t unicode_decomp_data[9451] = {
+static const uint8_t unicode_jsi_decomp_data[9451] = {
     0x20, 0x88, 0x20, 0x84, 0x32, 0x33, 0x20, 0x81,
     0x20, 0xa7, 0x31, 0x6f, 0x31, 0xd0, 0x34, 0x31,
     0xd0, 0x32, 0x33, 0xd0, 0x34, 0x41, 0x80, 0x41,
@@ -2235,7 +2235,7 @@ static const uint8_t unicode_decomp_data[9451] = {
     0x2a, 0x00, 0x80,
 };
 
-static const uint16_t unicode_comp_table[965] = {
+static const uint16_t unicode_jsi_comp_table[965] = {
     0x4a01, 0x49c0, 0x4a02, 0x0280, 0x0281, 0x0282, 0x0283, 0x02c0,
     0x02c2, 0x0a00, 0x0284, 0x2442, 0x0285, 0x07c0, 0x0980, 0x0982,
     0x2440, 0x2280, 0x02c4, 0x2282, 0x2284, 0x2286, 0x02c6, 0x02c8,
@@ -2401,7 +2401,7 @@ typedef enum {
     UNICODE_GC_COUNT,
 } UnicodeGCEnum;
 
-static const char unicode_gc_name_table[] =
+static const char unicode_jsi_gc_name_table[] =
     "Cn,Unassigned"            "\0"
     "Lu,Uppercase_Letter"      "\0"
     "Ll,Lowercase_Letter"      "\0"
@@ -2442,7 +2442,7 @@ static const char unicode_gc_name_table[] =
     "C,Other"                  "\0"
 ;
 
-static const uint8_t unicode_gc_table[4070] = {
+static const uint8_t unicode_jsi_gc_table[4070] = {
     0xfa, 0x18, 0x17, 0x56, 0x0d, 0x56, 0x12, 0x13,
     0x16, 0x0c, 0x16, 0x11, 0x36, 0xe9, 0x02, 0x36,
     0x4c, 0x36, 0xe1, 0x12, 0x12, 0x16, 0x13, 0x0e,
@@ -3129,7 +3129,7 @@ typedef enum {
     UNICODE_SCRIPT_COUNT,
 } UnicodeScriptEnum;
 
-static const char unicode_script_name_table[] =
+static const char unicode_jsi_script_name_table[] =
     "Unknown,Zzzz"                "\0"
     "Adlam,Adlm"                  "\0"
     "Ahom,Ahom"                   "\0"
@@ -3303,7 +3303,7 @@ static const char unicode_script_name_table[] =
     "Zanabazar_Square,Zanb"       "\0"
 ;
 
-static const uint8_t unicode_script_table[2803] = {
+static const uint8_t unicode_jsi_script_table[2803] = {
     0xc0, 0x19, 0x99, 0x4a, 0x85, 0x19, 0x99, 0x4a,
     0xae, 0x19, 0x80, 0x4a, 0x8e, 0x19, 0x80, 0x4a,
     0x84, 0x19, 0x96, 0x4a, 0x80, 0x19, 0x9e, 0x4a,
@@ -3657,7 +3657,7 @@ static const uint8_t unicode_script_table[2803] = {
     0xe0, 0x8f, 0x3a,
 };
 
-static const uint8_t unicode_script_ext_table[1253] = {
+static const uint8_t unicode_jsi_script_ext_table[1253] = {
     0x80, 0x36, 0x00, 0x00, 0x10, 0x06, 0x13, 0x1a,
     0x23, 0x25, 0x29, 0x2a, 0x2f, 0x2b, 0x2d, 0x32,
     0x4a, 0x51, 0x53, 0x72, 0x86, 0x81, 0x83, 0x00,
@@ -3817,14 +3817,14 @@ static const uint8_t unicode_script_ext_table[1253] = {
     0x32, 0xce, 0xcd, 0x2d, 0x00,
 };
 
-static const uint8_t unicode_prop_Hyphen_table[28] = {
+static const uint8_t unicode_jsi_prop_Hyphen_table[28] = {
     0xac, 0x80, 0xfe, 0x80, 0x44, 0xdb, 0x80, 0x52,
     0x7a, 0x80, 0x48, 0x08, 0x81, 0x4e, 0x04, 0x80,
     0x42, 0xe2, 0x80, 0x60, 0xcd, 0x66, 0x80, 0x40,
     0xa8, 0x80, 0xd6, 0x80,
 };
 
-static const uint8_t unicode_prop_Other_Math_table[200] = {
+static const uint8_t unicode_jsi_prop_Other_Math_table[200] = {
     0xdd, 0x80, 0x43, 0x70, 0x11, 0x80, 0x99, 0x09,
     0x81, 0x5c, 0x1f, 0x80, 0x9a, 0x82, 0x8a, 0x80,
     0x9f, 0x83, 0x97, 0x81, 0x8d, 0x81, 0xc0, 0x8c,
@@ -3852,7 +3852,7 @@ static const uint8_t unicode_prop_Other_Math_table[200] = {
     0x80, 0x89, 0x80, 0x90, 0x22, 0x04, 0x80, 0x90,
 };
 
-static const uint8_t unicode_prop_Other_Alphabetic_table[443] = {
+static const uint8_t unicode_jsi_prop_Other_Alphabetic_table[443] = {
     0x43, 0x44, 0x80, 0x9c, 0x8c, 0x42, 0x3f, 0x8d,
     0x00, 0x01, 0x01, 0x00, 0xc7, 0x8a, 0xaf, 0x8c,
     0x06, 0x8f, 0x80, 0xe4, 0x33, 0x19, 0x0b, 0x80,
@@ -3911,7 +3911,7 @@ static const uint8_t unicode_prop_Other_Alphabetic_table[443] = {
     0x99, 0x85, 0x99,
 };
 
-static const uint8_t unicode_prop_Other_Lowercase_table[69] = {
+static const uint8_t unicode_jsi_prop_Other_Lowercase_table[69] = {
     0x40, 0xa9, 0x80, 0x8e, 0x80, 0x41, 0xf4, 0x88,
     0x31, 0x9d, 0x84, 0xdf, 0x80, 0xb3, 0x80, 0x4d,
     0x80, 0x80, 0x4c, 0x2e, 0xbe, 0x8c, 0x80, 0xa1,
@@ -3923,12 +3923,12 @@ static const uint8_t unicode_prop_Other_Lowercase_table[69] = {
     0x88, 0x60, 0xd8, 0x74, 0xbd,
 };
 
-static const uint8_t unicode_prop_Other_Uppercase_table[15] = {
+static const uint8_t unicode_jsi_prop_Other_Uppercase_table[15] = {
     0x60, 0x21, 0x5f, 0x8f, 0x43, 0x45, 0x99, 0x61,
     0xcc, 0x5f, 0x99, 0x85, 0x99, 0x85, 0x99,
 };
 
-static const uint8_t unicode_prop_Other_Grapheme_Extend_table[112] = {
+static const uint8_t unicode_jsi_prop_Other_Grapheme_Extend_table[112] = {
     0x49, 0xbd, 0x80, 0x97, 0x80, 0x41, 0x65, 0x80,
     0x97, 0x80, 0xe5, 0x80, 0x97, 0x80, 0x40, 0xe7,
     0x00, 0x03, 0x08, 0x81, 0x88, 0x81, 0xe6, 0x80,
@@ -3945,57 +3945,57 @@ static const uint8_t unicode_prop_Other_Grapheme_Extend_table[112] = {
     0x61, 0x72, 0x0d, 0x85, 0x6c, 0x2e, 0xac, 0xdf,
 };
 
-static const uint8_t unicode_prop_Other_Default_Ignorable_Code_Point_table[32] = {
+static const uint8_t unicode_jsi_prop_Other_Default_Ignorable_Code_Point_table[32] = {
     0x43, 0x4e, 0x80, 0x4e, 0x0e, 0x81, 0x46, 0x52,
     0x81, 0x48, 0xae, 0x80, 0x50, 0xfd, 0x80, 0x60,
     0xce, 0x3a, 0x80, 0xce, 0x88, 0x6d, 0x00, 0x06,
     0x00, 0x9d, 0xdf, 0xff, 0x40, 0xef, 0x4e, 0x0f,
 };
 
-static const uint8_t unicode_prop_Other_ID_Start_table[11] = {
+static const uint8_t unicode_jsi_prop_Other_ID_Start_table[11] = {
     0x58, 0x84, 0x81, 0x48, 0x90, 0x80, 0x94, 0x80,
     0x4f, 0x6b, 0x81,
 };
 
-static const uint8_t unicode_prop_Other_ID_Continue_table[22] = {
+static const uint8_t unicode_jsi_prop_Other_ID_Continue_table[22] = {
     0x40, 0xb6, 0x80, 0x42, 0xce, 0x80, 0x4f, 0xe0,
     0x88, 0x46, 0x67, 0x80, 0x46, 0x30, 0x81, 0x50,
     0xec, 0x80, 0x60, 0xce, 0x68, 0x80,
 };
 
-static const uint8_t unicode_prop_Prepended_Concatenation_Mark_table[19] = {
+static const uint8_t unicode_jsi_prop_Prepended_Concatenation_Mark_table[19] = {
     0x45, 0xff, 0x85, 0x40, 0xd6, 0x80, 0xb0, 0x80,
     0x41, 0x7f, 0x81, 0xcf, 0x80, 0x61, 0x07, 0xd9,
     0x80, 0x8e, 0x80,
 };
 
-static const uint8_t unicode_prop_XID_Start1_table[31] = {
+static const uint8_t unicode_jsi_prop_XID_Start1_table[31] = {
     0x43, 0x79, 0x80, 0x4a, 0xb7, 0x80, 0xfe, 0x80,
     0x60, 0x21, 0xe6, 0x81, 0x60, 0xcb, 0xc0, 0x85,
     0x41, 0x95, 0x81, 0xf3, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x80, 0x41, 0x1e, 0x81,
 };
 
-static const uint8_t unicode_prop_XID_Continue1_table[23] = {
+static const uint8_t unicode_jsi_prop_XID_Continue1_table[23] = {
     0x43, 0x79, 0x80, 0x60, 0x2d, 0x1f, 0x81, 0x60,
     0xcb, 0xc0, 0x85, 0x41, 0x95, 0x81, 0xf3, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
 };
 
-static const uint8_t unicode_prop_Changes_When_Titlecased1_table[22] = {
+static const uint8_t unicode_jsi_prop_Changes_When_Titlecased1_table[22] = {
     0x41, 0xc3, 0x08, 0x08, 0x81, 0xa4, 0x81, 0x4e,
     0xdc, 0xaa, 0x0a, 0x4e, 0x87, 0x3f, 0x3f, 0x87,
     0x8b, 0x80, 0x8e, 0x80, 0xae, 0x80,
 };
 
-static const uint8_t unicode_prop_Changes_When_Casefolded1_table[29] = {
+static const uint8_t unicode_jsi_prop_Changes_When_Casefolded1_table[29] = {
     0x41, 0xef, 0x80, 0x41, 0x9e, 0x80, 0x9e, 0x80,
     0x5a, 0xe4, 0x83, 0x40, 0xb5, 0x00, 0x00, 0x00,
     0x80, 0xde, 0x06, 0x06, 0x80, 0x8a, 0x09, 0x81,
     0x89, 0x10, 0x81, 0x8d, 0x80,
 };
 
-static const uint8_t unicode_prop_Changes_When_NFKC_Casefolded1_table[450] = {
+static const uint8_t unicode_jsi_prop_Changes_When_NFKC_Casefolded1_table[450] = {
     0x40, 0x9f, 0x06, 0x00, 0x01, 0x00, 0x01, 0x12,
     0x10, 0x82, 0xf3, 0x80, 0x8b, 0x80, 0x40, 0x84,
     0x01, 0x01, 0x80, 0xa2, 0x01, 0x80, 0x40, 0xbb,
@@ -4055,7 +4055,7 @@ static const uint8_t unicode_prop_Changes_When_NFKC_Casefolded1_table[450] = {
     0x4f, 0xff,
 };
 
-static const uint8_t unicode_prop_Basic_Emoji1_table[143] = {
+static const uint8_t unicode_jsi_prop_Basic_Emoji1_table[143] = {
     0x60, 0x23, 0x19, 0x81, 0x40, 0xcc, 0x1a, 0x01,
     0x80, 0x42, 0x08, 0x81, 0x94, 0x81, 0xb1, 0x8b,
     0xaa, 0x80, 0x92, 0x80, 0x8c, 0x07, 0x81, 0x90,
@@ -4076,7 +4076,7 @@ static const uint8_t unicode_prop_Basic_Emoji1_table[143] = {
     0xb7, 0x86, 0x8e, 0x81, 0x8a, 0x85, 0x88,
 };
 
-static const uint8_t unicode_prop_Basic_Emoji2_table[183] = {
+static const uint8_t unicode_jsi_prop_Basic_Emoji2_table[183] = {
     0x40, 0xa8, 0x03, 0x80, 0x5f, 0x8c, 0x80, 0x8b,
     0x80, 0x40, 0xd7, 0x80, 0x95, 0x80, 0xd9, 0x85,
     0x8e, 0x81, 0x41, 0x7c, 0x80, 0x40, 0xa5, 0x80,
@@ -4102,7 +4102,7 @@ static const uint8_t unicode_prop_Basic_Emoji2_table[183] = {
     0x00, 0x82, 0x8f, 0x2a, 0x05, 0x01, 0x80,
 };
 
-static const uint8_t unicode_prop_RGI_Emoji_Modifier_Sequence_table[73] = {
+static const uint8_t unicode_jsi_prop_RGI_Emoji_Modifier_Sequence_table[73] = {
     0x60, 0x26, 0x1c, 0x80, 0x40, 0xda, 0x80, 0x8f,
     0x83, 0x61, 0xcc, 0x76, 0x80, 0xbb, 0x11, 0x01,
     0x82, 0xf4, 0x09, 0x8a, 0x94, 0x18, 0x18, 0x88,
@@ -4115,7 +4115,7 @@ static const uint8_t unicode_prop_RGI_Emoji_Modifier_Sequence_table[73] = {
     0x88,
 };
 
-static const uint8_t unicode_prop_RGI_Emoji_Flag_Sequence_table[128] = {
+static const uint8_t unicode_jsi_prop_RGI_Emoji_Flag_Sequence_table[128] = {
     0x0c, 0x00, 0x09, 0x00, 0x04, 0x01, 0x02, 0x06,
     0x03, 0x03, 0x01, 0x02, 0x01, 0x03, 0x07, 0x0d,
     0x18, 0x00, 0x09, 0x00, 0x00, 0x89, 0x08, 0x00,
@@ -4134,20 +4134,20 @@ static const uint8_t unicode_prop_RGI_Emoji_Flag_Sequence_table[128] = {
     0x80, 0x8d, 0x05, 0x80, 0x8a, 0x80, 0x88, 0x80,
 };
 
-static const uint8_t unicode_prop_Emoji_Keycap_Sequence_table[4] = {
+static const uint8_t unicode_jsi_prop_Emoji_Keycap_Sequence_table[4] = {
     0xa2, 0x05, 0x04, 0x89,
 };
 
-static const uint8_t unicode_prop_ASCII_Hex_Digit_table[5] = {
+static const uint8_t unicode_jsi_prop_ASCII_Hex_Digit_table[5] = {
     0xaf, 0x89, 0x35, 0x99, 0x85,
 };
 
-static const uint8_t unicode_prop_Bidi_Control_table[10] = {
+static const uint8_t unicode_jsi_prop_Bidi_Control_table[10] = {
     0x46, 0x1b, 0x80, 0x59, 0xf0, 0x81, 0x99, 0x84,
     0xb6, 0x83,
 };
 
-static const uint8_t unicode_prop_Dash_table[58] = {
+static const uint8_t unicode_jsi_prop_Dash_table[58] = {
     0xac, 0x80, 0x45, 0x5b, 0x80, 0xb2, 0x80, 0x4e,
     0x40, 0x80, 0x44, 0x04, 0x80, 0x48, 0x08, 0x85,
     0xbc, 0x80, 0xa6, 0x80, 0x8e, 0x80, 0x41, 0x85,
@@ -4158,13 +4158,13 @@ static const uint8_t unicode_prop_Dash_table[58] = {
     0x3d, 0x80,
 };
 
-static const uint8_t unicode_prop_Deprecated_table[23] = {
+static const uint8_t unicode_jsi_prop_Deprecated_table[23] = {
     0x41, 0x48, 0x80, 0x45, 0x28, 0x80, 0x49, 0x02,
     0x00, 0x80, 0x48, 0x28, 0x81, 0x48, 0xc4, 0x85,
     0x42, 0xb8, 0x81, 0x6d, 0xdc, 0xd5, 0x80,
 };
 
-static const uint8_t unicode_prop_Diacritic_table[438] = {
+static const uint8_t unicode_jsi_prop_Diacritic_table[438] = {
     0xdd, 0x00, 0x80, 0xc6, 0x05, 0x03, 0x01, 0x81,
     0x41, 0xf6, 0x40, 0x9e, 0x07, 0x25, 0x90, 0x0b,
     0x80, 0x88, 0x81, 0x40, 0xfc, 0x84, 0x40, 0xd0,
@@ -4222,7 +4222,7 @@ static const uint8_t unicode_prop_Diacritic_table[438] = {
     0x42, 0xdf, 0x86, 0xec, 0x10, 0x82,
 };
 
-static const uint8_t unicode_prop_Extender_table[111] = {
+static const uint8_t unicode_jsi_prop_Extender_table[111] = {
     0x40, 0xb6, 0x80, 0x42, 0x17, 0x81, 0x43, 0x6d,
     0x80, 0x41, 0xb8, 0x80, 0x42, 0x75, 0x80, 0x40,
     0x88, 0x80, 0xd8, 0x80, 0x42, 0xef, 0x80, 0xfe,
@@ -4239,24 +4239,24 @@ static const uint8_t unicode_prop_Extender_table[111] = {
     0x81, 0x44, 0xb0, 0x80, 0x43, 0x53, 0x82,
 };
 
-static const uint8_t unicode_prop_Hex_Digit_table[12] = {
+static const uint8_t unicode_jsi_prop_Hex_Digit_table[12] = {
     0xaf, 0x89, 0x35, 0x99, 0x85, 0x60, 0xfe, 0xa8,
     0x89, 0x35, 0x99, 0x85,
 };
 
-static const uint8_t unicode_prop_IDS_Unary_Operator_table[4] = {
+static const uint8_t unicode_jsi_prop_IDS_Unary_Operator_table[4] = {
     0x60, 0x2f, 0xfd, 0x81,
 };
 
-static const uint8_t unicode_prop_IDS_Binary_Operator_table[8] = {
+static const uint8_t unicode_jsi_prop_IDS_Binary_Operator_table[8] = {
     0x60, 0x2f, 0xef, 0x09, 0x89, 0x41, 0xf0, 0x80,
 };
 
-static const uint8_t unicode_prop_IDS_Trinary_Operator_table[4] = {
+static const uint8_t unicode_jsi_prop_IDS_Trinary_Operator_table[4] = {
     0x60, 0x2f, 0xf1, 0x81,
 };
 
-static const uint8_t unicode_prop_Ideographic_table[72] = {
+static const uint8_t unicode_jsi_prop_Ideographic_table[72] = {
     0x60, 0x30, 0x05, 0x81, 0x98, 0x88, 0x8d, 0x82,
     0x43, 0xc4, 0x59, 0xbf, 0xbf, 0x60, 0x51, 0xff,
     0x60, 0x58, 0xff, 0x41, 0x6d, 0x81, 0xe9, 0x60,
@@ -4268,21 +4268,21 @@ static const uint8_t unicode_prop_Ideographic_table[72] = {
     0x1d, 0x45, 0xe1, 0x53, 0x4a, 0x84, 0x50, 0x5f,
 };
 
-static const uint8_t unicode_prop_Join_Control_table[4] = {
+static const uint8_t unicode_jsi_prop_Join_Control_table[4] = {
     0x60, 0x20, 0x0b, 0x81,
 };
 
-static const uint8_t unicode_prop_Logical_Order_Exception_table[15] = {
+static const uint8_t unicode_jsi_prop_Logical_Order_Exception_table[15] = {
     0x4e, 0x3f, 0x84, 0xfa, 0x84, 0x4a, 0xef, 0x11,
     0x80, 0x60, 0x90, 0xf9, 0x09, 0x00, 0x81,
 };
 
-static const uint8_t unicode_prop_Modifier_Combining_Mark_table[16] = {
+static const uint8_t unicode_jsi_prop_Modifier_Combining_Mark_table[16] = {
     0x46, 0x53, 0x09, 0x80, 0x40, 0x82, 0x05, 0x02,
     0x81, 0x41, 0xe0, 0x08, 0x12, 0x80, 0x9e, 0x80,
 };
 
-static const uint8_t unicode_prop_Noncharacter_Code_Point_table[71] = {
+static const uint8_t unicode_jsi_prop_Noncharacter_Code_Point_table[71] = {
     0x60, 0xfd, 0xcf, 0x9f, 0x42, 0x0d, 0x81, 0x60,
     0xff, 0xfd, 0x81, 0x60, 0xff, 0xfd, 0x81, 0x60,
     0xff, 0xfd, 0x81, 0x60, 0xff, 0xfd, 0x81, 0x60,
@@ -4294,7 +4294,7 @@ static const uint8_t unicode_prop_Noncharacter_Code_Point_table[71] = {
     0xff, 0xfd, 0x81, 0x60, 0xff, 0xfd, 0x81,
 };
 
-static const uint8_t unicode_prop_Pattern_Syntax_table[58] = {
+static const uint8_t unicode_jsi_prop_Pattern_Syntax_table[58] = {
     0xa0, 0x8e, 0x89, 0x86, 0x99, 0x18, 0x80, 0x99,
     0x83, 0xa1, 0x30, 0x00, 0x08, 0x00, 0x0b, 0x03,
     0x02, 0x80, 0x96, 0x80, 0x9e, 0x80, 0x5f, 0x17,
@@ -4305,28 +4305,28 @@ static const uint8_t unicode_prop_Pattern_Syntax_table[58] = {
     0x04, 0x81,
 };
 
-static const uint8_t unicode_prop_Pattern_White_Space_table[11] = {
+static const uint8_t unicode_jsi_prop_Pattern_White_Space_table[11] = {
     0x88, 0x84, 0x91, 0x80, 0xe3, 0x80, 0x5f, 0x87,
     0x81, 0x97, 0x81,
 };
 
-static const uint8_t unicode_prop_Quotation_Mark_table[31] = {
+static const uint8_t unicode_jsi_prop_Quotation_Mark_table[31] = {
     0xa1, 0x03, 0x80, 0x40, 0x82, 0x80, 0x8e, 0x80,
     0x5f, 0x5b, 0x87, 0x98, 0x81, 0x4e, 0x06, 0x80,
     0x41, 0xc8, 0x83, 0x8c, 0x82, 0x60, 0xce, 0x20,
     0x83, 0x40, 0xbc, 0x03, 0x80, 0xd9, 0x81,
 };
 
-static const uint8_t unicode_prop_Radical_table[9] = {
+static const uint8_t unicode_jsi_prop_Radical_table[9] = {
     0x60, 0x2e, 0x7f, 0x99, 0x80, 0xd8, 0x8b, 0x40,
     0xd5,
 };
 
-static const uint8_t unicode_prop_Regional_Indicator_table[4] = {
+static const uint8_t unicode_jsi_prop_Regional_Indicator_table[4] = {
     0x61, 0xf1, 0xe5, 0x99,
 };
 
-static const uint8_t unicode_prop_Sentence_Terminal_table[213] = {
+static const uint8_t unicode_jsi_prop_Sentence_Terminal_table[213] = {
     0xa0, 0x80, 0x8b, 0x80, 0x8f, 0x80, 0x45, 0x48,
     0x80, 0x40, 0x92, 0x82, 0x40, 0xb3, 0x80, 0xaa,
     0x82, 0x40, 0xf5, 0x80, 0xbc, 0x00, 0x02, 0x81,
@@ -4356,7 +4356,7 @@ static const uint8_t unicode_prop_Sentence_Terminal_table[213] = {
     0x05, 0x80, 0x5d, 0xe7, 0x80,
 };
 
-static const uint8_t unicode_prop_Soft_Dotted_table[79] = {
+static const uint8_t unicode_jsi_prop_Soft_Dotted_table[79] = {
     0xe8, 0x81, 0x40, 0xc3, 0x80, 0x41, 0x18, 0x80,
     0x9d, 0x80, 0xb3, 0x80, 0x93, 0x80, 0x41, 0x3f,
     0x80, 0xe1, 0x00, 0x80, 0x59, 0x08, 0x80, 0xb2,
@@ -4369,7 +4369,7 @@ static const uint8_t unicode_prop_Soft_Dotted_table[79] = {
     0x85, 0x80, 0x41, 0x30, 0x81, 0x99, 0x80,
 };
 
-static const uint8_t unicode_prop_Terminal_Punctuation_table[264] = {
+static const uint8_t unicode_jsi_prop_Terminal_Punctuation_table[264] = {
     0xa0, 0x80, 0x89, 0x00, 0x80, 0x8a, 0x0a, 0x80,
     0x43, 0x3d, 0x07, 0x80, 0x42, 0x00, 0x80, 0xb8,
     0x80, 0xc7, 0x80, 0x8d, 0x00, 0x82, 0x40, 0xb3,
@@ -4405,7 +4405,7 @@ static const uint8_t unicode_prop_Terminal_Punctuation_table[264] = {
     0x81, 0x60, 0x4e, 0x05, 0x80, 0x5d, 0xe6, 0x83,
 };
 
-static const uint8_t unicode_prop_Unified_Ideograph_table[48] = {
+static const uint8_t unicode_jsi_prop_Unified_Ideograph_table[48] = {
     0x60, 0x33, 0xff, 0x59, 0xbf, 0xbf, 0x60, 0x51,
     0xff, 0x60, 0x5a, 0x0d, 0x08, 0x00, 0x81, 0x89,
     0x00, 0x00, 0x09, 0x82, 0x61, 0x05, 0xd5, 0x60,
@@ -4414,18 +4414,18 @@ static const uint8_t unicode_prop_Unified_Ideograph_table[48] = {
     0x6d, 0x51, 0xa1, 0x53, 0x4a, 0x84, 0x50, 0x5f,
 };
 
-static const uint8_t unicode_prop_Variation_Selector_table[13] = {
+static const uint8_t unicode_jsi_prop_Variation_Selector_table[13] = {
     0x58, 0x0a, 0x10, 0x80, 0x60, 0xe5, 0xef, 0x8f,
     0x6d, 0x02, 0xef, 0x40, 0xef,
 };
 
-static const uint8_t unicode_prop_White_Space_table[22] = {
+static const uint8_t unicode_jsi_prop_White_Space_table[22] = {
     0x88, 0x84, 0x91, 0x80, 0xe3, 0x80, 0x99, 0x80,
     0x55, 0xde, 0x80, 0x49, 0x7e, 0x8a, 0x9c, 0x0c,
     0x80, 0xae, 0x80, 0x4f, 0x9f, 0x80,
 };
 
-static const uint8_t unicode_prop_Bidi_Mirrored_table[173] = {
+static const uint8_t unicode_jsi_prop_Bidi_Mirrored_table[173] = {
     0xa7, 0x81, 0x91, 0x00, 0x80, 0x9b, 0x00, 0x80,
     0x9c, 0x00, 0x80, 0xac, 0x80, 0x8e, 0x80, 0x4e,
     0x7d, 0x83, 0x47, 0x5c, 0x81, 0x49, 0x9b, 0x81,
@@ -4450,7 +4450,7 @@ static const uint8_t unicode_prop_Bidi_Mirrored_table[173] = {
     0x80, 0xb8, 0x80, 0xb8, 0x80,
 };
 
-static const uint8_t unicode_prop_Emoji_table[238] = {
+static const uint8_t unicode_jsi_prop_Emoji_table[238] = {
     0xa2, 0x05, 0x04, 0x89, 0xee, 0x03, 0x80, 0x5f,
     0x8c, 0x80, 0x8b, 0x80, 0x40, 0xd7, 0x80, 0x95,
     0x80, 0xd9, 0x85, 0x8e, 0x81, 0x41, 0x6e, 0x81,
@@ -4483,18 +4483,18 @@ static const uint8_t unicode_prop_Emoji_table[238] = {
     0x86, 0x8e, 0x81, 0x8a, 0x85, 0x88,
 };
 
-static const uint8_t unicode_prop_Emoji_Component_table[28] = {
+static const uint8_t unicode_jsi_prop_Emoji_Component_table[28] = {
     0xa2, 0x05, 0x04, 0x89, 0x5f, 0xd2, 0x80, 0x40,
     0xd4, 0x80, 0x60, 0xdd, 0x2a, 0x80, 0x60, 0xf3,
     0xd5, 0x99, 0x41, 0xfa, 0x84, 0x45, 0xaf, 0x83,
     0x6c, 0x06, 0x6b, 0xdf,
 };
 
-static const uint8_t unicode_prop_Emoji_Modifier_table[4] = {
+static const uint8_t unicode_jsi_prop_Emoji_Modifier_table[4] = {
     0x61, 0xf3, 0xfa, 0x84,
 };
 
-static const uint8_t unicode_prop_Emoji_Modifier_Base_table[71] = {
+static const uint8_t unicode_jsi_prop_Emoji_Modifier_Base_table[71] = {
     0x60, 0x26, 0x1c, 0x80, 0x40, 0xda, 0x80, 0x8f,
     0x83, 0x61, 0xcc, 0x76, 0x80, 0xbb, 0x11, 0x01,
     0x82, 0xf4, 0x09, 0x8a, 0x94, 0x92, 0x10, 0x1a,
@@ -4506,7 +4506,7 @@ static const uint8_t unicode_prop_Emoji_Modifier_Base_table[71] = {
     0x10, 0x8c, 0x40, 0xe4, 0x82, 0xa9, 0x88,
 };
 
-static const uint8_t unicode_prop_Emoji_Presentation_table[144] = {
+static const uint8_t unicode_jsi_prop_Emoji_Presentation_table[144] = {
     0x60, 0x23, 0x19, 0x81, 0x40, 0xcc, 0x1a, 0x01,
     0x80, 0x42, 0x08, 0x81, 0x94, 0x81, 0xb1, 0x8b,
     0xaa, 0x80, 0x92, 0x80, 0x8c, 0x07, 0x81, 0x90,
@@ -4527,7 +4527,7 @@ static const uint8_t unicode_prop_Emoji_Presentation_table[144] = {
     0x84, 0xb7, 0x86, 0x8e, 0x81, 0x8a, 0x85, 0x88,
 };
 
-static const uint8_t unicode_prop_Extended_Pictographic_table[156] = {
+static const uint8_t unicode_jsi_prop_Extended_Pictographic_table[156] = {
     0x40, 0xa8, 0x03, 0x80, 0x5f, 0x8c, 0x80, 0x8b,
     0x80, 0x40, 0xd7, 0x80, 0x95, 0x80, 0xd9, 0x85,
     0x8e, 0x81, 0x41, 0x6e, 0x81, 0x8b, 0x80, 0xde,
@@ -4550,7 +4550,7 @@ static const uint8_t unicode_prop_Extended_Pictographic_table[156] = {
     0x40, 0xff, 0x43, 0xfd,
 };
 
-static const uint8_t unicode_prop_Default_Ignorable_Code_Point_table[51] = {
+static const uint8_t unicode_jsi_prop_Default_Ignorable_Code_Point_table[51] = {
     0x40, 0xac, 0x80, 0x42, 0xa0, 0x80, 0x42, 0xcb,
     0x80, 0x4b, 0x41, 0x81, 0x46, 0x52, 0x81, 0xd4,
     0x84, 0x47, 0xfa, 0x84, 0x99, 0x84, 0xb0, 0x8f,
@@ -4644,7 +4644,7 @@ typedef enum {
     UNICODE_PROP_COUNT,
 } UnicodePropertyEnum;
 
-static const char unicode_prop_name_table[] =
+static const char unicode_jsi_prop_name_table[] =
     "ASCII_Hex_Digit,AHex"               "\0"
     "Bidi_Control,Bidi_C"                "\0"
     "Dash"                               "\0"
@@ -4705,124 +4705,124 @@ static const char unicode_prop_name_table[] =
     "XID_Start,XIDS"                     "\0"
 ;
 
-static const uint8_t * const unicode_prop_table[] = {
-    unicode_prop_Hyphen_table,
-    unicode_prop_Other_Math_table,
-    unicode_prop_Other_Alphabetic_table,
-    unicode_prop_Other_Lowercase_table,
-    unicode_prop_Other_Uppercase_table,
-    unicode_prop_Other_Grapheme_Extend_table,
-    unicode_prop_Other_Default_Ignorable_Code_Point_table,
-    unicode_prop_Other_ID_Start_table,
-    unicode_prop_Other_ID_Continue_table,
-    unicode_prop_Prepended_Concatenation_Mark_table,
-    unicode_prop_ID_Continue1_table,
-    unicode_prop_XID_Start1_table,
-    unicode_prop_XID_Continue1_table,
-    unicode_prop_Changes_When_Titlecased1_table,
-    unicode_prop_Changes_When_Casefolded1_table,
-    unicode_prop_Changes_When_NFKC_Casefolded1_table,
-    unicode_prop_Basic_Emoji1_table,
-    unicode_prop_Basic_Emoji2_table,
-    unicode_prop_RGI_Emoji_Modifier_Sequence_table,
-    unicode_prop_RGI_Emoji_Flag_Sequence_table,
-    unicode_prop_Emoji_Keycap_Sequence_table,
-    unicode_prop_ASCII_Hex_Digit_table,
-    unicode_prop_Bidi_Control_table,
-    unicode_prop_Dash_table,
-    unicode_prop_Deprecated_table,
-    unicode_prop_Diacritic_table,
-    unicode_prop_Extender_table,
-    unicode_prop_Hex_Digit_table,
-    unicode_prop_IDS_Unary_Operator_table,
-    unicode_prop_IDS_Binary_Operator_table,
-    unicode_prop_IDS_Trinary_Operator_table,
-    unicode_prop_Ideographic_table,
-    unicode_prop_Join_Control_table,
-    unicode_prop_Logical_Order_Exception_table,
-    unicode_prop_Modifier_Combining_Mark_table,
-    unicode_prop_Noncharacter_Code_Point_table,
-    unicode_prop_Pattern_Syntax_table,
-    unicode_prop_Pattern_White_Space_table,
-    unicode_prop_Quotation_Mark_table,
-    unicode_prop_Radical_table,
-    unicode_prop_Regional_Indicator_table,
-    unicode_prop_Sentence_Terminal_table,
-    unicode_prop_Soft_Dotted_table,
-    unicode_prop_Terminal_Punctuation_table,
-    unicode_prop_Unified_Ideograph_table,
-    unicode_prop_Variation_Selector_table,
-    unicode_prop_White_Space_table,
-    unicode_prop_Bidi_Mirrored_table,
-    unicode_prop_Emoji_table,
-    unicode_prop_Emoji_Component_table,
-    unicode_prop_Emoji_Modifier_table,
-    unicode_prop_Emoji_Modifier_Base_table,
-    unicode_prop_Emoji_Presentation_table,
-    unicode_prop_Extended_Pictographic_table,
-    unicode_prop_Default_Ignorable_Code_Point_table,
-    unicode_prop_ID_Start_table,
-    unicode_prop_Case_Ignorable_table,
+static const uint8_t * const unicode_jsi_prop_table[] = {
+    unicode_jsi_prop_Hyphen_table,
+    unicode_jsi_prop_Other_Math_table,
+    unicode_jsi_prop_Other_Alphabetic_table,
+    unicode_jsi_prop_Other_Lowercase_table,
+    unicode_jsi_prop_Other_Uppercase_table,
+    unicode_jsi_prop_Other_Grapheme_Extend_table,
+    unicode_jsi_prop_Other_Default_Ignorable_Code_Point_table,
+    unicode_jsi_prop_Other_ID_Start_table,
+    unicode_jsi_prop_Other_ID_Continue_table,
+    unicode_jsi_prop_Prepended_Concatenation_Mark_table,
+    unicode_jsi_prop_ID_Continue1_table,
+    unicode_jsi_prop_XID_Start1_table,
+    unicode_jsi_prop_XID_Continue1_table,
+    unicode_jsi_prop_Changes_When_Titlecased1_table,
+    unicode_jsi_prop_Changes_When_Casefolded1_table,
+    unicode_jsi_prop_Changes_When_NFKC_Casefolded1_table,
+    unicode_jsi_prop_Basic_Emoji1_table,
+    unicode_jsi_prop_Basic_Emoji2_table,
+    unicode_jsi_prop_RGI_Emoji_Modifier_Sequence_table,
+    unicode_jsi_prop_RGI_Emoji_Flag_Sequence_table,
+    unicode_jsi_prop_Emoji_Keycap_Sequence_table,
+    unicode_jsi_prop_ASCII_Hex_Digit_table,
+    unicode_jsi_prop_Bidi_Control_table,
+    unicode_jsi_prop_Dash_table,
+    unicode_jsi_prop_Deprecated_table,
+    unicode_jsi_prop_Diacritic_table,
+    unicode_jsi_prop_Extender_table,
+    unicode_jsi_prop_Hex_Digit_table,
+    unicode_jsi_prop_IDS_Unary_Operator_table,
+    unicode_jsi_prop_IDS_Binary_Operator_table,
+    unicode_jsi_prop_IDS_Trinary_Operator_table,
+    unicode_jsi_prop_Ideographic_table,
+    unicode_jsi_prop_Join_Control_table,
+    unicode_jsi_prop_Logical_Order_Exception_table,
+    unicode_jsi_prop_Modifier_Combining_Mark_table,
+    unicode_jsi_prop_Noncharacter_Code_Point_table,
+    unicode_jsi_prop_Pattern_Syntax_table,
+    unicode_jsi_prop_Pattern_White_Space_table,
+    unicode_jsi_prop_Quotation_Mark_table,
+    unicode_jsi_prop_Radical_table,
+    unicode_jsi_prop_Regional_Indicator_table,
+    unicode_jsi_prop_Sentence_Terminal_table,
+    unicode_jsi_prop_Soft_Dotted_table,
+    unicode_jsi_prop_Terminal_Punctuation_table,
+    unicode_jsi_prop_Unified_Ideograph_table,
+    unicode_jsi_prop_Variation_Selector_table,
+    unicode_jsi_prop_White_Space_table,
+    unicode_jsi_prop_Bidi_Mirrored_table,
+    unicode_jsi_prop_Emoji_table,
+    unicode_jsi_prop_Emoji_Component_table,
+    unicode_jsi_prop_Emoji_Modifier_table,
+    unicode_jsi_prop_Emoji_Modifier_Base_table,
+    unicode_jsi_prop_Emoji_Presentation_table,
+    unicode_jsi_prop_Extended_Pictographic_table,
+    unicode_jsi_prop_Default_Ignorable_Code_Point_table,
+    unicode_jsi_prop_ID_Start_table,
+    unicode_jsi_prop_Case_Ignorable_table,
 };
 
-static const uint16_t unicode_prop_len_table[] = {
-    countof(unicode_prop_Hyphen_table),
-    countof(unicode_prop_Other_Math_table),
-    countof(unicode_prop_Other_Alphabetic_table),
-    countof(unicode_prop_Other_Lowercase_table),
-    countof(unicode_prop_Other_Uppercase_table),
-    countof(unicode_prop_Other_Grapheme_Extend_table),
-    countof(unicode_prop_Other_Default_Ignorable_Code_Point_table),
-    countof(unicode_prop_Other_ID_Start_table),
-    countof(unicode_prop_Other_ID_Continue_table),
-    countof(unicode_prop_Prepended_Concatenation_Mark_table),
-    countof(unicode_prop_ID_Continue1_table),
-    countof(unicode_prop_XID_Start1_table),
-    countof(unicode_prop_XID_Continue1_table),
-    countof(unicode_prop_Changes_When_Titlecased1_table),
-    countof(unicode_prop_Changes_When_Casefolded1_table),
-    countof(unicode_prop_Changes_When_NFKC_Casefolded1_table),
-    countof(unicode_prop_Basic_Emoji1_table),
-    countof(unicode_prop_Basic_Emoji2_table),
-    countof(unicode_prop_RGI_Emoji_Modifier_Sequence_table),
-    countof(unicode_prop_RGI_Emoji_Flag_Sequence_table),
-    countof(unicode_prop_Emoji_Keycap_Sequence_table),
-    countof(unicode_prop_ASCII_Hex_Digit_table),
-    countof(unicode_prop_Bidi_Control_table),
-    countof(unicode_prop_Dash_table),
-    countof(unicode_prop_Deprecated_table),
-    countof(unicode_prop_Diacritic_table),
-    countof(unicode_prop_Extender_table),
-    countof(unicode_prop_Hex_Digit_table),
-    countof(unicode_prop_IDS_Unary_Operator_table),
-    countof(unicode_prop_IDS_Binary_Operator_table),
-    countof(unicode_prop_IDS_Trinary_Operator_table),
-    countof(unicode_prop_Ideographic_table),
-    countof(unicode_prop_Join_Control_table),
-    countof(unicode_prop_Logical_Order_Exception_table),
-    countof(unicode_prop_Modifier_Combining_Mark_table),
-    countof(unicode_prop_Noncharacter_Code_Point_table),
-    countof(unicode_prop_Pattern_Syntax_table),
-    countof(unicode_prop_Pattern_White_Space_table),
-    countof(unicode_prop_Quotation_Mark_table),
-    countof(unicode_prop_Radical_table),
-    countof(unicode_prop_Regional_Indicator_table),
-    countof(unicode_prop_Sentence_Terminal_table),
-    countof(unicode_prop_Soft_Dotted_table),
-    countof(unicode_prop_Terminal_Punctuation_table),
-    countof(unicode_prop_Unified_Ideograph_table),
-    countof(unicode_prop_Variation_Selector_table),
-    countof(unicode_prop_White_Space_table),
-    countof(unicode_prop_Bidi_Mirrored_table),
-    countof(unicode_prop_Emoji_table),
-    countof(unicode_prop_Emoji_Component_table),
-    countof(unicode_prop_Emoji_Modifier_table),
-    countof(unicode_prop_Emoji_Modifier_Base_table),
-    countof(unicode_prop_Emoji_Presentation_table),
-    countof(unicode_prop_Extended_Pictographic_table),
-    countof(unicode_prop_Default_Ignorable_Code_Point_table),
-    countof(unicode_prop_ID_Start_table),
-    countof(unicode_prop_Case_Ignorable_table),
+static const uint16_t unicode_jsi_prop_len_table[] = {
+    countof(unicode_jsi_prop_Hyphen_table),
+    countof(unicode_jsi_prop_Other_Math_table),
+    countof(unicode_jsi_prop_Other_Alphabetic_table),
+    countof(unicode_jsi_prop_Other_Lowercase_table),
+    countof(unicode_jsi_prop_Other_Uppercase_table),
+    countof(unicode_jsi_prop_Other_Grapheme_Extend_table),
+    countof(unicode_jsi_prop_Other_Default_Ignorable_Code_Point_table),
+    countof(unicode_jsi_prop_Other_ID_Start_table),
+    countof(unicode_jsi_prop_Other_ID_Continue_table),
+    countof(unicode_jsi_prop_Prepended_Concatenation_Mark_table),
+    countof(unicode_jsi_prop_ID_Continue1_table),
+    countof(unicode_jsi_prop_XID_Start1_table),
+    countof(unicode_jsi_prop_XID_Continue1_table),
+    countof(unicode_jsi_prop_Changes_When_Titlecased1_table),
+    countof(unicode_jsi_prop_Changes_When_Casefolded1_table),
+    countof(unicode_jsi_prop_Changes_When_NFKC_Casefolded1_table),
+    countof(unicode_jsi_prop_Basic_Emoji1_table),
+    countof(unicode_jsi_prop_Basic_Emoji2_table),
+    countof(unicode_jsi_prop_RGI_Emoji_Modifier_Sequence_table),
+    countof(unicode_jsi_prop_RGI_Emoji_Flag_Sequence_table),
+    countof(unicode_jsi_prop_Emoji_Keycap_Sequence_table),
+    countof(unicode_jsi_prop_ASCII_Hex_Digit_table),
+    countof(unicode_jsi_prop_Bidi_Control_table),
+    countof(unicode_jsi_prop_Dash_table),
+    countof(unicode_jsi_prop_Deprecated_table),
+    countof(unicode_jsi_prop_Diacritic_table),
+    countof(unicode_jsi_prop_Extender_table),
+    countof(unicode_jsi_prop_Hex_Digit_table),
+    countof(unicode_jsi_prop_IDS_Unary_Operator_table),
+    countof(unicode_jsi_prop_IDS_Binary_Operator_table),
+    countof(unicode_jsi_prop_IDS_Trinary_Operator_table),
+    countof(unicode_jsi_prop_Ideographic_table),
+    countof(unicode_jsi_prop_Join_Control_table),
+    countof(unicode_jsi_prop_Logical_Order_Exception_table),
+    countof(unicode_jsi_prop_Modifier_Combining_Mark_table),
+    countof(unicode_jsi_prop_Noncharacter_Code_Point_table),
+    countof(unicode_jsi_prop_Pattern_Syntax_table),
+    countof(unicode_jsi_prop_Pattern_White_Space_table),
+    countof(unicode_jsi_prop_Quotation_Mark_table),
+    countof(unicode_jsi_prop_Radical_table),
+    countof(unicode_jsi_prop_Regional_Indicator_table),
+    countof(unicode_jsi_prop_Sentence_Terminal_table),
+    countof(unicode_jsi_prop_Soft_Dotted_table),
+    countof(unicode_jsi_prop_Terminal_Punctuation_table),
+    countof(unicode_jsi_prop_Unified_Ideograph_table),
+    countof(unicode_jsi_prop_Variation_Selector_table),
+    countof(unicode_jsi_prop_White_Space_table),
+    countof(unicode_jsi_prop_Bidi_Mirrored_table),
+    countof(unicode_jsi_prop_Emoji_table),
+    countof(unicode_jsi_prop_Emoji_Component_table),
+    countof(unicode_jsi_prop_Emoji_Modifier_table),
+    countof(unicode_jsi_prop_Emoji_Modifier_Base_table),
+    countof(unicode_jsi_prop_Emoji_Presentation_table),
+    countof(unicode_jsi_prop_Extended_Pictographic_table),
+    countof(unicode_jsi_prop_Default_Ignorable_Code_Point_table),
+    countof(unicode_jsi_prop_ID_Start_table),
+    countof(unicode_jsi_prop_Case_Ignorable_table),
 };
 
 typedef enum {
@@ -4836,7 +4836,7 @@ typedef enum {
     UNICODE_SEQUENCE_PROP_COUNT,
 } UnicodeSequencePropertyEnum;
 
-static const char unicode_sequence_prop_name_table[] =
+static const char unicode_jsi_sequence_prop_name_table[] =
     "Basic_Emoji"                 "\0"
     "Emoji_Keycap_Sequence"       "\0"
     "RGI_Emoji_Modifier_Sequence" "\0"
@@ -4846,13 +4846,13 @@ static const char unicode_sequence_prop_name_table[] =
     "RGI_Emoji"                   "\0"
 ;
 
-static const uint8_t unicode_rgi_emoji_tag_sequence[18] = {
+static const uint8_t unicode_jsi_rgi_emoji_tag_sequence[18] = {
     0x67, 0x62, 0x65, 0x6e, 0x67, 0x00, 0x67, 0x62,
     0x73, 0x63, 0x74, 0x00, 0x67, 0x62, 0x77, 0x6c,
     0x73, 0x00,
 };
 
-static const uint8_t unicode_rgi_emoji_zwj_sequence[2320] = {
+static const uint8_t unicode_jsi_rgi_emoji_zwj_sequence[2320] = {
     0x02, 0xb8, 0x19, 0x40, 0x86, 0x02, 0xd1, 0x39,
     0xb0, 0x19, 0x02, 0x26, 0x39, 0x42, 0x86, 0x02,
     0xb4, 0x36, 0x42, 0x86, 0x03, 0x68, 0x54, 0x64,

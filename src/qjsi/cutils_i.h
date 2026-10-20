@@ -66,10 +66,10 @@ enum {
 };
 #endif
 
-void pstrcpy(char *buf, int buf_size, const char *str);
-char *pstrcat(char *buf, int buf_size, const char *s);
-int strstart(const char *str, const char *val, const char **ptr);
-int has_suffix(const char *str, const char *suffix);
+void pstrcpy_jsi(char *buf, int buf_size, const char *str);
+// char *pstrcat(char *buf, int buf_size, const char *s);
+// int strstart(const char *str, const char *val, const char **ptr);
+static int has_suffix(const char *str, const char *suffix);
 
 /* Prevent UB when n == 0 and (src == NULL or dest == NULL) */
 static inline void memcpy_no_ub(void *dest, const void *src, size_t n) {
@@ -262,41 +262,41 @@ typedef struct DynBuf {
     void *opaque; /* for realloc_func */
 } DynBuf;
 
-void dbuf_init(DynBuf *s);
-void dbuf_init2(DynBuf *s, void *opaque, DynBufReallocFunc *realloc_func);
-int dbuf_realloc(DynBuf *s, size_t new_size);
-int dbuf_write(DynBuf *s, size_t offset, const uint8_t *data, size_t len);
-int dbuf_put(DynBuf *s, const uint8_t *data, size_t len);
-int dbuf_put_self(DynBuf *s, size_t offset, size_t len);
-int dbuf_putc(DynBuf *s, uint8_t c);
-int dbuf_putstr(DynBuf *s, const char *str);
-static inline int dbuf_put_u16(DynBuf *s, uint16_t val)
+void dbuf_jsi_init(DynBuf *s);
+void dbuf_jsi_init2(DynBuf *s, void *opaque, DynBufReallocFunc *realloc_func);
+int dbuf_jsi_realloc(DynBuf *s, size_t new_size);
+int dbuf_jsi_write(DynBuf *s, size_t offset, const uint8_t *data, size_t len);
+int dbuf_jsi_put(DynBuf *s, const uint8_t *data, size_t len);
+int dbuf_jsi_put_self(DynBuf *s, size_t offset, size_t len);
+int dbuf_jsi_putc(DynBuf *s, uint8_t c);
+int dbuf_jsi_putstr(DynBuf *s, const char *str);
+static inline int dbuf_jsi_put_u16(DynBuf *s, uint16_t val)
 {
-    return dbuf_put(s, (uint8_t *)&val, 2);
+    return dbuf_jsi_put(s, (uint8_t *)&val, 2);
 }
-static inline int dbuf_put_u32(DynBuf *s, uint32_t val)
+static inline int dbuf_jsi_put_u32(DynBuf *s, uint32_t val)
 {
-    return dbuf_put(s, (uint8_t *)&val, 4);
+    return dbuf_jsi_put(s, (uint8_t *)&val, 4);
 }
-static inline int dbuf_put_u64(DynBuf *s, uint64_t val)
+static inline int dbuf_jsi_put_u64(DynBuf *s, uint64_t val)
 {
-    return dbuf_put(s, (uint8_t *)&val, 8);
+    return dbuf_jsi_put(s, (uint8_t *)&val, 8);
 }
-int __attribute__((format(printf, 2, 3))) dbuf_printf(DynBuf *s,
+int __attribute__((format(printf, 2, 3))) dbuf_jsi_printf(DynBuf *s,
                                                       const char *fmt, ...);
-void dbuf_free(DynBuf *s);
-static inline BOOL dbuf_error(DynBuf *s) {
+void dbuf_jsi_free(DynBuf *s);
+static inline BOOL dbuf_jsi_error(DynBuf *s) {
     return s->error;
 }
-static inline void dbuf_set_error(DynBuf *s)
+static inline void dbuf_jsi_set_error(DynBuf *s)
 {
     s->error = TRUE;
 }
 
 #define UTF8_CHAR_LEN_MAX 6
 
-int unicode_to_utf8(uint8_t *buf, unsigned int c);
-int unicode_from_utf8(const uint8_t *p, int max_len, const uint8_t **pp);
+int unicode_jsi_to_utf8(uint8_t *buf, unsigned int c);
+int unicode_jsi_from_utf8(const uint8_t *p, int max_len, const uint8_t **pp);
 
 static inline BOOL is_surrogate(uint32_t c)
 {
@@ -340,7 +340,7 @@ static inline int from_hex(int c)
         return -1;
 }
 
-void rqsort(void *base, size_t nmemb, size_t size,
+void rqsort_jsi(void *base, size_t nmemb, size_t size,
             int (*cmp)(const void *, const void *, void *),
             void *arg);
 

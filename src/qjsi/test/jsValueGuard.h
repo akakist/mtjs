@@ -1,10 +1,10 @@
-// js_value_guard.h
+// jsi_value_guard.h
 #pragma once
 #include <quickjs_i.h>
 
 class JSValueGuard {
     JSContext* ctx = nullptr;
-    JSValue val = JS_UNDEFINED;
+    JSValue val = JSI_UNDEFINED;
 
 public:
     // Конструкторы
@@ -14,26 +14,26 @@ public:
 
     // Конструктор копирования (увеличивает счётчик)
     JSValueGuard(const JSValueGuard& other)
-        : ctx(other.ctx), val(JS_DupValue(other.ctx, other.val)) {}
+        : ctx(other.ctx), val(JSI_DupValue(other.ctx, other.val)) {}
 
     // Оператор присваивания (копирование)
     JSValueGuard& operator=(const JSValueGuard& other) {
         if (this != &other) {
             // Освобождаем текущее значение
-            if (ctx && !JS_IsUndefined(val) && !JS_IsNull(val)) {
-                JS_FreeValue(ctx, val);
+            if (ctx && !JSI_IsUndefined(val) && !JSI_IsNull(val)) {
+                JSI_FreeValue(ctx, val);
             }
             // Копируем новое
             ctx = other.ctx;
-            val = JS_DupValue(other.ctx, other.val);
+            val = JSI_DupValue(other.ctx, other.val);
         }
         return *this;
     }
 
     // Деструктор
     ~JSValueGuard() {
-        if (ctx && !JS_IsUndefined(val) && !JS_IsNull(val)) {
-            JS_FreeValue(ctx, val);
+        if (ctx && !JSI_IsUndefined(val) && !JSI_IsNull(val)) {
+            JSI_FreeValue(ctx, val);
         }
     }
 
@@ -47,24 +47,24 @@ public:
 
     // Проверка
     explicit operator bool() const {
-        return ctx && !JS_IsUndefined(val) && !JS_IsNull(val);
+        return ctx && !JSI_IsUndefined(val) && !JSI_IsNull(val);
     }
 
     // Отдать владение (не освобождать при разрушении)
     JSValue release() {
         JSValue tmp = val;
-        val = JS_UNDEFINED;
+        val = JSI_UNDEFINED;
         ctx = nullptr;
         return tmp;
     }
 
     // Очистить
     void clear() {
-        if (ctx && !JS_IsUndefined(val) && !JS_IsNull(val)) {
-            JS_FreeValue(ctx, val);
+        if (ctx && !JSI_IsUndefined(val) && !JSI_IsNull(val)) {
+            JSI_FreeValue(ctx, val);
         }
         ctx = nullptr;
-        val = JS_UNDEFINED;
+        val = JSI_UNDEFINED;
     }
 };
 

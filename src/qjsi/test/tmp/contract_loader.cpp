@@ -1,20 +1,20 @@
 #include "globals.h"
-#include <quickjs_i.h>
+#include <quickjsi_i.h>
 #include <iostream>
 #include <cstdio>
 
 void print_exception(JSContext* ctx) {
-    JSValue exc = JS_GetException(ctx);
-    const char* s = JS_ToCString(ctx, exc);
-    if (s) { std::cerr << "Exception: " << s << std::endl; JS_FreeCString(ctx, s); }
-    JS_FreeValue(ctx, exc);
+    JSValue exc = JSI_GetException(ctx);
+    const char* s = JSI_ToCString(ctx, exc);
+    if (s) { std::cerr << "Exception: " << s << std::endl; JSI_FreeCString(ctx, s); }
+    JSI_FreeValue(ctx, exc);
 }
 
 void delete_prop_str(JSContext* ctx, JSValueConst obj, const char* name) {
-    JSAtom atom = JS_NewAtom(ctx, name);
-    if (atom != JS_ATOM_NULL) {
-        JS_DeleteProperty(ctx, obj, atom, 0);
-        JS_FreeAtom(ctx, atom);
+    JSAtom atom = JSI_NewAtom(ctx, name);
+    if (atom != JSI_ATOM_NULL) {
+        JSI_DeleteProperty(ctx, obj, atom, 0);
+        JSI_FreeAtom(ctx, atom);
     }
 }
 
@@ -36,13 +36,13 @@ std::shared_ptr<ContractContext> load_contract(
     register_api(cc->ctx);
 
     // Удаляем опасные объекты
-    JSValue global = JS_GetGlobalObject(cc->ctx);
+    JSValue global = JSI_GetGlobalObject(cc->ctx);
     const char* banned[] = {
         "Math","Date","RegExp","JSON","Proxy","Promise","Map","Set",
         "WeakRef","FinalizationRegistry","Atomics","SharedArrayBuffer"
     };
     for (auto b : banned) delete_prop_str(cc->ctx, global, b);
-    JS_FreeValue(cc->ctx, global);
+    JSI_FreeValue(cc->ctx, global);
 
     // Читаем файл
     std::string src;
@@ -56,17 +56,17 @@ std::shared_ptr<ContractContext> load_contract(
         if (sz != (size_t)size) return nullptr;
     }
 
-    JSValue compiled = JS_Eval(cc->ctx, src.data(), src.size(), path.c_str(),
-        JS_EVAL_FLAG_STRICT | JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
-    if (JS_IsException(compiled)) { print_exception(cc->ctx); return nullptr; }
+    JSValue compiled = JSI_Eval(cc->ctx, src.data(), src.size(), path.c_str(),
+        JSI_EVAL_FLAG_STRICT | JSI_EVAL_TYPE_GLOBAL | JSI_EVAL_FLAG_COMPILE_ONLY);
+    if (JSI_IsException(compiled)) { print_exception(cc->ctx); return nullptr; }
 
-    JSValue result = JS_EvalFunction(cc->ctx, compiled);
-    if (JS_IsException(result)) {
+    JSValue result = JSI_EvalFunction(cc->ctx, compiled);
+    if (JSI_IsException(result)) {
         print_exception(cc->ctx);
-        JS_FreeValue(cc->ctx, result);
+        JSI_FreeValue(cc->ctx, result);
         return nullptr;
     }
-    JS_FreeValue(cc->ctx, result);
+    JSI_FreeValue(cc->ctx, result);
 
     contract_cache[name] = cc;
     return cc;

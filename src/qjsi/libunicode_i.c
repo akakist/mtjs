@@ -47,16 +47,45 @@ enum {
     RUN_TYPE_LF_EXT2,
     RUN_TYPE_UF_EXT3,
 };
+static  int cr_add_point(CharRange *cr, uint32_t v);
+static void cr_init(CharRange *cr, void *mem_opaque, void *(*realloc_func)(void *opaque, void *ptr, size_t size));
+static void cr_free(CharRange *cr);
+static int cr_realloc(CharRange *cr, int size);
+static int cr_copy(CharRange *cr, const CharRange *cr1);
+static int cr_op(CharRange *cr, const uint32_t *a_pt, int a_len,
+          const uint32_t *b_pt, int b_len, int op);
+static int cr_op1(CharRange *cr, const uint32_t *b_pt, int b_len, int op);
+static int cr_regexp_canonicalize(CharRange *cr, int is_unicode);
 
-static int lre_case_conv1(uint32_t c, int conv_type)
+static int cr_union_interval(CharRange *cr, uint32_t c1, uint32_t c2)
+{
+    uint32_t b_pt[2];
+    b_pt[0] = c1;
+    b_pt[1] = c2 + 1;
+    return cr_op1(cr, b_pt, 2, CR_OP_UNION);
+}
+static int cr_add_interval(CharRange *cr, uint32_t c1, uint32_t c2)
+{
+    if ((cr->len + 2) > cr->size) {
+        if (cr_realloc(cr, cr->len + 2))
+            return -1;
+    }
+    cr->points[cr->len++] = c1;
+    cr->points[cr->len++] = c2;
+    return 0;
+}
+
+
+
+static int lre_jsi_case_conv1(uint32_t c, int conv_type)
 {
     uint32_t res[LRE_CC_RES_LEN_MAX];
-    lre_case_conv(res, c, conv_type);
+    lre_jsi_case_conv(res, c, conv_type);
     return res[0];
 }
 
 /* case conversion using the table entry 'idx' with value 'v' */
-static int lre_case_conv_entry(uint32_t *res, uint32_t c, int conv_type, uint32_t idx, uint32_t v)
+static int lre_jsi_case_conv_entry(uint32_t *res, uint32_t c, int conv_type, uint32_t idx, uint32_t v)
 {
     uint32_t code, data, type, a, is_lower;
     is_lower = (conv_type != 0);
@@ -125,8 +154,8 @@ static int lre_case_conv_entry(uint32_t *res, uint32_t c, int conv_type, uint32_
         res[1] = case_conv_ext[data & 0x3f];
         if (conv_type == 2) {
             /* convert to lower */
-            res[0] = lre_case_conv1(res[0], 1);
-            res[1] = lre_case_conv1(res[1], 1);
+            res[0] = lre_jsi_case_conv1(res[0], 1);
+            res[1] = lre_jsi_case_conv1(res[1], 1);
         }
         return 2;
     default:
@@ -138,9 +167,9 @@ static int lre_case_conv_entry(uint32_t *res, uint32_t c, int conv_type, uint32_
         res[2] = case_conv_ext[data & 0xf];
         if (conv_type == 2) {
             /* convert to lower */
-            res[0] = lre_case_conv1(res[0], 1);
-            res[1] = lre_case_conv1(res[1], 1);
-            res[2] = lre_case_conv1(res[2], 1);
+            res[0] = lre_jsi_case_conv1(res[0], 1);
+            res[1] = lre_jsi_case_conv1(res[1], 1);
+            res[2] = lre_jsi_case_conv1(res[2], 1);
         }
         return 3;
     }
@@ -153,7 +182,7 @@ static int lre_case_conv_entry(uint32_t *res, uint32_t c, int conv_type, uint32_
    1 = to lower
    2 = case folding (= to lower with modifications)
 */
-int lre_case_conv(uint32_t *res, uint32_t c, int conv_type)
+int lre_jsi_case_conv(uint32_t *res, uint32_t c, int conv_type)
 {
     if (c < 128) {
         if (conv_type) {
@@ -181,7 +210,7 @@ int lre_case_conv(uint32_t *res, uint32_t c, int conv_type)
             } else if (c >= code + len) {
                 idx_min = idx + 1;
             } else {
-                return lre_case_conv_entry(res, c, conv_type, idx, v);
+                return lre_jsi_case_conv_entry(res, c, conv_type, idx, v);
             }
         }
     }
@@ -189,18 +218,18 @@ int lre_case_conv(uint32_t *res, uint32_t c, int conv_type)
     return 1;
 }
 
-static int lre_case_folding_entry(uint32_t c, uint32_t idx, uint32_t v, BOOL is_unicode)
+static int lre_jsi_case_folding_entry(uint32_t c, uint32_t idx, uint32_t v, BOOL is_unicode)
 {
     uint32_t res[LRE_CC_RES_LEN_MAX];
     int len;
 
     if (is_unicode) {
-        len = lre_case_conv_entry(res, c, 2, idx, v);
+        len = lre_jsi_case_conv_entry(res, c, 2, idx, v);
         if (len == 1) {
             c = res[0];
         } else {
             /* handle the few specific multi-character cases (see
-               unicode_gen.c:dump_case_folding_special_cases()) */
+               unicode_jsi_gen.c:dump_case_folding_special_cases()) */
             if (c == 0xfb06) {
                 c = 0xfb05;
             } else if (c == 0x01fd3) {
@@ -215,7 +244,7 @@ static int lre_case_folding_entry(uint32_t c, uint32_t idx, uint32_t v, BOOL is_
                 c = c - 'a' + 'A';
         } else {
             /* legacy regexp: to upper case if single char >= 128 */
-            len = lre_case_conv_entry(res, c, FALSE, idx, v);
+            len = lre_jsi_case_conv_entry(res, c, FALSE, idx, v);
             if (len == 1 && res[0] >= 128)
                 c = res[0];
         }
@@ -224,7 +253,7 @@ static int lre_case_folding_entry(uint32_t c, uint32_t idx, uint32_t v, BOOL is_
 }
 
 /* JS regexp specific rules for case folding */
-int lre_canonicalize(uint32_t c, BOOL is_unicode)
+int lre_jsi_canonicalize(uint32_t c, BOOL is_unicode)
 {
     if (c < 128) {
         /* fast case */
@@ -253,7 +282,7 @@ int lre_canonicalize(uint32_t c, BOOL is_unicode)
             } else if (c >= code + len) {
                 idx_min = idx + 1;
             } else {
-                return lre_case_folding_entry(c, idx, v, is_unicode);
+                return lre_jsi_case_folding_entry(c, idx, v, is_unicode);
             }
         }
     }
@@ -301,7 +330,7 @@ static int get_index_pos(uint32_t *pcode, uint32_t c,
     return (idx_min + 1) * UNICODE_INDEX_BLOCK_LEN + (v >> 21);
 }
 
-static BOOL lre_is_in_table(uint32_t c, const uint8_t *table,
+static BOOL lre_jsi_is_in_table(uint32_t c, const uint8_t *table,
                             const uint8_t *index_table, int index_table_len)
 {
     uint32_t code, b, bit;
@@ -344,7 +373,7 @@ static BOOL lre_is_in_table(uint32_t c, const uint8_t *table,
     }
 }
 
-BOOL lre_is_cased(uint32_t c)
+BOOL lre_jsi_is_cased(uint32_t c)
 {
     uint32_t v, code, len;
     int idx, idx_min, idx_max;
@@ -364,16 +393,16 @@ BOOL lre_is_cased(uint32_t c)
             return TRUE;
         }
     }
-    return lre_is_in_table(c, unicode_prop_Cased1_table,
-                           unicode_prop_Cased1_index,
-                           sizeof(unicode_prop_Cased1_index) / 3);
+    return lre_jsi_is_in_table(c, unicode_jsi_prop_Cased1_table,
+                           unicode_jsi_prop_Cased1_index,
+                           sizeof(unicode_jsi_prop_Cased1_index) / 3);
 }
 
-BOOL lre_is_case_ignorable(uint32_t c)
+BOOL lre_jsi_is_case_ignorable(uint32_t c)
 {
-    return lre_is_in_table(c, unicode_prop_Case_Ignorable_table,
-                           unicode_prop_Case_Ignorable_index,
-                           sizeof(unicode_prop_Case_Ignorable_index) / 3);
+    return lre_jsi_is_in_table(c, unicode_jsi_prop_Case_Ignorable_table,
+                           unicode_jsi_prop_Case_Ignorable_index,
+                           sizeof(unicode_jsi_prop_Case_Ignorable_index) / 3);
 }
 
 /* character range */
@@ -403,7 +432,7 @@ void cr_free(CharRange *cr)
     cr->realloc_func(cr->mem_opaque, cr->points, 0);
 }
 
-int cr_realloc(CharRange *cr, int size)
+static int cr_realloc(CharRange *cr, int size)
 {
     int new_size;
     uint32_t *new_buf;
@@ -420,7 +449,7 @@ int cr_realloc(CharRange *cr, int size)
     return 0;
 }
 
-int cr_copy(CharRange *cr, const CharRange *cr1)
+static int cr_copy(CharRange *cr, const CharRange *cr1)
 {
     if (cr_realloc(cr, cr1->len))
         return -1;
@@ -459,7 +488,7 @@ static void cr_compress(CharRange *cr)
 }
 
 /* union or intersection */
-int cr_op(CharRange *cr, const uint32_t *a_pt, int a_len,
+static int cr_op(CharRange *cr, const uint32_t *a_pt, int a_len,
           const uint32_t *b_pt, int b_len, int op)
 {
     int a_idx, b_idx, is_in;
@@ -514,7 +543,7 @@ int cr_op(CharRange *cr, const uint32_t *a_pt, int a_len,
     return 0;
 }
 
-int cr_op1(CharRange *cr, const uint32_t *b_pt, int b_len, int op)
+static int cr_op1(CharRange *cr, const uint32_t *b_pt, int b_len, int op)
 {
     CharRange a = *cr;
     int ret;
@@ -525,8 +554,17 @@ int cr_op1(CharRange *cr, const uint32_t *b_pt, int b_len, int op)
     cr_free(&a);
     return ret;
 }
+static  int cr_add_point(CharRange *cr, uint32_t v)
+{
+    if (cr->len >= cr->size) {
+        if (cr_realloc(cr, cr->len + 1))
+            return -1;
+    }
+    cr->points[cr->len++] = v;
+    return 0;
+}
 
-int cr_invert(CharRange *cr)
+static int cr_invert(CharRange *cr)
 {
     int len;
     len = cr->len;
@@ -549,7 +587,7 @@ int cr_invert(CharRange *cr)
    CASE_L: set char if modified by lowercasing,
    CASE_F: set char if modified by case folding,
  */
-static int unicode_case1(CharRange *cr, int case_mask)
+static int unicode_jsi_case1(CharRange *cr, int case_mask)
 {
 #define MR(x) (1 << RUN_TYPE_ ## x)
     const uint32_t tab_run_mask[3] = {
@@ -624,7 +662,7 @@ static void cr_sort_and_remove_overlap(CharRange *cr)
     uint32_t start, end, start1, end1, i, j;
 
     /* the resulting ranges are not necessarily sorted and may overlap */
-    rqsort(cr->points, cr->len / 2, sizeof(cr->points[0]) * 2, point_cmp, NULL);
+    rqsort_jsi(cr->points, cr->len / 2, sizeof(cr->points[0]) * 2, point_cmp, NULL);
     j = 0;
     for(i = 0; i < cr->len; ) {
         start = cr->points[i];
@@ -656,8 +694,8 @@ static void cr_sort_and_remove_overlap(CharRange *cr)
 }
 
 /* canonicalize a character set using the JS regex case folding rules
-   (see lre_canonicalize()) */
-int cr_regexp_canonicalize(CharRange *cr, BOOL is_unicode)
+   (see lre_jsi_canonicalize()) */
+static int cr_regexp_canonicalize(CharRange *cr, BOOL is_unicode)
 {
     CharRange cr_inter, cr_mask, cr_result, cr_sub;
     uint32_t v, code, len, i, idx, start, end, c, d_start, d_end, d;
@@ -667,7 +705,7 @@ int cr_regexp_canonicalize(CharRange *cr, BOOL is_unicode)
     cr_init(&cr_result, cr->mem_opaque, cr->realloc_func);
     cr_init(&cr_sub, cr->mem_opaque, cr->realloc_func);
 
-    if (unicode_case1(&cr_mask, is_unicode ? CASE_F : CASE_U))
+    if (unicode_jsi_case1(&cr_mask, is_unicode ? CASE_F : CASE_U))
         goto fail;
     if (cr_op(&cr_inter, cr_mask.points, cr_mask.len, cr->points, cr->len, CR_OP_INTER))
         goto fail;
@@ -701,7 +739,7 @@ int cr_regexp_canonicalize(CharRange *cr, BOOL is_unicode)
                 code = v >> (32 - 17);
                 len = (v >> (32 - 17 - 7)) & 0x7f;
             }
-            d = lre_case_folding_entry(c, idx, v, is_unicode);
+            d = lre_jsi_case_folding_entry(c, idx, v, is_unicode);
             /* try to merge with the current interval */
             if (d_start == -1) {
                 d_start = d;
@@ -743,19 +781,19 @@ int cr_regexp_canonicalize(CharRange *cr, BOOL is_unicode)
 
 #ifdef CONFIG_ALL_UNICODE
 
-BOOL lre_is_id_start(uint32_t c)
+BOOL lre_jsi_is_id_start(uint32_t c)
 {
-    return lre_is_in_table(c, unicode_prop_ID_Start_table,
-                           unicode_prop_ID_Start_index,
-                           sizeof(unicode_prop_ID_Start_index) / 3);
+    return lre_jsi_is_in_table(c, unicode_jsi_prop_ID_Start_table,
+                           unicode_jsi_prop_ID_Start_index,
+                           sizeof(unicode_jsi_prop_ID_Start_index) / 3);
 }
 
-BOOL lre_is_id_continue(uint32_t c)
+BOOL lre_jsi_is_id_continue(uint32_t c)
 {
-    return lre_is_id_start(c) ||
-        lre_is_in_table(c, unicode_prop_ID_Continue1_table,
-                        unicode_prop_ID_Continue1_index,
-                        sizeof(unicode_prop_ID_Continue1_index) / 3);
+    return lre_jsi_is_id_start(c) ||
+        lre_jsi_is_in_table(c, unicode_jsi_prop_ID_Continue1_table,
+                        unicode_jsi_prop_ID_Continue1_index,
+                        sizeof(unicode_jsi_prop_ID_Continue1_index) / 3);
 }
 
 #define UNICODE_DECOMP_LEN_MAX 18
@@ -798,19 +836,19 @@ typedef enum {
     DECOMP_TYPE_LS2_UL,
 } DecompTypeEnum;
 
-static uint32_t unicode_get_short_code(uint32_t c)
+static uint32_t unicode_jsi_get_short_code(uint32_t c)
 {
-    static const uint16_t unicode_short_table[2] = { 0x2044, 0x2215 };
+    static const uint16_t unicode_jsi_short_table[2] = { 0x2044, 0x2215 };
 
     if (c < 0x80)
         return c;
     else if (c < 0x80 + 0x50)
         return c - 0x80 + 0x300;
     else
-        return unicode_short_table[c - 0x80 - 0x50];
+        return unicode_jsi_short_table[c - 0x80 - 0x50];
 }
 
-static uint32_t unicode_get_lower_simple(uint32_t c)
+static uint32_t unicode_jsi_get_lower_simple(uint32_t c)
 {
     if (c < 0x100 || (c >= 0x410 && c <= 0x42f))
         c += 0x20;
@@ -819,12 +857,12 @@ static uint32_t unicode_get_lower_simple(uint32_t c)
     return c;
 }
 
-static uint16_t unicode_get16(const uint8_t *p)
+static uint16_t unicode_jsi_get16(const uint8_t *p)
 {
     return p[0] | (p[1] << 8);
 }
 
-static int unicode_decomp_entry(uint32_t *res, uint32_t c,
+static int unicode_jsi_decomp_entry(uint32_t *res, uint32_t c,
                                 int idx, uint32_t code, uint32_t len,
                                 uint32_t type)
 {
@@ -833,10 +871,10 @@ static int unicode_decomp_entry(uint32_t *res, uint32_t c,
     const uint8_t *d;
 
     if (type == DECOMP_TYPE_C1) {
-        res[0] = unicode_decomp_table2[idx];
+        res[0] = unicode_jsi_decomp_table2[idx];
         return 1;
     } else {
-        d = unicode_decomp_data + unicode_decomp_table2[idx];
+        d = unicode_jsi_decomp_data + unicode_jsi_decomp_table2[idx];
         switch(type) {
         case DECOMP_TYPE_L1:
         case DECOMP_TYPE_L2:
@@ -848,7 +886,7 @@ static int unicode_decomp_entry(uint32_t *res, uint32_t c,
             l = type - DECOMP_TYPE_L1 + 1;
             d += (c - code) * l * 2;
             for(i = 0; i < l; i++) {
-                if ((res[i] = unicode_get16(d + 2 * i)) == 0)
+                if ((res[i] = unicode_jsi_get16(d + 2 * i)) == 0)
                     return 0;
             }
             return l;
@@ -860,7 +898,7 @@ static int unicode_decomp_entry(uint32_t *res, uint32_t c,
                 k = (c - code) * l;
                 p = len * l * 2;
                 for(i = 0; i < l; i++) {
-                    c1 = unicode_get16(d + 2 * k) |
+                    c1 = unicode_jsi_get16(d + 2 * k) |
                         (((d[p + (k / 4)] >> ((k % 4) * 2)) & 3) << 16);
                     if (!c1)
                         return 0;
@@ -877,7 +915,7 @@ static int unicode_decomp_entry(uint32_t *res, uint32_t c,
             l = type - DECOMP_TYPE_S1 + 1;
             d += (c - code) * l;
             for(i = 0; i < l; i++) {
-                if ((res[i] = unicode_get_short_code(d[i])) == 0)
+                if ((res[i] = unicode_jsi_get_short_code(d[i])) == 0)
                     return 0;
             }
             return l;
@@ -895,7 +933,7 @@ static int unicode_decomp_entry(uint32_t *res, uint32_t c,
             p = ((type - DECOMP_TYPE_I2_0) & 1) + (l > 2);
         decomp_type_i:
             for(i = 0; i < l; i++) {
-                c1 = unicode_get16(d + 2 * i);
+                c1 = unicode_jsi_get16(d + 2 * i);
                 if (i == p)
                     c1 += c - code;
                 res[i] = c1;
@@ -916,7 +954,7 @@ static int unicode_decomp_entry(uint32_t *res, uint32_t c,
         decomp_type_b:
             {
                 uint32_t c_min;
-                c_min = unicode_get16(d);
+                c_min = unicode_jsi_get16(d);
                 d += 2 + (c - code) * l;
                 for(i = 0; i < l; i++) {
                     c1 = d[i];
@@ -930,32 +968,32 @@ static int unicode_decomp_entry(uint32_t *res, uint32_t c,
             return l;
         case DECOMP_TYPE_LS2:
             d += (c - code) * 3;
-            if (!(res[0] = unicode_get16(d)))
+            if (!(res[0] = unicode_jsi_get16(d)))
                 return 0;
-            res[1] = unicode_get_short_code(d[2]);
+            res[1] = unicode_jsi_get_short_code(d[2]);
             return 2;
         case DECOMP_TYPE_PAT3:
-            res[0] = unicode_get16(d);
-            res[2] = unicode_get16(d + 2);
+            res[0] = unicode_jsi_get16(d);
+            res[2] = unicode_jsi_get16(d + 2);
             d += 4 + (c - code) * 2;
-            res[1] = unicode_get16(d);
+            res[1] = unicode_jsi_get16(d);
             return 3;
         case DECOMP_TYPE_S2_UL:
         case DECOMP_TYPE_LS2_UL:
             c1 = c - code;
             if (type == DECOMP_TYPE_S2_UL) {
                 d += c1 & ~1;
-                c = unicode_get_short_code(*d);
+                c = unicode_jsi_get_short_code(*d);
                 d++;
             } else {
                 d += (c1 >> 1) * 3;
-                c = unicode_get16(d);
+                c = unicode_jsi_get16(d);
                 d += 2;
             }
             if (c1 & 1)
-                c = unicode_get_lower_simple(c);
+                c = unicode_jsi_get_lower_simple(c);
             res[0] = c;
-            res[1] = unicode_get_short_code(*d);
+            res[1] = unicode_jsi_get_short_code(*d);
             return 2;
         }
     }
@@ -965,16 +1003,16 @@ static int unicode_decomp_entry(uint32_t *res, uint32_t c,
 
 /* return the length of the decomposition (length <=
    UNICODE_DECOMP_LEN_MAX) or 0 if no decomposition */
-static int unicode_decomp_char(uint32_t *res, uint32_t c, BOOL is_compat1)
+static int unicode_jsi_decomp_char(uint32_t *res, uint32_t c, BOOL is_compat1)
 {
     uint32_t v, type, is_compat, code, len;
     int idx_min, idx_max, idx;
 
     idx_min = 0;
-    idx_max = countof(unicode_decomp_table1) - 1;
+    idx_max = countof(unicode_jsi_decomp_table1) - 1;
     while (idx_min <= idx_max) {
         idx = (idx_max + idx_min) / 2;
-        v = unicode_decomp_table1[idx];
+        v = unicode_jsi_decomp_table1[idx];
         code = v >> (32 - 18);
         len = (v >> (32 - 18 - 7)) & 0x7f;
         //        printf("idx=%d code=%05x len=%d\n", idx, code, len);
@@ -987,34 +1025,34 @@ static int unicode_decomp_char(uint32_t *res, uint32_t c, BOOL is_compat1)
             if (is_compat1 < is_compat)
                 break;
             type = (v >> (32 - 18 - 7 - 6)) & 0x3f;
-            return unicode_decomp_entry(res, c, idx, code, len, type);
+            return unicode_jsi_decomp_entry(res, c, idx, code, len, type);
         }
     }
     return 0;
 }
 
 /* return 0 if no pair found */
-static int unicode_compose_pair(uint32_t c0, uint32_t c1)
+static int unicode_jsi_compose_pair(uint32_t c0, uint32_t c1)
 {
     uint32_t code, len, type, v, idx1, d_idx, d_offset, ch;
     int idx_min, idx_max, idx, d;
     uint32_t pair[2];
 
     idx_min = 0;
-    idx_max = countof(unicode_comp_table) - 1;
+    idx_max = countof(unicode_jsi_comp_table) - 1;
     while (idx_min <= idx_max) {
         idx = (idx_max + idx_min) / 2;
-        idx1 = unicode_comp_table[idx];
+        idx1 = unicode_jsi_comp_table[idx];
 
         /* idx1 represent an entry of the decomposition table */
         d_idx = idx1 >> 6;
         d_offset = idx1 & 0x3f;
-        v = unicode_decomp_table1[d_idx];
+        v = unicode_jsi_decomp_table1[d_idx];
         code = v >> (32 - 18);
         len = (v >> (32 - 18 - 7)) & 0x7f;
         type = (v >> (32 - 18 - 7 - 6)) & 0x3f;
         ch = code + d_offset;
-        unicode_decomp_entry(pair, ch, d_idx, code, len, type);
+        unicode_jsi_decomp_entry(pair, ch, d_idx, code, len, type);
         d = c0 - pair[0];
         if (d == 0)
             d = c1 - pair[1];
@@ -1030,17 +1068,17 @@ static int unicode_compose_pair(uint32_t c0, uint32_t c1)
 }
 
 /* return the combining class of character c (between 0 and 255) */
-static int unicode_get_cc(uint32_t c)
+static int unicode_jsi_get_cc(uint32_t c)
 {
     uint32_t code, n, type, cc, c1, b;
     int pos;
     const uint8_t *p;
 
     pos = get_index_pos(&code, c,
-                        unicode_cc_index, sizeof(unicode_cc_index) / 3);
+                        unicode_jsi_cc_index, sizeof(unicode_jsi_cc_index) / 3);
     if (pos < 0)
         return 0;
-    p = unicode_cc_table + pos;
+    p = unicode_jsi_cc_table + pos;
     /* Compressed run length encoding:
        - 2 high order bits are combining class type
        -         0:0, 1:230, 2:extra byte linear progression, 3:extra byte
@@ -1093,18 +1131,18 @@ static void sort_cc(int *buf, int len)
     int i, j, k, cc, cc1, start, ch1;
 
     for(i = 0; i < len; i++) {
-        cc = unicode_get_cc(buf[i]);
+        cc = unicode_jsi_get_cc(buf[i]);
         if (cc != 0) {
             start = i;
             j = i + 1;
             while (j < len) {
                 ch1 = buf[j];
-                cc1 = unicode_get_cc(ch1);
+                cc1 = unicode_jsi_get_cc(ch1);
                 if (cc1 == 0)
                     break;
                 k = j - 1;
                 while (k >= start) {
-                    if (unicode_get_cc(buf[k]) <= cc1)
+                    if (unicode_jsi_get_cc(buf[k]) <= cc1)
                         break;
                     buf[k + 1] = buf[k];
                     k--;
@@ -1115,7 +1153,7 @@ static void sort_cc(int *buf, int len)
 #if 0
             printf("cc:");
             for(k = start; k < j; k++) {
-                printf(" %3d", unicode_get_cc(buf[k]));
+                printf(" %3d", unicode_jsi_get_cc(buf[k]));
             }
             printf("\n");
 #endif
@@ -1136,17 +1174,17 @@ static void to_nfd_rec(DynBuf *dbuf,
         if (c >= 0xac00 && c < 0xd7a4) {
             /* Hangul decomposition */
             c -= 0xac00;
-            dbuf_put_u32(dbuf, 0x1100 + c / 588);
-            dbuf_put_u32(dbuf, 0x1161 + (c % 588) / 28);
+            dbuf_jsi_put_u32(dbuf, 0x1100 + c / 588);
+            dbuf_jsi_put_u32(dbuf, 0x1161 + (c % 588) / 28);
             v = c % 28;
             if (v != 0)
-                dbuf_put_u32(dbuf, 0x11a7 + v);
+                dbuf_jsi_put_u32(dbuf, 0x11a7 + v);
         } else {
-            l = unicode_decomp_char(res, c, is_compat);
+            l = unicode_jsi_decomp_char(res, c, is_compat);
             if (l) {
                 to_nfd_rec(dbuf, (int *)res, l, is_compat);
             } else {
-                dbuf_put_u32(dbuf, c);
+                dbuf_jsi_put_u32(dbuf, c);
             }
         }
     }
@@ -1164,22 +1202,22 @@ static int compose_pair(uint32_t c0, uint32_t c1)
                c1 >= 0x11a7 && c1 < 0x11a7 + 28) {
         return c0 + c1 - 0x11a7;
     } else {
-        return unicode_compose_pair(c0, c1);
+        return unicode_jsi_compose_pair(c0, c1);
     }
 }
 
-int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
+int unicode_jsi_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
                       UnicodeNormalizationEnum n_type,
                       void *opaque, DynBufReallocFunc *realloc_func)
 {
     int *buf, buf_len, i, p, starter_pos, cc, last_cc, out_len;
     BOOL is_compat;
-    DynBuf dbuf_s, *dbuf = &dbuf_s;
+    DynBuf dbuf_jsi_s, *dbuf = &dbuf_jsi_s;
 
     is_compat = n_type >> 1;
 
-    dbuf_init2(dbuf, opaque, realloc_func);
-    if (dbuf_realloc(dbuf, sizeof(int) * src_len))
+    dbuf_jsi_init2(dbuf, opaque, realloc_func);
+    if (dbuf_jsi_realloc(dbuf, sizeof(int) * src_len))
         goto fail;
 
     /* common case: latin1 is unaffected by NFC */
@@ -1196,7 +1234,7 @@ int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
     }
 
     to_nfd_rec(dbuf, (const int *)src, src_len, is_compat);
-    if (dbuf_error(dbuf)) {
+    if (dbuf_jsi_error(dbuf)) {
     fail:
         *pdst = NULL;
         return -1;
@@ -1217,10 +1255,10 @@ int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
     while (i < buf_len) {
         /* find the starter character and test if it is blocked from
            the character at 'i' */
-        last_cc = unicode_get_cc(buf[i]);
+        last_cc = unicode_jsi_get_cc(buf[i]);
         starter_pos = out_len - 1;
         while (starter_pos >= 0) {
-            cc = unicode_get_cc(buf[starter_pos]);
+            cc = unicode_jsi_get_cc(buf[starter_pos]);
             if (cc == 0)
                 break;
             if (cc >= last_cc)
@@ -1243,7 +1281,7 @@ int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
 
 /* char ranges for various unicode properties */
 
-static int unicode_find_name(const char *name_table, const char *name)
+static int unicode_jsi_find_name(const char *name_table, const char *name)
 {
     const char *p, *r;
     int pos;
@@ -1272,7 +1310,7 @@ static int unicode_find_name(const char *name_table, const char *name)
 
 /* 'cr' must be initialized and empty. Return 0 if OK, -1 if error, -2
    if not found */
-int unicode_script(CharRange *cr,
+int unicode_jsi_script(CharRange *cr,
                    const char *script_name, BOOL is_ext)
 {
     int script_idx;
@@ -1282,7 +1320,7 @@ int unicode_script(CharRange *cr,
     CharRange cr2_s, *cr2 = &cr2_s;
     BOOL is_common;
 
-    script_idx = unicode_find_name(unicode_script_name_table, script_name);
+    script_idx = unicode_jsi_find_name(unicode_jsi_script_name_table, script_name);
     if (script_idx < 0)
         return -2;
 
@@ -1296,8 +1334,8 @@ int unicode_script(CharRange *cr,
         cr1 = cr;
     }
 
-    p = unicode_script_table;
-    p_end = unicode_script_table + countof(unicode_script_table);
+    p = unicode_jsi_script_table;
+    p_end = unicode_jsi_script_table + countof(unicode_jsi_script_table);
     c = 0;
     while (p < p_end) {
         b = *p++;
@@ -1332,8 +1370,8 @@ int unicode_script(CharRange *cr,
 
     if (is_ext) {
         /* add the script extensions */
-        p = unicode_script_ext_table;
-        p_end = unicode_script_ext_table + countof(unicode_script_ext_table);
+        p = unicode_jsi_script_ext_table;
+        p_end = unicode_jsi_script_ext_table + countof(unicode_jsi_script_ext_table);
         c = 0;
         while (p < p_end) {
             b = *p++;
@@ -1394,13 +1432,13 @@ int unicode_script(CharRange *cr,
 
 #define M(id) (1U << UNICODE_GC_ ## id)
 
-static int unicode_general_category1(CharRange *cr, uint32_t gc_mask)
+static int unicode_jsi_general_category1(CharRange *cr, uint32_t gc_mask)
 {
     const uint8_t *p, *p_end;
     uint32_t c, c0, b, n, v;
 
-    p = unicode_gc_table;
-    p_end = unicode_gc_table + countof(unicode_gc_table);
+    p = unicode_jsi_gc_table;
+    p_end = unicode_jsi_gc_table + countof(unicode_jsi_gc_table);
     c = 0;
     /* Compressed range encoding:
        initial byte:
@@ -1455,13 +1493,13 @@ static int unicode_general_category1(CharRange *cr, uint32_t gc_mask)
     return 0;
 }
 
-static int unicode_prop1(CharRange *cr, int prop_idx)
+static int unicode_jsi_prop1(CharRange *cr, int prop_idx)
 {
     const uint8_t *p, *p_end;
     uint32_t c, c0, b, bit;
 
-    p = unicode_prop_table[prop_idx];
-    p_end = p + unicode_prop_len_table[prop_idx];
+    p = unicode_jsi_prop_table[prop_idx];
+    p_end = p + unicode_jsi_prop_len_table[prop_idx];
     c = 0;
     bit = 0;
     /* Compressed range encoding:
@@ -1515,7 +1553,7 @@ typedef enum {
 
 #define POP_STACK_LEN_MAX 4
 
-static int unicode_prop_ops(CharRange *cr, ...)
+static int unicode_jsi_prop_ops(CharRange *cr, ...)
 {
     va_list ap;
     CharRange stack[POP_STACK_LEN_MAX];
@@ -1531,21 +1569,21 @@ static int unicode_prop_ops(CharRange *cr, ...)
             assert(stack_len < POP_STACK_LEN_MAX);
             a = va_arg(ap, int);
             cr_init(&stack[stack_len++], cr->mem_opaque, cr->realloc_func);
-            if (unicode_general_category1(&stack[stack_len - 1], a))
+            if (unicode_jsi_general_category1(&stack[stack_len - 1], a))
                 goto fail;
             break;
         case POP_PROP:
             assert(stack_len < POP_STACK_LEN_MAX);
             a = va_arg(ap, int);
             cr_init(&stack[stack_len++], cr->mem_opaque, cr->realloc_func);
-            if (unicode_prop1(&stack[stack_len - 1], a))
+            if (unicode_jsi_prop1(&stack[stack_len - 1], a))
                 goto fail;
             break;
         case POP_CASE:
             assert(stack_len < POP_STACK_LEN_MAX);
             a = va_arg(ap, int);
             cr_init(&stack[stack_len++], cr->mem_opaque, cr->realloc_func);
-            if (unicode_case1(&stack[stack_len - 1], a))
+            if (unicode_jsi_case1(&stack[stack_len - 1], a))
                 goto fail;
             break;
         case POP_UNION:
@@ -1591,7 +1629,7 @@ static int unicode_prop_ops(CharRange *cr, ...)
     return -1;
 }
 
-static const uint32_t unicode_gc_mask_table[] = {
+static const uint32_t unicode_jsi_gc_mask_table[] = {
     M(Lu) | M(Ll) | M(Lt), /* LC */
     M(Lu) | M(Ll) | M(Lt) | M(Lm) | M(Lo), /* L */
     M(Mn) | M(Mc) | M(Me), /* M */
@@ -1604,30 +1642,30 @@ static const uint32_t unicode_gc_mask_table[] = {
 
 /* 'cr' must be initialized and empty. Return 0 if OK, -1 if error, -2
    if not found */
-int unicode_general_category(CharRange *cr, const char *gc_name)
+int unicode_jsi_general_category(CharRange *cr, const char *gc_name)
 {
     int gc_idx;
     uint32_t gc_mask;
 
-    gc_idx = unicode_find_name(unicode_gc_name_table, gc_name);
+    gc_idx = unicode_jsi_find_name(unicode_jsi_gc_name_table, gc_name);
     if (gc_idx < 0)
         return -2;
     if (gc_idx <= UNICODE_GC_Co) {
         gc_mask = (uint64_t)1 << gc_idx;
     } else {
-        gc_mask = unicode_gc_mask_table[gc_idx - UNICODE_GC_LC];
+        gc_mask = unicode_jsi_gc_mask_table[gc_idx - UNICODE_GC_LC];
     }
-    return unicode_general_category1(cr, gc_mask);
+    return unicode_jsi_general_category1(cr, gc_mask);
 }
 
 
 /* 'cr' must be initialized and empty. Return 0 if OK, -1 if error, -2
    if not found */
-int unicode_prop(CharRange *cr, const char *prop_name)
+int unicode_jsi_prop(CharRange *cr, const char *prop_name)
 {
     int prop_idx, ret;
 
-    prop_idx = unicode_find_name(unicode_prop_name_table, prop_name);
+    prop_idx = unicode_jsi_find_name(unicode_jsi_prop_name_table, prop_name);
     if (prop_idx < 0)
         return -2;
     prop_idx += UNICODE_PROP_ASCII_Hex_Digit;
@@ -1643,34 +1681,34 @@ int unicode_prop(CharRange *cr, const char *prop_name)
             return -1;
         break;
     case UNICODE_PROP_Assigned:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Cn),
                                POP_INVERT,
                                POP_END);
         break;
     case UNICODE_PROP_Math:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Sm),
                                POP_PROP, UNICODE_PROP_Other_Math,
                                POP_UNION,
                                POP_END);
         break;
     case UNICODE_PROP_Lowercase:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Ll),
                                POP_PROP, UNICODE_PROP_Other_Lowercase,
                                POP_UNION,
                                POP_END);
         break;
     case UNICODE_PROP_Uppercase:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Lu),
                                POP_PROP, UNICODE_PROP_Other_Uppercase,
                                POP_UNION,
                                POP_END);
         break;
     case UNICODE_PROP_Cased:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Lu) | M(Ll) | M(Lt),
                                POP_PROP, UNICODE_PROP_Other_Uppercase,
                                POP_UNION,
@@ -1679,7 +1717,7 @@ int unicode_prop(CharRange *cr, const char *prop_name)
                                POP_END);
         break;
     case UNICODE_PROP_Alphabetic:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Lu) | M(Ll) | M(Lt) | M(Lm) | M(Lo) | M(Nl),
                                POP_PROP, UNICODE_PROP_Other_Uppercase,
                                POP_UNION,
@@ -1690,7 +1728,7 @@ int unicode_prop(CharRange *cr, const char *prop_name)
                                POP_END);
         break;
     case UNICODE_PROP_Grapheme_Base:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Cc) | M(Cf) | M(Cs) | M(Co) | M(Cn) | M(Zl) | M(Zp) | M(Me) | M(Mn),
                                POP_PROP, UNICODE_PROP_Other_Grapheme_Extend,
                                POP_UNION,
@@ -1698,14 +1736,14 @@ int unicode_prop(CharRange *cr, const char *prop_name)
                                POP_END);
         break;
     case UNICODE_PROP_Grapheme_Extend:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Me) | M(Mn),
                                POP_PROP, UNICODE_PROP_Other_Grapheme_Extend,
                                POP_UNION,
                                POP_END);
         break;
     case UNICODE_PROP_XID_Start:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Lu) | M(Ll) | M(Lt) | M(Lm) | M(Lo) | M(Nl),
                                POP_PROP, UNICODE_PROP_Other_ID_Start,
                                POP_UNION,
@@ -1719,7 +1757,7 @@ int unicode_prop(CharRange *cr, const char *prop_name)
                                POP_END);
         break;
     case UNICODE_PROP_XID_Continue:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Lu) | M(Ll) | M(Lt) | M(Lm) | M(Lo) | M(Nl) |
                                M(Mn) | M(Mc) | M(Nd) | M(Pc),
                                POP_PROP, UNICODE_PROP_Other_ID_Start,
@@ -1736,30 +1774,30 @@ int unicode_prop(CharRange *cr, const char *prop_name)
                                POP_END);
         break;
     case UNICODE_PROP_Changes_When_Uppercased:
-        ret = unicode_case1(cr, CASE_U);
+        ret = unicode_jsi_case1(cr, CASE_U);
         break;
     case UNICODE_PROP_Changes_When_Lowercased:
-        ret = unicode_case1(cr, CASE_L);
+        ret = unicode_jsi_case1(cr, CASE_L);
         break;
     case UNICODE_PROP_Changes_When_Casemapped:
-        ret = unicode_case1(cr, CASE_U | CASE_L | CASE_F);
+        ret = unicode_jsi_case1(cr, CASE_U | CASE_L | CASE_F);
         break;
     case UNICODE_PROP_Changes_When_Titlecased:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_CASE, CASE_U,
                                POP_PROP, UNICODE_PROP_Changes_When_Titlecased1,
                                POP_XOR,
                                POP_END);
         break;
     case UNICODE_PROP_Changes_When_Casefolded:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_CASE, CASE_F,
                                POP_PROP, UNICODE_PROP_Changes_When_Casefolded1,
                                POP_XOR,
                                POP_END);
         break;
     case UNICODE_PROP_Changes_When_NFKC_Casefolded:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_CASE, CASE_F,
                                POP_PROP, UNICODE_PROP_Changes_When_NFKC_Casefolded1,
                                POP_XOR,
@@ -1767,7 +1805,7 @@ int unicode_prop(CharRange *cr, const char *prop_name)
         break;
 #if 0
     case UNICODE_PROP_ID_Start:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Lu) | M(Ll) | M(Lt) | M(Lm) | M(Lo) | M(Nl),
                                POP_PROP, UNICODE_PROP_Other_ID_Start,
                                POP_UNION,
@@ -1779,7 +1817,7 @@ int unicode_prop(CharRange *cr, const char *prop_name)
                                POP_END);
         break;
     case UNICODE_PROP_ID_Continue:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Lu) | M(Ll) | M(Lt) | M(Lm) | M(Lo) | M(Nl) |
                                M(Mn) | M(Mc) | M(Nd) | M(Pc),
                                POP_PROP, UNICODE_PROP_Other_ID_Start,
@@ -1794,7 +1832,7 @@ int unicode_prop(CharRange *cr, const char *prop_name)
                                POP_END);
         break;
     case UNICODE_PROP_Case_Ignorable:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_GC, M(Mn) | M(Cf) | M(Lm) | M(Sk),
                                POP_PROP, UNICODE_PROP_Case_Ignorable1,
                                POP_XOR,
@@ -1803,7 +1841,7 @@ int unicode_prop(CharRange *cr, const char *prop_name)
 #else
         /* we use the existing tables */
     case UNICODE_PROP_ID_Continue:
-        ret = unicode_prop_ops(cr,
+        ret = unicode_jsi_prop_ops(cr,
                                POP_PROP, UNICODE_PROP_ID_Start,
                                POP_PROP, UNICODE_PROP_ID_Continue1,
                                POP_XOR,
@@ -1811,9 +1849,9 @@ int unicode_prop(CharRange *cr, const char *prop_name)
         break;
 #endif
     default:
-        if (prop_idx >= countof(unicode_prop_table))
+        if (prop_idx >= countof(unicode_jsi_prop_table))
             return -2;
-        ret = unicode_prop1(cr, prop_idx);
+        ret = unicode_jsi_prop1(cr, prop_idx);
         break;
     }
     return ret;
@@ -1831,7 +1869,7 @@ int unicode_prop(CharRange *cr, const char *prop_name)
 #define _  UNICODE_C_UNDER
 #define d  UNICODE_C_DOLLAR
 
-uint8_t const lre_ctype_bits[256] = {
+uint8_t const lre_jsi_ctype_bits[256] = {
     0, 0, 0, 0, 0, 0, 0, 0,
     0, S, S, S, S, S, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
@@ -1899,7 +1937,7 @@ static const uint16_t char_range_s[] = {
     0xFEFF, 0xFEFF + 1,
 };
 
-BOOL lre_is_space_non_ascii(uint32_t c)
+BOOL lre_jsi_is_space_non_ascii(uint32_t c)
 {
     size_t i, n;
 
@@ -1917,7 +1955,7 @@ BOOL lre_is_space_non_ascii(uint32_t c)
 
 #define SEQ_MAX_LEN 16
 
-static int unicode_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, void *opaque,
+static int unicode_jsi_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, void *opaque,
                                   CharRange *cr)
 {
     int i, c, j;
@@ -1925,7 +1963,7 @@ static int unicode_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, v
     
     switch(seq_prop_idx) {
     case UNICODE_SEQUENCE_PROP_Basic_Emoji:
-        if (unicode_prop1(cr, UNICODE_PROP_Basic_Emoji1) < 0)
+        if (unicode_jsi_prop1(cr, UNICODE_PROP_Basic_Emoji1) < 0)
             return -1;
         for(i = 0; i < cr->len; i += 2) {
             for(c = cr->points[i]; c < cr->points[i + 1]; c++) {
@@ -1936,7 +1974,7 @@ static int unicode_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, v
 
         cr->len = 0;
 
-        if (unicode_prop1(cr, UNICODE_PROP_Basic_Emoji2) < 0)
+        if (unicode_jsi_prop1(cr, UNICODE_PROP_Basic_Emoji2) < 0)
             return -1;
         for(i = 0; i < cr->len; i += 2) {
             for(c = cr->points[i]; c < cr->points[i + 1]; c++) {
@@ -1948,7 +1986,7 @@ static int unicode_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, v
 
         break;
     case UNICODE_SEQUENCE_PROP_RGI_Emoji_Modifier_Sequence:
-        if (unicode_prop1(cr, UNICODE_PROP_Emoji_Modifier_Base) < 0)
+        if (unicode_jsi_prop1(cr, UNICODE_PROP_Emoji_Modifier_Base) < 0)
             return -1;
         for(i = 0; i < cr->len; i += 2) {
             for(c = cr->points[i]; c < cr->points[i + 1]; c++) {
@@ -1961,7 +1999,7 @@ static int unicode_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, v
         }
         break;
     case UNICODE_SEQUENCE_PROP_RGI_Emoji_Flag_Sequence:
-        if (unicode_prop1(cr, UNICODE_PROP_RGI_Emoji_Flag_Sequence) < 0)
+        if (unicode_jsi_prop1(cr, UNICODE_PROP_RGI_Emoji_Flag_Sequence) < 0)
             return -1;
         for(i = 0; i < cr->len; i += 2) {
             for(c = cr->points[i]; c < cr->points[i + 1]; c++) {
@@ -1978,9 +2016,9 @@ static int unicode_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, v
         {
             int len, code, pres, k, mod, mod_count, mod_pos[2], hc_pos, n_mod, n_hc, mod1;
             int mod_idx, hc_idx, i0, i1;
-            const uint8_t *tab = unicode_rgi_emoji_zwj_sequence;
+            const uint8_t *tab = unicode_jsi_rgi_emoji_zwj_sequence;
             
-            for(i = 0; i < countof(unicode_rgi_emoji_zwj_sequence);) {
+            for(i = 0; i < countof(unicode_jsi_rgi_emoji_zwj_sequence);) {
                 len = tab[i++];
                 k = 0;
                 mod = 0;
@@ -2068,11 +2106,11 @@ static int unicode_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, v
         break;
     case UNICODE_SEQUENCE_PROP_RGI_Emoji_Tag_Sequence:
         {
-            for(i = 0; i < countof(unicode_rgi_emoji_tag_sequence);) {
+            for(i = 0; i < countof(unicode_jsi_rgi_emoji_tag_sequence);) {
                 j = 0;
                 seq[j++] = 0x1F3F4;
                 for(;;) {
-                    c = unicode_rgi_emoji_tag_sequence[i++];
+                    c = unicode_jsi_rgi_emoji_tag_sequence[i++];
                     if (c == 0x00)
                         break;
                     seq[j++] = 0xe0000 + c;
@@ -2083,7 +2121,7 @@ static int unicode_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, v
         }
         break;
     case UNICODE_SEQUENCE_PROP_Emoji_Keycap_Sequence:
-        if (unicode_prop1(cr, UNICODE_PROP_Emoji_Keycap_Sequence) < 0)
+        if (unicode_jsi_prop1(cr, UNICODE_PROP_Emoji_Keycap_Sequence) < 0)
             return -1;
         for(i = 0; i < cr->len; i += 2) {
             for(c = cr->points[i]; c < cr->points[i + 1]; c++) {
@@ -2098,7 +2136,7 @@ static int unicode_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, v
         /* all prevous sequences */
         for(i = UNICODE_SEQUENCE_PROP_Basic_Emoji; i <= UNICODE_SEQUENCE_PROP_RGI_Emoji_ZWJ_Sequence; i++) {
             int ret;
-            ret = unicode_sequence_prop1(i, cb, opaque, cr);
+            ret = unicode_jsi_sequence_prop1(i, cb, opaque, cr);
             if (ret < 0)
                 return ret;
             cr->len = 0;
@@ -2112,12 +2150,12 @@ static int unicode_sequence_prop1(int seq_prop_idx, UnicodeSequencePropCB *cb, v
 
 /* build a unicode sequence property */
 /* return -2 if not found, -1 if other error. 'cr' is used as temporary memory. */
-int unicode_sequence_prop(const char *prop_name, UnicodeSequencePropCB *cb, void *opaque,
+int unicode_jsi_sequence_prop(const char *prop_name, UnicodeSequencePropCB *cb, void *opaque,
                           CharRange *cr)
 {
     int seq_prop_idx;
-    seq_prop_idx = unicode_find_name(unicode_sequence_prop_name_table, prop_name);
+    seq_prop_idx = unicode_jsi_find_name(unicode_jsi_sequence_prop_name_table, prop_name);
     if (seq_prop_idx < 0)
         return -2;
-    return unicode_sequence_prop1(seq_prop_idx, cb, opaque, cr);
+    return unicode_jsi_sequence_prop1(seq_prop_idx, cb, opaque, cr);
 }

@@ -9,13 +9,13 @@ public:
     JSScope(JSContext* ctx) : ctx_(ctx) {}
     ~JSScope() {
         for(size_t i=0; i<stringgs_n; i++)
-            JS_FreeCString(ctx_, strings_[i]);
+            JSI_FreeCString(ctx_, strings_[i]);
         for(size_t i=0; i<values_n; i++)
-            JS_FreeValue(ctx_, values_[i]);
+            JSI_FreeValue(ctx_, values_[i]);
     }
     std::string_view toStdStringView(const JSValue& val) {
         size_t len;
-        const char* str = JS_ToCStringLen(ctx_, &len, val);
+        const char* str = JSI_ToCStringLen(ctx_, &len, val);
         if (str)
         {
             if(stringgs_n<S1)
@@ -30,7 +30,7 @@ public:
     }
     std::string toStdString(const JSValue& val) {
         size_t len;
-        const char* str = JS_ToCStringLen(ctx_, &len, val);
+        const char* str = JSI_ToCStringLen(ctx_, &len, val);
         if (str)
         {
             if(stringgs_n<S1)

@@ -1,5 +1,5 @@
 #pragma once
-#include <quickjs_i.h>
+#include <quickjsi_i.h>
 #include <string>
 #include <map>
 #include <memory>
@@ -22,20 +22,20 @@ struct ContractContext {
     ~ContractContext() {
         methods.clear();
         views.clear();
-        if (ctx) { JS_FreeContext(ctx); ctx = nullptr; }
-        if (rt) { JS_FreeRuntime(rt); rt = nullptr; }
+        if (ctx) { JSI_FreeContext(ctx); ctx = nullptr; }
+        if (rt) { JSI_FreeRuntime(rt); rt = nullptr; }
     }
 
     bool create() {
-        rt = JS_NewRuntime();
+        rt = JSI_NewRuntime();
         if (!rt) return false;
-        JS_SetMemoryLimit(rt, 64 * 1024 * 1024);
-        JS_SetMaxStackSize(rt, 1024 * 1024);
+        JSI_SetMemoryLimit(rt, 64 * 1024 * 1024);
+        JSI_SetMaxStackSize(rt, 1024 * 1024);
 
-        ctx = JS_NewContext(rt);
-        if (!ctx) { JS_FreeRuntime(rt); rt = nullptr; return false; }
+        ctx = JSI_NewContext(rt);
+        if (!ctx) { JSI_FreeRuntime(rt); rt = nullptr; return false; }
 
-        JS_SetContextOpaque(ctx, this);
+        JSI_SetContextOpaque(ctx, this);
         return true;
     }
 };

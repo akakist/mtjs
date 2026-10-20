@@ -18,8 +18,6 @@
 #include "jsValueGuard.h"
 #include "jsscope.h"
 
-static JSContext* g_runner_ctx = nullptr;
-
 // ============================================================
 // ContractContext
 // ============================================================
@@ -39,78 +37,84 @@ struct ContractContext {
     ~ContractContext() {
         methods.clear();
         views.clear();
-        if (ctx) { JS_FreeContext(ctx); ctx = nullptr; }
-        if (rt) { JS_FreeRuntime(rt); rt = nullptr; }
+        if (ctx) { JSI_FreeContext(ctx); ctx = nullptr; }
+        if (rt) { JSI_FreeRuntime(rt); rt = nullptr; }
     }
 
     bool create() {
-        rt = JS_NewRuntime();
+        rt = JSI_NewRuntime();
         if (!rt) return false;
-        JS_SetMemoryLimit(rt, 64 * 1024 * 1024);
-        JS_SetMaxStackSize(rt, 1024 * 1024);
-        ctx = JS_NewContext(rt);
-        if (!ctx) { JS_FreeRuntime(rt); rt = nullptr; return false; }
-        JS_SetContextOpaque(ctx, this);
+        JSI_SetMemoryLimit(rt, 64 * 1024 * 1024);
+        JSI_SetMaxStackSize(rt, 1024 * 1024);
+        ctx = JSI_NewContext(rt);
+        if (!ctx) { JSI_FreeRuntime(rt); rt = nullptr; return false; }
+        JSI_SetContextOpaque(ctx, this);
         return true;
     }
 };
 
 // ============================================================
-// Granule — только значение. Владелец не хранится (анонимизация
-// на боевом через blake2b(contract || "/" || key)).
+// Granule
 // ============================================================
 struct Granule {
     std::string value;
+    int64_t create_time = 0;
+    int64_t ttl = 0;   // 0 = бесконечно
 };
 
 // ============================================================
 // Глобальное состояние
 // ============================================================
-std::map<std::string, Granule> granules;   // полный ключ "contract/key"
+std::map<std::string, Granule> granules;
 std::map<std::string, std::shared_ptr<ContractContext>> contract_cache;
+
+struct Event {
+    std::string contract;
+    std::string name;
+    std::string value;
+};
+
+std::vector<Event> current_events;    // события текущей команды/транзакции
+std::vector<Event> all_events;        // события всего прогона
+
+static int64_t g_current_time = 0;
+static int64_t g_current_block_height = 0;
+
+static constexpr size_t MAX_GRANULE_SIZE = 10 * 1024;
 
 // ============================================================
 // Утилиты
 // ============================================================
 void print_exception(JSContext* ctx) {
-    JSValue exc = JS_GetException(ctx);
-    const char* s = JS_ToCString(ctx, exc);
-    if (s) { std::cerr << "Exception: " << s << std::endl; JS_FreeCString(ctx, s); }
-    JS_FreeValue(ctx, exc);
+    JSValue exc = JSI_GetException(ctx);
+    const char* s = JSI_ToCString(ctx, exc);
+    if (s) { std::cerr << "Exception: " << s << std::endl; JSI_FreeCString(ctx, s); }
+    JSI_FreeValue(ctx, exc);
 }
 
 void delete_prop_str(JSContext* ctx, JSValueConst obj, const char* name) {
-    JSAtom atom = JS_NewAtom(ctx, name);
-    if (atom != JS_ATOM_NULL) {
-        JS_DeleteProperty(ctx, obj, atom, 0);
-        JS_FreeAtom(ctx, atom);
+    JSAtom atom = JSI_NewAtom(ctx, name);
+    if (atom != JSI_ATOM_NULL) {
+        JSI_DeleteProperty(ctx, obj, atom, 0);
+        JSI_FreeAtom(ctx, atom);
     }
 }
 
-// Строгая сериализация JSValue в валидный JS-литерал.
 std::string serialize_value(JSContext* ctx, JSValueConst val) {
-    if (JS_IsUndefined(val)) return "undefined";
-    if (JS_IsNull(val)) return "null";
-    if (JS_IsBool(val)) return JS_ToBool(ctx, val) ? "true" : "false";
+    if (JSI_IsUndefined(val)) return "undefined";
+    if (JSI_IsNull(val)) return "null";
+    if (JSI_IsBool(val)) return JSI_ToBool(ctx, val) ? "true" : "false";
 
-    if ( val.tag == JS_TAG_FLOAT64 )
-    printf("if ( val.tag == JS_TAG_FLOAT64 ) %f\n",val.u.float64);
-    if ( val.tag == JS_TAG_INT ) {
-        int64_t d;
-        if (JS_ToInt64(ctx, &d, val) != 0) return "0";
-        // if (std::isnan(d)) return "NaN";
-        // if (std::isinf(d)) return d > 0 ? "Infinity" : "-Infinity";
-        int64_t n;
-        // if (d == std::trunc(d) && std::fabs(d) < 1e15 && JS_ToInt64(ctx, &n, val) == 0)
-        //     return std::to_string(n);
+    if (JSI_VALUE_GET_TAG(val) == JSI_TAG_INT) {
+        int64_t d = JSI_VALUE_GET_INT(val);
         char buf[32];
-        std::snprintf(buf, sizeof buf, "%ld", d);
+        std::snprintf(buf, sizeof buf, "%lld", (long long)d);
         return buf;
     }
 
-    if (JS_IsString(val)) {
+    if (JSI_IsString(val)) {
         size_t len = 0;
-        const char* s = JS_ToCStringLen(ctx, &len, val);
+        const char* s = JSI_ToCStringLen(ctx, &len, val);
         if (!s) return "null";
         std::string r = "\"";
         for (size_t i = 0; i < len; ++i) {
@@ -132,35 +136,35 @@ std::string serialize_value(JSContext* ctx, JSValueConst val) {
             }
         }
         r += '"';
-        JS_FreeCString(ctx, s);
+        JSI_FreeCString(ctx, s);
         return r;
     }
 
-    if (JS_IsArray(ctx, val)) {
+    if (JSI_IsArray(ctx, val)) {
         std::string r = "[";
-        JSValue lv = JS_GetPropertyStr(ctx, val, "length");
-        int64_t len = 0; JS_ToInt64(ctx, &len, lv); JS_FreeValue(ctx, lv);
+        JSValue lv = JSI_GetPropertyStr(ctx, val, "length");
+        int64_t len = 0; JSI_ToInt64(ctx, &len, lv); JSI_FreeValue(ctx, lv);
         for (int64_t i = 0; i < len; ++i) {
             if (i) r += ",";
-            JSValue item = JS_GetPropertyUint32(ctx, val, (uint32_t)i);
+            JSValue item = JSI_GetPropertyUint32(ctx, val, (uint32_t)i);
             r += serialize_value(ctx, item);
-            JS_FreeValue(ctx, item);
+            JSI_FreeValue(ctx, item);
         }
         return r + "]";
     }
 
-    if (JS_IsObject(val)) {
+    if (JSI_IsObject(val)) {
         JSPropertyEnum* props = nullptr;
         uint32_t count = 0;
         std::vector<std::string> keys;
-        if (JS_GetOwnPropertyNames(ctx, &props, &count, val,
-                JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) == 0) {
+        if (JSI_GetOwnPropertyNames(ctx, &props, &count, val,
+                JSI_GPN_STRING_MASK | JSI_GPN_ENUM_ONLY) == 0) {
             for (uint32_t i = 0; i < count; ++i) {
-                const char* k = JS_AtomToCString(ctx, props[i].atom);
-                if (k) { keys.push_back(k); JS_FreeCString(ctx, k); }
-                JS_FreeAtom(ctx, props[i].atom);
+                const char* k = JSI_AtomToCString(ctx, props[i].atom);
+                if (k) { keys.push_back(k); JSI_FreeCString(ctx, k); }
+                JSI_FreeAtom(ctx, props[i].atom);
             }
-            js_free(ctx, props);
+            jsi_free(ctx, props);
         }
         std::sort(keys.begin(), keys.end());
         std::string r = "{";
@@ -168,9 +172,9 @@ std::string serialize_value(JSContext* ctx, JSValueConst val) {
         for (auto& k : keys) {
             if (!first) r += ","; first = false;
             r += "\"" + k + "\":";
-            JSValue item = JS_GetPropertyStr(ctx, val, k.c_str());
+            JSValue item = JSI_GetPropertyStr(ctx, val, k.c_str());
             r += serialize_value(ctx, item);
-            JS_FreeValue(ctx, item);
+            JSI_FreeValue(ctx, item);
         }
         return r + "}";
     }
@@ -185,12 +189,12 @@ bool is_serializable(const std::string& s) {
 JSValue convert_value(JSContext* from_ctx, JSContext* to_ctx, JSValueConst val) {
     std::string s = serialize_value(from_ctx, val);
     if (!is_serializable(s)) {
-        return JS_ThrowTypeError(to_ctx, "cannot convert value: %s", s.c_str());
+        return JSI_ThrowTypeError(to_ctx, "cannot convert value: %s", s.c_str());
     }
     std::string wrapped = "(" + s + ")";
-    JSValue result = JS_Eval(to_ctx, wrapped.c_str(), wrapped.size(),
-                             "<convert>", JS_EVAL_TYPE_GLOBAL);
-    if (JS_IsException(result)) {
+    JSValue result = JSI_Eval(to_ctx, wrapped.c_str(), wrapped.size(),
+                             "<convert>", JSI_EVAL_TYPE_GLOBAL);
+    if (JSI_IsException(result)) {
         std::cerr << "convert_value failed, source: [" << wrapped << "]" << std::endl;
         print_exception(to_ctx);
     }
@@ -200,192 +204,276 @@ JSValue convert_value(JSContext* from_ctx, JSContext* to_ctx, JSValueConst val) 
 // ============================================================
 // API контракта
 // ============================================================
-JSValue js_registerMethod(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
-    if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsFunction(ctx, argv[1]))
-        return JS_ThrowTypeError(ctx, "registerMethod(name, fn)");
-
-    ContractContext* cc = (ContractContext*)JS_GetContextOpaque(ctx);
-    if (!cc) return JS_ThrowTypeError(ctx, "no contract context");
-
+JSValue jsi_registerMethod(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 2 || !JSI_IsString(argv[0]) || !JSI_IsFunction(ctx, argv[1]))
+        return JSI_ThrowTypeError(ctx, "registerMethod(name, fn)");
+    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
+    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
     JSScope<20,20> scope(ctx);
     auto name = scope.toStdString(argv[0]);
-    if (name.empty()) return JS_EXCEPTION;
-
-    cc->methods[name] = JSValueGuard(ctx, JS_DupValue(ctx, argv[1]));
-    return JS_UNDEFINED;
+    if (name.empty()) return JSI_EXCEPTION;
+    cc->methods[name] = JSValueGuard(ctx, JSI_DupValue(ctx, argv[1]));
+    return JSI_UNDEFINED;
 }
 
-JSValue js_registerView(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
-    if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsFunction(ctx, argv[1]))
-        return JS_ThrowTypeError(ctx, "registerView(name, fn)");
-
-    ContractContext* cc = (ContractContext*)JS_GetContextOpaque(ctx);
-    if (!cc) return JS_ThrowTypeError(ctx, "no contract context");
-
+JSValue jsi_registerView(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 2 || !JSI_IsString(argv[0]) || !JSI_IsFunction(ctx, argv[1]))
+        return JSI_ThrowTypeError(ctx, "registerView(name, fn)");
+    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
+    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
     JSScope<20,20> scope(ctx);
     auto name = scope.toStdString(argv[0]);
-    if (name.empty()) return JS_EXCEPTION;
-
-    cc->views[name] = JSValueGuard(ctx, JS_DupValue(ctx, argv[1]));
-    return JS_UNDEFINED;
+    if (name.empty()) return JSI_EXCEPTION;
+    cc->views[name] = JSValueGuard(ctx, JSI_DupValue(ctx, argv[1]));
+    return JSI_UNDEFINED;
 }
 
-JSValue js_setGranule(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
-    if (argc < 2 || !JS_IsString(argv[0]))
-        return JS_ThrowTypeError(ctx, "setGranule(key, value)");
-    if (JS_IsUndefined(argv[1]))
-        return JS_ThrowTypeError(ctx, "setGranule: undefined not allowed");
-
-    ContractContext* cc = (ContractContext*)JS_GetContextOpaque(ctx);
-    if (!cc) return JS_ThrowTypeError(ctx, "no contract context");
+// createGranule(key, value, ttl) — создаёт, если уже есть -> TypeError
+JSValue jsi_createGranule(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 2 || !JSI_IsString(argv[0]))
+        return JSI_ThrowTypeError(ctx, "createGranule(key, value[, ttl])");
+    if (JSI_IsUndefined(argv[1]))
+        return JSI_ThrowTypeError(ctx, "createGranule: undefined not allowed");
+    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
+    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
     if (cc->in_view)
-        return JS_ThrowTypeError(ctx, "setGranule is not allowed in view");
+        return JSI_ThrowTypeError(ctx, "createGranule is not allowed in view");
 
     JSScope<20,20> scope(ctx);
     auto key = scope.toStdString(argv[0]);
-    if (key.empty()) return JS_EXCEPTION;
+    if (key.empty()) return JSI_EXCEPTION;
+
+    int64_t ttl = 0;
+    if (argc >= 3 && !JSI_IsUndefined(argv[2])) {
+        if (JSI_ToInt64(ctx, &ttl, argv[2]) != 0)
+            return JSI_ThrowTypeError(ctx, "createGranule: ttl must be int64");
+        if (ttl < 0)
+            return JSI_ThrowTypeError(ctx, "createGranule: ttl must be >= 0");
+    }
 
     std::string full_key = cc->name + "/" + key;
+    if (granules.count(full_key))
+        return JSI_ThrowTypeError(ctx, "createGranule: already exists: %s", full_key.c_str());
 
     std::string s = serialize_value(ctx, argv[1]);
     if (!is_serializable(s))
-        return JS_ThrowTypeError(ctx, "setGranule(%s): cannot serialize value",
-                                 full_key.c_str());
+        return JSI_ThrowTypeError(ctx, "createGranule(%s): cannot serialize value", full_key.c_str());
+    if (s.size() > MAX_GRANULE_SIZE)
+        return JSI_ThrowTypeError(ctx, "createGranule(%s): value too large (%zu > %zu)",
+                                 full_key.c_str(), s.size(), MAX_GRANULE_SIZE);
 
-    granules[full_key] = Granule{ std::move(s) };
-    return JS_UNDEFINED;
+    granules[full_key] = Granule{ std::move(s), g_current_time, ttl };
+    return JSI_UNDEFINED;
 }
 
-JSValue js_getGranule(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
-    if (argc < 1 || !JS_IsString(argv[0]))
-        return JS_ThrowTypeError(ctx, "getGranule(key)");
-
-    ContractContext* cc = (ContractContext*)JS_GetContextOpaque(ctx);
-    if (!cc) return JS_ThrowTypeError(ctx, "no contract context");
+// setGranule(key, value) — обновляет существующую, иначе TypeError
+JSValue jsi_setGranule(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 2 || !JSI_IsString(argv[0]))
+        return JSI_ThrowTypeError(ctx, "setGranule(key, value)");
+    if (JSI_IsUndefined(argv[1]))
+        return JSI_ThrowTypeError(ctx, "setGranule: undefined not allowed");
+    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
+    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
+    if (cc->in_view)
+        return JSI_ThrowTypeError(ctx, "setGranule is not allowed in view");
 
     JSScope<20,20> scope(ctx);
     auto key = scope.toStdString(argv[0]);
-    if (key.empty()) return JS_EXCEPTION;
+    if (key.empty()) return JSI_EXCEPTION;
 
     std::string full_key = cc->name + "/" + key;
-
     auto it = granules.find(full_key);
-    if (it == granules.end()) return JS_UNDEFINED;
+    if (it == granules.end())
+        return JSI_ThrowTypeError(ctx, "setGranule: not found: %s", full_key.c_str());
 
-    std::string wrapped = "(" + it->second.value + ")";
-    return JS_Eval(ctx, wrapped.c_str(), wrapped.size(),
-                   "<granule>", JS_EVAL_TYPE_GLOBAL);
+    std::string s = serialize_value(ctx, argv[1]);
+    if (!is_serializable(s))
+        return JSI_ThrowTypeError(ctx, "setGranule(%s): cannot serialize value", full_key.c_str());
+    if (s.size() > MAX_GRANULE_SIZE)
+        return JSI_ThrowTypeError(ctx, "setGranule(%s): value too large (%zu > %zu)",
+                                 full_key.c_str(), s.size(), MAX_GRANULE_SIZE);
+
+    it->second.value = std::move(s);
+    // create_time и ttl не меняем
+    return JSI_UNDEFINED;
 }
 
-JSValue js_call(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
-    if (argc < 3 || !JS_IsString(argv[0]) || !JS_IsString(argv[1]))
-        return JS_ThrowTypeError(ctx, "call(contract, method, params)");
+JSValue jsi_getGranule(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 1 || !JSI_IsString(argv[0]))
+        return JSI_ThrowTypeError(ctx, "getGranule(key)");
+    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
+    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
+    JSScope<20,20> scope(ctx);
+    auto key = scope.toStdString(argv[0]);
+    if (key.empty()) return JSI_EXCEPTION;
+    std::string full_key = cc->name + "/" + key;
+    auto it = granules.find(full_key);
+    if (it == granules.end()) return JSI_UNDEFINED;
+    std::string wrapped = "(" + it->second.value + ")";
+    return JSI_Eval(ctx, wrapped.c_str(), wrapped.size(), "<granule>", JSI_EVAL_TYPE_GLOBAL);
+}
 
+// emit(name, value) — запрещён во view, только в методе
+JSValue jsi_emit(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 2 || !JSI_IsString(argv[0]))
+        return JSI_ThrowTypeError(ctx, "emit(name, value)");
+    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
+    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
+    if (cc->in_view)
+        return JSI_ThrowTypeError(ctx, "emit is not allowed in view");
+    JSScope<20,20> scope(ctx);
+    auto name = scope.toStdString(argv[0]);
+    if (name.empty()) return JSI_EXCEPTION;
+    std::string s = serialize_value(ctx, argv[1]);
+    if (!is_serializable(s))
+        return JSI_ThrowTypeError(ctx, "emit(%s): cannot serialize value", name.c_str());
+    current_events.push_back(Event{ cc->name, std::move(name), std::move(s) });
+    return JSI_UNDEFINED;
+}
+
+// ============================================================
+// Вспомогательные: построение msg-объекта и вызов метода/вью
+// ============================================================
+struct Msg {
+    std::string sender;
+    int64_t value = 0;
+    int64_t gasLimit = 0;
+    int64_t gasUsed = 0;
+    int64_t blockTimestamp = 0;
+    int64_t blockHeight = 0;
+    int64_t nonce = 0;
+    int64_t chainId = 0;
+    std::string txHash;
+    int64_t txIndex = 0;
+};
+
+JSValue build_msg_object(JSContext* ctx, const Msg& m) {
+    JSValue obj = JSI_NewObject(ctx);
+    JSI_SetPropertyStr(ctx, obj, "sender", JSI_NewString(ctx, m.sender.c_str()));
+    JSI_SetPropertyStr(ctx, obj, "value", JSI_NewInt64(ctx, m.value));
+    JSI_SetPropertyStr(ctx, obj, "gasLimit", JSI_NewInt64(ctx, m.gasLimit));
+    JSI_SetPropertyStr(ctx, obj, "gasUsed", JSI_NewInt64(ctx, m.gasUsed));
+    JSI_SetPropertyStr(ctx, obj, "blockTimestamp", JSI_NewInt64(ctx, m.blockTimestamp));
+    JSI_SetPropertyStr(ctx, obj, "blockHeight", JSI_NewInt64(ctx, m.blockHeight));
+    JSI_SetPropertyStr(ctx, obj, "nonce", JSI_NewInt64(ctx, m.nonce));
+    JSI_SetPropertyStr(ctx, obj, "chainId", JSI_NewInt64(ctx, m.chainId));
+    JSI_SetPropertyStr(ctx, obj, "txHash", JSI_NewString(ctx, m.txHash.c_str()));
+    JSI_SetPropertyStr(ctx, obj, "txIndex", JSI_NewInt64(ctx, m.txIndex));
+    return obj;
+}
+
+JSValue call_contract_method(ContractContext* cc, JSValueConst fn,
+                             JSValueConst params_js, const Msg& m, bool is_view)
+{
+    JSValue msg_obj = build_msg_object(cc->ctx, m);
+    JSValue argv[2] = { params_js, msg_obj };
+    int nargs = is_view ? 1 : 2;
+
+    bool saved = cc->in_view;
+    cc->in_view = is_view;
+    JSValue r = JSI_Call(cc->ctx, fn, JSI_UNDEFINED, nargs, argv);
+    cc->in_view = saved;
+
+    JSI_FreeValue(cc->ctx, msg_obj);
+    return r;
+}
+
+// callMethod(contract, method, params) — из контракта
+JSValue jsi_callMethod(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 3 || !JSI_IsString(argv[0]) || !JSI_IsString(argv[1]))
+        return JSI_ThrowTypeError(ctx, "callMethod(contract, method, params)");
     JSScope<20,20> scope(ctx);
     auto contract_name = scope.toStdString(argv[0]);
     auto method_name   = scope.toStdString(argv[1]);
-    if (contract_name.empty() || method_name.empty()) return JS_EXCEPTION;
+    if (contract_name.empty() || method_name.empty()) return JSI_EXCEPTION;
 
-    ContractContext* self = (ContractContext*)JS_GetContextOpaque(ctx);
+    ContractContext* self = (ContractContext*)JSI_GetContextOpaque(ctx);
     if (self && self->name == contract_name)
-        return JS_ThrowTypeError(ctx, "call to self is not allowed; call directly");
+        return JSI_ThrowTypeError(ctx, "callMethod to self not allowed");
 
     auto it = contract_cache.find(contract_name);
     if (it == contract_cache.end())
-        return JS_ThrowTypeError(ctx, "contract not found: %s", contract_name.c_str());
-
+        return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.c_str());
     auto cc = it->second;
     auto mit = cc->methods.find(method_name);
     if (mit == cc->methods.end())
-        return JS_ThrowTypeError(ctx, "method not found: %s.%s",
-            contract_name.c_str(), method_name.c_str());
+        return JSI_ThrowTypeError(ctx, "method not found: %s.%s",
+                                 contract_name.c_str(), method_name.c_str());
 
     JSValue params_in_cc = convert_value(ctx, cc->ctx, argv[2]);
-    if (JS_IsException(params_in_cc)) return JS_EXCEPTION;
+    if (JSI_IsException(params_in_cc)) return JSI_EXCEPTION;
 
-    bool saved_in_view = cc->in_view;
-    cc->in_view = false;
-    JSValue result = JS_Call(cc->ctx, mit->second.get(), JS_UNDEFINED, 1, &params_in_cc);
-    cc->in_view = saved_in_view;
-    JS_FreeValue(cc->ctx, params_in_cc);
+    Msg empty;   // cross-contract: msg не пробрасываем (упрощение)
+    JSValue r = call_contract_method(cc.get(), mit->second.get(), params_in_cc, empty, false);
+    JSI_FreeValue(cc->ctx, params_in_cc);
 
-    if (JS_IsException(result)) {
-        JSValue exc = JS_GetException(cc->ctx);
-        const char* s = JS_ToCString(cc->ctx, exc);
-        if (s) { std::cerr << "call " << contract_name << "." << method_name
-                           << " exception: " << s << std::endl; JS_FreeCString(cc->ctx, s); }
-        JS_FreeValue(cc->ctx, exc);
-        JS_FreeValue(cc->ctx, result);
-        return JS_EXCEPTION;
+    if (JSI_IsException(r)) {
+        print_exception(cc->ctx);
+        JSI_FreeValue(cc->ctx, r);
+        return JSI_EXCEPTION;
     }
-
-    JSValue result_in_caller = convert_value(cc->ctx, ctx, result);
-    JS_FreeValue(cc->ctx, result);
-    return result_in_caller;
+    JSValue r_caller = convert_value(cc->ctx, ctx, r);
+    JSI_FreeValue(cc->ctx, r);
+    return r_caller;
 }
 
-JSValue js_callView(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
-    if (argc < 3 || !JS_IsString(argv[0]) || !JS_IsString(argv[1]))
-        return JS_ThrowTypeError(ctx, "callView(contract, view, params)");
-
+JSValue jsi_callView(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 3 || !JSI_IsString(argv[0]) || !JSI_IsString(argv[1]))
+        return JSI_ThrowTypeError(ctx, "callView(contract, view, params)");
     JSScope<20,20> scope(ctx);
     auto contract_name = scope.toStdString(argv[0]);
     auto view_name     = scope.toStdString(argv[1]);
-    if (contract_name.empty() || view_name.empty()) return JS_EXCEPTION;
+    if (contract_name.empty() || view_name.empty()) return JSI_EXCEPTION;
 
-    ContractContext* self = (ContractContext*)JS_GetContextOpaque(ctx);
+    ContractContext* self = (ContractContext*)JSI_GetContextOpaque(ctx);
     if (self && self->name == contract_name)
-        return JS_ThrowTypeError(ctx, "callView to self is not allowed");
+        return JSI_ThrowTypeError(ctx, "callView to self not allowed");
 
     auto it = contract_cache.find(contract_name);
     if (it == contract_cache.end())
-        return JS_ThrowTypeError(ctx, "contract not found: %s", contract_name.c_str());
-
+        return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.c_str());
     auto cc = it->second;
     auto vit = cc->views.find(view_name);
     if (vit == cc->views.end())
-        return JS_ThrowTypeError(ctx, "view not found: %s.%s",
-            contract_name.c_str(), view_name.c_str());
+        return JSI_ThrowTypeError(ctx, "view not found: %s.%s",
+                                 contract_name.c_str(), view_name.c_str());
 
     JSValue params_in_cc = convert_value(ctx, cc->ctx, argv[2]);
-    if (JS_IsException(params_in_cc)) return JS_EXCEPTION;
+    if (JSI_IsException(params_in_cc)) return JSI_EXCEPTION;
 
-    bool saved_in_view = cc->in_view;
-    cc->in_view = true;
-    JSValue result = JS_Call(cc->ctx, vit->second.get(), JS_UNDEFINED, 1, &params_in_cc);
-    cc->in_view = saved_in_view;
-    JS_FreeValue(cc->ctx, params_in_cc);
+    Msg empty;
+    JSValue r = call_contract_method(cc.get(), vit->second.get(), params_in_cc, empty, true);
+    JSI_FreeValue(cc->ctx, params_in_cc);
 
-    if (JS_IsException(result)) {
-        JSValue exc = JS_GetException(cc->ctx);
-        const char* s = JS_ToCString(cc->ctx, exc);
-        if (s) { std::cerr << "callView " << contract_name << "." << view_name
-                           << " exception: " << s << std::endl; JS_FreeCString(cc->ctx, s); }
-        JS_FreeValue(cc->ctx, exc);
-        JS_FreeValue(cc->ctx, result);
-        return JS_EXCEPTION;
+    if (JSI_IsException(r)) {
+        print_exception(cc->ctx);
+        JSI_FreeValue(cc->ctx, r);
+        return JSI_EXCEPTION;
     }
-
-    JSValue result_in_caller = convert_value(cc->ctx, ctx, result);
-    JS_FreeValue(cc->ctx, result);
-    return result_in_caller;
+    JSValue r_caller = convert_value(cc->ctx, ctx, r);
+    JSI_FreeValue(cc->ctx, r);
+    return r_caller;
 }
 
 void register_api(JSContext* ctx) {
-    JSValue global = JS_GetGlobalObject(ctx);
-    JS_SetPropertyStr(ctx, global, "registerMethod",
-        JS_NewCFunction(ctx, js_registerMethod, "registerMethod", 2));
-    JS_SetPropertyStr(ctx, global, "registerView",
-        JS_NewCFunction(ctx, js_registerView, "registerView", 2));
-    JS_SetPropertyStr(ctx, global, "setGranule",
-        JS_NewCFunction(ctx, js_setGranule, "setGranule", 2));
-    JS_SetPropertyStr(ctx, global, "getGranule",
-        JS_NewCFunction(ctx, js_getGranule, "getGranule", 1));
-    JS_SetPropertyStr(ctx, global, "call",
-        JS_NewCFunction(ctx, js_call, "call", 3));
-    JS_SetPropertyStr(ctx, global, "callView",
-        JS_NewCFunction(ctx, js_callView, "callView", 3));
-    JS_FreeValue(ctx, global);
+    JSValue global = JSI_GetGlobalObject(ctx);
+    JSI_SetPropertyStr(ctx, global, "registerMethod",
+        JSI_NewCFunction(ctx, jsi_registerMethod, "registerMethod", 2));
+    JSI_SetPropertyStr(ctx, global, "registerView",
+        JSI_NewCFunction(ctx, jsi_registerView, "registerView", 2));
+    JSI_SetPropertyStr(ctx, global, "createGranule",
+        JSI_NewCFunction(ctx, jsi_createGranule, "createGranule", 3));
+    JSI_SetPropertyStr(ctx, global, "setGranule",
+        JSI_NewCFunction(ctx, jsi_setGranule, "setGranule", 2));
+    JSI_SetPropertyStr(ctx, global, "getGranule",
+        JSI_NewCFunction(ctx, jsi_getGranule, "getGranule", 1));
+    JSI_SetPropertyStr(ctx, global, "emit",
+        JSI_NewCFunction(ctx, jsi_emit, "emit", 2));
+    JSI_SetPropertyStr(ctx, global, "callMethod",
+        JSI_NewCFunction(ctx, jsi_callMethod, "callMethod", 3));
+    JSI_SetPropertyStr(ctx, global, "callView",
+        JSI_NewCFunction(ctx, jsi_callView, "callView", 3));
+    JSI_FreeValue(ctx, global);
 }
 
 // ============================================================
@@ -401,20 +489,17 @@ std::shared_ptr<ContractContext> load_contract(
     cc->name = name;
     cc->path = path;
 
-    if (!cc->create()) {
-        std::cerr << "cannot create context for " << name << std::endl;
-        return nullptr;
-    }
+    if (!cc->create()) { std::cerr << "cannot create context for " << name << std::endl; return nullptr; }
 
     register_api(cc->ctx);
 
-    JSValue global = JS_GetGlobalObject(cc->ctx);
+    JSValue global = JSI_GetGlobalObject(cc->ctx);
     const char* banned[] = {
         "Math","Date","RegExp","JSON","Proxy","Promise","Map","Set",
         "WeakRef","FinalizationRegistry","Atomics","SharedArrayBuffer"
     };
     for (auto b : banned) delete_prop_str(cc->ctx, global, b);
-    JS_FreeValue(cc->ctx, global);
+    JSI_FreeValue(cc->ctx, global);
 
     std::string src;
     {
@@ -427,17 +512,17 @@ std::shared_ptr<ContractContext> load_contract(
         if (sz != (size_t)size) return nullptr;
     }
 
-    JSValue compiled = JS_Eval(cc->ctx, src.data(), src.size(), path.c_str(),
-        JS_EVAL_FLAG_STRICT | JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
-    if (JS_IsException(compiled)) { print_exception(cc->ctx); return nullptr; }
+    JSValue compiled = JSI_Eval(cc->ctx, src.data(), src.size(), path.c_str(),
+        JSI_EVAL_FLAG_STRICT | JSI_EVAL_TYPE_GLOBAL | JSI_EVAL_FLAG_COMPILE_ONLY);
+    if (JSI_IsException(compiled)) { print_exception(cc->ctx); return nullptr; }
 
-    JSValue result = JS_EvalFunction(cc->ctx, compiled);
-    if (JS_IsException(result)) {
+    JSValue result = JSI_EvalFunction(cc->ctx, compiled);
+    if (JSI_IsException(result)) {
         print_exception(cc->ctx);
-        JS_FreeValue(cc->ctx, result);
+        JSI_FreeValue(cc->ctx, result);
         return nullptr;
     }
-    JS_FreeValue(cc->ctx, result);
+    JSI_FreeValue(cc->ctx, result);
 
     contract_cache[name] = cc;
     return cc;
@@ -454,17 +539,25 @@ std::shared_ptr<ContractContext> get_contract(
 // ============================================================
 // Тест
 // ============================================================
-struct Tx {
+struct TxCommand {
     std::string contract;
     std::string method;
     JSValueGuard params;
     bool expect_error = false;
     JSValueGuard expect_result;
+    std::vector<Event> expect_events;
+};
+
+struct Transaction {
+    Msg msg;
+    std::vector<TxCommand> commands;
 };
 
 struct TestCase {
+    int64_t time = 0;
     std::map<std::string, JSValueGuard> initial;
-    std::vector<Tx> transactions;
+    std::vector<Transaction> transactions;
+    std::vector<Event> expected_emits;
     std::map<std::string, JSValueGuard> expected;
 };
 
@@ -473,31 +566,69 @@ static void read_object_map(JSContext* ctx, JSValueConst obj,
 {
     JSPropertyEnum* props = nullptr;
     uint32_t count = 0;
-    if (JS_GetOwnPropertyNames(ctx, &props, &count, obj,
-            JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) != 0) return;
-
+    if (JSI_GetOwnPropertyNames(ctx, &props, &count, obj,
+            JSI_GPN_STRING_MASK | JSI_GPN_ENUM_ONLY) != 0) return;
     for (uint32_t i = 0; i < count; ++i) {
-        const char* k = JS_AtomToCString(ctx, props[i].atom);
+        const char* k = JSI_AtomToCString(ctx, props[i].atom);
         if (k) {
-            JSValue v = JS_GetProperty(ctx, obj, props[i].atom);
-            out[k] = JSValueGuard(ctx, JS_DupValue(ctx, v));
-            JS_FreeValue(ctx, v);
-            JS_FreeCString(ctx, k);
+            JSValue v = JSI_GetProperty(ctx, obj, props[i].atom);
+            out[k] = JSValueGuard(ctx, JSI_DupValue(ctx, v));
+            JSI_FreeValue(ctx, v);
+            JSI_FreeCString(ctx, k);
         }
-        JS_FreeAtom(ctx, props[i].atom);
+        JSI_FreeAtom(ctx, props[i].atom);
     }
-    js_free(ctx, props);
+    jsi_free(ctx, props);
 }
 
 static std::string read_string_prop(JSContext* ctx, JSValueConst obj, const char* name) {
-    JSValue v = JS_GetPropertyStr(ctx, obj, name);
+    JSValue v = JSI_GetPropertyStr(ctx, obj, name);
     std::string r;
-    if (JS_IsString(v)) {
-        const char* s = JS_ToCString(ctx, v);
-        if (s) { r = s; JS_FreeCString(ctx, s); }
-    }
-    JS_FreeValue(ctx, v);
+    if (JSI_IsString(v)) { const char* s = JSI_ToCString(ctx, v);
+        if (s) { r = s; JSI_FreeCString(ctx, s); } }
+    JSI_FreeValue(ctx, v);
     return r;
+}
+
+static int64_t read_int64_prop(JSContext* ctx, JSValueConst obj, const char* name) {
+    JSValue v = JSI_GetPropertyStr(ctx, obj, name);
+    int64_t r = 0;
+    if (!JSI_IsUndefined(v)) JSI_ToInt64(ctx, &r, v);
+    JSI_FreeValue(ctx, v);
+    return r;
+}
+
+static Msg read_msg(JSContext* ctx, JSValueConst obj) {
+    Msg m;
+    if (!JSI_IsObject(obj)) return m;
+    m.sender         = read_string_prop(ctx, obj, "sender");
+    m.value          = read_int64_prop(ctx, obj, "value");
+    m.gasLimit       = read_int64_prop(ctx, obj, "gasLimit");
+    m.blockTimestamp = read_int64_prop(ctx, obj, "blockTimestamp");
+    m.blockHeight    = read_int64_prop(ctx, obj, "blockHeight");
+    m.nonce          = read_int64_prop(ctx, obj, "nonce");
+    m.chainId        = read_int64_prop(ctx, obj, "chainId");
+    m.txHash         = read_string_prop(ctx, obj, "txHash");
+    m.txIndex        = read_int64_prop(ctx, obj, "txIndex");
+    return m;
+}
+
+static void read_events(JSContext* ctx, JSValueConst arr, std::vector<Event>& out) {
+    if (!JSI_IsArray(ctx, arr)) return;
+    JSValue lv = JSI_GetPropertyStr(ctx, arr, "length");
+    int64_t len = 0; JSI_ToInt64(ctx, &len, lv); JSI_FreeValue(ctx, lv);
+    for (int64_t i = 0; i < len; ++i) {
+        JSValue e = JSI_GetPropertyUint32(ctx, arr, (uint32_t)i);
+        if (!JSI_IsObject(e)) { JSI_FreeValue(ctx, e); continue; }
+        Event ev;
+        ev.contract = read_string_prop(ctx, e, "contract");
+        ev.name     = read_string_prop(ctx, e, "name");
+        JSValue vv  = JSI_GetPropertyStr(ctx, e, "value");
+        ev.value    = serialize_value(ctx, vv);
+        JSI_FreeValue(ctx, vv);
+        out.push_back(std::move(ev));
+        JSI_FreeValue(ctx, e);
+    }
 }
 
 bool load_test(JSContext* ctx, const std::string& path, TestCase& out) {
@@ -512,134 +643,227 @@ bool load_test(JSContext* ctx, const std::string& path, TestCase& out) {
         if (sz != (size_t)size) return false;
     }
 
-    JSValue compiled = JS_Eval(ctx, src.data(), src.size(), path.c_str(),
-        JS_EVAL_FLAG_STRICT | JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
-    if (JS_IsException(compiled)) { print_exception(ctx); return false; }
+    JSValue compiled = JSI_Eval(ctx, src.data(), src.size(), path.c_str(),
+        JSI_EVAL_FLAG_STRICT | JSI_EVAL_TYPE_GLOBAL | JSI_EVAL_FLAG_COMPILE_ONLY);
+    if (JSI_IsException(compiled)) { print_exception(ctx); return false; }
 
-    JSValue result = JS_EvalFunction(ctx, compiled);
-    if (JS_IsException(result)) { print_exception(ctx); JS_FreeValue(ctx, result); return false; }
-
-    if (!JS_IsObject(result)) {
+    JSValue result = JSI_EvalFunction(ctx, compiled);
+    if (JSI_IsException(result)) { print_exception(ctx); JSI_FreeValue(ctx, result); return false; }
+    if (!JSI_IsObject(result)) {
         std::cerr << path << ": result is not an object" << std::endl;
-        JS_FreeValue(ctx, result);
-        return false;
+        JSI_FreeValue(ctx, result); return false;
     }
 
-    JSValue initial_val = JS_GetPropertyStr(ctx, result, "initial");
-    if (JS_IsObject(initial_val)) read_object_map(ctx, initial_val, out.initial);
-    JS_FreeValue(ctx, initial_val);
+    out.time = read_int64_prop(ctx, result, "time");
 
-    JSValue tx_val = JS_GetPropertyStr(ctx, result, "transactions");
-    if (JS_IsArray(ctx, tx_val)) {
-        JSValue lv = JS_GetPropertyStr(ctx, tx_val, "length");
-        int64_t len = 0; JS_ToInt64(ctx, &len, lv); JS_FreeValue(ctx, lv);
+    JSValue initial_val = JSI_GetPropertyStr(ctx, result, "initial");
+    if (JSI_IsObject(initial_val)) read_object_map(ctx, initial_val, out.initial);
+    JSI_FreeValue(ctx, initial_val);
+
+    JSValue txs_val = JSI_GetPropertyStr(ctx, result, "transactions");
+    if (JSI_IsArray(ctx, txs_val)) {
+        JSValue lv = JSI_GetPropertyStr(ctx, txs_val, "length");
+        int64_t len = 0; JSI_ToInt64(ctx, &len, lv); JSI_FreeValue(ctx, lv);
 
         for (int64_t i = 0; i < len; ++i) {
-            JSValue item = JS_GetPropertyUint32(ctx, tx_val, (uint32_t)i);
-            if (!JS_IsObject(item)) { JS_FreeValue(ctx, item); continue; }
+            JSValue item = JSI_GetPropertyUint32(ctx, txs_val, (uint32_t)i);
+            if (!JSI_IsObject(item)) { JSI_FreeValue(ctx, item); continue; }
 
-            Tx tx;
-            tx.contract = read_string_prop(ctx, item, "contract");
-            tx.method   = read_string_prop(ctx, item, "method");
+            Transaction tx;
+            JSValue mv = JSI_GetPropertyStr(ctx, item, "msg");
+            tx.msg = read_msg(ctx, mv);
+            JSI_FreeValue(ctx, mv);
 
-            JSValue pv = JS_GetPropertyStr(ctx, item, "params");
-            tx.params = JSValueGuard(ctx,
-                JS_IsUndefined(pv) ? JS_NewObject(ctx) : JS_DupValue(ctx, pv));
-            JS_FreeValue(ctx, pv);
-
-            JSValue ev = JS_GetPropertyStr(ctx, item, "expect_error");
-            if (!JS_IsUndefined(ev)) tx.expect_error = JS_ToBool(ctx, ev);
-            JS_FreeValue(ctx, ev);
-
-            JSValue rv = JS_GetPropertyStr(ctx, item, "expect_result");
-            if (!JS_IsUndefined(rv)) tx.expect_result = JSValueGuard(ctx, JS_DupValue(ctx, rv));
-            JS_FreeValue(ctx, rv);
-
+            JSValue cmds = JSI_GetPropertyStr(ctx, item, "commands");
+            if (JSI_IsArray(ctx, cmds)) {
+                JSValue clv = JSI_GetPropertyStr(ctx, cmds, "length");
+                int64_t clen = 0; JSI_ToInt64(ctx, &clen, clv); JSI_FreeValue(ctx, clv);
+                for (int64_t j = 0; j < clen; ++j) {
+                    JSValue c = JSI_GetPropertyUint32(ctx, cmds, (uint32_t)j);
+                    if (!JSI_IsObject(c)) { JSI_FreeValue(ctx, c); continue; }
+                    TxCommand cmd;
+                    cmd.contract = read_string_prop(ctx, c, "contract");
+                    cmd.method   = read_string_prop(ctx, c, "method");
+                    JSValue pv = JSI_GetPropertyStr(ctx, c, "params");
+                    cmd.params = JSValueGuard(ctx,
+                        JSI_IsUndefined(pv) ? JSI_NewObject(ctx) : JSI_DupValue(ctx, pv));
+                    JSI_FreeValue(ctx, pv);
+                    JSValue ev = JSI_GetPropertyStr(ctx, c, "expect_error");
+                    if (!JSI_IsUndefined(ev)) cmd.expect_error = JSI_ToBool(ctx, ev);
+                    JSI_FreeValue(ctx, ev);
+                    JSValue rv = JSI_GetPropertyStr(ctx, c, "expect_result");
+                    if (!JSI_IsUndefined(rv)) cmd.expect_result = JSValueGuard(ctx, JSI_DupValue(ctx, rv));
+                    JSI_FreeValue(ctx, rv);
+                    JSValue ee = JSI_GetPropertyStr(ctx, c, "expect_events");
+                    read_events(ctx, ee, cmd.expect_events);
+                    JSI_FreeValue(ctx, ee);
+                    tx.commands.push_back(std::move(cmd));
+                    JSI_FreeValue(ctx, c);
+                }
+            }
+            JSI_FreeValue(ctx, cmds);
             out.transactions.push_back(std::move(tx));
-            JS_FreeValue(ctx, item);
+            JSI_FreeValue(ctx, item);
         }
     }
-    JS_FreeValue(ctx, tx_val);
+    JSI_FreeValue(ctx, txs_val);
 
-    JSValue expected_val = JS_GetPropertyStr(ctx, result, "expected");
-    if (JS_IsObject(expected_val)) read_object_map(ctx, expected_val, out.expected);
-    JS_FreeValue(ctx, expected_val);
+    JSValue ee_val = JSI_GetPropertyStr(ctx, result, "expected_emits");
+    read_events(ctx, ee_val, out.expected_emits);
+    JSI_FreeValue(ctx, ee_val);
 
-    JS_FreeValue(ctx, result);
+    JSValue expected_val = JSI_GetPropertyStr(ctx, result, "expected");
+    if (JSI_IsObject(expected_val)) read_object_map(ctx, expected_val, out.expected);
+    JSI_FreeValue(ctx, expected_val);
+
+    JSI_FreeValue(ctx, result);
     return true;
 }
 
 // ============================================================
-// Применение initial / выполнение / сравнение
+// Прогон
 // ============================================================
 static void apply_initial(JSContext* ctx, const TestCase& tc) {
     granules.clear();
+    all_events.clear();
+    current_events.clear();
+    g_current_time = tc.time;
     for (auto& [key, guard] : tc.initial) {
         std::string s = serialize_value(ctx, guard.get());
         if (!is_serializable(s)) {
             std::cerr << "initial[" << key << "]: cannot serialize " << s << std::endl;
             continue;
         }
-        granules[key] = Granule{ std::move(s) };
+        granules[key] = Granule{ std::move(s), 0, 0 };
     }
 }
-
 static bool run_transactions(JSContext* runner_ctx, TestCase& tc) {
     for (auto& tx : tc.transactions) {
-        auto cc = get_contract(tx.contract, "contracts");
-        if (!cc) { std::cerr << "contract not loaded: " << tx.contract << std::endl; return false; }
+        auto saved = granules;
+        auto saved_events = all_events;
+        bool tx_aborted = false;
 
-        auto mit = cc->methods.find(tx.method);
-        if (mit == cc->methods.end()) {
-            std::cerr << "method not found: " << tx.contract << "." << tx.method << std::endl;
-            return false;
-        }
+        for (auto& cmd : tx.commands) {
+            auto cc = get_contract(cmd.contract, "contracts");
+            if (!cc) { std::cerr << "contract not loaded: " << cmd.contract << std::endl; return false; }
+            auto mit = cc->methods.find(cmd.method);
+            if (mit == cc->methods.end()) {
+                std::cerr << "method not found: " << cmd.contract << "." << cmd.method << std::endl;
+                return false;
+            }
 
-        JSValue params_in_cc = convert_value(runner_ctx, cc->ctx, tx.params.get());
-        if (JS_IsException(params_in_cc)) {
-            print_exception(cc->ctx);
-            return false;
-        }
-
-        bool saved_in_view = cc->in_view;
-        cc->in_view = false;
-        JSValue result = JS_Call(cc->ctx, mit->second.get(), JS_UNDEFINED, 1, &params_in_cc);
-        cc->in_view = saved_in_view;
-        JS_FreeValue(cc->ctx, params_in_cc);
-
-        if (JS_IsException(result)) {
-            if (!tx.expect_error) {
-                std::cerr << "unexpected exception in " << tx.contract << "." << tx.method << std::endl;
+            JSValue params_in_cc = convert_value(runner_ctx, cc->ctx, cmd.params.get());
+            if (JSI_IsException(params_in_cc)) {
                 print_exception(cc->ctx);
-                JS_FreeValue(cc->ctx, result);
+                granules = std::move(saved);
+                all_events = std::move(saved_events);
                 return false;
             }
-            JS_FreeValue(cc->ctx, result);
-        } else {
-            if (tx.expect_error) {
+
+            current_events.clear();
+            JSValue result = call_contract_method(cc.get(), mit->second.get(), params_in_cc, tx.msg, false);
+            JSI_FreeValue(cc->ctx, params_in_cc);
+
+            if (JSI_IsException(result)) {
+                JSI_FreeValue(cc->ctx, result);
+                granules = std::move(saved);
+                all_events = std::move(saved_events);
+                current_events.clear();
+                if (!cmd.expect_error) {
+                    std::cerr << "unexpected exception in " << cmd.contract << "." << cmd.method << std::endl;
+                    return false;
+                }
+                tx_aborted = true;
+                break;
+            }
+            if (cmd.expect_error) {
                 std::cerr << "expected error, but got result in "
-                          << tx.contract << "." << tx.method << std::endl;
-                JS_FreeValue(cc->ctx, result);
+                          << cmd.contract << "." << cmd.method << std::endl;
+                JSI_FreeValue(cc->ctx, result);
+                granules = std::move(saved);
+                all_events = std::move(saved_events);
                 return false;
             }
-            if (tx.expect_result) {
-                std::string exp = serialize_value(runner_ctx, tx.expect_result.get());
+
+            if (cmd.expect_result) {
+                std::string exp = serialize_value(runner_ctx, cmd.expect_result.get());
                 JSValue res_in_runner = convert_value(cc->ctx, runner_ctx, result);
-                if (JS_IsException(res_in_runner)) {
+                if (JSI_IsException(res_in_runner)) {
                     print_exception(runner_ctx);
-                    JS_FreeValue(cc->ctx, result);
+                    JSI_FreeValue(cc->ctx, result);
+                    granules = std::move(saved);
+                    all_events = std::move(saved_events);
                     return false;
                 }
                 std::string act = serialize_value(runner_ctx, res_in_runner);
-                JS_FreeValue(runner_ctx, res_in_runner);
+                JSI_FreeValue(runner_ctx, res_in_runner);
                 if (exp != act) {
-                    std::cerr << "result mismatch in " << tx.contract << "." << tx.method
+                    std::cerr << "result mismatch in " << cmd.contract << "." << cmd.method
                               << ": expected " << exp << ", got " << act << std::endl;
-                    JS_FreeValue(cc->ctx, result);
+                    JSI_FreeValue(cc->ctx, result);
+                    granules = std::move(saved);
+                    all_events = std::move(saved_events);
                     return false;
                 }
             }
-            JS_FreeValue(cc->ctx, result);
+
+            // if (!cmd.expect_events.empty() || !current_events.empty()) 
+            if (!cmd.expect_events.empty()) {
+                if (current_events.size() != cmd.expect_events.size()) {
+                    std::cerr << "  events count mismatch in " << cmd.contract << "." << cmd.method
+                              << ": expected " << cmd.expect_events.size()
+                              << ", got " << current_events.size() << std::endl;
+                    JSI_FreeValue(cc->ctx, result);
+                    granules = std::move(saved);
+                    all_events = std::move(saved_events);
+                    return false;
+                }
+                for (size_t k = 0; k < cmd.expect_events.size(); ++k) {
+                    if (cmd.expect_events[k].contract != current_events[k].contract ||
+                        cmd.expect_events[k].name     != current_events[k].name ||
+                        cmd.expect_events[k].value    != current_events[k].value) {
+                        std::cerr << "  event[" << k << "] mismatch in "
+                                  << cmd.contract << "." << cmd.method << std::endl;
+                        JSI_FreeValue(cc->ctx, result);
+                        granules = std::move(saved);
+                        all_events = std::move(saved_events);
+                        return false;
+                    }
+                }
+            }
+
+            for (auto& ev : current_events) all_events.push_back(ev);
+            JSI_FreeValue(cc->ctx, result);
+        }
+
+        if (tx_aborted) continue;
+    }
+    return true;
+}
+static bool compare_emits(const std::vector<Event>& actual,
+                          const std::vector<Event>& expected)
+{
+    if (actual.size() != expected.size()) {
+        std::cerr << "  emits count mismatch: expected " << expected.size()
+                  << ", got " << actual.size() << std::endl;
+        for (auto& e : expected)
+            std::cerr << "    expected: " << e.contract << "." << e.name
+                      << "(" << e.value << ")" << std::endl;
+        for (auto& e : actual)
+            std::cerr << "    actual:   " << e.contract << "." << e.name
+                      << "(" << e.value << ")" << std::endl;
+        return false;
+    }
+    for (size_t i = 0; i < actual.size(); ++i) {
+        if (actual[i].contract != expected[i].contract ||
+            actual[i].name     != expected[i].name ||
+            actual[i].value    != expected[i].value) {
+            std::cerr << "  emits[" << i << "] mismatch: expected "
+                      << expected[i].contract << "." << expected[i].name
+                      << "(" << expected[i].value << "), got "
+                      << actual[i].contract << "." << actual[i].name
+                      << "(" << actual[i].value << ")" << std::endl;
+            return false;
         }
     }
     return true;
@@ -651,8 +875,7 @@ static bool compare_expected(JSContext* ctx, const TestCase& tc) {
         auto it = granules.find(key);
         if (it == granules.end()) {
             std::cerr << "  missing granule: " << key << std::endl;
-            ok = false;
-            continue;
+            ok = false; continue;
         }
         std::string exp = serialize_value(ctx, guard.get());
         if (exp != it->second.value) {
@@ -686,16 +909,14 @@ std::vector<std::string> list_directory(const std::string& path) {
 }
 
 int main() {
-    JSRuntime* rt = JS_NewRuntime();
+    JSRuntime* rt = JSI_NewRuntime();
     if (!rt) return 1;
-    JSContext* ctx = JS_NewContext(rt);
-    if (!ctx) { JS_FreeRuntime(rt); return 1; }
-
-    g_runner_ctx = ctx;
+    JSContext* ctx = JSI_NewContext(rt);
+    if (!ctx) { JSI_FreeRuntime(rt); return 1; }
+    // g_runner_ctx = ctx;
 
     auto dir = list_directory("tx");
-    int failures = 0;
-    int total = 0;
+    int failures = 0, total = 0;
 
     for (auto& file : dir) {
         if (file.size() < 6 || file.substr(file.size() - 6) != ".tx.js") continue;
@@ -707,14 +928,15 @@ int main() {
         if (!load_test(ctx, path, tc)) { failures++; continue; }
 
         bool load_ok = true;
-        for (auto& tx : tc.transactions) {
-            if (!get_contract(tx.contract, "contracts")) { load_ok = false; break; }
-        }
+        for (auto& tx : tc.transactions)
+            for (auto& cmd : tx.commands)
+                if (!get_contract(cmd.contract, "contracts")) { load_ok = false; break; }
         if (!load_ok) { std::cerr << "  cannot load contracts" << std::endl; failures++; continue; }
 
         apply_initial(ctx, tc);
 
         if (!run_transactions(ctx, tc)) { failures++; continue; }
+        if (!compare_emits(all_events, tc.expected_emits)) { failures++; continue; }
         if (!compare_expected(ctx, tc)) { failures++; continue; }
 
         std::cout << "  PASS" << std::endl;
@@ -722,9 +944,8 @@ int main() {
 
     granules.clear();
     contract_cache.clear();
-
-    JS_FreeContext(ctx);
-    JS_FreeRuntime(rt);
+    JSI_FreeContext(ctx);
+    JSI_FreeRuntime(rt);
 
     std::cout << total - failures << "/" << total << " passed" << std::endl;
     return failures ? 1 : 0;
