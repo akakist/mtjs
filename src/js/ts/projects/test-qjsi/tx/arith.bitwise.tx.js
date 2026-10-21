@@ -5,7 +5,11 @@
         { contract: "arith", method: "bitor",  params: { a: 0b1100, b: 0b1010 }, expect_result: 0b1110 },
         { contract: "arith", method: "bitxor", params: { a: 0b1100, b: 0b1010 }, expect_result: 0b0110 },
         { contract: "arith", method: "shl",    params: { a: 1, b: 4 }, expect_result: 16 },
-        { contract: "arith", method: "shr",    params: { a: 16, b: 4 }, expect_result: 1 }
+        { contract: "arith", method: "shr",    params: { a: 16, b: 4 }, expect_result: 1 },
+{ contract:"arith", method:"shl", params:{a:1, b:32}, expect_result: 1<<32 },
+{ contract:"arith", method:"shl", params:{a:1, b:63}, expect_result: 1<<63 },
+{ contract:"arith", method:"shr", params:{a:1<<40, b:4}, expect_result: 1<<36 },
+{ contract:"arith", method:"sar", params:{a:1<<40, b:4}, expect_result: 1<<36 }
     ],
     expected: {}
 })

@@ -12,11 +12,18 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
+#include <optional>
 #include <dirent.h>
 #include <sys/stat.h>
+
+#include <nlohmann/json.hpp>
+
 #include "REF.h"
 #include "jsiValueGuard.h"
 #include "jsiscope.h"
+
+using json = nlohmann::json;
 
 // ============================================================
 // ContractContext
@@ -41,7 +48,7 @@ struct ContractContext: public Refcountable {
         if (rt) { JSI_FreeRuntime(rt); rt = nullptr; }
     }
 
-    bool create() {
+    bool create__() {
         rt = JSI_NewRuntime();
         if (!rt) return false;
         JSI_SetMemoryLimit(rt, 64 * 1024 * 1024);
@@ -59,7 +66,7 @@ struct ContractContext: public Refcountable {
 struct Granule {
     std::string value;
     int64_t create_time = 0;
-    int64_t ttl = 0;   // 0 = бесконечно
+    int64_t ttl = 0;
 };
 
 // ============================================================
@@ -74,8 +81,8 @@ struct jsiEvent {
     std::string value;
 };
 
-std::vector<jsiEvent> current_events;    // события текущей команды/транзакции
-std::vector<jsiEvent> all_events;        // события всего прогона
+std::vector<jsiEvent> current_events;
+std::vector<jsiEvent> all_events;
 
 static int64_t g_current_time = 0;
 static int64_t g_current_block_height = 0;
@@ -202,6 +209,108 @@ JSIValue convert_value(JSIContext* from_ctx, JSIContext* to_ctx, JSIValueConst v
 }
 
 // ============================================================
+// nlohmann <-> JSI
+// ============================================================
+static json json_from_jsi(JSIContext* ctx, JSIValueConst val) {
+    if (JSI_IsNull(val)) return nullptr;
+    if (JSI_IsUndefined(val)) throw std::runtime_error("undefined in .tx.js");
+    if (JSI_IsBool(val)) return JSI_ToBool(ctx, val) != 0;
+    if (JSI_VALUE_GET_TAG(val) == JSI_TAG_INT)
+    {
+        // printf("val %ld\n",JSI_VALUE_GET_INT(val));
+         return JSI_VALUE_GET_INT(val);
+    }
+
+    if (JSI_IsString(val)) {
+        size_t len = 0;
+        const char* s = JSI_ToCStringLen(ctx, &len, val);
+        if (!s) throw std::runtime_error("bad string");
+        std::string r(s, len);
+        JSI_FreeCString(ctx, s);
+        return r;
+    }
+
+    if (JSI_IsArray(ctx, val)) {
+        json arr = json::array();
+        JSIValue lv = JSI_GetPropertyStr(ctx, val, "length");
+        int64_t len = 0; JSI_ToInt64(ctx, &len, lv); JSI_FreeValue(ctx, lv);
+        for (int64_t i = 0; i < len; ++i) {
+            JSIValue item = JSI_GetPropertyUint32(ctx, val, (uint32_t)i);
+            arr.push_back(json_from_jsi(ctx, item));
+            JSI_FreeValue(ctx, item);
+        }
+        return arr;
+    }
+
+    if (JSI_IsObject(val)) {
+        json obj = json::object();
+        JSPropertyEnum* props = nullptr;
+        uint32_t count = 0;
+        if (JSI_GetOwnPropertyNames(ctx, &props, &count, val,
+                JSI_GPN_STRING_MASK | JSI_GPN_ENUM_ONLY) == 0) {
+            for (uint32_t i = 0; i < count; ++i) {
+                const char* k = JSI_AtomToCString(ctx, props[i].atom);
+                if (k) {
+                    JSIValue item = JSI_GetProperty(ctx, val, props[i].atom);
+                    obj[std::string(k)] = json_from_jsi(ctx, item);
+                    JSI_FreeValue(ctx, item);
+                    JSI_FreeCString(ctx, k);
+                }
+                JSI_FreeAtom(ctx, props[i].atom);
+            }
+            jsi_free(ctx, props);
+        }
+        return obj;
+    }
+
+    throw std::runtime_error("unsupported JS value in .tx.js");
+}
+
+static JSIValue json_to_jsi(JSIContext* ctx, const json& j) {
+    if (j.is_null()) return JSI_NULL;
+    if (j.is_boolean()) return JSI_NewBool(ctx, j.get<bool>());
+
+    if (j.is_number_integer()) return JSI_NewInt64(ctx, j.get<int64_t>());
+    if (j.is_number_unsigned()) {
+        uint64_t u = j.get<uint64_t>();
+        if (u > (uint64_t)INT64_MAX)
+            return JSI_ThrowTypeError(ctx, "uint64 too large");
+        return JSI_NewInt64(ctx, (int64_t)u);
+    }
+    if (j.is_number_float())
+        return JSI_ThrowTypeError(ctx, "float not supported");
+
+    if (j.is_string()) {
+        auto s = j.get<std::string>();
+        return JSI_NewStringLen(ctx, s.data(), s.size());
+    }
+
+    if (j.is_array()) {
+        JSIValue arr = JSI_NewArray(ctx);
+        if (JSI_IsException(arr)) return arr;
+        for (size_t i = 0; i < j.size(); ++i) {
+            JSIValue v = json_to_jsi(ctx, j[i]);
+            if (JSI_IsException(v)) { JSI_FreeValue(ctx, arr); return v; }
+            JSI_SetPropertyUint32(ctx, arr, (uint32_t)i, v);
+        }
+        return arr;
+    }
+
+    if (j.is_object()) {
+        JSIValue obj = JSI_NewObject(ctx);
+        if (JSI_IsException(obj)) return obj;
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            JSIValue v = json_to_jsi(ctx, it.value());
+            if (JSI_IsException(v)) { JSI_FreeValue(ctx, obj); return v; }
+            JSI_SetPropertyStr(ctx, obj, it.key().c_str(), v);
+        }
+        return obj;
+    }
+
+    return JSI_ThrowTypeError(ctx, "unsupported json type");
+}
+
+// ============================================================
 // API контракта
 // ============================================================
 JSIValue jsi_registerMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
@@ -228,7 +337,6 @@ JSIValue jsi_registerView(JSIContext* ctx, JSIValueConst, int argc, JSIValueCons
     return JSI_UNDEFINED;
 }
 
-// createGranule(key, value, ttl) — создаёт, если уже есть -> TypeError
 JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     if (argc < 2 || !JSI_IsString(argv[0]))
         return JSI_ThrowTypeError(ctx, "createGranule(key, value[, ttl])");
@@ -266,7 +374,6 @@ JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueCon
     return JSI_UNDEFINED;
 }
 
-// setGranule(key, value) — обновляет существующую, иначе TypeError
 JSIValue jsi_setGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     if (argc < 2 || !JSI_IsString(argv[0]))
         return JSI_ThrowTypeError(ctx, "setGranule(key, value)");
@@ -294,7 +401,6 @@ JSIValue jsi_setGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
                                  full_key.c_str(), s.size(), MAX_GRANULE_SIZE);
 
     it->second.value = std::move(s);
-    // create_time и ttl не меняем
     return JSI_UNDEFINED;
 }
 
@@ -309,11 +415,15 @@ JSIValue jsi_getGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
     std::string full_key = cc->name + "/" + key;
     auto it = granules.find(full_key);
     if (it == granules.end()) return JSI_UNDEFINED;
-    std::string wrapped = "(" + it->second.value + ")";
-    return JSI_Eval(ctx, wrapped.c_str(), wrapped.size(), "<granule>", JSI_EVAL_TYPE_GLOBAL);
+
+    try {
+        json j = json::parse(it->second.value);
+        return json_to_jsi(ctx, j);
+    } catch (const std::exception& e) {
+        return JSI_ThrowTypeError(ctx, "getGranule(%s): %s", full_key.c_str(), e.what());
+    }
 }
 
-// emit(name, value) — запрещён во view, только в методе
 JSIValue jsi_emit(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     if (argc < 2 || !JSI_IsString(argv[0]))
         return JSI_ThrowTypeError(ctx, "emit(name, value)");
@@ -332,7 +442,7 @@ JSIValue jsi_emit(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv)
 }
 
 // ============================================================
-// Вспомогательные: построение msg-объекта и вызов метода/вью
+// msg
 // ============================================================
 struct jsiMsg {
     std::string sender;
@@ -378,7 +488,6 @@ JSIValue call_contract_method(ContractContext* cc, JSIValueConst fn,
     return r;
 }
 
-// callMethod(contract, method, params) — из контракта
 JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     if (argc < 3 || !JSI_IsString(argv[0]) || !JSI_IsString(argv[1]))
         return JSI_ThrowTypeError(ctx, "callMethod(contract, method, params)");
@@ -403,7 +512,7 @@ JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
     JSIValue params_in_cc = convert_value(ctx, cc->ctx, argv[2]);
     if (JSI_IsException(params_in_cc)) return JSI_EXCEPTION;
 
-    jsiMsg empty;   // cross-contract: msg не пробрасываем (упрощение)
+    jsiMsg empty;
     JSIValue r = call_contract_method(cc.get(), mit->second.get(), params_in_cc, empty, false);
     JSI_FreeValue(cc->ctx, params_in_cc);
 
@@ -479,7 +588,7 @@ void register_api(JSIContext* ctx) {
 // ============================================================
 // Загрузка контракта
 // ============================================================
-REF_getter<ContractContext> load_contract( JSIRuntime *rt,
+REF_getter<ContractContext> load_contract(JSIRuntime *rt,
     const std::string& name, const std::string& path)
 {
     auto it = contract_cache.find(name);
@@ -489,7 +598,7 @@ REF_getter<ContractContext> load_contract( JSIRuntime *rt,
     cc->name = name;
     cc->path__1 = path;
 
-    if (!cc->create()) { std::cerr << "cannot create context for " << name << std::endl; return nullptr; }
+    if (!cc->create__()) { std::cerr << "cannot create context for " << name << std::endl; return nullptr; }
 
     register_api(cc->ctx);
 
@@ -528,7 +637,7 @@ REF_getter<ContractContext> load_contract( JSIRuntime *rt,
     return cc;
 }
 
-REF_getter<ContractContext> get_contract( JSIRuntime* rt,
+REF_getter<ContractContext> get_contract(JSIRuntime* rt,
     const std::string& name, const std::string& contracts_dir)
 {
     auto it = contract_cache.find(name);
@@ -542,9 +651,9 @@ REF_getter<ContractContext> get_contract( JSIRuntime* rt,
 struct TxCommand {
     std::string contract;
     std::string method;
-    JSIValueGuard params;
+    json params;
     bool expect_error = false;
-    JSIValueGuard expect_result;
+    std::optional<json> expect_result;
     std::vector<jsiEvent> expect_events;
 };
 
@@ -555,188 +664,198 @@ struct Transaction {
 
 struct TestCase {
     int64_t time = 0;
-    std::map<std::string, JSIValueGuard> initial;
+    json initial;
     std::vector<Transaction> transactions;
     std::vector<jsiEvent> expected_emits;
-    std::map<std::string, JSIValueGuard> expected;
+    json expected;
 };
 
-static void read_object_map(JSIContext* ctx, JSIValueConst obj,
-                            std::map<std::string, JSIValueGuard>& out)
-{
-    JSPropertyEnum* props = nullptr;
-    uint32_t count = 0;
-    if (JSI_GetOwnPropertyNames(ctx, &props, &count, obj,
-            JSI_GPN_STRING_MASK | JSI_GPN_ENUM_ONLY) != 0) return;
-    for (uint32_t i = 0; i < count; ++i) {
-        const char* k = JSI_AtomToCString(ctx, props[i].atom);
-        if (k) {
-            JSIValue v = JSI_GetProperty(ctx, obj, props[i].atom);
-            out[k] = JSIValueGuard(ctx, JSI_DupValue(ctx, v));
-            JSI_FreeValue(ctx, v);
-            JSI_FreeCString(ctx, k);
-        }
-        JSI_FreeAtom(ctx, props[i].atom);
-    }
-    jsi_free(ctx, props);
-}
-
-static std::string read_string_prop(JSIContext* ctx, JSIValueConst obj, const char* name) {
-    JSIValue v = JSI_GetPropertyStr(ctx, obj, name);
-    std::string r;
-    if (JSI_IsString(v)) { const char* s = JSI_ToCString(ctx, v);
-        if (s) { r = s; JSI_FreeCString(ctx, s); } }
-    JSI_FreeValue(ctx, v);
-    return r;
-}
-
-static int64_t read_int64_prop(JSIContext* ctx, JSIValueConst obj, const char* name) {
-    JSIValue v = JSI_GetPropertyStr(ctx, obj, name);
-    int64_t r = 0;
-    if (!JSI_IsUndefined(v)) JSI_ToInt64(ctx, &r, v);
-    JSI_FreeValue(ctx, v);
-    return r;
-}
-
-static jsiMsg read_msg(JSIContext* ctx, JSIValueConst obj) {
+static jsiMsg read_msg_json(const json& j) {
     jsiMsg m;
-    if (!JSI_IsObject(obj)) return m;
-    m.sender         = read_string_prop(ctx, obj, "sender");
-    m.value          = read_int64_prop(ctx, obj, "value");
-    m.gasLimit       = read_int64_prop(ctx, obj, "gasLimit");
-    m.blockTimestamp = read_int64_prop(ctx, obj, "blockTimestamp");
-    m.blockHeight    = read_int64_prop(ctx, obj, "blockHeight");
-    m.nonce          = read_int64_prop(ctx, obj, "nonce");
-    m.chainId        = read_int64_prop(ctx, obj, "chainId");
-    m.txHash         = read_string_prop(ctx, obj, "txHash");
-    m.txIndex        = read_int64_prop(ctx, obj, "txIndex");
+    if (!j.is_object()) return m;
+    auto get_str = [&](const char* k) -> std::string {
+        auto it = j.find(k);
+        if (it == j.end() || it->is_null()) return {};
+        return it->get<std::string>();
+    };
+    auto get_i64 = [&](const char* k) -> int64_t {
+        auto it = j.find(k);
+        if (it == j.end() || it->is_null()) return 0;
+        return it->get<int64_t>();
+    };
+    m.sender         = get_str("sender");
+    m.value          = get_i64("value");
+    m.gasLimit       = get_i64("gasLimit");
+    m.blockTimestamp = get_i64("blockTimestamp");
+    m.blockHeight    = get_i64("blockHeight");
+    m.nonce          = get_i64("nonce");
+    m.chainId        = get_i64("chainId");
+    m.txHash         = get_str("txHash");
+    m.txIndex        = get_i64("txIndex");
     return m;
 }
 
-static void read_events(JSIContext* ctx, JSIValueConst arr, std::vector<jsiEvent>& out) {
-    if (!JSI_IsArray(ctx, arr)) return;
-    JSIValue lv = JSI_GetPropertyStr(ctx, arr, "length");
-    int64_t len = 0; JSI_ToInt64(ctx, &len, lv); JSI_FreeValue(ctx, lv);
-    for (int64_t i = 0; i < len; ++i) {
-        JSIValue e = JSI_GetPropertyUint32(ctx, arr, (uint32_t)i);
-        if (!JSI_IsObject(e)) { JSI_FreeValue(ctx, e); continue; }
+static void read_events_json(const json& arr, std::vector<jsiEvent>& out) {
+    if (!arr.is_array()) return;
+    for (auto& e : arr) {
+        if (!e.is_object()) continue;
         jsiEvent ev;
-        ev.contract = read_string_prop(ctx, e, "contract");
-        ev.name     = read_string_prop(ctx, e, "name");
-        JSIValue vv  = JSI_GetPropertyStr(ctx, e, "value");
-        ev.value    = serialize_value(ctx, vv);
-        JSI_FreeValue(ctx, vv);
+        ev.contract = e.value("contract", std::string{});
+        ev.name     = e.value("name", std::string{});
+        auto it = e.find("value");
+        if (it != e.end()) {
+            ev.value = it->dump();
+        }
         out.push_back(std::move(ev));
-        JSI_FreeValue(ctx, e);
     }
 }
 
-bool load_test(JSIContext* ctx, const std::string& path, TestCase& out) {
+static std::optional<json> parse_tx_js(const std::string& path) {
+    JSIRuntime* rt = JSI_NewRuntime();
+    if (!rt) return std::nullopt;
+    JSIContext* ctx = JSI_NewContext(rt);
+    if (!ctx) { JSI_FreeRuntime(rt); return std::nullopt; }
+
     std::string src;
     {
         FILE* f = fopen(path.c_str(), "rb");
-        if (!f) { std::cerr << "cannot open " << path << std::endl; return false; }
+        if (!f) { JSI_FreeContext(ctx); JSI_FreeRuntime(rt); return std::nullopt; }
         fseek(f, 0, SEEK_END); long size = ftell(f); fseek(f, 0, SEEK_SET);
         src.resize(size);
         auto sz = fread(&src[0], 1, size, f);
         fclose(f);
-        if (sz != (size_t)size) return false;
+        if (sz != (size_t)size) { JSI_FreeContext(ctx); JSI_FreeRuntime(rt); return std::nullopt; }
     }
 
     JSIValue compiled = JSI_Eval(ctx, src.data(), src.size(), path.c_str(),
         JSI_EVAL_FLAG_STRICT | JSI_EVAL_TYPE_GLOBAL | JSI_EVAL_FLAG_COMPILE_ONLY);
-    if (JSI_IsException(compiled)) { print_exception(ctx); return false; }
+    if (JSI_IsException(compiled)) {
+        print_exception(ctx);
+        JSI_FreeContext(ctx); JSI_FreeRuntime(rt);
+        return std::nullopt;
+    }
 
     JSIValue result = JSI_EvalFunction(ctx, compiled);
-    if (JSI_IsException(result)) { print_exception(ctx); JSI_FreeValue(ctx, result); return false; }
+    if (JSI_IsException(result)) {
+        print_exception(ctx);
+        JSI_FreeValue(ctx, result);
+        JSI_FreeContext(ctx); JSI_FreeRuntime(rt);
+        return std::nullopt;
+    }
     if (!JSI_IsObject(result)) {
         std::cerr << path << ": result is not an object" << std::endl;
-        JSI_FreeValue(ctx, result); return false;
+        JSI_FreeValue(ctx, result);
+        JSI_FreeContext(ctx); JSI_FreeRuntime(rt);
+        return std::nullopt;
     }
 
-    out.time = read_int64_prop(ctx, result, "time");
-
-    JSIValue initial_val = JSI_GetPropertyStr(ctx, result, "initial");
-    if (JSI_IsObject(initial_val)) read_object_map(ctx, initial_val, out.initial);
-    JSI_FreeValue(ctx, initial_val);
-
-    JSIValue txs_val = JSI_GetPropertyStr(ctx, result, "transactions");
-    if (JSI_IsArray(ctx, txs_val)) {
-        JSIValue lv = JSI_GetPropertyStr(ctx, txs_val, "length");
-        int64_t len = 0; JSI_ToInt64(ctx, &len, lv); JSI_FreeValue(ctx, lv);
-
-        for (int64_t i = 0; i < len; ++i) {
-            JSIValue item = JSI_GetPropertyUint32(ctx, txs_val, (uint32_t)i);
-            if (!JSI_IsObject(item)) { JSI_FreeValue(ctx, item); continue; }
-
-            Transaction tx;
-            JSIValue mv = JSI_GetPropertyStr(ctx, item, "msg");
-            tx.msg = read_msg(ctx, mv);
-            JSI_FreeValue(ctx, mv);
-
-            JSIValue cmds = JSI_GetPropertyStr(ctx, item, "commands");
-            if (JSI_IsArray(ctx, cmds)) {
-                JSIValue clv = JSI_GetPropertyStr(ctx, cmds, "length");
-                int64_t clen = 0; JSI_ToInt64(ctx, &clen, clv); JSI_FreeValue(ctx, clv);
-                for (int64_t j = 0; j < clen; ++j) {
-                    JSIValue c = JSI_GetPropertyUint32(ctx, cmds, (uint32_t)j);
-                    if (!JSI_IsObject(c)) { JSI_FreeValue(ctx, c); continue; }
-                    TxCommand cmd;
-                    cmd.contract = read_string_prop(ctx, c, "contract");
-                    cmd.method   = read_string_prop(ctx, c, "method");
-                    JSIValue pv = JSI_GetPropertyStr(ctx, c, "params");
-                    cmd.params = JSIValueGuard(ctx,
-                        JSI_IsUndefined(pv) ? JSI_NewObject(ctx) : JSI_DupValue(ctx, pv));
-                    JSI_FreeValue(ctx, pv);
-                    JSIValue ev = JSI_GetPropertyStr(ctx, c, "expect_error");
-                    if (!JSI_IsUndefined(ev)) cmd.expect_error = JSI_ToBool(ctx, ev);
-                    JSI_FreeValue(ctx, ev);
-                    JSIValue rv = JSI_GetPropertyStr(ctx, c, "expect_result");
-                    if (!JSI_IsUndefined(rv)) cmd.expect_result = JSIValueGuard(ctx, JSI_DupValue(ctx, rv));
-                    JSI_FreeValue(ctx, rv);
-                    JSIValue ee = JSI_GetPropertyStr(ctx, c, "expect_events");
-                    read_events(ctx, ee, cmd.expect_events);
-                    JSI_FreeValue(ctx, ee);
-                    tx.commands.push_back(std::move(cmd));
-                    JSI_FreeValue(ctx, c);
-                }
-            }
-            JSI_FreeValue(ctx, cmds);
-            out.transactions.push_back(std::move(tx));
-            JSI_FreeValue(ctx, item);
-        }
+    json j;
+    try {
+        j = json_from_jsi(ctx, result);
+    } catch (const std::exception& e) {
+        std::cerr << "exception: " << path << ": " << e.what() << std::endl;
+        JSI_FreeValue(ctx, result);
+        JSI_FreeContext(ctx); JSI_FreeRuntime(rt);
+        return std::nullopt;
     }
-    JSI_FreeValue(ctx, txs_val);
-
-    JSIValue ee_val = JSI_GetPropertyStr(ctx, result, "expected_emits");
-    read_events(ctx, ee_val, out.expected_emits);
-    JSI_FreeValue(ctx, ee_val);
-
-    JSIValue expected_val = JSI_GetPropertyStr(ctx, result, "expected");
-    if (JSI_IsObject(expected_val)) read_object_map(ctx, expected_val, out.expected);
-    JSI_FreeValue(ctx, expected_val);
 
     JSI_FreeValue(ctx, result);
+    JSI_FreeContext(ctx);
+    JSI_FreeRuntime(rt);
+    return j;
+}
+
+bool load_test(const std::string& path, TestCase& out) {
+    auto opt = parse_tx_js(path);
+    if (!opt) return false;
+    const json& j = *opt;
+
+    if (!j.is_object()) {
+        std::cerr << path << ": top-level not an object" << std::endl;
+        return false;
+    }
+
+    out.time = j.value("time", (int64_t)0);
+
+    auto init_it = j.find("initial");
+    if (init_it != j.end() && init_it->is_object()) {
+        out.initial = *init_it;
+    } else {
+        out.initial = json::object();
+    }
+
+    auto exp_it = j.find("expected");
+    if (exp_it != j.end() && exp_it->is_object()) {
+        out.expected = *exp_it;
+    } else {
+        out.expected = json::object();
+    }
+
+    auto txs_it = j.find("transactions");
+    if (txs_it != j.end() && txs_it->is_array()) {
+        for (auto& item : *txs_it) {
+            if (!item.is_object()) continue;
+            Transaction tx;
+            auto mv = item.find("msg");
+            if (mv != item.end() && mv->is_object()) tx.msg = read_msg_json(*mv);
+
+            auto cmds = item.find("commands");
+            if (cmds != item.end() && cmds->is_array()) {
+                for (auto& c : *cmds) {
+                    if (!c.is_object()) continue;
+                    TxCommand cmd;
+                    cmd.contract = c.value("contract", std::string{});
+                    cmd.method   = c.value("method", std::string{});
+
+                    auto pv = c.find("params");
+                    cmd.params = (pv != c.end()) ? *pv : json::object();
+
+                    auto ev = c.find("expect_error");
+                    if (ev != c.end()) cmd.expect_error = ev->get<bool>();
+
+                    auto rv = c.find("expect_result");
+                    if (rv != c.end() && !rv->is_null()) cmd.expect_result = *rv;
+
+                    auto ee = c.find("expect_events");
+                    if (ee != c.end()) read_events_json(*ee, cmd.expect_events);
+
+                    tx.commands.push_back(std::move(cmd));
+                }
+            }
+            out.transactions.push_back(std::move(tx));
+        }
+    }
+
+    auto emits_it = j.find("expected_emits");
+    if (emits_it != j.end()) read_events_json(*emits_it, out.expected_emits);
+
     return true;
 }
 
 // ============================================================
 // Прогон
 // ============================================================
-static void apply_initial(JSIContext* ctx, const TestCase& tc) {
+static void apply_initial(const TestCase& tc) {
     granules.clear();
     all_events.clear();
     current_events.clear();
     g_current_time = tc.time;
-    for (auto& [key, guard] : tc.initial) {
-        std::string s = serialize_value(ctx, guard.get());
-        if (!is_serializable(s)) {
-            std::cerr << "initial[" << key << "]: cannot serialize " << s << std::endl;
+    for (auto it = tc.initial.begin(); it != tc.initial.end(); ++it) {
+        const std::string& key = it.key();
+        const json& v = it.value();
+        std::string s = v.dump();
+        if (s.size() > MAX_GRANULE_SIZE) {
+            std::cerr << "initial[" << key << "]: too large" << std::endl;
             continue;
         }
         granules[key] = Granule{ std::move(s), 0, 0 };
     }
 }
+
+static bool json_equal(const json& a, const json& b) {
+    return a == b;
+}
+
 static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& tc) {
     for (auto& tx : tc.transactions) {
         auto saved = granules;
@@ -752,7 +871,7 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
                 return false;
             }
 
-            JSIValue params_in_cc = convert_value(runner_ctx, cc->ctx, cmd.params.get());
+            JSIValue params_in_cc = json_to_jsi(cc->ctx, cmd.params);
             if (JSI_IsException(params_in_cc)) {
                 print_exception(cc->ctx);
                 granules = std::move(saved);
@@ -786,20 +905,22 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             }
 
             if (cmd.expect_result) {
-                std::string exp = serialize_value(runner_ctx, cmd.expect_result.get());
-                JSIValue res_in_runner = convert_value(cc->ctx, runner_ctx, result);
-                if (JSI_IsException(res_in_runner)) {
-                    print_exception(runner_ctx);
+                std::string act_str = serialize_value(cc->ctx, result);
+                json act;
+                try {
+                    act = json::parse(act_str);
+                } catch (const std::exception& e) {
+                    std::cerr << "result in " << cmd.contract << "." << cmd.method
+                              << " is not JSON: " << act_str << " (" << e.what() << ")" << std::endl;
                     JSI_FreeValue(cc->ctx, result);
                     granules = std::move(saved);
                     all_events = std::move(saved_events);
                     return false;
                 }
-                std::string act = serialize_value(runner_ctx, res_in_runner);
-                JSI_FreeValue(runner_ctx, res_in_runner);
-                if (exp != act) {
+                if (!json_equal(*cmd.expect_result, act)) {
                     std::cerr << "result mismatch in " << cmd.contract << "." << cmd.method
-                              << ": expected " << exp << ", got " << act << std::endl;
+                              << ": expected " << cmd.expect_result->dump()
+                              << ", got " << act.dump() << std::endl;
                     JSI_FreeValue(cc->ctx, result);
                     granules = std::move(saved);
                     all_events = std::move(saved_events);
@@ -807,7 +928,6 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
                 }
             }
 
-            // if (!cmd.expect_events.empty() || !current_events.empty()) 
             if (!cmd.expect_events.empty()) {
                 if (current_events.size() != cmd.expect_events.size()) {
                     std::cerr << "  events count mismatch in " << cmd.contract << "." << cmd.method
@@ -820,8 +940,26 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
                 }
                 for (size_t k = 0; k < cmd.expect_events.size(); ++k) {
                     if (cmd.expect_events[k].contract != current_events[k].contract ||
-                        cmd.expect_events[k].name     != current_events[k].name ||
-                        cmd.expect_events[k].value    != current_events[k].value) {
+                        cmd.expect_events[k].name     != current_events[k].name) {
+                        std::cerr << "  event[" << k << "] mismatch (contract/name) in "
+                                  << cmd.contract << "." << cmd.method << std::endl;
+                        JSI_FreeValue(cc->ctx, result);
+                        granules = std::move(saved);
+                        all_events = std::move(saved_events);
+                        return false;
+                    }
+                    json exp_v, act_v;
+                    try {
+                        exp_v = json::parse(cmd.expect_events[k].value);
+                        act_v = json::parse(current_events[k].value);
+                    } catch (const std::exception& e) {
+                        std::cerr << "  event[" << k << "] not JSON: " << e.what() << std::endl;
+                        JSI_FreeValue(cc->ctx, result);
+                        granules = std::move(saved);
+                        all_events = std::move(saved_events);
+                        return false;
+                    }
+                    if (!json_equal(exp_v, act_v)) {
                         std::cerr << "  event[" << k << "] mismatch in "
                                   << cmd.contract << "." << cmd.method << std::endl;
                         JSI_FreeValue(cc->ctx, result);
@@ -840,6 +978,7 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
     }
     return true;
 }
+
 static bool compare_emits(const std::vector<jsiEvent>& actual,
                           const std::vector<jsiEvent>& expected)
 {
@@ -856,32 +995,51 @@ static bool compare_emits(const std::vector<jsiEvent>& actual,
     }
     for (size_t i = 0; i < actual.size(); ++i) {
         if (actual[i].contract != expected[i].contract ||
-            actual[i].name     != expected[i].name ||
-            actual[i].value    != expected[i].value) {
+            actual[i].name     != expected[i].name) {
+            std::cerr << "  emits[" << i << "] mismatch (contract/name)" << std::endl;
+            return false;
+        }
+        json a, b;
+        try {
+            a = json::parse(actual[i].value);
+            b = json::parse(expected[i].value);
+        } catch (const std::exception& e) {
+            std::cerr << "  emits[" << i << "] not JSON: " << e.what() << std::endl;
+            return false;
+        }
+        if (!json_equal(a, b)) {
             std::cerr << "  emits[" << i << "] mismatch: expected "
-                      << expected[i].contract << "." << expected[i].name
-                      << "(" << expected[i].value << "), got "
-                      << actual[i].contract << "." << actual[i].name
-                      << "(" << actual[i].value << ")" << std::endl;
+                      << b.dump() << ", got " << a.dump() << std::endl;
             return false;
         }
     }
     return true;
 }
 
-static bool compare_expected(JSIContext* ctx, const TestCase& tc) {
+static bool compare_expected(JSIContext*, const TestCase& tc) {
     bool ok = true;
-    for (auto& [key, guard] : tc.expected) {
-        auto it = granules.find(key);
-        if (it == granules.end()) {
+    for (auto it = tc.expected.begin(); it != tc.expected.end(); ++it) {
+        const std::string& key = it.key();
+        const json& exp_j = it.value();
+
+        auto it_g = granules.find(key);
+        if (it_g == granules.end()) {
             std::cerr << "  missing granule: " << key << std::endl;
-            ok = false; continue;
+            ok = false;
+            continue;
         }
-        std::string exp = serialize_value(ctx, guard.get());
-        if (exp != it->second.value) {
+        json act_j;
+        try {
+            act_j = json::parse(it_g->second.value);
+        } catch (const std::exception& e) {
+            std::cerr << "  granule " << key << " not JSON: " << e.what() << std::endl;
+            ok = false;
+            continue;
+        }
+        if (!json_equal(exp_j, act_j)) {
             std::cerr << "  mismatch at " << key
-                      << ": expected " << exp
-                      << ", got "      << it->second.value << std::endl;
+                      << ": expected " << exp_j.dump()
+                      << ", got " << act_j.dump() << std::endl;
             ok = false;
         }
     }
@@ -913,7 +1071,6 @@ int main() {
     if (!rt) return 1;
     JSIContext* ctx = JSI_NewContext(rt);
     if (!ctx) { JSI_FreeRuntime(rt); return 1; }
-    // g_runner_ctx = ctx;
 
     auto dir = list_directory("tx");
     int failures = 0, total = 0;
@@ -925,7 +1082,7 @@ int main() {
         std::cout << "Running: " << path << std::endl;
 
         TestCase tc;
-        if (!load_test(ctx, path, tc)) { failures++; continue; }
+        if (!load_test(path, tc)) { failures++; continue; }
 
         bool load_ok = true;
         for (auto& tx : tc.transactions)
@@ -933,7 +1090,7 @@ int main() {
                 if (!get_contract(rt, cmd.contract, "contracts").valid()) { load_ok = false; break; }
         if (!load_ok) { std::cerr << "  cannot load contracts" << std::endl; failures++; continue; }
 
-        apply_initial(ctx, tc);
+        apply_initial(tc);
 
         if (!run_transactions(rt, ctx, tc)) { failures++; continue; }
         if (!compare_emits(all_events, tc.expected_emits)) { failures++; continue; }

@@ -4278,7 +4278,7 @@ JSAtom JSI_NewAtomUInt32(JSIContext *ctx, uint32_t n)
     if (n <= JSI_ATOM_MAX_INT) {
         return __JSI_AtomFromUInt32(n);
     } else {
-        char buf[11];
+        char buf[20];
         JSIValue val;
         size_t len;
         len = u64toa2(buf, n);
@@ -11898,7 +11898,6 @@ static JSIValue jsi_atof2(JSIContext *ctx, const char *str, const char **pp,
             return  JSI_NewInt64(ctx, d);        
 
 }
-// #ifdef KALL
 static JSIValue jsi_atof(JSIContext *ctx, const char *str, const char **pp,
                        int radix, int flags)
 {
@@ -12081,7 +12080,6 @@ done:
     val = JSI_ThrowOutOfMemory(ctx);
     goto done;
 }
-// #endif
 typedef enum JSToNumberHintEnum {
     TON_FLAG_NUMBER,
     TON_FLAG_NUMERIC,
@@ -13309,21 +13307,30 @@ static no_inline __exception int jsi_unary_arith_slow(JSIContext *ctx,
             v64 = JSI_VALUE_GET_INT(op1);
             switch(op) {
             case OP_inc:
+                if (unlikely(v64 == INT64_MAX)) {
+                    JSI_FreeValue(ctx, op1);
+                    JSI_ThrowRangeError(ctx, "inc overflow");
+                    goto exception;
+                }
                 v64++;
                 break;
             case OP_dec:
+                if (unlikely(v64 == INT64_MIN)) {
+                    JSI_FreeValue(ctx, op1);
+                    JSI_ThrowRangeError(ctx, "dec overflow");
+                    goto exception;
+                }
                 v64--;
-                // v = 2 * (op - OP_dec) - 1;
-                // v64 += v;
                 break;
             case OP_plus:
                 break;
             case OP_neg:
-                // if (v64 == 0) {
-                //     return -1;
-                // } else {
-                    v64 = -v64;
-                // }
+                if (v64 == INT64_MIN) {
+                    JSI_FreeValue(ctx, op1);
+                    JSI_ThrowRangeError(ctx, "neg overflow");
+                    goto exception;
+                }     
+                v64 = -v64;
                 break;
             default:
                 abort();
@@ -13436,25 +13443,44 @@ static no_inline __exception int jsi_binary_arith_slow(JSIContext *ctx, JSIValue
         v2 = JSI_VALUE_GET_INT(op2);
         switch(op) {
         case OP_sub:
-            v = (int64_t)v1 - (int64_t)v2;
+            if (__builtin_sub_overflow(v1, v2, &v)) {
+                JSI_FreeValue(ctx, op1);
+                JSI_FreeValue(ctx, op2);
+                JSI_ThrowRangeError(ctx, "sub overflow");
+                goto exception;
+            }
             break;
         case OP_mul:
-            v = (int64_t)v1 * (int64_t)v2;
+            if (__builtin_mul_overflow(v1, v2, &v)) {
+                JSI_FreeValue(ctx, op1);
+                JSI_FreeValue(ctx, op2);
+                JSI_ThrowRangeError(ctx, "mul overflow");
+                goto exception;
+            }
             break;
         case OP_div:
+            if (v2 == 0 || (v1 == INT64_MIN && v2 == -1)) {
+                JSI_FreeValue(ctx, op1);
+                JSI_FreeValue(ctx, op2);
+                JSI_ThrowRangeError(ctx, "divide overflow");
+                goto exception;
+            }
             sp[-2] = JSI_NewInt64(ctx, v1 / v2);
+            JSI_FreeValue(ctx, op1);
+            JSI_FreeValue(ctx, op2);
             return 0;
         case OP_mod:
-            if (v1 < 0 || v2 <= 0) {
-                sp[-2] = JSI_NewInt64(ctx, v1 % v2);
-                return 0;
-            } else {
-                v = (int64_t)v1 % (int64_t)v2;
+            if (v2 == 0 || (v1 == INT64_MIN && v2 == -1)) {
+                JSI_FreeValue(ctx, op1);
+                JSI_FreeValue(ctx, op2);
+                JSI_ThrowRangeError(ctx, "modulo overflow");
+                goto exception;
             }
+            v = v1 % v2;
             break;
         default:
             abort();
-        }
+    }
         sp[-2] = JSI_NewInt64(ctx, v);
     } else if (0) {
     } else {
@@ -13470,7 +13496,6 @@ static inline BOOL tag_is_string(uint32_t tag)
 {
     return tag == JSI_TAG_STRING || tag == JSI_TAG_STRING_ROPE;
 }
-// #ifdef KALL
 static no_inline __exception int jsi_add_slow(JSIContext *ctx, JSIValue *sp)
 {
     JSIValue op1, op2;
@@ -13528,9 +13553,15 @@ static no_inline __exception int jsi_add_slow(JSIContext *ctx, JSIValue *sp)
         int64_t v;
         v1 = JSI_VALUE_GET_INT(op1);
         v2 = JSI_VALUE_GET_INT(op2);
-        v = v1 + v2;
+        if (__builtin_add_overflow(v1, v2, &v)) {
+            JSI_FreeValue(ctx, op1);
+            JSI_FreeValue(ctx, op2);
+            JSI_ThrowRangeError(ctx, "add overflow");
+            goto exception;
+        }
         sp[-2] = JSI_NewInt64(ctx, v);
-    } else if (0) {
+    }    
+    else if (0) {
     } else {
     }
     return 0;
@@ -13539,7 +13570,6 @@ static no_inline __exception int jsi_add_slow(JSIContext *ctx, JSIValue *sp)
     sp[-1] = JSI_UNDEFINED;
     return -1;
 }
-// #endif
 static no_inline __exception int jsi_binary_logic_slow(JSIContext *ctx,
                                                       JSIValue *sp,
                                                       OPCodeEnum op)
@@ -17355,10 +17385,10 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
                 pv = &var_buf[idx];
                 if (likely(JSI_VALUE_IS_BOTH_INT(*pv, op2))) {
                     int64_t r;
-                    r = (int64_t)JSI_VALUE_GET_INT(*pv) + JSI_VALUE_GET_INT(op2);
-                    if (unlikely((int)r != r))
+                    if (unlikely(__builtin_add_overflow(JSI_VALUE_GET_INT(*pv),
+                                                        JSI_VALUE_GET_INT(op2), &r)))
                         goto add_loc_slow;
-                    *pv = JSI_NewInt32(ctx, r);
+                    *pv = JSI_NewInt64(ctx, r);
                     sp--;
                 } else if (0) {
                 } else if (JSI_VALUE_GET_TAG(*pv) == JSI_TAG_STRING) {
@@ -17519,30 +17549,32 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
             {
                 JSIValue op1;
                 uint32_t tag;
-                int val;
+                int64_t val;
                 op1 = sp[-1];
                 tag = JSI_VALUE_GET_TAG(op1);
                 if (tag == JSI_TAG_INT) {
                     val = JSI_VALUE_GET_INT(op1);
-                    sp[-1] = JSI_NewInt32(ctx, -val);
-                } else if (0) {
+                    if (unlikely(val == INT64_MIN))
+                        goto neg_slow;
+                    sp[-1] = JSI_NewInt64(ctx, -val);
                 } else {
+                neg_slow:
                     sf->cur_pc = pc;
                     if (jsi_unary_arith_slow(ctx, sp, opcode))
                         goto exception;
                 }
             }
             BREAK;
-        CASE(OP_inc):
+            CASE(OP_inc):
             {
                 JSIValue op1;
-                int val;
+                int64_t val;
                 op1 = sp[-1];
                 if (JSI_VALUE_GET_TAG(op1) == JSI_TAG_INT) {
                     val = JSI_VALUE_GET_INT(op1);
-                    if (unlikely(val == INT32_MAX))
+                    if (unlikely(val == INT64_MAX))
                         goto inc_slow;
-                    sp[-1] = JSI_NewInt32(ctx, val + 1);
+                    sp[-1] = JSI_NewInt64(ctx, val + 1);
                 } else {
                 inc_slow:
                     sf->cur_pc = pc;
@@ -17554,13 +17586,13 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
         CASE(OP_dec):
             {
                 JSIValue op1;
-                int val;
+                int64_t val;
                 op1 = sp[-1];
                 if (JSI_VALUE_GET_TAG(op1) == JSI_TAG_INT) {
                     val = JSI_VALUE_GET_INT(op1);
-                    if (unlikely(val == INT32_MIN))
+                    if (unlikely(val == INT64_MIN))
                         goto dec_slow;
-                    sp[-1] = JSI_NewInt32(ctx, val - 1);
+                    sp[-1] = JSI_NewInt64(ctx, val - 1);
                 } else {
                 dec_slow:
                     sf->cur_pc = pc;
@@ -17579,7 +17611,7 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
         CASE(OP_inc_loc):
             {
                 JSIValue op1;
-                int val;
+                int64_t val;
                 int idx;
                 idx = *pc;
                 pc += 1;
@@ -17587,9 +17619,9 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
                 op1 = var_buf[idx];
                 if (JSI_VALUE_GET_TAG(op1) == JSI_TAG_INT) {
                     val = JSI_VALUE_GET_INT(op1);
-                    if (unlikely(val == INT32_MAX))
+                    if (unlikely(val == INT64_MAX))
                         goto inc_loc_slow;
-                    var_buf[idx] = JSI_NewInt32(ctx, val + 1);
+                    var_buf[idx] = JSI_NewInt64(ctx, val + 1);
                 } else {
                 inc_loc_slow:
                     sf->cur_pc = pc;
@@ -17605,7 +17637,7 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
         CASE(OP_dec_loc):
             {
                 JSIValue op1;
-                int val;
+                int64_t val;
                 int idx;
                 idx = *pc;
                 pc += 1;
@@ -17613,9 +17645,9 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
                 op1 = var_buf[idx];
                 if (JSI_VALUE_GET_TAG(op1) == JSI_TAG_INT) {
                     val = JSI_VALUE_GET_INT(op1);
-                    if (unlikely(val == INT32_MIN))
+                    if (unlikely(val == INT64_MIN))
                         goto dec_loc_slow;
-                    var_buf[idx] = JSI_NewInt32(ctx, val - 1);
+                    var_buf[idx] = JSI_NewInt64(ctx, val - 1);
                 } else {
                 dec_loc_slow:
                     sf->cur_pc = pc;
@@ -17633,7 +17665,7 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
                 JSIValue op1;
                 op1 = sp[-1];
                 if (JSI_VALUE_GET_TAG(op1) == JSI_TAG_INT) {
-                    sp[-1] = JSI_NewInt32(ctx, ~JSI_VALUE_GET_INT(op1));
+                    sp[-1] = JSI_NewInt64(ctx, ~JSI_VALUE_GET_INT(op1));
                 } else {
                     sf->cur_pc = pc;
                     if (jsi_not_slow(ctx, sp))
@@ -17648,11 +17680,10 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
-                    uint32_t v1, v2;
-                    v1 = JSI_VALUE_GET_INT(op1);
-                    v2 = JSI_VALUE_GET_INT(op2);
-                    v2 &= 0x1f;
-                    sp[-2] = JSI_NewInt32(ctx, v1 << v2);
+                    uint64_t v1, v2;
+                    v1 = (uint64_t)JSI_VALUE_GET_INT(op1);
+                    v2 = (uint64_t)JSI_VALUE_GET_INT(op2) & 0x3f;
+                    sp[-2] = JSI_NewInt64(ctx, (int64_t)(v1 << v2));
                     sp--;
                 } else {
                     sf->cur_pc = pc;
@@ -17668,13 +17699,11 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
-                    uint32_t v2;
-                    v2 = JSI_VALUE_GET_INT(op2);
-                    v2 &= 0x1f;
-                    sp[-2] = JSI_NewUint32(ctx,
-                                          (uint32_t)JSI_VALUE_GET_INT(op1) >>
-                                          v2);
-                    sp--;
+                        uint64_t v2;
+                        v2 = (uint64_t)JSI_VALUE_GET_INT(op2) & 0x3f;
+                        sp[-2] = JSI_NewInt64(ctx,
+                                            (int64_t)((uint64_t)JSI_VALUE_GET_INT(op1) >> v2));
+                        sp--;
                 } else {
                     sf->cur_pc = pc;
                     if (jsi_shr_slow(ctx, sp))
@@ -17689,11 +17718,10 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
-                    uint32_t v2;
-                    v2 = JSI_VALUE_GET_INT(op2);
-                    v2 &= 0x1f;
-                    sp[-2] = JSI_NewInt32(ctx,
-                                          (int)JSI_VALUE_GET_INT(op1) >> v2);
+                    uint64_t v2;
+                    v2 = (uint64_t)JSI_VALUE_GET_INT(op2) & 0x3f;
+                    sp[-2] = JSI_NewInt64(ctx,
+                                        JSI_VALUE_GET_INT(op1) >> v2);
                     sp--;
                 } else {
                     sf->cur_pc = pc;
@@ -17709,7 +17737,7 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
-                    sp[-2] = JSI_NewInt32(ctx,
+                    sp[-2] = JSI_NewInt64(ctx,
                                          JSI_VALUE_GET_INT(op1) &
                                          JSI_VALUE_GET_INT(op2));
                     sp--;
@@ -17727,7 +17755,7 @@ static JSIValue JSI_CallInternal(JSIContext *caller_ctx, JSIValueConst func_obj,
                 op1 = sp[-2];
                 op2 = sp[-1];
                 if (likely(JSI_VALUE_IS_BOTH_INT(op1, op2))) {
-                    sp[-2] = JSI_NewInt32(ctx,
+                    sp[-2] = JSI_NewInt64(ctx,
                                          JSI_VALUE_GET_INT(op1) |
                                          JSI_VALUE_GET_INT(op2));
                     sp--;
@@ -37691,7 +37719,19 @@ static int jsi_get_radix(JSIContext *ctx, JSIValueConst val)
     }
     return radix;
 }
-
+static int i64toa_radix(char *buf, int64_t n, int base) {
+    static const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    char tmp[70];
+    int i = 0, neg = 0;
+    uint64_t u = n < 0 ? -(uint64_t)n : (uint64_t)n;
+    neg = (n < 0);
+    do { tmp[i++] = digits[u % base]; u /= base; } while (u);
+    int j = 0;
+    if (neg) buf[j++] = '-';
+    while (i) buf[j++] = tmp[--i];
+    buf[j] = 0;
+    return j;
+}
 static JSIValue jsi_number_toString(JSIContext *ctx, JSIValueConst this_val,
                                   int argc, JSIValueConst *argv, int magic)
 {
@@ -37711,14 +37751,17 @@ static JSIValue jsi_number_toString(JSIContext *ctx, JSIValueConst this_val,
     }
     if (JSI_VALUE_GET_TAG(val) == JSI_TAG_INT) {
         char buf1[70];
-        // int len;
-        // printf("base %d\n",base);
-        int len = snprintf(buf1, sizeof buf1, "%lld", (long long)JSI_VALUE_GET_INT(val));
-        // len = i64toa_radix(buf1, JSI_VALUE_GET_INT(val), base);
-        
+        int len;
+        int64_t n = JSI_VALUE_GET_INT(val);
+        if (base == 10) {
+            len = snprintf(buf1, sizeof buf1, "%lld", (long long)n);
+        } else {
+            /* i64toa_radix должен быть доступен или реализуйте вручную */
+            len = (int)i64toa_radix(buf1, n, base);
+        }
         return jsi_new_string8_len(ctx, buf1, len);
-    }
- fail:
+} 
+fail:
     JSI_FreeValue(ctx, val);
     return JSI_EXCEPTION;
 }
@@ -37735,7 +37778,7 @@ static JSIValue jsi_parseInt(JSIContext *ctx, JSIValueConst this_val,
                            int argc, JSIValueConst *argv)
 {
     const char *str, *p;
-    int radix, flags;
+    int64_t radix, flags;
     JSIValue ret;
     char *end;
     int effective_radix;
@@ -37743,7 +37786,7 @@ static JSIValue jsi_parseInt(JSIContext *ctx, JSIValueConst this_val,
     str = JSI_ToCString(ctx, argv[0]);
     if (!str)
         return JSI_EXCEPTION;
-    if (JSI_ToInt32(ctx, &radix, argv[1])) {
+    if (JSI_ToInt64(ctx, &radix, argv[1])) {
         JSI_FreeCString(ctx, str);
         return JSI_EXCEPTION;
     }
@@ -37788,33 +37831,6 @@ static JSIValue jsi_parseInt(JSIContext *ctx, JSIValueConst this_val,
     return ret;
 }
 
-#ifdef KALL
-static JSIValue jsi_parseInt(JSIContext *ctx, JSIValueConst this_val,
-                           int argc, JSIValueConst *argv)
-{
-    const char *str, *p;
-    int radix, flags;
-    JSIValue ret;
-
-    str = JSI_ToCString(ctx, argv[0]);
-    if (!str)
-        return JSI_EXCEPTION;
-    if (JSI_ToInt32(ctx, &radix, argv[1])) {
-        JSI_FreeCString(ctx, str);
-        return JSI_EXCEPTION;
-    }
-    if (radix != 0 && (radix < 2 || radix > 36)) {
-        ret = JSI_UNDEFINED;
-    } else {
-        p = str;
-        p += skip_spaces(p);
-        flags = ATOD_INT_ONLY | ATOD_ACCEPT_PREFIX_AFTER_SIGN;
-        ret = jsi_atof(ctx, p, NULL, radix, flags);
-    }
-    JSI_FreeCString(ctx, str);
-    return ret;
-}
-#endif
 
 /* Boolean */
 static JSIValue jsi_boolean_constructor(JSIContext *ctx, JSIValueConst new_target,
@@ -40183,14 +40199,6 @@ void JSI_AddIntrinsicBaseObjects(JSIContext *ctx)
                                jsi_object_proto_funcs, countof(jsi_object_proto_funcs));
 
     /* Function */
-    #ifdef KALL
-    JSI_SetPropertyFunctionList(ctx, ctx->function_proto, jsi_function_proto_funcs, countof(jsi_function_proto_funcs));
-    ctx->function_ctor = JSI_NewCFunctionMagic(ctx, jsi_function_constructor,
-                                              "Function", 1, JSI_CFUNC_constructor_or_func_magic,
-                                              JSI_FUNC_NORMAL);
-    JSI_NewGlobalCConstructor2(ctx, JSI_DupValue(ctx, ctx->function_ctor), "Function",
-                              ctx->function_proto);
-    #endif
 
     /* Error */
     obj1 = JSI_NewCFunctionMagic(ctx, jsi_error_constructor,
