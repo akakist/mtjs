@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
+#include <cassert>
 #include <optional>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -22,632 +23,67 @@
 #include "REF.h"
 #include "jsiValueGuard.h"
 #include "jsiscope.h"
-
+#include "GranuleIO.h"
+#include "jsiMsg.h"
+#include "CallFrame.h"
+#include "CallStack.h"
+#include "CallContext.h"
+#include "ContractContext.h"
+#include "contract_constants.h"
+#include "Granule.h"
+#include "EventSink.h"
+#include "jsiEvent.h"
+#include "Clock.h"
+#include "ContractSourceIO.h"
+#include "TestGranuleIO.h"
+#include "NodeGranuleIO.h"
+#include "ContractHost.h"
 using json = nlohmann::json;
 
-// ============================================================
-// ContractContext
-// ============================================================
-struct ContractContext: public Refcountable {
-    JSIRuntime* rt = nullptr;
-    JSIContext* ctx = nullptr;
-    std::string name;
-    std::string path__1;
-    bool in_view = false;
-    std::map<std::string, JSIValueGuard> methods;
-    std::map<std::string, JSIValueGuard> views;
-
-    ContractContext(void *_rt): Refcountable("ContractContext"), rt((JSIRuntime*)_rt){}
-    ContractContext(const ContractContext&) = delete;
-    ContractContext& operator=(const ContractContext&) = delete;
-
-    ~ContractContext() {
-        methods.clear();
-        views.clear();
-        if (ctx) { JSI_FreeContext(ctx); ctx = nullptr; }
-        if (rt) { JSI_FreeRuntime(rt); rt = nullptr; }
-    }
-
-    bool create__() {
-        rt = JSI_NewRuntime();
-        if (!rt) return false;
-        JSI_SetMemoryLimit(rt, 64 * 1024 * 1024);
-        JSI_SetMaxStackSize(rt, 1024 * 1024);
-        ctx = JSI_NewContext(rt);
-        if (!ctx) { JSI_FreeRuntime(rt); rt = nullptr; return false; }
-        JSI_SetContextOpaque(ctx, this);
-        return true;
-    }
-};
 
 // ============================================================
-// Granule
+// Forward
 // ============================================================
-struct Granule {
-    std::string value;
-    int64_t create_time = 0;
-    int64_t ttl = 0;
-};
+struct ContractContext;
+struct ContractHost;
+struct GranuleIO;
+struct EventSink;
+struct Clock;
+struct ContractSourceIO;
 
-// ============================================================
-// Глобальное состояние
-// ============================================================
-std::map<std::string, Granule> granules;
-std::map<std::string, REF_getter<ContractContext>> contract_cache;
+JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& m);
+// JSIValue call_contract_method(ContractContext* cc, const std::string& method_name,
+//                              JSIValueConst fn, JSIValueConst params_js,
+//                              const jsiMsg& m, bool is_view,
+//                              const REF_getter<CallStack>& call_stack,
+//                              const REF_getter<ContractHost>& host);
+void print_exception(JSIContext* ctx);
+json json_from_jsi(JSIContext* ctx, JSIValueConst val);
+JSIValue json_to_jsi(JSIContext* ctx, const json& j);
+ 
+std::string serialize_value(JSIContext* ctx, JSIValueConst val, int depth = 0);
 
-struct jsiEvent {
-    std::string contract;
-    std::string name;
-    std::string value;
-};
 
-std::vector<jsiEvent> current_events;
-std::vector<jsiEvent> all_events;
 
-static int64_t g_current_time = 0;
-static int64_t g_current_block_height = 0;
-
-static constexpr size_t MAX_GRANULE_SIZE = 10 * 1024;
-
-// ============================================================
-// Утилиты
-// ============================================================
-void print_exception(JSIContext* ctx) {
-    JSIValue exc = JSI_GetException(ctx);
-    const char* s = JSI_ToCString(ctx, exc);
-    if (s) { std::cerr << "Exception: " << s << std::endl; JSI_FreeCString(ctx, s); }
-    JSI_FreeValue(ctx, exc);
+static REF_getter<ContractHost> make_test() {
+    REF_getter<ContractHost> h = new ContractHost();
+    h->granules = new TestGranuleIO();
+    h->events = new TestEventSink();
+    h->clock = new TestClock();
+    h->source = new TestContractSourceIO();
+    return h;
+}
+static REF_getter<ContractHost> make_node() {
+    REF_getter<ContractHost> h = new ContractHost();
+    h->granules = new NodeGranuleIO();
+    h->events = new NodeEventSink();
+    h->clock = new NodeClock();
+    h->source = new NodeContractSourceIO();
+    return h;
 }
 
-void delete_prop_str(JSIContext* ctx, JSIValueConst obj, const char* name) {
-    JSAtom atom = JSI_NewAtom(ctx, name);
-    if (atom != JSI_ATOM_NULL) {
-        JSI_DeleteProperty(ctx, obj, atom, 0);
-        JSI_FreeAtom(ctx, atom);
-    }
-}
 
-std::string serialize_value(JSIContext* ctx, JSIValueConst val) {
-    if (JSI_IsUndefined(val)) return "undefined";
-    if (JSI_IsNull(val)) return "null";
-    if (JSI_IsBool(val)) return JSI_ToBool(ctx, val) ? "true" : "false";
 
-    if (JSI_VALUE_GET_TAG(val) == JSI_TAG_INT) {
-        int64_t d = JSI_VALUE_GET_INT(val);
-        char buf[32];
-        std::snprintf(buf, sizeof buf, "%lld", (long long)d);
-        return buf;
-    }
-
-    if (JSI_IsString(val)) {
-        size_t len = 0;
-        const char* s = JSI_ToCStringLen(ctx, &len, val);
-        if (!s) return "null";
-        std::string r = "\"";
-        for (size_t i = 0; i < len; ++i) {
-            unsigned char c = (unsigned char)s[i];
-            switch (c) {
-                case '"':  r += "\\\""; break;
-                case '\\': r += "\\\\"; break;
-                case '\n': r += "\\n";  break;
-                case '\r': r += "\\r";  break;
-                case '\t': r += "\\t";  break;
-                default:
-                    if (c < 0x20) {
-                        char esc[8];
-                        std::snprintf(esc, sizeof esc, "\\u%04x", c);
-                        r += esc;
-                    } else {
-                        r += (char)c;
-                    }
-            }
-        }
-        r += '"';
-        JSI_FreeCString(ctx, s);
-        return r;
-    }
-
-    if (JSI_IsArray(ctx, val)) {
-        std::string r = "[";
-        JSIValue lv = JSI_GetPropertyStr(ctx, val, "length");
-        int64_t len = 0; JSI_ToInt64(ctx, &len, lv); JSI_FreeValue(ctx, lv);
-        for (int64_t i = 0; i < len; ++i) {
-            if (i) r += ",";
-            JSIValue item = JSI_GetPropertyUint32(ctx, val, (uint32_t)i);
-            r += serialize_value(ctx, item);
-            JSI_FreeValue(ctx, item);
-        }
-        return r + "]";
-    }
-
-    if (JSI_IsObject(val)) {
-        JSPropertyEnum* props = nullptr;
-        uint32_t count = 0;
-        std::vector<std::string> keys;
-        if (JSI_GetOwnPropertyNames(ctx, &props, &count, val,
-                JSI_GPN_STRING_MASK | JSI_GPN_ENUM_ONLY) == 0) {
-            for (uint32_t i = 0; i < count; ++i) {
-                const char* k = JSI_AtomToCString(ctx, props[i].atom);
-                if (k) { keys.push_back(k); JSI_FreeCString(ctx, k); }
-                JSI_FreeAtom(ctx, props[i].atom);
-            }
-            jsi_free(ctx, props);
-        }
-        std::sort(keys.begin(), keys.end());
-        std::string r = "{";
-        bool first = true;
-        for (auto& k : keys) {
-            if (!first) r += ","; first = false;
-            r += "\"" + k + "\":";
-            JSIValue item = JSI_GetPropertyStr(ctx, val, k.c_str());
-            r += serialize_value(ctx, item);
-            JSI_FreeValue(ctx, item);
-        }
-        return r + "}";
-    }
-
-    return "<unknown>";
-}
-
-bool is_serializable(const std::string& s) {
-    return s.find('<') == std::string::npos;
-}
-
-JSIValue convert_value(JSIContext* from_ctx, JSIContext* to_ctx, JSIValueConst val) {
-    std::string s = serialize_value(from_ctx, val);
-    if (!is_serializable(s)) {
-        return JSI_ThrowTypeError(to_ctx, "cannot convert value: %s", s.c_str());
-    }
-    std::string wrapped = "(" + s + ")";
-    JSIValue result = JSI_Eval(to_ctx, wrapped.c_str(), wrapped.size(),
-                             "<convert>", JSI_EVAL_TYPE_GLOBAL);
-    if (JSI_IsException(result)) {
-        std::cerr << "convert_value failed, source: [" << wrapped << "]" << std::endl;
-        print_exception(to_ctx);
-    }
-    return result;
-}
-
-// ============================================================
-// nlohmann <-> JSI
-// ============================================================
-static json json_from_jsi(JSIContext* ctx, JSIValueConst val) {
-    if (JSI_IsNull(val)) return nullptr;
-    if (JSI_IsUndefined(val)) throw std::runtime_error("undefined in .tx.js");
-    if (JSI_IsBool(val)) return JSI_ToBool(ctx, val) != 0;
-    if (JSI_VALUE_GET_TAG(val) == JSI_TAG_INT)
-    {
-        // printf("val %ld\n",JSI_VALUE_GET_INT(val));
-         return JSI_VALUE_GET_INT(val);
-    }
-
-    if (JSI_IsString(val)) {
-        size_t len = 0;
-        const char* s = JSI_ToCStringLen(ctx, &len, val);
-        if (!s) throw std::runtime_error("bad string");
-        std::string r(s, len);
-        JSI_FreeCString(ctx, s);
-        return r;
-    }
-
-    if (JSI_IsArray(ctx, val)) {
-        json arr = json::array();
-        JSIValue lv = JSI_GetPropertyStr(ctx, val, "length");
-        int64_t len = 0; JSI_ToInt64(ctx, &len, lv); JSI_FreeValue(ctx, lv);
-        for (int64_t i = 0; i < len; ++i) {
-            JSIValue item = JSI_GetPropertyUint32(ctx, val, (uint32_t)i);
-            arr.push_back(json_from_jsi(ctx, item));
-            JSI_FreeValue(ctx, item);
-        }
-        return arr;
-    }
-
-    if (JSI_IsObject(val)) {
-        json obj = json::object();
-        JSPropertyEnum* props = nullptr;
-        uint32_t count = 0;
-        if (JSI_GetOwnPropertyNames(ctx, &props, &count, val,
-                JSI_GPN_STRING_MASK | JSI_GPN_ENUM_ONLY) == 0) {
-            for (uint32_t i = 0; i < count; ++i) {
-                const char* k = JSI_AtomToCString(ctx, props[i].atom);
-                if (k) {
-                    JSIValue item = JSI_GetProperty(ctx, val, props[i].atom);
-                    obj[std::string(k)] = json_from_jsi(ctx, item);
-                    JSI_FreeValue(ctx, item);
-                    JSI_FreeCString(ctx, k);
-                }
-                JSI_FreeAtom(ctx, props[i].atom);
-            }
-            jsi_free(ctx, props);
-        }
-        return obj;
-    }
-
-    throw std::runtime_error("unsupported JS value in .tx.js");
-}
-
-static JSIValue json_to_jsi(JSIContext* ctx, const json& j) {
-    if (j.is_null()) return JSI_NULL;
-    if (j.is_boolean()) return JSI_NewBool(ctx, j.get<bool>());
-
-    if (j.is_number_integer()) return JSI_NewInt64(ctx, j.get<int64_t>());
-    if (j.is_number_unsigned()) {
-        uint64_t u = j.get<uint64_t>();
-        if (u > (uint64_t)INT64_MAX)
-            return JSI_ThrowTypeError(ctx, "uint64 too large");
-        return JSI_NewInt64(ctx, (int64_t)u);
-    }
-    if (j.is_number_float())
-        return JSI_ThrowTypeError(ctx, "float not supported");
-
-    if (j.is_string()) {
-        auto s = j.get<std::string>();
-        return JSI_NewStringLen(ctx, s.data(), s.size());
-    }
-
-    if (j.is_array()) {
-        JSIValue arr = JSI_NewArray(ctx);
-        if (JSI_IsException(arr)) return arr;
-        for (size_t i = 0; i < j.size(); ++i) {
-            JSIValue v = json_to_jsi(ctx, j[i]);
-            if (JSI_IsException(v)) { JSI_FreeValue(ctx, arr); return v; }
-            JSI_SetPropertyUint32(ctx, arr, (uint32_t)i, v);
-        }
-        return arr;
-    }
-
-    if (j.is_object()) {
-        JSIValue obj = JSI_NewObject(ctx);
-        if (JSI_IsException(obj)) return obj;
-        for (auto it = j.begin(); it != j.end(); ++it) {
-            JSIValue v = json_to_jsi(ctx, it.value());
-            if (JSI_IsException(v)) { JSI_FreeValue(ctx, obj); return v; }
-            JSI_SetPropertyStr(ctx, obj, it.key().c_str(), v);
-        }
-        return obj;
-    }
-
-    return JSI_ThrowTypeError(ctx, "unsupported json type");
-}
-
-// ============================================================
-// API контракта
-// ============================================================
-JSIValue jsi_registerMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    if (argc < 2 || !JSI_IsString(argv[0]) || !JSI_IsFunction(ctx, argv[1]))
-        return JSI_ThrowTypeError(ctx, "registerMethod(name, fn)");
-    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
-    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
-    JSIScope<20,20> scope(ctx);
-    auto name = scope.toStdString(argv[0]);
-    if (name.empty()) return JSI_EXCEPTION;
-    cc->methods[name] = JSIValueGuard(ctx, JSI_DupValue(ctx, argv[1]));
-    return JSI_UNDEFINED;
-}
-
-JSIValue jsi_registerView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    if (argc < 2 || !JSI_IsString(argv[0]) || !JSI_IsFunction(ctx, argv[1]))
-        return JSI_ThrowTypeError(ctx, "registerView(name, fn)");
-    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
-    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
-    JSIScope<20,20> scope(ctx);
-    auto name = scope.toStdString(argv[0]);
-    if (name.empty()) return JSI_EXCEPTION;
-    cc->views[name] = JSIValueGuard(ctx, JSI_DupValue(ctx, argv[1]));
-    return JSI_UNDEFINED;
-}
-
-JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    if (argc < 2 || !JSI_IsString(argv[0]))
-        return JSI_ThrowTypeError(ctx, "createGranule(key, value[, ttl])");
-    if (JSI_IsUndefined(argv[1]))
-        return JSI_ThrowTypeError(ctx, "createGranule: undefined not allowed");
-    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
-    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
-    if (cc->in_view)
-        return JSI_ThrowTypeError(ctx, "createGranule is not allowed in view");
-
-    JSIScope<20,20> scope(ctx);
-    auto key = scope.toStdString(argv[0]);
-    if (key.empty()) return JSI_EXCEPTION;
-
-    int64_t ttl = 0;
-    if (argc >= 3 && !JSI_IsUndefined(argv[2])) {
-        if (JSI_ToInt64(ctx, &ttl, argv[2]) != 0)
-            return JSI_ThrowTypeError(ctx, "createGranule: ttl must be int64");
-        if (ttl < 0)
-            return JSI_ThrowTypeError(ctx, "createGranule: ttl must be >= 0");
-    }
-
-    std::string full_key = cc->name + "/" + key;
-    if (granules.count(full_key))
-        return JSI_ThrowTypeError(ctx, "createGranule: already exists: %s", full_key.c_str());
-
-    std::string s = serialize_value(ctx, argv[1]);
-    if (!is_serializable(s))
-        return JSI_ThrowTypeError(ctx, "createGranule(%s): cannot serialize value", full_key.c_str());
-    if (s.size() > MAX_GRANULE_SIZE)
-        return JSI_ThrowTypeError(ctx, "createGranule(%s): value too large (%zu > %zu)",
-                                 full_key.c_str(), s.size(), MAX_GRANULE_SIZE);
-
-    granules[full_key] = Granule{ std::move(s), g_current_time, ttl };
-    return JSI_UNDEFINED;
-}
-
-JSIValue jsi_setGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    if (argc < 2 || !JSI_IsString(argv[0]))
-        return JSI_ThrowTypeError(ctx, "setGranule(key, value)");
-    if (JSI_IsUndefined(argv[1]))
-        return JSI_ThrowTypeError(ctx, "setGranule: undefined not allowed");
-    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
-    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
-    if (cc->in_view)
-        return JSI_ThrowTypeError(ctx, "setGranule is not allowed in view");
-
-    JSIScope<20,20> scope(ctx);
-    auto key = scope.toStdString(argv[0]);
-    if (key.empty()) return JSI_EXCEPTION;
-
-    std::string full_key = cc->name + "/" + key;
-    auto it = granules.find(full_key);
-    if (it == granules.end())
-        return JSI_ThrowTypeError(ctx, "setGranule: not found: %s", full_key.c_str());
-
-    std::string s = serialize_value(ctx, argv[1]);
-    if (!is_serializable(s))
-        return JSI_ThrowTypeError(ctx, "setGranule(%s): cannot serialize value", full_key.c_str());
-    if (s.size() > MAX_GRANULE_SIZE)
-        return JSI_ThrowTypeError(ctx, "setGranule(%s): value too large (%zu > %zu)",
-                                 full_key.c_str(), s.size(), MAX_GRANULE_SIZE);
-
-    it->second.value = std::move(s);
-    return JSI_UNDEFINED;
-}
-
-JSIValue jsi_getGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    if (argc < 1 || !JSI_IsString(argv[0]))
-        return JSI_ThrowTypeError(ctx, "getGranule(key)");
-    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
-    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
-    JSIScope<20,20> scope(ctx);
-    auto key = scope.toStdString(argv[0]);
-    if (key.empty()) return JSI_EXCEPTION;
-    std::string full_key = cc->name + "/" + key;
-    auto it = granules.find(full_key);
-    if (it == granules.end()) return JSI_UNDEFINED;
-
-    try {
-        json j = json::parse(it->second.value);
-        return json_to_jsi(ctx, j);
-    } catch (const std::exception& e) {
-        return JSI_ThrowTypeError(ctx, "getGranule(%s): %s", full_key.c_str(), e.what());
-    }
-}
-
-JSIValue jsi_emit(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    if (argc < 2 || !JSI_IsString(argv[0]))
-        return JSI_ThrowTypeError(ctx, "emit(name, value)");
-    ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
-    if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
-    if (cc->in_view)
-        return JSI_ThrowTypeError(ctx, "emit is not allowed in view");
-    JSIScope<20,20> scope(ctx);
-    auto name = scope.toStdString(argv[0]);
-    if (name.empty()) return JSI_EXCEPTION;
-    std::string s = serialize_value(ctx, argv[1]);
-    if (!is_serializable(s))
-        return JSI_ThrowTypeError(ctx, "emit(%s): cannot serialize value", name.c_str());
-    current_events.push_back(jsiEvent{ cc->name, std::move(name), std::move(s) });
-    return JSI_UNDEFINED;
-}
-
-// ============================================================
-// msg
-// ============================================================
-struct jsiMsg {
-    std::string sender;
-    int64_t value = 0;
-    int64_t gasLimit = 0;
-    int64_t gasUsed = 0;
-    int64_t blockTimestamp = 0;
-    int64_t blockHeight = 0;
-    int64_t nonce = 0;
-    int64_t chainId = 0;
-    std::string txHash;
-    int64_t txIndex = 0;
-};
-
-JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& m) {
-    JSIValue obj = JSI_NewObject(ctx);
-    JSI_SetPropertyStr(ctx, obj, "sender", JSI_NewString(ctx, m.sender.c_str()));
-    JSI_SetPropertyStr(ctx, obj, "value", JSI_NewInt64(ctx, m.value));
-    JSI_SetPropertyStr(ctx, obj, "gasLimit", JSI_NewInt64(ctx, m.gasLimit));
-    JSI_SetPropertyStr(ctx, obj, "gasUsed", JSI_NewInt64(ctx, m.gasUsed));
-    JSI_SetPropertyStr(ctx, obj, "blockTimestamp", JSI_NewInt64(ctx, m.blockTimestamp));
-    JSI_SetPropertyStr(ctx, obj, "blockHeight", JSI_NewInt64(ctx, m.blockHeight));
-    JSI_SetPropertyStr(ctx, obj, "nonce", JSI_NewInt64(ctx, m.nonce));
-    JSI_SetPropertyStr(ctx, obj, "chainId", JSI_NewInt64(ctx, m.chainId));
-    JSI_SetPropertyStr(ctx, obj, "txHash", JSI_NewString(ctx, m.txHash.c_str()));
-    JSI_SetPropertyStr(ctx, obj, "txIndex", JSI_NewInt64(ctx, m.txIndex));
-    return obj;
-}
-
-JSIValue call_contract_method(ContractContext* cc, JSIValueConst fn,
-                             JSIValueConst params_js, const jsiMsg& m, bool is_view)
-{
-    JSIValue msg_obj = build_msg_object(cc->ctx, m);
-    JSIValue argv[2] = { params_js, msg_obj };
-    int nargs = is_view ? 1 : 2;
-
-    bool saved = cc->in_view;
-    cc->in_view = is_view;
-    JSIValue r = JSI_Call(cc->ctx, fn, JSI_UNDEFINED, nargs, argv);
-    cc->in_view = saved;
-
-    JSI_FreeValue(cc->ctx, msg_obj);
-    return r;
-}
-
-JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    if (argc < 3 || !JSI_IsString(argv[0]) || !JSI_IsString(argv[1]))
-        return JSI_ThrowTypeError(ctx, "callMethod(contract, method, params)");
-    JSIScope<20,20> scope(ctx);
-    auto contract_name = scope.toStdString(argv[0]);
-    auto method_name   = scope.toStdString(argv[1]);
-    if (contract_name.empty() || method_name.empty()) return JSI_EXCEPTION;
-
-    ContractContext* self = (ContractContext*)JSI_GetContextOpaque(ctx);
-    if (self && self->name == contract_name)
-        return JSI_ThrowTypeError(ctx, "callMethod to self not allowed");
-
-    auto it = contract_cache.find(contract_name);
-    if (it == contract_cache.end())
-        return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.c_str());
-    auto cc = it->second;
-    auto mit = cc->methods.find(method_name);
-    if (mit == cc->methods.end())
-        return JSI_ThrowTypeError(ctx, "method not found: %s.%s",
-                                 contract_name.c_str(), method_name.c_str());
-
-    JSIValue params_in_cc = convert_value(ctx, cc->ctx, argv[2]);
-    if (JSI_IsException(params_in_cc)) return JSI_EXCEPTION;
-
-    jsiMsg empty;
-    JSIValue r = call_contract_method(cc.get(), mit->second.get(), params_in_cc, empty, false);
-    JSI_FreeValue(cc->ctx, params_in_cc);
-
-    if (JSI_IsException(r)) {
-        print_exception(cc->ctx);
-        JSI_FreeValue(cc->ctx, r);
-        return JSI_EXCEPTION;
-    }
-    JSIValue r_caller = convert_value(cc->ctx, ctx, r);
-    JSI_FreeValue(cc->ctx, r);
-    return r_caller;
-}
-
-JSIValue jsi_callView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    if (argc < 3 || !JSI_IsString(argv[0]) || !JSI_IsString(argv[1]))
-        return JSI_ThrowTypeError(ctx, "callView(contract, view, params)");
-    JSIScope<20,20> scope(ctx);
-    auto contract_name = scope.toStdString(argv[0]);
-    auto view_name     = scope.toStdString(argv[1]);
-    if (contract_name.empty() || view_name.empty()) return JSI_EXCEPTION;
-
-    ContractContext* self = (ContractContext*)JSI_GetContextOpaque(ctx);
-    if (self && self->name == contract_name)
-        return JSI_ThrowTypeError(ctx, "callView to self not allowed");
-
-    auto it = contract_cache.find(contract_name);
-    if (it == contract_cache.end())
-        return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.c_str());
-    auto cc = it->second;
-    auto vit = cc->views.find(view_name);
-    if (vit == cc->views.end())
-        return JSI_ThrowTypeError(ctx, "view not found: %s.%s",
-                                 contract_name.c_str(), view_name.c_str());
-
-    JSIValue params_in_cc = convert_value(ctx, cc->ctx, argv[2]);
-    if (JSI_IsException(params_in_cc)) return JSI_EXCEPTION;
-
-    jsiMsg empty;
-    JSIValue r = call_contract_method(cc.get(), vit->second.get(), params_in_cc, empty, true);
-    JSI_FreeValue(cc->ctx, params_in_cc);
-
-    if (JSI_IsException(r)) {
-        print_exception(cc->ctx);
-        JSI_FreeValue(cc->ctx, r);
-        return JSI_EXCEPTION;
-    }
-    JSIValue r_caller = convert_value(cc->ctx, ctx, r);
-    JSI_FreeValue(cc->ctx, r);
-    return r_caller;
-}
-
-void register_api(JSIContext* ctx) {
-    JSIValue global = JSI_GetGlobalObject(ctx);
-    JSI_SetPropertyStr(ctx, global, "registerMethod",
-        JSI_NewCFunction(ctx, jsi_registerMethod, "registerMethod", 2));
-    JSI_SetPropertyStr(ctx, global, "registerView",
-        JSI_NewCFunction(ctx, jsi_registerView, "registerView", 2));
-    JSI_SetPropertyStr(ctx, global, "createGranule",
-        JSI_NewCFunction(ctx, jsi_createGranule, "createGranule", 3));
-    JSI_SetPropertyStr(ctx, global, "setGranule",
-        JSI_NewCFunction(ctx, jsi_setGranule, "setGranule", 2));
-    JSI_SetPropertyStr(ctx, global, "getGranule",
-        JSI_NewCFunction(ctx, jsi_getGranule, "getGranule", 1));
-    JSI_SetPropertyStr(ctx, global, "emit",
-        JSI_NewCFunction(ctx, jsi_emit, "emit", 2));
-    JSI_SetPropertyStr(ctx, global, "callMethod",
-        JSI_NewCFunction(ctx, jsi_callMethod, "callMethod", 3));
-    JSI_SetPropertyStr(ctx, global, "callView",
-        JSI_NewCFunction(ctx, jsi_callView, "callView", 3));
-    JSI_FreeValue(ctx, global);
-}
-
-// ============================================================
-// Загрузка контракта
-// ============================================================
-REF_getter<ContractContext> load_contract(JSIRuntime *rt,
-    const std::string& name, const std::string& path)
-{
-    auto it = contract_cache.find(name);
-    if (it != contract_cache.end()) return it->second;
-
-    REF_getter<ContractContext> cc = new ContractContext(rt);
-    cc->name = name;
-    cc->path__1 = path;
-
-    if (!cc->create__()) { std::cerr << "cannot create context for " << name << std::endl; return nullptr; }
-
-    register_api(cc->ctx);
-
-    JSIValue global = JSI_GetGlobalObject(cc->ctx);
-    const char* banned[] = {
-        "Math","Date","RegExp","JSON","Proxy","Promise","Map","Set",
-        "WeakRef","FinalizationRegistry","Atomics","SharedArrayBuffer"
-    };
-    for (auto b : banned) delete_prop_str(cc->ctx, global, b);
-    JSI_FreeValue(cc->ctx, global);
-
-    std::string src;
-    {
-        FILE* f = fopen(path.c_str(), "rb");
-        if (!f) { std::cerr << "cannot open " << path << std::endl; return nullptr; }
-        fseek(f, 0, SEEK_END); long size = ftell(f); fseek(f, 0, SEEK_SET);
-        src.resize(size);
-        auto sz = fread(&src[0], 1, size, f);
-        fclose(f);
-        if (sz != (size_t)size) return nullptr;
-    }
-
-    JSIValue compiled = JSI_Eval(cc->ctx, src.data(), src.size(), path.c_str(),
-        JSI_EVAL_FLAG_STRICT | JSI_EVAL_TYPE_GLOBAL | JSI_EVAL_FLAG_COMPILE_ONLY);
-    if (JSI_IsException(compiled)) { print_exception(cc->ctx); return nullptr; }
-
-    JSIValue result = JSI_EvalFunction(cc->ctx, compiled);
-    if (JSI_IsException(result)) {
-        print_exception(cc->ctx);
-        JSI_FreeValue(cc->ctx, result);
-        return nullptr;
-    }
-    JSI_FreeValue(cc->ctx, result);
-
-    contract_cache[name] = cc;
-    return cc;
-}
-
-REF_getter<ContractContext> get_contract(JSIRuntime* rt,
-    const std::string& name, const std::string& contracts_dir)
-{
-    auto it = contract_cache.find(name);
-    if (it != contract_cache.end()) return it->second;
-    return load_contract(rt, name, contracts_dir + "/" + name + ".js");
-}
-
-// ============================================================
-// Тест
-// ============================================================
 struct TxCommand {
     std::string contract;
     std::string method;
@@ -835,11 +271,16 @@ bool load_test(const std::string& path, TestCase& out) {
 // ============================================================
 // Прогон
 // ============================================================
-static void apply_initial(const TestCase& tc) {
-    granules.clear();
-    all_events.clear();
-    current_events.clear();
-    g_current_time = tc.time;
+static void apply_initial(const TestCase& tc, const REF_getter<ContractHost>& host) {
+    auto* test_io = static_cast<TestGranuleIO*>(host->granules.get());
+    auto* test_events = static_cast<TestEventSink*>(host->events.get());
+    auto* test_clock = static_cast<TestClock*>(host->clock.get());
+
+    test_io->data.clear();
+    test_events->all_events.clear();
+    test_events->current_events.clear();
+    test_clock->set(tc.time);
+
     for (auto it = tc.initial.begin(); it != tc.initial.end(); ++it) {
         const std::string& key = it.key();
         const json& v = it.value();
@@ -848,7 +289,7 @@ static void apply_initial(const TestCase& tc) {
             std::cerr << "initial[" << key << "]: too large" << std::endl;
             continue;
         }
-        granules[key] = Granule{ std::move(s), 0, 0 };
+        test_io->data[key] = Granule{ std::move(s), 0, 0 };
     }
 }
 
@@ -856,14 +297,19 @@ static bool json_equal(const json& a, const json& b) {
     return a == b;
 }
 
-static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& tc) {
+static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& tc,
+                             const REF_getter<ContractHost>& host)
+{
+    auto* test_events = static_cast<TestEventSink*>(host->events.get());
+    auto* test_io = static_cast<TestGranuleIO*>(host->granules.get());
+
     for (auto& tx : tc.transactions) {
-        auto saved = granules;
-        auto saved_events = all_events;
+        auto saved = test_io->data;
+        auto saved_events = test_events->all_events;
         bool tx_aborted = false;
 
         for (auto& cmd : tx.commands) {
-            auto cc = get_contract(rt, cmd.contract, "contracts");
+            auto cc = host->get_contract(cmd.contract);
             if (!cc.valid()) { std::cerr << "contract not loaded: " << cmd.contract << std::endl; return false; }
             auto mit = cc->methods.find(cmd.method);
             if (mit == cc->methods.end()) {
@@ -874,20 +320,22 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             JSIValue params_in_cc = json_to_jsi(cc->ctx, cmd.params);
             if (JSI_IsException(params_in_cc)) {
                 print_exception(cc->ctx);
-                granules = std::move(saved);
-                all_events = std::move(saved_events);
+                test_io->data = std::move(saved);
+                test_events->all_events = std::move(saved_events);
                 return false;
             }
 
-            current_events.clear();
-            JSIValue result = call_contract_method(cc.get(), mit->second.get(), params_in_cc, tx.msg, false);
+            test_events->current_events.clear();
+            REF_getter<CallStack> call_stack = new CallStack;
+            JSIValue result = cc->call_contract_method(cmd.method, mit->second.get(),
+                                                   params_in_cc, tx.msg, false, call_stack, host);
             JSI_FreeValue(cc->ctx, params_in_cc);
 
             if (JSI_IsException(result)) {
                 JSI_FreeValue(cc->ctx, result);
-                granules = std::move(saved);
-                all_events = std::move(saved_events);
-                current_events.clear();
+                test_io->data = std::move(saved);
+                test_events->all_events = std::move(saved_events);
+                test_events->current_events.clear();
                 if (!cmd.expect_error) {
                     std::cerr << "unexpected exception in " << cmd.contract << "." << cmd.method << std::endl;
                     return false;
@@ -899,8 +347,8 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
                 std::cerr << "expected error, but got result in "
                           << cmd.contract << "." << cmd.method << std::endl;
                 JSI_FreeValue(cc->ctx, result);
-                granules = std::move(saved);
-                all_events = std::move(saved_events);
+                test_io->data = std::move(saved);
+                test_events->all_events = std::move(saved_events);
                 return false;
             }
 
@@ -913,8 +361,8 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
                     std::cerr << "result in " << cmd.contract << "." << cmd.method
                               << " is not JSON: " << act_str << " (" << e.what() << ")" << std::endl;
                     JSI_FreeValue(cc->ctx, result);
-                    granules = std::move(saved);
-                    all_events = std::move(saved_events);
+                    test_io->data = std::move(saved);
+                    test_events->all_events = std::move(saved_events);
                     return false;
                 }
                 if (!json_equal(*cmd.expect_result, act)) {
@@ -922,55 +370,55 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
                               << ": expected " << cmd.expect_result->dump()
                               << ", got " << act.dump() << std::endl;
                     JSI_FreeValue(cc->ctx, result);
-                    granules = std::move(saved);
-                    all_events = std::move(saved_events);
+                    test_io->data = std::move(saved);
+                    test_events->all_events = std::move(saved_events);
                     return false;
                 }
             }
 
             if (!cmd.expect_events.empty()) {
-                if (current_events.size() != cmd.expect_events.size()) {
+                if (test_events->current_events.size() != cmd.expect_events.size()) {
                     std::cerr << "  events count mismatch in " << cmd.contract << "." << cmd.method
                               << ": expected " << cmd.expect_events.size()
-                              << ", got " << current_events.size() << std::endl;
+                              << ", got " << test_events->current_events.size() << std::endl;
                     JSI_FreeValue(cc->ctx, result);
-                    granules = std::move(saved);
-                    all_events = std::move(saved_events);
+                    test_io->data = std::move(saved);
+                    test_events->all_events = std::move(saved_events);
                     return false;
                 }
                 for (size_t k = 0; k < cmd.expect_events.size(); ++k) {
-                    if (cmd.expect_events[k].contract != current_events[k].contract ||
-                        cmd.expect_events[k].name     != current_events[k].name) {
+                    if (cmd.expect_events[k].contract != test_events->current_events[k].contract ||
+                        cmd.expect_events[k].name     != test_events->current_events[k].name) {
                         std::cerr << "  event[" << k << "] mismatch (contract/name) in "
                                   << cmd.contract << "." << cmd.method << std::endl;
                         JSI_FreeValue(cc->ctx, result);
-                        granules = std::move(saved);
-                        all_events = std::move(saved_events);
+                        test_io->data = std::move(saved);
+                        test_events->all_events = std::move(saved_events);
                         return false;
                     }
                     json exp_v, act_v;
                     try {
                         exp_v = json::parse(cmd.expect_events[k].value);
-                        act_v = json::parse(current_events[k].value);
+                        act_v = json::parse(test_events->current_events[k].value);
                     } catch (const std::exception& e) {
                         std::cerr << "  event[" << k << "] not JSON: " << e.what() << std::endl;
                         JSI_FreeValue(cc->ctx, result);
-                        granules = std::move(saved);
-                        all_events = std::move(saved_events);
+                        test_io->data = std::move(saved);
+                        test_events->all_events = std::move(saved_events);
                         return false;
                     }
                     if (!json_equal(exp_v, act_v)) {
                         std::cerr << "  event[" << k << "] mismatch in "
                                   << cmd.contract << "." << cmd.method << std::endl;
                         JSI_FreeValue(cc->ctx, result);
-                        granules = std::move(saved);
-                        all_events = std::move(saved_events);
+                        test_io->data = std::move(saved);
+                        test_events->all_events = std::move(saved_events);
                         return false;
                     }
                 }
             }
 
-            for (auto& ev : current_events) all_events.push_back(ev);
+            for (auto& ev : test_events->current_events) test_events->all_events.push_back(ev);
             JSI_FreeValue(cc->ctx, result);
         }
 
@@ -1016,14 +464,16 @@ static bool compare_emits(const std::vector<jsiEvent>& actual,
     return true;
 }
 
-static bool compare_expected(JSIContext*, const TestCase& tc) {
+static bool compare_expected(JSIContext*, const TestCase& tc,
+                             const REF_getter<ContractHost>& host) {
+    auto* test_io = static_cast<TestGranuleIO*>(host->granules.get());
     bool ok = true;
     for (auto it = tc.expected.begin(); it != tc.expected.end(); ++it) {
         const std::string& key = it.key();
         const json& exp_j = it.value();
 
-        auto it_g = granules.find(key);
-        if (it_g == granules.end()) {
+        auto it_g = test_io->data.find(key);
+        if (it_g == test_io->data.end()) {
             std::cerr << "  missing granule: " << key << std::endl;
             ok = false;
             continue;
@@ -1084,23 +534,17 @@ int main() {
         TestCase tc;
         if (!load_test(path, tc)) { failures++; continue; }
 
-        bool load_ok = true;
-        for (auto& tx : tc.transactions)
-            for (auto& cmd : tx.commands)
-                if (!get_contract(rt, cmd.contract, "contracts").valid()) { load_ok = false; break; }
-        if (!load_ok) { std::cerr << "  cannot load contracts" << std::endl; failures++; continue; }
+        REF_getter<ContractHost> host = make_test();
+        apply_initial(tc, host);
 
-        apply_initial(tc);
-
-        if (!run_transactions(rt, ctx, tc)) { failures++; continue; }
-        if (!compare_emits(all_events, tc.expected_emits)) { failures++; continue; }
-        if (!compare_expected(ctx, tc)) { failures++; continue; }
+        if (!run_transactions(rt, ctx, tc, host)) { failures++; continue; }
+        auto* test_events = static_cast<TestEventSink*>(host->events.get());
+        if (!compare_emits(test_events->all_events, tc.expected_emits)) { failures++; continue; }
+        if (!compare_expected(ctx, tc, host)) { failures++; continue; }
 
         std::cout << "  PASS" << std::endl;
     }
 
-    granules.clear();
-    contract_cache.clear();
     JSI_FreeContext(ctx);
     JSI_FreeRuntime(rt);
 
