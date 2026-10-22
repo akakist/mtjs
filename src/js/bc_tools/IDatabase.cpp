@@ -161,9 +161,9 @@ std::vector<std::string> IDatabase::getContractPath(const CONTRACT_id &name)
 {
     return getPath("CONTRACT_"+name.container);
 }
-std::vector<std::string> IDatabase::getContractDataPath(const CONTRACT_DATA_id &name)
+std::vector<std::string> IDatabase::getContractDataPath(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId)
 {
-    std::string key="CONTRACT_DATA_"+name.container;
+    std::string key="CONTRACT_DATA_"+contract.container+"_"+dataId.container;
     return getPath(key);
 
 }
@@ -193,7 +193,7 @@ std::vector<std::string> IDatabase::getNodePath(const NODE_id &name)
     return getPath("NODE_"+name.container);
 }
 
-REF_getter<bc_contract> IDatabase::getContract(const CONTRACT_id &name)
+REF_getter<bc_contract> IDatabase::getContractNoCreate(const CONTRACT_id &name)
 {
     MUTEX_INSPECTOR;
     auto cc = getByPathNoCreate(root.get(), getContractPath(name));
@@ -203,15 +203,36 @@ REF_getter<bc_contract> IDatabase::getContract(const CONTRACT_id &name)
         throw CommonError("if(!cc->data.valid())");
     return dynamic_cast<bc_contract *>(cc->data.get());
 }
-REF_getter<bc_contract_data> IDatabase::getContractData(const CONTRACT_DATA_id &name)
+REF_getter<const bc_contract> IDatabase::getContractNoCreateConst(const CONTRACT_id &name)
 {
     MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(root.get(), getContractDataPath(name));
+    auto cc = getByPathNoCreate(root.get(), getContractPath(name));
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        throw CommonError("if(!cc->data.valid())");
+    return dynamic_cast<const bc_contract *>(cc->data.get());
+}
+
+REF_getter<bc_contract_data> IDatabase::getContractDataNoCreate(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getContractDataPath(contract,dataId));
     if (!cc.valid())
         return NULL;
     if (!cc->data.valid())
         throw CommonError("if(!cc->data.valid())");
     return dynamic_cast<bc_contract_data *>(cc->data.get());
+}
+REF_getter<const bc_contract_data> IDatabase::getContractDataNoCreateConst(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getContractDataPath(contract,dataId));
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        throw CommonError("if(!cc->data.valid())");
+    return dynamic_cast<const bc_contract_data *>(cc->data.get());
 }
 REF_getter<bc_nodelist> IDatabase::getNodeListOrCreate(Rollback* roll)
 {
@@ -247,7 +268,7 @@ REF_getter<bc_nodelist> IDatabase::getNodeListNoCreate()
     return NULL;
 }
 
-REF_getter<bc_contract> IDatabase::addContract(const CONTRACT_id &name, Rollback* roll)
+REF_getter<bc_contract> IDatabase::getContractOrCreate(const CONTRACT_id &name, Rollback* roll)
 {
     MUTEX_INSPECTOR;
     auto cc = getByPathOrCreate(root.get(), getContractPath(name), roll);
@@ -261,15 +282,17 @@ REF_getter<bc_contract> IDatabase::addContract(const CONTRACT_id &name, Rollback
     cc->data->setDirty(roll);
     return bc;
 }
-REF_getter<bc_contract_data> IDatabase::addContractData(const CONTRACT_DATA_id &name, Rollback* roll)
+REF_getter<bc_contract_data> IDatabase::getContractDataOrCreate(const CONTRACT_id& con, const CONTRACT_DATA_id &name, Rollback* roll, int ttl, time_t create_time)
 {
     MUTEX_INSPECTOR;
-    auto cc = getByPathOrCreate(root.get(), getContractDataPath(name), roll);
+    auto cc = getByPathOrCreate(root.get(), getContractDataPath(con,name), roll);
     if (!cc.valid())
         throw CommonError("if(!cc.valid())");
     if (cc->data.valid())
         throw CommonError("if(cc->data.valid())");
     REF_getter<bc_contract_data> bc = new bc_contract_data(cc.get());
+    bc->ttl=ttl;
+    bc->create_time=create_time;
     cc->data = bc.get();
     cc->payload_ctor_idx = hsh::bc_contract_data;
     cc->data->setDirty(roll);

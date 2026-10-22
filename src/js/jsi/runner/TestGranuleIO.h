@@ -1,30 +1,32 @@
 #pragma once
 #include "GranuleIO.h"
 #include <map>
+#include <optional>
 struct TestGranuleIO : GranuleIO {
     std::map<std::string, Granule> data;
     TestGranuleIO() : GranuleIO() {}
 
-    bool get(const std::string& key, std::string& out) override {
-        auto it = data.find(key);
+    bool get(const CONTRACT_id& c, const CONTRACT_DATA_id& d, std::string& out) override {
+        auto it = data.find(c.container+d.container);
         if (it == data.end()) return false;
         out = it->second.value;
         return true;
     }
-    bool exists(const std::string& key) override {
-        return data.find(key) != data.end();
+    bool exists(const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
+        return data.find(c.container+d.container) != data.end();
     }
-    bool create(const std::string& key, const std::string& value,
-                int64_t create_time, int64_t ttl) override {
-        if (data.find(key) != data.end()) return false;
-        data[key] = Granule{ value, create_time, ttl };
-        return true;
+    std::optional<std::string> create(const CONTRACT_id& c, const CONTRACT_DATA_id& d, const std::string& value,
+                int64_t create_time, int64_t ttl, Rollback* roll) override {
+        if (data.find(c.container+d.container) != data.end())
+            return std::string("already exists");
+        data[c.container+d.container] = Granule{ value, create_time, ttl };
+        return std::nullopt;
     }
-    bool set(const std::string& key, const std::string& value) override {
-        auto it = data.find(key);
-        if (it == data.end()) return false;
+    std::optional<std::string> set(const CONTRACT_id& c, const CONTRACT_DATA_id& d, const std::string& value, Rollback* roll) override {
+        auto it = data.find(c.container+d.container);
+        if (it == data.end()) return std::string("not found");
         it->second.value = value;
-        return true;
+        return std::nullopt;
     }
 };
 
@@ -35,9 +37,9 @@ struct TestEventSink : EventSink {
 
     TestEventSink() : EventSink() {}
 
-    void emit(const std::string& contract, const std::string& name,
+    void emit(const CONTRACT_id& contract, const std::string& name,
               const std::string& value) override {
-        current_events.push_back(jsiEvent{ contract, name, value });
+        current_events.push_back(jsiEvent{ contract.container, name, value });
     }
 };
 
@@ -53,8 +55,8 @@ struct TestClock : Clock {
 struct TestContractSourceIO : ContractSourceIO {
     TestContractSourceIO() : ContractSourceIO() {}
 
-    bool load(const std::string& name, std::string& src) override {
-        std::string path = "contracts/" + name + ".js";
+    bool load(const CONTRACT_id& name, std::string& src) override {
+        std::string path = "contracts/" + name.container + ".js";
         FILE* f = fopen(path.c_str(), "rb");
         if (!f) return false;
         fseek(f, 0, SEEK_END);
@@ -66,4 +68,3 @@ struct TestContractSourceIO : ContractSourceIO {
         return sz == (size_t)size;
     }
 };
-

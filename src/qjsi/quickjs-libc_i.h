@@ -33,8 +33,8 @@
 extern "C" {
 #endif
 
-JSModuleDef *jsi_init_module_std(JSIContext *ctx, const char *module_name);
-JSModuleDef *jsi_init_module_os(JSIContext *ctx, const char *module_name);
+JSIModuleDef *jsi_init_module_std(JSIContext *ctx, const char *module_name);
+JSIModuleDef *jsi_init_module_os(JSIContext *ctx, const char *module_name);
 void jsi_std_add_helpers(JSIContext *ctx, int argc, char **argv);
 void jsi_std_loop(JSIContext *ctx);
 JSIValue jsi_std_await(JSIContext *ctx, JSIValue obj);
@@ -46,7 +46,7 @@ int jsi_module_set_import_meta(JSIContext *ctx, JSIValueConst func_val,
                               JSI_BOOL use_realpath, JSI_BOOL is_main);
 int jsi_module_test_json(JSIContext *ctx, JSIValueConst attributes);
 int jsi_module_check_attributes(JSIContext *ctx, void *opaque, JSIValueConst attributes);
-JSModuleDef *jsi_module_loader(JSIContext *ctx,
+JSIModuleDef *jsi_module_loader(JSIContext *ctx,
                               const char *module_name, void *opaque,
                               JSIValueConst attributes);
 void jsi_std_eval_binary(JSIContext *ctx, const uint8_t *buf, size_t buf_len,

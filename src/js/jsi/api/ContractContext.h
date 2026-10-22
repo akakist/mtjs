@@ -1,20 +1,20 @@
+
 #pragma once
 #include "REF.h"
 #include "quickjs_i.h"
 #include <map>
 #include <string>
+#include <nlohmann/json.hpp>
 #include "contract_constants.h"
 #include "jsiValueGuard.h"
 #include "jsiMsg.h"
+#include "CONTRACT_id.h"
 struct CallStack;
 struct ContractHost;
-// ============================================================
-// ContractContext
-// ============================================================
 struct ContractContext : public Refcountable {
     JSIRuntime* rt = nullptr;
     JSIContext* ctx = nullptr;
-    std::string name;
+    CONTRACT_id name;
     std::map<std::string, JSIValueGuard> methods;
     std::map<std::string, JSIValueGuard> views;
 
@@ -41,9 +41,8 @@ struct ContractContext : public Refcountable {
     }
 
     JSIValue call_contract_method(const std::string& method_name,
-                             JSIValueConst fn, JSIValueConst params_js,
+                             const nlohmann::json& params,
                              const jsiMsg& m, bool is_view,
                              const REF_getter<CallStack>& call_stack,
                              const REF_getter<ContractHost>& host);
-
 };

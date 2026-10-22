@@ -1,11 +1,11 @@
-
-
 #include_directories(../../qjsi ../api)
 
 add_library(contract-api STATIC
-contract-api.cpp
+convert.cpp
+contract_call.cpp
+contract_api.cpp
+contract_host.cpp
 )
-
 
 
 

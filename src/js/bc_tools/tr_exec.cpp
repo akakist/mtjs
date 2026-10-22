@@ -377,7 +377,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     }
     CONTRACT_id cn;
     cn.container=name;
-    auto nn = b.db->getContract(cn);
+    auto nn = b.db->getContractNoCreateConst(cn);
     if (nn.valid())
         return "Contract already registered with name";
 
@@ -386,7 +386,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
         return "if(!us.valid())";
 
 
-    auto n = b.db->addContract(cn, t.roll);
+    auto n = b.db->getContractOrCreate(cn, t.roll);
 
     std::string src;
     err=yy_get_string(params,"src",src);
@@ -417,7 +417,7 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     if(err)
         return err;
 
-    auto n = b.db->getContract(cn);
+    auto n = b.db->getContractNoCreate(cn);
     if (!n.valid())
         return "contract not exists";
 

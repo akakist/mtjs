@@ -39,6 +39,7 @@
 #include "md/md_DelayNotificationREQ.h"
 #include "t_params.h"
 #include "contract_rt.h"
+#include "ContractHost.h"
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db);
 
@@ -314,6 +315,8 @@ namespace Node
         std::optional<std::string> execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params);
 
         JSRuntime *contract_runtime=NULL;
+
+        REF_getter<ContractHost> contractHost=nullptr;
 
     };
 

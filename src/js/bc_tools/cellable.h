@@ -7,20 +7,9 @@
 #include "db_to_save.h"
 #include "hsh.h"
 #include "THASH_id.h"
-
+#include "Rollback.h"
 struct Cellable;
 
-struct Rollback
-{
-    std::map<Cellable*, std::string> data;
-    size_t size()
-    {
-        size_t ret;
-        for(auto &z: data)
-            ret+=z.second.size();
-        return ret;
-    }
-};
 struct data_base : public Refcountable
 {
     int type;

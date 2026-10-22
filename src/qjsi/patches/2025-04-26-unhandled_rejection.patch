@@ -11,7 +11,7 @@ index 325c6dd..0535169 100644
 +
      struct list_head job_list; /* list of JSJobEntry.link */
  
-     JSModuleNormalizeFunc *module_normalize_func;
+     JSIModuleNormalizeFunc *module_normalize_func;
 @@ -49246,6 +49249,7 @@ typedef struct JSPromiseData {
      struct list_head promise_reactions[2];
      BOOL is_handled; /* Note: only useful to debug */

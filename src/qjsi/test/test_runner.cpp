@@ -154,7 +154,7 @@ std::string serialize_value(JSIContext* ctx, JSIValueConst val) {
     }
 
     if (JSI_IsObject(val)) {
-        JSPropertyEnum* props = nullptr;
+        JSIPropertyEnum* props = nullptr;
         uint32_t count = 0;
         std::vector<std::string> keys;
         if (JSI_GetOwnPropertyNames(ctx, &props, &count, val,
@@ -564,7 +564,7 @@ struct TestCase {
 static void read_object_map(JSIContext* ctx, JSIValueConst obj,
                             std::map<std::string, JSIValueGuard>& out)
 {
-    JSPropertyEnum* props = nullptr;
+    JSIPropertyEnum* props = nullptr;
     uint32_t count = 0;
     if (JSI_GetOwnPropertyNames(ctx, &props, &count, obj,
             JSI_GPN_STRING_MASK | JSI_GPN_ENUM_ONLY) != 0) return;

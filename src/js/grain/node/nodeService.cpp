@@ -47,10 +47,21 @@
 #include "tr_exec.h"
 #include "yyjson_to_quickjs.h"
 #include "js_tools.h"
+#include "jsi/api/ContractHost.h"
+#include "NodeGranuleIO.h"
+
+static REF_getter<ContractHost> make_node_contract_host(const REF_getter<IDatabase>& db) {
+    REF_getter<ContractHost> h = new ContractHost();
+    h->granules = new NodeGranuleIO(db);
+    h->events = new NodeEventSink();
+    h->clock = new NodeClock();
+    h->source = new NodeContractSourceIO(db);
+    return h;
+}
+
 bool Node::Service::on_startService(const systemEvent::startService *)
 {
     MUTEX_INSPECTOR;
-
 
 
     last_activity_time=iUtils->getNow();
@@ -61,6 +72,8 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
 
     db_state = new CDatabaseRocksdb(db_name);
+
+    contractHost=make_node_contract_host(db_state);
 
     prev_block=load_last_block(db_state.get());
     db_state->root=getRoot(db_state.get(),prev_block);
@@ -818,7 +831,9 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 MUTEX_INSPECTOR;
                 CONTRACT_id c;
                 c.container=contract_str;
-                auto m=method;
+                auto cc=contractHost->get_contract(c);
+                // cc->call_contract_method(meth,)
+                // auto m=method;
 
             }
 

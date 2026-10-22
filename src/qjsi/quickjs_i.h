@@ -22,8 +22,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef QUICKJSI_H
-#define QUICKJSI_H
+#ifndef QUICKJSI_HI
+#define QUICKJSI_HI
 
 #include <stdio.h>
 #include <stdint.h>
@@ -49,8 +49,8 @@ extern "C" {
 
 typedef struct JSIRuntime JSIRuntime;
 typedef struct JSIContext JSIContext;
-typedef struct JSClass JSClass;
-typedef uint32_t JSClassID;
+typedef struct JSIClass JSIClass;
+typedef uint32_t JSIClassID;
 typedef uint32_t JSAtom;
 
 #if INTPTR_MAX >= INT64_MAX
@@ -95,9 +95,9 @@ enum {
     /* any larger tag is FLOAT64 if JSI_NAN_BOXING */
 };
 
-typedef struct JSRefCountHeader {
+typedef struct JSIRefCountHeader {
     int ref_count;
-} JSRefCountHeader;
+} JSIRefCountHeader;
 
 #define JSI_FLOAT64_NAN NAN
 
@@ -334,25 +334,25 @@ static inline JSI_BOOL JSI_VALUE_IS_NAN(JSIValue v)
    promise. Only allowed with JSI_EVAL_TYPE_GLOBAL */
 #define JSI_EVAL_FLAG_ASYNC (1 << 7)
 
-typedef JSIValue JSCFunction(JSIContext *ctx, JSIValueConst this_val, int argc, JSIValueConst *argv);
-typedef JSIValue JSCFunctionMagic(JSIContext *ctx, JSIValueConst this_val, int argc, JSIValueConst *argv, int magic);
-typedef JSIValue JSCFunctionData(JSIContext *ctx, JSIValueConst this_val, int argc, JSIValueConst *argv, int magic, JSIValue *func_data);
+typedef JSIValue JSICFunction(JSIContext *ctx, JSIValueConst this_val, int argc, JSIValueConst *argv);
+typedef JSIValue JSICFunctionMagic(JSIContext *ctx, JSIValueConst this_val, int argc, JSIValueConst *argv, int magic);
+typedef JSIValue JSICFunctionData(JSIContext *ctx, JSIValueConst this_val, int argc, JSIValueConst *argv, int magic, JSIValue *func_data);
 
-typedef struct JSMallocState {
+typedef struct JSIMallocState {
     size_t malloc_count;
     size_t malloc_size;
     size_t malloc_limit;
     void *opaque; /* user opaque */
-} JSMallocState;
+} JSIMallocState;
 
-typedef struct JSMallocFunctions {
-    void *(*jsi_malloc)(JSMallocState *s, size_t size);
-    void (*jsi_free)(JSMallocState *s, void *ptr);
-    void *(*jsi_realloc)(JSMallocState *s, void *ptr, size_t size);
+typedef struct JSIMallocFunctions {
+    void *(*jsi_malloc)(JSIMallocState *s, size_t size);
+    void (*jsi_free)(JSIMallocState *s, void *ptr);
+    void *(*jsi_realloc)(JSIMallocState *s, void *ptr, size_t size);
     size_t (*jsi_malloc_usable_size)(const void *ptr);
-} JSMallocFunctions;
+} JSIMallocFunctions;
 
-typedef struct JSGCObjectHeader JSGCObjectHeader;
+typedef struct JSIGCObjectHeader JSIGCObjectHeader;
 
 JSIRuntime *JSI_NewRuntime(void);
 /* info lifetime must exceed that of rt */
@@ -364,11 +364,11 @@ void JSI_SetMaxStackSize(JSIRuntime *rt, size_t stack_size);
 /* should be called when changing thread to update the stack top value
    used to check stack overflow. */
 void JSI_UpdateStackTop(JSIRuntime *rt);
-JSIRuntime *JSI_NewRuntime2(const JSMallocFunctions *mf, void *opaque);
+JSIRuntime *JSI_NewRuntime2(const JSIMallocFunctions *mf, void *opaque);
 void JSI_FreeRuntime(JSIRuntime *rt);
 void *JSI_GetRuntimeOpaque(JSIRuntime *rt);
 void JSI_SetRuntimeOpaque(JSIRuntime *rt, void *opaque);
-typedef void JSI_MarkFunc(JSIRuntime *rt, JSGCObjectHeader *gp);
+typedef void JSI_MarkFunc(JSIRuntime *rt, JSIGCObjectHeader *gp);
 void JSI_MarkValue(JSIRuntime *rt, JSIValueConst val, JSI_MarkFunc *mark_func);
 void JSI_RunGC(JSIRuntime *rt);
 JSI_BOOL JSI_IsLiveObject(JSIRuntime *rt, JSIValueConst obj);
@@ -379,8 +379,8 @@ JSIContext *JSI_DupContext(JSIContext *ctx);
 void *JSI_GetContextOpaque(JSIContext *ctx);
 void JSI_SetContextOpaque(JSIContext *ctx, void *opaque);
 JSIRuntime *JSI_GetRuntime(JSIContext *ctx);
-void JSI_SetClassProto(JSIContext *ctx, JSClassID class_id, JSIValue obj);
-JSIValue JSI_GetClassProto(JSIContext *ctx, JSClassID class_id);
+void JSI_SetClassProto(JSIContext *ctx, JSIClassID class_id, JSIValue obj);
+JSIValue JSI_GetClassProto(JSIContext *ctx, JSIClassID class_id);
 
 /* the following functions are used to select the intrinsic object to
    save memory */
@@ -408,7 +408,7 @@ void *jsi_mallocz(JSIContext *ctx, size_t size);
 char *jsi_strdup(JSIContext *ctx, const char *str);
 char *jsi_strndup(JSIContext *ctx, const char *s, size_t n);
 
-typedef struct JSMemoryUsage {
+typedef struct JSIMemoryUsage {
     int64_t malloc_size, malloc_limit, memory_used_size;
     int64_t malloc_count;
     int64_t memory_used_count;
@@ -422,10 +422,10 @@ typedef struct JSMemoryUsage {
     int64_t c_func_count, array_count;
     int64_t fast_array_count, fast_array_elements;
     int64_t binary_object_count, binary_object_size;
-} JSMemoryUsage;
+} JSIMemoryUsage;
 
-void JSI_ComputeMemoryUsage(JSIRuntime *rt, JSMemoryUsage *s);
-void JSI_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSIRuntime *rt);
+void JSI_ComputeMemoryUsage(JSIRuntime *rt, JSIMemoryUsage *s);
+void JSI_DumpMemoryUsage(FILE *fp, const JSIMemoryUsage *s, JSIRuntime *rt);
 
 /* atom support */
 #define JSI_ATOM_NULL 0
@@ -447,28 +447,28 @@ JSAtom JSI_ValueToAtom(JSIContext *ctx, JSIValueConst val);
 
 /* object class support */
 
-typedef struct JSPropertyEnum {
+typedef struct JSIPropertyEnum {
     JSI_BOOL is_enumerable;
     JSAtom atom;
-} JSPropertyEnum;
+} JSIPropertyEnum;
 
-typedef struct JSPropertyDescriptor {
+typedef struct JSIPropertyDescriptor {
     int flags;
     JSIValue value;
     JSIValue getter;
     JSIValue setter;
-} JSPropertyDescriptor;
+} JSIPropertyDescriptor;
 
-typedef struct JSClassExoticMethods {
+typedef struct JSIClassExoticMethods {
     /* Return -1 if exception (can only happen in case of Proxy object),
        FALSE if the property does not exists, TRUE if it exists. If 1 is
        returned, the property descriptor 'desc' is filled if != NULL. */
-    int (*get_own_property)(JSIContext *ctx, JSPropertyDescriptor *desc,
+    int (*get_own_property)(JSIContext *ctx, JSIPropertyDescriptor *desc,
                              JSIValueConst obj, JSAtom prop);
     /* '*ptab' should hold the '*plen' property keys. Return 0 if OK,
        -1 if exception. The 'is_enumerable' field is ignored.
     */
-    int (*get_own_property_names)(JSIContext *ctx, JSPropertyEnum **ptab,
+    int (*get_own_property_names)(JSIContext *ctx, JSIPropertyEnum **ptab,
                                   uint32_t *plen,
                                   JSIValueConst obj);
     /* return < 0 if exception, or TRUE/FALSE */
@@ -498,37 +498,37 @@ typedef struct JSClassExoticMethods {
     int (*is_extensible)(JSIContext *ctx, JSIValueConst obj);
     /* return < 0 if exception or TRUE/FALSE */
     int (*prevent_extensions)(JSIContext *ctx, JSIValueConst obj);
-} JSClassExoticMethods;
+} JSIClassExoticMethods;
 
-typedef void JSClassFinalizer(JSIRuntime *rt, JSIValue val);
-typedef void JSClassGCMark(JSIRuntime *rt, JSIValueConst val,
+typedef void JSIClassFinalizer(JSIRuntime *rt, JSIValue val);
+typedef void JSIClassGCMark(JSIRuntime *rt, JSIValueConst val,
                            JSI_MarkFunc *mark_func);
 #define JSI_CALL_FLAG_CONSTRUCTOR (1 << 0)
-typedef JSIValue JSClassCall(JSIContext *ctx, JSIValueConst func_obj,
+typedef JSIValue JSIClassCall(JSIContext *ctx, JSIValueConst func_obj,
                             JSIValueConst this_val, int argc, JSIValueConst *argv,
                             int flags);
 
-typedef struct JSClassDef {
+typedef struct JSIClassDef {
     const char *class_name;
-    JSClassFinalizer *finalizer;
-    JSClassGCMark *gc_mark;
+    JSIClassFinalizer *finalizer;
+    JSIClassGCMark *gc_mark;
     /* if call != NULL, the object is a function. If (flags &
        JSI_CALL_FLAG_CONSTRUCTOR) != 0, the function is called as a
        constructor. In this case, 'this_val' is new.target. A
        constructor call only happens if the object constructor bit is
        set (see JSI_SetConstructorBit()). */
-    JSClassCall *call;
+    JSIClassCall *call;
     /* XXX: suppress this indirection ? It is here only to save memory
        because only a few classes need these methods */
-    JSClassExoticMethods *exotic;
-} JSClassDef;
+    JSIClassExoticMethods *exotic;
+} JSIClassDef;
 
 #define JSI_INVALID_CLASS_ID 0
-JSClassID JSI_NewClassID(JSClassID *pclass_id);
+JSIClassID JSI_NewClassID(JSIClassID *pclass_id);
 /* Returns the class ID if `v` is an object, otherwise returns JSI_INVALID_CLASS_ID. */
-JSClassID JSI_GetClassID(JSIValueConst v);
-int JSI_NewClass(JSIRuntime *rt, JSClassID class_id, const JSClassDef *class_def);
-int JSI_IsRegisteredClass(JSIRuntime *rt, JSClassID class_id);
+JSIClassID JSI_GetClassID(JSIValueConst v);
+int JSI_NewClass(JSIRuntime *rt, JSIClassID class_id, const JSIClassDef *class_def);
+int JSI_IsRegisteredClass(JSIRuntime *rt, JSIClassID class_id);
 
 /* value handling */
 
@@ -625,7 +625,7 @@ void __JSI_FreeValue(JSIContext *ctx, JSIValue v);
 static inline void JSI_FreeValue(JSIContext *ctx, JSIValue v)
 {
     if (JSI_VALUE_HAS_REF_COUNT(v)) {
-        JSRefCountHeader *p = (JSRefCountHeader *)JSI_VALUE_GET_PTR(v);
+        JSIRefCountHeader *p = (JSIRefCountHeader *)JSI_VALUE_GET_PTR(v);
         if (--p->ref_count <= 0) {
             __JSI_FreeValue(ctx, v);
         }
@@ -635,7 +635,7 @@ void __JSI_FreeValueRT(JSIRuntime *rt, JSIValue v);
 static inline void JSI_FreeValueRT(JSIRuntime *rt, JSIValue v)
 {
     if (JSI_VALUE_HAS_REF_COUNT(v)) {
-        JSRefCountHeader *p = (JSRefCountHeader *)JSI_VALUE_GET_PTR(v);
+        JSIRefCountHeader *p = (JSIRefCountHeader *)JSI_VALUE_GET_PTR(v);
         if (--p->ref_count <= 0) {
             __JSI_FreeValueRT(rt, v);
         }
@@ -645,7 +645,7 @@ static inline void JSI_FreeValueRT(JSIRuntime *rt, JSIValue v)
 static inline JSIValue JSI_DupValue(JSIContext *ctx, JSIValueConst v)
 {
     if (JSI_VALUE_HAS_REF_COUNT(v)) {
-        JSRefCountHeader *p = (JSRefCountHeader *)JSI_VALUE_GET_PTR(v);
+        JSIRefCountHeader *p = (JSIRefCountHeader *)JSI_VALUE_GET_PTR(v);
         p->ref_count++;
     }
     return (JSIValue)v;
@@ -654,7 +654,7 @@ static inline JSIValue JSI_DupValue(JSIContext *ctx, JSIValueConst v)
 static inline JSIValue JSI_DupValueRT(JSIRuntime *rt, JSIValueConst v)
 {
     if (JSI_VALUE_HAS_REF_COUNT(v)) {
-        JSRefCountHeader *p = (JSRefCountHeader *)JSI_VALUE_GET_PTR(v);
+        JSIRefCountHeader *p = (JSIRefCountHeader *)JSI_VALUE_GET_PTR(v);
         p->ref_count++;
     }
     return (JSIValue)v;
@@ -695,7 +695,7 @@ static inline const char *JSI_ToCString(JSIContext *ctx, JSIValueConst val1)
 }
 void JSI_FreeCString(JSIContext *ctx, const char *ptr);
 
-JSIValue JSI_NewObjectProtoClass(JSIContext *ctx, JSIValueConst proto, JSClassID class_id);
+JSIValue JSI_NewObjectProtoClass(JSIContext *ctx, JSIValueConst proto, JSIClassID class_id);
 JSIValue JSI_NewObjectClass(JSIContext *ctx, int class_id);
 JSIValue JSI_NewObjectProto(JSIContext *ctx, JSIValueConst proto);
 JSIValue JSI_NewObject(JSIContext *ctx);
@@ -746,14 +746,14 @@ JSIValue JSI_GetPrototype(JSIContext *ctx, JSIValueConst val);
 #define JSI_GPN_PRIVATE_MASK (1 << 2)
 /* only include the enumerable properties */
 #define JSI_GPN_ENUM_ONLY    (1 << 4)
-/* set theJSPropertyEnum.is_enumerable field */
+/* set theJSIPropertyEnum.is_enumerable field */
 #define JSI_GPN_SET_ENUM     (1 << 5)
 
-int JSI_GetOwnPropertyNames(JSIContext *ctx, JSPropertyEnum **ptab,
+int JSI_GetOwnPropertyNames(JSIContext *ctx, JSIPropertyEnum **ptab,
                            uint32_t *plen, JSIValueConst obj, int flags);
-void JSI_FreePropertyEnum(JSIContext *ctx, JSPropertyEnum *tab,
+void JSI_FreePropertyEnum(JSIContext *ctx, JSIPropertyEnum *tab,
                          uint32_t len);
-int JSI_GetOwnProperty(JSIContext *ctx, JSPropertyDescriptor *desc,
+int JSI_GetOwnProperty(JSIContext *ctx, JSIPropertyDescriptor *desc,
                       JSIValueConst obj, JSAtom prop);
 
 JSIValue JSI_Call(JSIContext *ctx, JSIValueConst func_obj, JSIValueConst this_obj,
@@ -788,9 +788,9 @@ int JSI_DefinePropertyGetSet(JSIContext *ctx, JSIValueConst this_obj,
                             JSAtom prop, JSIValue getter, JSIValue setter,
                             int flags);
 void JSI_SetOpaque(JSIValue obj, void *opaque);
-void *JSI_GetOpaque(JSIValueConst obj, JSClassID class_id);
-void *JSI_GetOpaque2(JSIContext *ctx, JSIValueConst obj, JSClassID class_id);
-void *JSI_GetAnyOpaque(JSIValueConst obj, JSClassID *class_id);
+void *JSI_GetOpaque(JSIValueConst obj, JSIClassID class_id);
+void *JSI_GetOpaque2(JSIContext *ctx, JSIValueConst obj, JSIClassID class_id);
+void *JSI_GetAnyOpaque(JSIValueConst obj, JSIClassID *class_id);
 
 /* 'buf' must be zero terminated i.e. buf[buf_len] = '\0'. */
 JSIValue JSI_ParseJSON(JSIContext *ctx, const char *buf, size_t buf_len,
@@ -801,15 +801,15 @@ JSIValue JSI_ParseJSON2(JSIContext *ctx, const char *buf, size_t buf_len,
 JSIValue JSI_JSONStringify(JSIContext *ctx, JSIValueConst obj,
                          JSIValueConst replacer, JSIValueConst space0);
 
-typedef void JSFreeArrayBufferDataFunc(JSIRuntime *rt, void *opaque, void *ptr);
+typedef void JSIFreeArrayBufferDataFunc(JSIRuntime *rt, void *opaque, void *ptr);
 JSIValue JSI_NewArrayBuffer(JSIContext *ctx, uint8_t *buf, size_t len,
-                          JSFreeArrayBufferDataFunc *free_func, void *opaque,
+                          JSIFreeArrayBufferDataFunc *free_func, void *opaque,
                           JSI_BOOL is_shared);
 JSIValue JSI_NewArrayBufferCopy(JSIContext *ctx, const uint8_t *buf, size_t len);
 void JSI_DetachArrayBuffer(JSIContext *ctx, JSIValueConst obj);
 uint8_t *JSI_GetArrayBuffer(JSIContext *ctx, size_t *psize, JSIValueConst obj);
 
-typedef enum JSTypedArrayEnum {
+typedef enum JSITypedArrayEnum {
     JSI_TYPED_ARRAY_UINT8C = 0,
     JSI_TYPED_ARRAY_INT8,
     JSI_TYPED_ARRAY_UINT8,
@@ -822,10 +822,10 @@ typedef enum JSTypedArrayEnum {
     JSI_TYPED_ARRAY_FLOAT16,
     JSI_TYPED_ARRAY_FLOAT32,
     JSI_TYPED_ARRAY_FLOAT64,
-} JSTypedArrayEnum;
+} JSITypedArrayEnum;
 
 JSIValue JSI_NewTypedArray(JSIContext *ctx, int argc, JSIValueConst *argv,
-                         JSTypedArrayEnum array_type);
+                         JSITypedArrayEnum array_type);
 JSIValue JSI_GetTypedArrayBuffer(JSIContext *ctx, JSIValueConst obj,
                                size_t *pbyte_offset,
                                size_t *pbyte_length,
@@ -835,25 +835,25 @@ typedef struct {
     void (*sab_free)(void *opaque, void *ptr);
     void (*sab_dup)(void *opaque, void *ptr);
     void *sab_opaque;
-} JSSharedArrayBufferFunctions;
+} JSISharedArrayBufferFunctions;
 void JSI_SetSharedArrayBufferFunctions(JSIRuntime *rt,
-                                      const JSSharedArrayBufferFunctions *sf);
+                                      const JSISharedArrayBufferFunctions *sf);
 
-typedef enum JSPromiseStateEnum {
+typedef enum JSIPromiseStateEnum {
     JSI_PROMISE_PENDING,
     JSI_PROMISE_FULFILLED,
     JSI_PROMISE_REJECTED,
-} JSPromiseStateEnum;
+} JSIPromiseStateEnum;
 
 
 /* is_handled = TRUE means that the rejection is handled */
-typedef void JSHostPromiseRejectionTracker(JSIContext *ctx, JSIValueConst promise,
+typedef void JSIHostPromiseRejectionTracker(JSIContext *ctx, JSIValueConst promise,
                                            JSIValueConst reason,
                                            JSI_BOOL is_handled, void *opaque);
 
 /* return != 0 if the JS code needs to be interrupted */
-typedef int JSInterruptHandler(JSIRuntime *rt, void *opaque);
-void JSI_SetInterruptHandler(JSIRuntime *rt, JSInterruptHandler *cb, void *opaque);
+typedef int JSIInterruptHandler(JSIRuntime *rt, void *opaque);
+void JSI_SetInterruptHandler(JSIRuntime *rt, JSIInterruptHandler *cb, void *opaque);
 /* if can_block is TRUE, Atomics.wait() can be used */
 void JSI_SetCanBlock(JSIRuntime *rt, JSI_BOOL can_block);
 /* select which debug info is stripped from the compiled code */
@@ -865,43 +865,43 @@ int JSI_GetStripInfo(JSIRuntime *rt);
 /* set the [IsHTMLDDA] internal slot */
 void JSI_SetIsHTMLDDA(JSIContext *ctx, JSIValueConst obj);
 
-typedef struct JSModuleDef JSModuleDef;
+typedef struct JSIModuleDef JSIModuleDef;
 
 /* return the module specifier (allocated with jsi_malloc()) or NULL if
    exception */
-typedef char *JSModuleNormalizeFunc(JSIContext *ctx,
+typedef char *JSIModuleNormalizeFunc(JSIContext *ctx,
                                     const char *module_base_name,
                                     const char *module_name, void *opaque);
-typedef JSModuleDef *JSModuleLoaderFunc(JSIContext *ctx,
+typedef JSIModuleDef *JSIModuleLoaderFunc(JSIContext *ctx,
                                         const char *module_name, void *opaque);
-typedef JSModuleDef *JSModuleLoaderFunc2(JSIContext *ctx,
+typedef JSIModuleDef *JSIModuleLoaderFunc2(JSIContext *ctx,
                                          const char *module_name, void *opaque,
                                          JSIValueConst attributes);
 /* return -1 if exception, 0 if OK */
-typedef int JSModuleCheckSupportedImportAttributes(JSIContext *ctx, void *opaque,
+typedef int JSIModuleCheckSupportedImportAttributes(JSIContext *ctx, void *opaque,
                                                    JSIValueConst attributes);
                                                    
 /* module_normalize = NULL is allowed and invokes the default module
    filename normalizer */
 void JSI_SetModuleLoaderFunc(JSIRuntime *rt,
-                            JSModuleNormalizeFunc *module_normalize,
-                            JSModuleLoaderFunc *module_loader, void *opaque);
+                            JSIModuleNormalizeFunc *module_normalize,
+                            JSIModuleLoaderFunc *module_loader, void *opaque);
 /* same as JSI_SetModuleLoaderFunc but with attributes. if
    module_check_attrs = NULL, no attribute checking is done. */
 void JSI_SetModuleLoaderFunc2(JSIRuntime *rt,
-                             JSModuleNormalizeFunc *module_normalize,
-                             JSModuleLoaderFunc2 *module_loader,
-                             JSModuleCheckSupportedImportAttributes *module_check_attrs,
+                             JSIModuleNormalizeFunc *module_normalize,
+                             JSIModuleLoaderFunc2 *module_loader,
+                             JSIModuleCheckSupportedImportAttributes *module_check_attrs,
                              void *opaque);
 /* return the import.meta object of a module */
-JSIValue JSI_GetImportMeta(JSIContext *ctx, JSModuleDef *m);
-JSAtom JSI_GetModuleName(JSIContext *ctx, JSModuleDef *m);
-JSIValue JSI_GetModuleNamespace(JSIContext *ctx, JSModuleDef *m);
+JSIValue JSI_GetImportMeta(JSIContext *ctx, JSIModuleDef *m);
+JSAtom JSI_GetModuleName(JSIContext *ctx, JSIModuleDef *m);
+JSIValue JSI_GetModuleNamespace(JSIContext *ctx, JSIModuleDef *m);
 
 /* JS Job support */
 
-typedef JSIValue JSJobFunc(JSIContext *ctx, int argc, JSIValueConst *argv);
-int JSI_EnqueueJob(JSIContext *ctx, JSJobFunc *job_func, int argc, JSIValueConst *argv);
+typedef JSIValue JSIJobFunc(JSIContext *ctx, int argc, JSIValueConst *argv);
+int JSI_EnqueueJob(JSIContext *ctx, JSIJobFunc *job_func, int argc, JSIValueConst *argv);
 
 JSI_BOOL JSI_IsJobPending(JSIRuntime *rt);
 int JSI_ExecutePendingJob(JSIRuntime *rt, JSIContext **pctx);
@@ -938,7 +938,7 @@ JSIValue JSI_LoadModule(JSIContext *ctx, const char *basename,
                       const char *filename);
 
 /* C function definition */
-typedef enum JSCFunctionEnum {  /* XXX: should rename for namespace isolation */
+typedef enum JSICFunctionEnum {  /* XXX: should rename for namespace isolation */
     JSI_CFUNC_generic,
     JSI_CFUNC_generic_magic,
     JSI_CFUNC_constructor,
@@ -952,14 +952,14 @@ typedef enum JSCFunctionEnum {  /* XXX: should rename for namespace isolation */
     JSI_CFUNC_getter_magic,
     JSI_CFUNC_setter_magic,
     JSI_CFUNC_iterator_next,
-} JSCFunctionEnum;
+} JSICFunctionEnum;
 
-typedef union JSCFunctionType {
-    JSCFunction *generic;
+typedef union JSICFunctionType {
+    JSICFunction *generic;
     JSIValue (*generic_magic)(JSIContext *ctx, JSIValueConst this_val, int argc, JSIValueConst *argv, int magic);
-    JSCFunction *constructor;
+    JSICFunction *constructor;
     JSIValue (*constructor_magic)(JSIContext *ctx, JSIValueConst new_target, int argc, JSIValueConst *argv, int magic);
-    JSCFunction *constructor_or_func;
+    JSICFunction *constructor_or_func;
     int64_t (*f_f)(int64_t);
     int64_t (*f_f_f)(int64_t, int64_t);
     JSIValue (*getter)(JSIContext *ctx, JSIValueConst this_val);
@@ -968,33 +968,33 @@ typedef union JSCFunctionType {
     JSIValue (*setter_magic)(JSIContext *ctx, JSIValueConst this_val, JSIValueConst val, int magic);
     JSIValue (*iterator_next)(JSIContext *ctx, JSIValueConst this_val,
                              int argc, JSIValueConst *argv, int *pdone, int magic);
-} JSCFunctionType;
+} JSICFunctionType;
 
-JSIValue JSI_NewCFunction2(JSIContext *ctx, JSCFunction *func,
+JSIValue JSI_NewCFunction2(JSIContext *ctx, JSICFunction *func,
                          const char *name,
-                         int length, JSCFunctionEnum cproto, int magic);
-JSIValue JSI_NewCFunctionData(JSIContext *ctx, JSCFunctionData *func,
+                         int length, JSICFunctionEnum cproto, int magic);
+JSIValue JSI_NewCFunctionData(JSIContext *ctx, JSICFunctionData *func,
                             int length, int magic, int data_len,
                             JSIValueConst *data);
 
-static inline JSIValue JSI_NewCFunction(JSIContext *ctx, JSCFunction *func, const char *name,
+static inline JSIValue JSI_NewCFunction(JSIContext *ctx, JSICFunction *func, const char *name,
                                       int length)
 {
     return JSI_NewCFunction2(ctx, func, name, length, JSI_CFUNC_generic, 0);
 }
 
-static inline JSIValue JSI_NewCFunctionMagic(JSIContext *ctx, JSCFunctionMagic *func,
+static inline JSIValue JSI_NewCFunctionMagic(JSIContext *ctx, JSICFunctionMagic *func,
                                            const char *name,
-                                           int length, JSCFunctionEnum cproto, int magic)
+                                           int length, JSICFunctionEnum cproto, int magic)
 {
-    return JSI_NewCFunction2(ctx, (JSCFunction *)func, name, length, cproto, magic);
+    return JSI_NewCFunction2(ctx, (JSICFunction *)func, name, length, cproto, magic);
 }
 void JSI_SetConstructor(JSIContext *ctx, JSIValueConst func_obj,
                        JSIValueConst proto);
 
 /* C property definition */
 
-typedef struct JSCFunctionListEntry {
+typedef struct JSICFunctionListEntry {
     const char *name;
     uint8_t prop_flags;
     uint8_t def_type;
@@ -1003,18 +1003,18 @@ typedef struct JSCFunctionListEntry {
         struct {
             uint8_t length; /* XXX: should move outside union */
             uint8_t cproto; /* XXX: should move outside union */
-            JSCFunctionType cfunc;
+            JSICFunctionType cfunc;
         } func;
         struct {
-            JSCFunctionType get;
-            JSCFunctionType set;
+            JSICFunctionType get;
+            JSICFunctionType set;
         } getset;
         struct {
             const char *name;
             int base;
         } alias;
         struct {
-            const struct JSCFunctionListEntry *tab;
+            const struct JSICFunctionListEntry *tab;
             int len;
         } prop_list;
         const char *str;
@@ -1022,7 +1022,7 @@ typedef struct JSCFunctionListEntry {
         int64_t i64;
         double f64;
     } u;
-} JSCFunctionListEntry;
+} JSICFunctionListEntry;
 
 #define JSI_DEF_CFUNC          0
 #define JSI_DEF_CGETSET        1
@@ -1052,27 +1052,27 @@ typedef struct JSCFunctionListEntry {
 #define JSI_ALIAS_BASE_DEF(name, from, base) { name, JSI_PROP_WRITABLE | JSI_PROP_CONFIGURABLE, JSI_DEF_ALIAS, 0, .u = { .alias = { from, base } } }
 
 int JSI_SetPropertyFunctionList(JSIContext *ctx, JSIValueConst obj,
-                               const JSCFunctionListEntry *tab,
+                               const JSICFunctionListEntry *tab,
                                int len);
 
 /* C module definition */
 
-typedef int JSModuleInitFunc(JSIContext *ctx, JSModuleDef *m);
+typedef int JSIModuleInitFunc(JSIContext *ctx, JSIModuleDef *m);
 
-JSModuleDef *JSI_NewCModule(JSIContext *ctx, const char *name_str,
-                           JSModuleInitFunc *func);
+JSIModuleDef *JSI_NewCModule(JSIContext *ctx, const char *name_str,
+                           JSIModuleInitFunc *func);
 /* can only be called before the module is instantiated */
-int JSI_AddModuleExport(JSIContext *ctx, JSModuleDef *m, const char *name_str);
-int JSI_AddModuleExportList(JSIContext *ctx, JSModuleDef *m,
-                           const JSCFunctionListEntry *tab, int len);
+int JSI_AddModuleExport(JSIContext *ctx, JSIModuleDef *m, const char *name_str);
+int JSI_AddModuleExportList(JSIContext *ctx, JSIModuleDef *m,
+                           const JSICFunctionListEntry *tab, int len);
 /* can only be called after the module is instantiated */
-int JSI_SetModuleExport(JSIContext *ctx, JSModuleDef *m, const char *export_name,
+int JSI_SetModuleExport(JSIContext *ctx, JSIModuleDef *m, const char *export_name,
                        JSIValue val);
-int JSI_SetModuleExportList(JSIContext *ctx, JSModuleDef *m,
-                           const JSCFunctionListEntry *tab, int len);
+int JSI_SetModuleExportList(JSIContext *ctx, JSIModuleDef *m,
+                           const JSICFunctionListEntry *tab, int len);
 /* associate a JSIValue to a C module */
-int JSI_SetModulePrivateValue(JSIContext *ctx, JSModuleDef *m, JSIValue val);
-JSIValue JSI_GetModulePrivateValue(JSIContext *ctx, JSModuleDef *m);
+int JSI_SetModulePrivateValue(JSIContext *ctx, JSIModuleDef *m, JSIValue val);
+JSIValue JSI_GetModulePrivateValue(JSIContext *ctx, JSIModuleDef *m);
                         
 /* debug value output */
 
@@ -1084,15 +1084,15 @@ typedef struct {
                                    strings, 0 = no limit */
     uint32_t max_item_count; /*  print no more than this count for
                                  arrays or objects, 0 = no limit */
-} JSPrintValueOptions;
+} JSIPrintValueOptions;
 
-typedef void JSPrintValueWrite(void *opaque, const char *buf, size_t len);
+typedef void JSIPrintValueWrite(void *opaque, const char *buf, size_t len);
 
-void JSI_PrintValueSetDefaultOptions(JSPrintValueOptions *options);
-void JSI_PrintValueRT(JSIRuntime *rt, JSPrintValueWrite *write_func, void *write_opaque,
-                     JSIValueConst val, const JSPrintValueOptions *options);
-void JSI_PrintValue(JSIContext *ctx, JSPrintValueWrite *write_func, void *write_opaque,
-                   JSIValueConst val, const JSPrintValueOptions *options);
+void JSI_PrintValueSetDefaultOptions(JSIPrintValueOptions *options);
+void JSI_PrintValueRT(JSIRuntime *rt, JSIPrintValueWrite *write_func, void *write_opaque,
+                     JSIValueConst val, const JSIPrintValueOptions *options);
+void JSI_PrintValue(JSIContext *ctx, JSIPrintValueWrite *write_func, void *write_opaque,
+                   JSIValueConst val, const JSIPrintValueOptions *options);
 
 #undef jsi_unlikely
 #undef jsi_force_inline

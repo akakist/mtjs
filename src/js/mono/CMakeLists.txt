@@ -21,8 +21,8 @@ set(linuxlib     mariadbclient )
 endif()
 
 if(APPLE)
-target_link_libraries(mtjs  node2-serviceS node-serviceS node3-serviceS node4-serviceS  node5-serviceS  node6-serviceS  nodeW-serviceS 
-rockdb     mtjsmoduleS mtjscommon    mtjsnet mtjsutils bctools  quickjs megatron-main   zsingle megatron-core   ${linuxlib}  yyjson ssh  blst 
+target_link_libraries(mtjs  node2-serviceS node-serviceS node3-serviceS node4-serviceS  node5-serviceS  node6-serviceS  nodeW-serviceS contract-api
+rockdb     mtjsmoduleS mtjscommon    mtjsnet mtjsutils bctools  quickjs quickjs-i megatron-main   zsingle megatron-core   ${linuxlib}  yyjson ssh  blst 
 
 #curl  
 ${OPENSSL_LIBRARIES}
@@ -34,7 +34,8 @@ else()
 target_link_libraries(mtjs 
 #-static  
 -Wl,--start-group node2-serviceS node-serviceS node3-serviceS node4-serviceS node5-serviceS node6-serviceS nodeW-serviceS 
-rocksdb     mtjsmoduleS mtjscommon     mtjsnet  mtjsutils bctools quickjs megatron-main   zsingle megatron-core sodium     crypto  blst 
+contract-api
+rocksdb     mtjsmoduleS mtjscommon     mtjsnet  mtjsutils bctools quickjs quickjs-i megatron-main   zsingle megatron-core sodium     crypto  blst 
       ${linuxlib} yyjson  
 
 #curl  psl idn2 unistring nghttp2

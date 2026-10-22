@@ -36,14 +36,11 @@
 #include "Clock.h"
 #include "ContractSourceIO.h"
 #include "TestGranuleIO.h"
-#include "NodeGranuleIO.h"
 #include "ContractHost.h"
+#include "convert.h"
 using json = nlohmann::json;
 
 
-// ============================================================
-// Forward
-// ============================================================
 struct ContractContext;
 struct ContractHost;
 struct GranuleIO;
@@ -52,18 +49,6 @@ struct Clock;
 struct ContractSourceIO;
 
 JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& m);
-// JSIValue call_contract_method(ContractContext* cc, const std::string& method_name,
-//                              JSIValueConst fn, JSIValueConst params_js,
-//                              const jsiMsg& m, bool is_view,
-//                              const REF_getter<CallStack>& call_stack,
-//                              const REF_getter<ContractHost>& host);
-void print_exception(JSIContext* ctx);
-json json_from_jsi(JSIContext* ctx, JSIValueConst val);
-JSIValue json_to_jsi(JSIContext* ctx, const json& j);
- 
-std::string serialize_value(JSIContext* ctx, JSIValueConst val, int depth = 0);
-
-
 
 static REF_getter<ContractHost> make_test() {
     REF_getter<ContractHost> h = new ContractHost();
@@ -73,6 +58,7 @@ static REF_getter<ContractHost> make_test() {
     h->source = new TestContractSourceIO();
     return h;
 }
+#ifdef KALL
 static REF_getter<ContractHost> make_node() {
     REF_getter<ContractHost> h = new ContractHost();
     h->granules = new NodeGranuleIO();
@@ -81,7 +67,7 @@ static REF_getter<ContractHost> make_node() {
     h->source = new NodeContractSourceIO();
     return h;
 }
-
+#endif
 
 
 struct TxCommand {
@@ -105,6 +91,19 @@ struct TestCase {
     std::vector<jsiEvent> expected_emits;
     json expected;
 };
+
+static bool split_granule_key(const std::string& key,
+                              CONTRACT_id& c, CONTRACT_DATA_id& d,
+                              std::string& combined)
+{
+    auto pos = key.find('/');
+    if (pos == std::string::npos || pos == 0 || pos + 1 >= key.size())
+        return false;
+    c.container = key.substr(0, pos);
+    d.container = key.substr(pos + 1);
+    combined = c.container + d.container;
+    return true;
+}
 
 static jsiMsg read_msg_json(const json& j) {
     jsiMsg m;
@@ -191,7 +190,8 @@ static std::optional<json> parse_tx_js(const std::string& path) {
     } catch (const std::exception& e) {
         std::cerr << "exception: " << path << ": " << e.what() << std::endl;
         JSI_FreeValue(ctx, result);
-        JSI_FreeContext(ctx); JSI_FreeRuntime(rt);
+        JSI_FreeContext(ctx);
+        JSI_FreeRuntime(rt);
         return std::nullopt;
     }
 
@@ -268,9 +268,6 @@ bool load_test(const std::string& path, TestCase& out) {
     return true;
 }
 
-// ============================================================
-// Прогон
-// ============================================================
 static void apply_initial(const TestCase& tc, const REF_getter<ContractHost>& host) {
     auto* test_io = static_cast<TestGranuleIO*>(host->granules.get());
     auto* test_events = static_cast<TestEventSink*>(host->events.get());
@@ -289,7 +286,12 @@ static void apply_initial(const TestCase& tc, const REF_getter<ContractHost>& ho
             std::cerr << "initial[" << key << "]: too large" << std::endl;
             continue;
         }
-        test_io->data[key] = Granule{ std::move(s), 0, 0 };
+        CONTRACT_id c; CONTRACT_DATA_id d; std::string combined;
+        if (!split_granule_key(key, c, d, combined)) {
+            std::cerr << "initial[" << key << "]: bad granule key (expected contract/data)" << std::endl;
+            continue;
+        }
+        test_io->data[combined] = Granule{ std::move(s), 0, 0 };
     }
 }
 
@@ -309,7 +311,9 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
         bool tx_aborted = false;
 
         for (auto& cmd : tx.commands) {
-            auto cc = host->get_contract(cmd.contract);
+            CONTRACT_id cid;
+            cid.container=cmd.contract;
+            auto cc = host->get_contract(cid);
             if (!cc.valid()) { std::cerr << "contract not loaded: " << cmd.contract << std::endl; return false; }
             auto mit = cc->methods.find(cmd.method);
             if (mit == cc->methods.end()) {
@@ -317,19 +321,24 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
                 return false;
             }
 
-            JSIValue params_in_cc = json_to_jsi(cc->ctx, cmd.params);
-            if (JSI_IsException(params_in_cc)) {
-                print_exception(cc->ctx);
-                test_io->data = std::move(saved);
-                test_events->all_events = std::move(saved_events);
-                return false;
-            }
-
             test_events->current_events.clear();
-            REF_getter<CallStack> call_stack = new CallStack;
-            JSIValue result = cc->call_contract_method(cmd.method, mit->second.get(),
-                                                   params_in_cc, tx.msg, false, call_stack, host);
-            JSI_FreeValue(cc->ctx, params_in_cc);
+
+            CallContext call_ctx;
+            call_ctx.contract = cc;
+            call_ctx.in_view = false;
+            call_ctx.msg = tx.msg;
+            call_ctx.depth = 0;
+            call_ctx.call_stack = new CallStack;
+            call_ctx.host = host;
+
+            void* saved_opaque = JSI_GetContextOpaque(cc->ctx);
+            JSI_SetContextOpaque(cc->ctx, &call_ctx);
+
+            JSIValue result = cc->call_contract_method(cmd.method, cmd.params, tx.msg, false,
+                                                   call_ctx.call_stack, host);
+            JSI_SetContextOpaque(cc->ctx, saved_opaque);
+
+            for (auto& ev : call_ctx.emits) test_events->current_events.push_back(ev);
 
             if (JSI_IsException(result)) {
                 JSI_FreeValue(cc->ctx, result);
@@ -472,7 +481,14 @@ static bool compare_expected(JSIContext*, const TestCase& tc,
         const std::string& key = it.key();
         const json& exp_j = it.value();
 
-        auto it_g = test_io->data.find(key);
+        CONTRACT_id c; CONTRACT_DATA_id d; std::string combined;
+        if (!split_granule_key(key, c, d, combined)) {
+            std::cerr << "  expected[" << key << "]: bad granule key" << std::endl;
+            ok = false;
+            continue;
+        }
+
+        auto it_g = test_io->data.find(combined);
         if (it_g == test_io->data.end()) {
             std::cerr << "  missing granule: " << key << std::endl;
             ok = false;
@@ -496,9 +512,6 @@ static bool compare_expected(JSIContext*, const TestCase& tc,
     return ok;
 }
 
-// ============================================================
-// main
-// ============================================================
 std::vector<std::string> list_directory(const std::string& path) {
     std::vector<std::string> result;
     DIR* dir = opendir(path.c_str());

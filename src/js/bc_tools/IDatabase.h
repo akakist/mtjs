@@ -91,18 +91,21 @@ public:
     REF_getter<data_base> replaceLeaf(const THASH_id &name, Rollback* roll, const std::string & buffer);
 
     static std::vector<std::string> getContractPath(const CONTRACT_id &name);
-    static std::vector<std::string> getContractDataPath(const CONTRACT_DATA_id &name);
+    std::vector<std::string> getContractDataPath(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId);
     static std::vector<std::string> getNodePath(const NODE_id &name);
 
 
     static std::vector<std::string> getUserPath(const ADDRESS_id &addr);
     static std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
 
-    REF_getter<bc_contract> getContract(const CONTRACT_id &name);
-    REF_getter<bc_contract> addContract(const CONTRACT_id &name, Rollback*);
+    REF_getter<bc_contract> getContractNoCreate(const CONTRACT_id &name);
+    REF_getter<const bc_contract> getContractNoCreateConst(const CONTRACT_id &name);
+    REF_getter<bc_contract> getContractOrCreate(const CONTRACT_id &name,Rollback* roll);
 
-    REF_getter<bc_contract_data> getContractData(const CONTRACT_DATA_id &name);
-    REF_getter<bc_contract_data> addContractData(const CONTRACT_DATA_id &name,  Rollback*);
+    REF_getter<bc_contract_data> getContractDataNoCreate(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId);
+    REF_getter<const bc_contract_data> getContractDataNoCreateConst(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId);
+    REF_getter<bc_contract_data> getContractDataOrCreate(const CONTRACT_id& con, const CONTRACT_DATA_id &name, Rollback* roll, int ttl, time_t create_time);
+
 
     REF_getter<bc_values> getValuesOrCreate(Rollback*);
     REF_getter<bc_values> getValuesNoCreate();
