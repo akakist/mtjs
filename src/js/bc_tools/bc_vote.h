@@ -7,18 +7,18 @@ struct vote
     uint64_t value;
     std::set<NODE_id> nodes;
     time_t create_time;
+    int64_t ttl = 0;                     // <-- новое
 };
 inline outBuffer& operator<<(outBuffer &o,const vote& z)
 {
-    o<<z.param<<z.value<<z.nodes<<z.create_time;
+    o<<z.param<<z.value<<z.nodes<<z.create_time<<z.ttl;   // <-- ttl в конце
     return o;
 }
 inline inBuffer& operator>>(inBuffer &o,vote& z)
 {
-    o>>z.param>>z.value>>z.nodes>>z.create_time;
+    o>>z.param>>z.value>>z.nodes>>z.create_time>>z.ttl;   // <-- ttl в конце
     return o;
 }
-
 struct bc_votes:  public data_base
 {
 

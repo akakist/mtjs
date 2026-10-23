@@ -14,6 +14,7 @@ extern "C"
 void register_http_response_class(JSContext* ctx);
 void register_http_request_class(JSContext* ctx) ;
 void register_http_server_class(JSContext* ctx) ;
+void register_block_class(JSContext* ctx);
 void register_ws_server_connection_class(JSContext* ctx);
 void js_register_pipe_reader( JSContext *ctx,JSValue & mtjs_obj);
 int js_init_module_mysql(JSContext *ctx) ;
@@ -180,6 +181,7 @@ bool MTJS::Service::on_startService(const systemEvent::startService*)
     register_rpc_request_class(js_ctx);
     register_rpc_response_class(js_ctx);
     js_register_async_tools(js_ctx,mtjs_obj);
+    register_block_class(js_ctx);
     js_register_add_instance(js_ctx,mtjs_obj);
 
     js_init_fs(js_ctx, mtjs_obj);

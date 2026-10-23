@@ -26,6 +26,12 @@
 #include "md/md_GetUserNonceRSP.h"
 #include "init_root.h"
 #include "CDatabaseRocksdb.h"
+#include "md/md_GetNodeInfoREQ.h"
+#include "md/md_GetNodeInfoRSP.h"
+#include "md/md_GetContractDataREQ.h"
+#include "md/md_GetContractDataRSP.h"
+#include "md/md_GetValuesREQ.h"
+#include "md/md_GetValuesRSP.h"
 
 bool GrainReader::Service::on_startService(const systemEvent::startService *)
 {
@@ -137,23 +143,69 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
 
     switch(p)
     {
-    case msgid::GetUserNonceREQ:
-    {
-        ADDRESS_id addr;
-        auto pp=(MsgData::GetUserNonceREQ*) b.get();
-        auto u = db_state_3->getAddressStateOrCreate(pp->user_address,NULL);
-
-        REF_getter<MsgData::GetUserNonceRSP> rsp=new MsgData::GetUserNonceRSP;
+        case msgid::GetUserNonceREQ:
         {
-            M_LOCK(u->parent->mx);
-            rsp->nonce=u->nonce;
-            rsp->balance=u->balance;
+            ADDRESS_id addr;
+            auto pp=(MsgData::GetUserNonceREQ*) b.get();
+            auto u = db_state_3->getAddressStateOrCreate(pp->user_address,NULL);
+
+            REF_getter<MsgData::GetUserNonceRSP> rsp=new MsgData::GetUserNonceRSP;
+            {
+                M_LOCK(u->parent->mx);
+                rsp->nonce=u->nonce;
+                rsp->balance=u->balance;
+            }
+            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
+
+
         }
-        passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
-
-
-    }
-    break;
+        break;
+        case msgid::GetNodeInfoREQ:
+        {
+            auto pp=(MsgData::GetNodeInfoREQ*) b.get();
+            REF_getter<MsgData::GetNodeInfoRSP> rsp = new MsgData::GetNodeInfoRSP;
+            auto n = db_state_3->getNodeNoCreate(pp->node_name);
+            if (n.valid()) {
+                rsp->found = true;
+                rsp->name = n->getName();
+                rsp->owner = n->get_owner();
+                rsp->ed_pk = base16::encode(n->get_ed_pk());
+                rsp->bls_pk = base16::encode(n->get_bls_pk().serialize());
+                rsp->ip = n->get_ip();
+                rsp->enabled = n->isEnabled();
+                rsp->missed_rounds = n->missed_rounds;
+                rsp->full_stake = n->get_full_stake();
+                rsp->stakes = n->getStakes();
+            }
+            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
+            break;
+        }
+        case msgid::GetValuesREQ:
+        {
+            REF_getter<MsgData::GetValuesRSP> rsp = new MsgData::GetValuesRSP;
+            auto v = db_state_3->getValuesNoCreate();
+            if (v.valid()) {
+                rsp->found = true;
+                rsp->fees = v->fees;
+            }
+            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
+            break;
+        }
+        case msgid::GetContractDataREQ:
+        {
+            auto pp=(MsgData::GetContractDataREQ*) b.get();
+            REF_getter<MsgData::GetContractDataRSP> rsp = new MsgData::GetContractDataRSP;
+            rsp->contract = pp->contract.container;
+            rsp->key = pp->key.container;
+            auto d = db_state_3->getContractDataNoCreate(pp->contract, pp->key);
+            if (d.valid()) {
+                rsp->found = true;
+                rsp->value = d->container;
+            }
+            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
+            break;
+        }
+        default: logErr2("unhanddledf msg %s",msgName(p));
     }
 
     return true;

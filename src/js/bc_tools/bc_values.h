@@ -19,6 +19,7 @@ struct bc_values: public data_base
         fees["validator_count_percent"]=50;
         fees["missed_rounds_max"]=100;
         fees["vote"]=4000;
+        fees["validator_min_stake"]=100;   // дефолт для новой БД; активация — только через vote (validator_min_stake_activated)
     }
     std::map<std::string,uint64_t> fees;
     std::set<ADDRESS_id> emitters_bin;
@@ -46,6 +47,7 @@ struct bc_values: public data_base
         auto it=fees.find(fee_type);
         if(it!=fees.end())
             return it->second;
+        if (fee_type == "vote") return 4000;   // fallback: старая БД без fees["vote"]
         throw CommonError("fee '%s' not found", fee_type.c_str());
         return 0;
     }

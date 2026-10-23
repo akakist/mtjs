@@ -114,6 +114,11 @@ public:
         M_LOCK(parent->mx);
         return bls_pk;
     }
+    std::map<ADDRESS_id, uint64_t> getStakes() const
+    {
+        M_LOCK(parent->mx);
+        return stakes;
+    }
     void init(const NODE_id& name, const ADDRESS_id &_owner_address, const blst_cpp::PublicKey &_bls_pk,
               const std::string &_ed_pk, const std::string& _ip)
     {

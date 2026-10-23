@@ -20,7 +20,7 @@ rpc_request.cpp
 rpc_response.cpp
 asyncExecute.cpp
 createInstance.cpp
-contract.cpp
+#contract.cpp
            )
 
 

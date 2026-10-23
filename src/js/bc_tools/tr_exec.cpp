@@ -452,75 +452,112 @@ std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_p
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
-    auto votes=b.db->getVotesOrCreate(t.roll);
+    auto votes = b.db->getVotesOrCreate(t.roll);
+
     NODE_id node;
-    auto err=yy_get_string(params,"node",node.container);
-    if(err)
-        return err;
+    auto err = yy_get_string(params, "node", node.container);
+    if (err) return err;
+
     std::string param;
-    err=yy_get_string(params,"param",param);
-    if(err)
-        return err;
+    err = yy_get_string(params, "param", param);
+    if (err) return err;
+
     std::string value;
-    err=yy_get_string(params,"value",value);
-    if(err)
-        return err;
+    err = yy_get_string(params, "value", value);
+    if (err) return err;
+
+    bool has_ttl = false;
+    uint64_t ttl = 0;
+    {
+        auto tv = yyjson_obj_get(params, "ttl");
+        if (tv) {
+            if (yyjson_is_num(tv)) {
+                ttl = yyjson_get_uint(tv);
+            } else if (yyjson_is_str(tv)) {
+                try { ttl = std::stoull(yyjson_get_str(tv)); }
+                catch (...) { return "param 'ttl' invalid"; }
+            } else {
+                return "param 'ttl' must be number or string";
+            }
+            has_ttl = true;
+        }
+    }
 
     auto n = b.db->getNodeNoCreateConst(node);
     if (!n.valid())
         return "node not exists";
-    if(n->get_owner()!=t.senderAddress)
-    {
+    if (n->get_owner() != t.senderAddress)
         return "insufficient privileges, node owner required";
-    }
-    auto vhash=blake2b_hash(param+value);
-    std::set<NODE_id> voted;
+
+    int64_t block_ts = b.validateBlockREQ->heart_beat->block_timestamp;
+    auto vhash = blake2b_hash(param + value);
+
     {
         MutexLockerDeferred l(votes->parent->mx);
         l.lock();
-        if(!votes->votes.count(vhash))
-        {
-            votes->votes[vhash].create_time=b.validateBlockREQ->heart_beat->block_timestamp;
-        }
-        auto &z=votes->votes[vhash];
-        if(!z.nodes.count(node))
-        {
+
+        auto it = votes->votes.find(vhash);
+        if (it == votes->votes.end()) {
+            if (!has_ttl || ttl == 0) {
+                l.unlock();
+                return "param 'ttl' must be specified on first vote";
+            }
+            vote& z = votes->votes[vhash];
+            z.param = param;
+            z.value = std::stoull(value);
+            z.create_time = block_ts;
+            z.ttl = (int64_t)ttl;
             z.nodes.insert(node);
+        } else {
+            int64_t elapsed = block_ts - it->second.create_time;
+            if (elapsed > it->second.ttl) {
+                l.unlock();
+                b.emit_command(t.tx_id, seqId, "vote_failed",
+                    R"({"param":"%s","value":"%s","reason":"ttl_expired","elapsed":"%lld","ttl":"%lld"})",
+                    param.c_str(), value.c_str(),
+                    (long long)elapsed, (long long)it->second.ttl);
+                {
+                    MutexLockerDeferred l2(votes->parent->mx);
+                    l2.lock();
+                    votes->votes.erase(vhash);
+                }
+                t.markDirty(votes.get());
+                return std::nullopt;
+            }
+            it->second.nodes.insert(node);
         }
-        voted=z.nodes;
+
+        auto voted = votes->votes[vhash].nodes;
         l.unlock();
         t.markDirty(votes.get());
-    }
-    uint64_t stake=0;
 
-    bool accepted=false;
-    for(auto& z: voted)
-    {
-        auto n=b.db->getNodeNoCreateConst(z);
-        if(!n.valid())
-            return "node not found "+z.container;
-        stake+=n->get_full_stake();
-    }
-    if((stake*100)/b.meta->fullStake()>QUORUM)
-    {
-        auto vv=b.db->getValuesNoCreate();
-        {
-            M_LOCK(v->parent->mx);
-            vv->fees[param]=atoll(value.c_str());
+        uint64_t stake = 0;
+        for (auto& z : voted) {
+            auto nn = b.db->getNodeNoCreateConst(z);
+            if (!nn.valid())
+                return "node not found " + z.container;
+            stake += nn->get_full_stake();
         }
-        votes->votes.erase(vhash);
-        t.markDirty(votes.get());
-        t.markDirty(vv.get());
-
-        accepted=true;
+        if ((stake * 100) / b.meta->fullStake() > QUORUM) {
+            auto vv = b.db->getValuesNoCreate();
+            {
+                M_LOCK(vv->parent->mx);
+                vv->fees[param] = std::stoull(value);
+                if (param == "validator_min_stake")
+                    vv->fees["validator_min_stake_activated"] = 1;   // активация sybil (getMetaFull — TBD)
+            }
+            votes->votes.erase(vhash);
+            t.markDirty(votes.get());
+            t.markDirty(vv.get());
+            b.emit_command(t.tx_id, seqId, "vote_applied",
+                R"({"param":"%s","value":"%s"})", param.c_str(), value.c_str());
+        }
     }
 
-
-    t.gasUsed+=v->getGas("vote");
-
-    b.emit_command(t.tx_id, seqId, "vote_counted",R"({"node":"%s","param":"%s","value":"%s"})",node.container.c_str(),param.c_str(),value.c_str());
-    if(accepted)
-        b.emit_command(t.tx_id, seqId, "vote_applied",R"({"param":"%s","value":"%s"})",param.c_str(),value.c_str());
+    t.gasUsed += v->getGas("vote");
+    b.emit_command(t.tx_id, seqId, "vote_counted",
+        R"({"node":"%s","param":"%s","value":"%s"})",
+        node.container.c_str(), param.c_str(), value.c_str());
 
     return std::nullopt;
 }

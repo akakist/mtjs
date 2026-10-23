@@ -78,6 +78,9 @@ namespace msgid
         LcEnvelopeREQ=16,
         DelayNotificationREQ=17,
 
+        GetNodeInfoREQ=22, GetNodeInfoRSP=23,
+        GetValuesREQ=24, GetValuesRSP=25,
+        GetContractDataREQ=26, GetContractDataRSP=27,
         BlockDiffValidateREQ=18, BlockDiffValidateRSP=19,
         BlockAccepted2REQ = 20,
         LeaderCert = 21

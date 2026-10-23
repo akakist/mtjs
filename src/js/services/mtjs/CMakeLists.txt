@@ -24,6 +24,7 @@ add_library(mtjsmoduleS STATIC
     mtjs_startService.cpp
     mtjs_rpc.cpp
     mtjsService.h
+    mtjs_block.cpp
 )
 if(NOT APPLE)
 

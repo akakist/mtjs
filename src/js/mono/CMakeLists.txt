@@ -33,9 +33,9 @@ ${OPENSSL_LIBRARIES}
 else()
 target_link_libraries(mtjs 
 #-static  
--Wl,--start-group node2-serviceS node-serviceS node3-serviceS node4-serviceS node5-serviceS node6-serviceS nodeW-serviceS 
+-Wl,--start-group node2-serviceS node-serviceS node3-serviceS node4-serviceS node5-serviceS node6-serviceS nodeW-serviceS
 contract-api
-rocksdb     mtjsmoduleS mtjscommon     mtjsnet  mtjsutils bctools quickjs quickjs-i megatron-main   zsingle megatron-core sodium     crypto  blst 
+rocksdb     mtjsmoduleS mtjscommon    mtjsnet  mtjsutils bctools quickjs quickjs-i megatron-main   zsingle megatron-core sodium     crypto  blst 
       ${linuxlib} yyjson  
 
 #curl  psl idn2 unistring nghttp2

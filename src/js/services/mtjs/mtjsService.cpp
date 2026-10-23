@@ -23,9 +23,13 @@
 
 #include "sv.h"
 #include "md/md_GetUserNonceRSP.h"
+#include "md/md_GetContractDataRSP.h"
+#include "md/md_GetNodeInfoRSP.h"
+#include "md/md_GetValuesRSP.h"
 // #include <yyjson.h>
 #include <nlohmann/json.hpp>
 #include "js_tools.h"
+#include "mtjs_block.h"
 extern "C"
 {
 }
@@ -261,6 +265,7 @@ void MTJS::Service::checkForExit()
     executePending();
     if (getPendingCount())
         return;
+    if (opaque.tx_wait_promises.size()) return;
     if (opaque.rpcBlockExit)
         return;
     if(opaque.node_req_promises.size())
@@ -315,6 +320,22 @@ bool MTJS::Service::TickAlarm(const timerEvent::TickAlarm *e)
         opaque.node_req_promises.erase(h);
         return true;
         // JS_Call
+    }
+    if (e->tid == Timers::TIMER_TX_WAIT_BLOCK)
+    {
+        JSScope<10, 10> scope(js_ctx);
+        std::string h = e->data->container;
+        auto it = opaque.tx_wait_promises.find(h);
+        if (it == opaque.tx_wait_promises.end())
+            return true;
+        JSValue global_obj = JS_GetGlobalObject(js_ctx);
+        scope.addValue(global_obj);
+        JSValue o = makeError(it->second.ctx, BCERR_TIMEDOUT, "timed out");
+        scope.addValue(o);
+        JSValue r = JS_Call(it->second.ctx, it->second.reject.get(), global_obj, 1, &o);
+        scope.addValue(r);
+        opaque.tx_wait_promises.erase(h);
+        return true;
     }
     if (e->tid == Timers::TIMER_TIMER)
     {
@@ -530,13 +551,10 @@ bool MTJS::Service::AddTxRSP(const bcEvent::AddTxRSP* e)
     return true;
 
 }
-
 bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
 {
     MUTEX_INSPECTOR;
-
     logErr2("ClientMsgReply");
-    // throw CommonError("ClientMsgReply");
     auto it = opaque.node_req_promises.find(e->hash_of_request.container);
     if (it == opaque.node_req_promises.end())
         throw CommonError("if(it==opaque.node_req_promises.end())");
@@ -554,7 +572,6 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JSScope<20, 20> scope(it->second.ctx);
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        // JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, rs->balance.toString().c_str()));
         JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, std::to_string(rs->nonce).c_str()));
         JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, std::to_string(rs->balance).c_str()));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
@@ -562,7 +579,76 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         opaque.node_req_promises.erase(e->hash_of_request.container);
         sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
         return true;
-
+    }
+    break;
+    case msgid::GetNodeInfoRSP:
+    {
+        auto *rs=(MsgData::GetNodeInfoRSP*) b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20, 20> scope(it->second.ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "name", JS_NewString(ctx, rs->name.container.c_str()));
+        JS_SetPropertyStr(ctx, obj, "owner", JS_NewString(ctx, base16::encode(rs->owner.addr).c_str()));
+        JS_SetPropertyStr(ctx, obj, "ed_pk", JS_NewString(ctx, rs->ed_pk.c_str()));
+        JS_SetPropertyStr(ctx, obj, "bls_pk", JS_NewString(ctx, rs->bls_pk.c_str()));
+        JS_SetPropertyStr(ctx, obj, "ip", JS_NewString(ctx, rs->ip.c_str()));
+        JS_SetPropertyStr(ctx, obj, "enabled", JS_NewBool(ctx, rs->enabled));
+        JS_SetPropertyStr(ctx, obj, "missed_rounds", JS_NewInt64(ctx, rs->missed_rounds));
+        JS_SetPropertyStr(ctx, obj, "full_stake", JS_NewString(ctx, std::to_string(rs->full_stake).c_str()));
+        JSValue stakes_obj = JS_NewObject(ctx);
+        // scope.addValue(stakes_obj);
+        for (auto& kv : rs->stakes) {
+            JS_SetPropertyStr(ctx, stakes_obj, base16::encode(kv.first.addr).c_str(),
+                              JS_NewString(ctx, std::to_string(kv.second).c_str()));
+        }
+        JS_SetPropertyStr(ctx, obj, "stakes", stakes_obj);
+        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
+    }
+    break;
+    case msgid::GetValuesRSP:
+    {
+        auto *rs=(MsgData::GetValuesRSP*) b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20, 20> scope(it->second.ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JSValue fees_obj = JS_NewObject(ctx);
+        // scope.addValue(fees_obj);
+        for (auto& kv : rs->fees) {
+            JS_SetPropertyStr(ctx, fees_obj, kv.first.c_str(),
+                              JS_NewString(ctx, std::to_string(kv.second).c_str()));
+        }
+        JS_SetPropertyStr(ctx, obj, "fees", fees_obj);
+        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
+    }
+    break;
+    case msgid::GetContractDataRSP:
+    {
+        auto *rs=(MsgData::GetContractDataRSP*) b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20, 20> scope(it->second.ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "contract", JS_NewString(ctx, rs->contract.c_str()));
+        JS_SetPropertyStr(ctx, obj, "key", JS_NewString(ctx, rs->key.c_str()));
+        JS_SetPropertyStr(ctx, obj, "value", JS_NewString(ctx, rs->value.c_str()));
+        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
     }
     break;
     default:
@@ -610,6 +696,7 @@ void to_json(nlohmann::json& j, const EmitNode& node) {
     }
     XPASS;
 }
+#ifdef KALL
 JSValue emit_node_to_js(JSContext* ctx, const EmitNode& node) {
     JSValue obj = JS_NewObject(ctx);
     
@@ -636,57 +723,58 @@ JSValue emit_node_to_js(JSContext* ctx, const EmitNode& node) {
     
     return obj;
 }
+#endif
 bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 {
     MUTEX_INSPECTOR;
     XTRY;
-
-    // inBuffer in(e->msg);
-    // REF_getter<MsgData::BlockDBStore> pb = new MsgData::BlockDBStore();
-    // pb->unpack2(in);
-    for (size_t ti = 0; ti < e->tx_hashes.size(); ti++)
-    {
-        XTRY;
-        if (opaque.tx_subscription_cb.has_value())
-        {
-            XTRY;
-            JSScope<10, 10> scope(js_ctx);
-            JSValue global_obj = JS_GetGlobalObject(js_ctx);
-            scope.addValue(global_obj);
-            
-            THASH_id tx_hash = e->tx_hashes[ti];
-            auto it=opaque.node_tx_cb.find(tx_hash.container);
-            if(it!=opaque.node_tx_cb.end())
-            {
-                auto tx_it=e->att_data->blockRoot.children.find(base16::encode(tx_hash.container));
-                if(tx_it==e->att_data->blockRoot.children.end())
-                    throw CommonError("if(tx_it==e->att_data->blockRoot.children.end())");
-                JSValue obj2=emit_node_to_js(js_ctx, tx_it->second);
-                scope.addValue(obj2);
-                // JSValue argv1[1];
-                // argv1[0] = obj2;
-                JSValue func_result = JS_Call(js_ctx, it->second.get(), global_obj, 1, & obj2);
-                scope.addValue(func_result);
-                qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
-                opaque.node_tx_cb.erase(it);
-
-            }
-            // else logErr2("node_tx_cb not found %s",base16::encode(tx_hash.container).c_str());
-            if (!JS_IsFunction(js_ctx, opaque.tx_subscription_cb->get()))
-            {
-                throw CommonError("callback not a function");
-            }
-            JSValue obj=emit_node_to_js(js_ctx, e->att_data->blockRoot);
-            scope.addValue(obj);
-            // JSValue argv[1];
-            // argv[0] = obj;
-            JSValue func_result = JS_Call(js_ctx, opaque.tx_subscription_cb->get(), global_obj, 1, &obj);
-            scope.addValue(func_result);
-            qjs::checkForException(js_ctx, func_result, "ClientTxSubscribeRSP: JS_Call");
-            XPASS;
-        }
-        XPASS;
+logErr2("MTJS::ClientTxSubscribeRSP: tx=%d, promises=%d, keys=", (int)e->tx_hashes.size(), (int)opaque.tx_wait_promises.size());
+for (auto& kv : opaque.tx_wait_promises) logErr2("  %s", kv.first.c_str());
+    if (!e->att_data.valid()) {
+        logErr2("ClientTxSubscribeRSP: att_data invalid");
+        return true;
     }
+
+    JSScope<10, 10> scope(js_ctx);
+
+    bool finalized = e->blockAccepted2REQ.valid();
+    JSValue js_block = js_block_new(js_ctx, e->blockAccepted2REQ, e->att_data, e->tx_hashes, finalized);
+    scope.addValue(js_block);
+    if (JS_IsException(js_block)) {
+        logErr2("ClientTxSubscribeRSP: js_block_new exception");
+        return true;
+    }
+
+    for (size_t ti = 0; ti < e->tx_hashes.size(); ++ti) {
+        auto hex = base16::encode(e->tx_hashes[ti].container);
+        auto it = opaque.tx_wait_promises.find(hex);
+        if (it != opaque.tx_wait_promises.end()) {
+            JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &js_block);
+            scope.addValue(ret);
+            qjs::checkForException(it->second.ctx, ret, "ClientTxSubscribeRSP: resolve tx_wait_promises");
+            opaque.tx_wait_promises.erase(it);
+            sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(hex), this));
+        }
+    }
+
+    {
+        std::string next_key = "next:";
+        auto it = opaque.tx_wait_promises.find(next_key);
+        if (it != opaque.tx_wait_promises.end()) {
+            JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &js_block);
+            scope.addValue(ret);
+            qjs::checkForException(it->second.ctx, ret, "ClientTxSubscribeRSP: resolve next");
+            opaque.tx_wait_promises.erase(it);
+            sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(next_key), this));
+        }
+    }
+
+    if (opaque.tx_subscription_cb.has_value() && JS_IsFunction(js_ctx, opaque.tx_subscription_cb->get())) {
+        JSValue ret = JS_Call(js_ctx, opaque.tx_subscription_cb->get(), JS_UNDEFINED, 1, &js_block);
+        scope.addValue(ret);
+        qjs::checkForException(js_ctx, ret, "ClientTxSubscribeRSP: tx_subscription_cb");
+    }
+
     XPASS;
     return true;
 }

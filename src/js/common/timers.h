@@ -9,6 +9,7 @@ namespace Timers
         TIMER_ClientMsg_TIMEDOUT=103,
         TIMER_REPORT_MEM=104,
 
+        TIMER_TX_WAIT_BLOCK=105,
     };
 
 }

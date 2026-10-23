@@ -20,6 +20,12 @@
 #include "md/md_BlockDBStore.h"
 
 
+#include "md/md_GetNodeInfoREQ.h"
+#include "md/md_GetNodeInfoRSP.h"
+#include "md/md_GetValuesREQ.h"
+#include "md/md_GetValuesRSP.h"
+#include "md/md_GetContractDataREQ.h"
+#include "md/md_GetContractDataRSP.h"
 #include "md/md_DelayNotificationREQ.h"
 
 
@@ -41,6 +47,12 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::LcEnvelopeREQ, MsgData::LcEnvelopeREQ::construct);
     registerMsg(msgid::DelayNotificationREQ, MsgData::DelayNotificationREQ::construct);
 
+    registerMsg(msgid::GetNodeInfoREQ, MsgData::GetNodeInfoREQ::construct);
+    registerMsg(msgid::GetNodeInfoRSP, MsgData::GetNodeInfoRSP::construct);
+    registerMsg(msgid::GetValuesREQ, MsgData::GetValuesREQ::construct);
+    registerMsg(msgid::GetValuesRSP, MsgData::GetValuesRSP::construct);
+    registerMsg(msgid::GetContractDataREQ, MsgData::GetContractDataREQ::construct);
+    registerMsg(msgid::GetContractDataRSP, MsgData::GetContractDataRSP::construct);
     registerMsg(msgid::BlockDiffValidateREQ, MsgData::BlockDiffValidateREQ::construct);
     registerMsg(msgid::BlockDiffValidateRSP, MsgData::BlockDiffValidateRSP::construct);
     registerMsg(msgid::BlockDBStore, MsgData::BlockDBStore::construct);

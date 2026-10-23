@@ -1,4 +1,3 @@
-
 #pragma once
 #include "REF.h"
 #include "quickjs_i.h"
@@ -11,6 +10,9 @@
 #include "CONTRACT_id.h"
 struct CallStack;
 struct ContractHost;
+struct t_params;
+struct b_params;
+
 struct ContractContext : public Refcountable {
     JSIRuntime* rt = nullptr;
     JSIContext* ctx = nullptr;
@@ -23,8 +25,7 @@ struct ContractContext : public Refcountable {
     ContractContext& operator=(const ContractContext&) = delete;
 
     ~ContractContext() {
-        methods.clear();
-        views.clear();
+        methods.clear(); views.clear();
         if (ctx) { JSI_FreeContext(ctx); ctx = nullptr; }
         if (rt) { JSI_FreeRuntime(rt); rt = nullptr; }
     }
@@ -44,5 +45,10 @@ struct ContractContext : public Refcountable {
                              const nlohmann::json& params,
                              const jsiMsg& m, bool is_view,
                              const REF_getter<CallStack>& call_stack,
-                             const REF_getter<ContractHost>& host);
+                             const REF_getter<ContractHost>& host,
+                             t_params* t = nullptr,
+                             b_params* b = nullptr);
 };
+
+
+

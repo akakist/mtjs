@@ -49,6 +49,7 @@
 #include "js_tools.h"
 #include "jsi/api/ContractHost.h"
 #include "NodeGranuleIO.h"
+#include "CallStack.h"
 
 static REF_getter<ContractHost> make_node_contract_host(const REF_getter<IDatabase>& db) {
     REF_getter<ContractHost> h = new ContractHost();
@@ -751,6 +752,7 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     return true;
 }
+#ifdef KALL
 std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_params& t,
         yyjson_val * j_tx)
 {
@@ -841,7 +843,88 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
     }
     return std::nullopt;
 }
+#endif
+std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_params& t,
+        yyjson_val * j_tx)
+{
+    MUTEX_INSPECTOR;
+    if(!yyjson_is_arr(j_tx))
+        return "command list must be json array";
 
+    yyjson_arr_iter iter;
+    yyjson_arr_iter_init(j_tx, &iter);
+
+    uint32_t index = 0;
+    yyjson_val* item;
+    {
+        MUTEX_INSPECTOR;
+        if(t.gasUsed>t.gasLimit) return "gas exceeds limit";
+        while ((item = yyjson_arr_iter_next(&iter)))
+        {
+            MUTEX_INSPECTOR;
+            bool err=false;
+            yyjson_val* contract = yyjson_obj_get(item, "contract");
+            yyjson_val* method = yyjson_obj_get(item, "method");
+            yyjson_val* params = yyjson_obj_get(item, "params");
+            if(contract==NULL) return "'contract' field required";
+            if(method==NULL) return "'method' field required";
+            if(params==NULL) return "'params' field required";
+            if(!yyjson_is_str(contract)) return "'contract' must be string type";
+            if(!yyjson_is_str(method)) return "'method' must be string type";
+            if(!yyjson_is_obj(params)) return "'params' must be object type";
+            std::string contract_str=yyjson_get_str(contract);
+            std::string method_str=yyjson_get_str(method);
+
+            if (contract_str == "root")
+            {
+                std::optional<std::string> err;
+                auto meth=method_str;
+                if (meth == "mint") err = TR::execute_mint(params, b, t, index);
+                else if (meth == "transfer") err = TR::execute_transfer(params, b,t, index);
+                else if (meth == "node_create") err = TR::execute_node_create(params,b, t, index);
+                else if (meth == "node_update") err = TR::execute_node_update(params, b,t, index);
+                else if (meth == "node_stake") err = TR::execute_node_stake(params, b,t, index);
+                else if (meth == "node_unstake") err = TR::execute_unstake_node(params, b,t, index);
+                else if (meth == "node_enable") err = TR::execute_node_enable(params, b,t, index);
+                else if (meth == "node_disable") err = TR::execute_node_disable(params, b,t, index);
+                else if (meth == "contract_deploy") err = TR::execute_contract_deploy(params,b, t, index);
+                else if (meth == "contract_update") err = TR::execute_contract_update(params, b,t, index);
+                else if (meth == "vote") err = TR::execute_vote(params, b,t, index);
+                else return "unhandled method '"+method_str+"' for root contract";
+                if (err) return err;
+            }
+            else
+            {
+                // JSI-контракт (gym.js и т.п.)
+                CONTRACT_id c; c.container = contract_str;
+                auto cc = contractHost->get_contract(c);
+                if (!cc.valid()) return "contract not found: " + contract_str;
+
+                // params yyjson -> json
+                std::string params_str = yyjson_val_write(params, 0, nullptr);
+                nlohmann::json params_json;
+                if (!params_str.empty()) {
+                    try { params_json = nlohmann::json::parse(params_str); }
+                    catch (const std::exception& e) { return std::string("params parse error: ") + e.what(); }
+                } else params_json = nlohmann::json::object();
+
+                jsiMsg m; // в ноде msg собирается лениво из t; m — для совместимости, поля не используются геттерами
+                REF_getter<CallStack> call_stack = new CallStack;
+                JSIValue result = cc->call_contract_method(method_str, params_json, m, false,
+                                                           call_stack, contractHost, &t, &b);
+                if (JSI_IsException(result)) {
+                    JSI_FreeValue(cc->ctx, result);
+                    return "contract call failed: " + contract_str + "." + method_str;
+                }
+                JSI_FreeValue(cc->ctx, result);
+                // эмиты: TBD (out-параметр call_contract_method или NodeEventSink с контекстом)
+            }
+            ++index;
+        }
+    }
+    return std::nullopt;
+}
+#ifdef KALL
 std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
         const REF_getter<MsgData::TX> &tx, uint64_t epoch)
 {
@@ -951,6 +1034,113 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
     return std::nullopt;
 }
+#endif
+std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
+        const REF_getter<MsgData::TX> &tx, uint64_t epoch)
+{
+    MUTEX_INSPECTOR;
+    uint64_t gasLimit=0, gasPrice=0, value=0;
+    yyjson_val *jroot=yyjson_doc_get_root(tx->doc);
+    yyjson_val * j_tx = yyjson_obj_get(jroot,"tx");
+    if(!j_tx) throw CommonError("if(!j_tx)");
+    auto err=yy_get_uint64_t(jroot,"value",value);
+    if(!err) err=yy_get_uint64_t(jroot,"gasLimit",gasLimit);
+    if(!err) err=yy_get_uint64_t(jroot,"gasPrice",gasPrice);
+    if(err)
+    {
+        b.emit_tx(tx_id,"error",R"({"error":"%s"})",err->c_str());
+        return err;
+    }
+    Rollback roll;
+    t_params t(db_state);
+    t.senderAddress=senderAddress;
+    t.tx=tx;
+    t.epoch=epoch;
+    t.tx_id=tx_id;
+    t.roll=&roll;
+    t.value=value;
+    t.gasLimit=gasLimit;
+    // new: заполняем msg-поля из актуальных источников
+    t.block_timestamp = prev_block.valid()
+        ? (int64_t)prev_block->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp
+        : 0;
+    t.block_height = 0; // TBD
+    {
+        uint64_t n=0;
+        if(!tx->getNonce(n)) t.nonce = (int64_t)n;
+    }
+    // chainId из TX (если есть)
+    {
+        yyjson_val* cid = yyjson_obj_get(jroot, "chainId");
+        if (cid && yyjson_is_num(cid)) t.chain_id = (int64_t)yyjson_get_uint(cid);
+        else if (cid && yyjson_is_str(cid)) t.chain_id = (int64_t)std::atoll(yyjson_get_str(cid));
+    }
+    t.tx_index = 0; // TBD (индекс TX/команды)
+
+    auto uu=db_state->getAddressStateNoCreate(senderAddress);
+    if(!uu.valid()) throw CommonError("if(!uu.valid())");
+    {
+        M_LOCK(uu->parent->mx);
+        if(uu->balance < gasLimit*gasPrice+value)
+            return "not enough funds to reserve gasLimit*gasPrice+value";
+    }
+    db_state->root->calc_tree_hash(db_to_save_Z);
+
+    err=execute_tx_commands(b,t,j_tx);
+    if(err)
+    {
+        logNode("error:%s",err->c_str());
+        b.emit_tx(t.tx_id,"error",R"({"error":"%s"})",err->c_str());
+        t.gasUsed+=t.roll->size();
+        t.rollback();
+        auto gu=t.gasUsed;
+        if(gu>gasLimit) gu=gasLimit;
+        M_LOCK(uu->parent->mx);
+        uu->balance-=gu*gasPrice;
+        b.node_rewards+=gu*gasPrice;
+        return err;
+    }
+    if(t.value<0)
+    {
+        t.gasUsed+=t.roll->size();
+        t.rollback();
+        b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
+        M_LOCK(uu->parent->mx);
+        uu->balance-=t.gasUsed*gasPrice;
+        b.node_rewards+=t.gasUsed*gasPrice;
+        return "value exceeds limit";
+    }
+    if(t.gasUsed>gasLimit)
+    {
+        t.rollback();
+        b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
+        M_LOCK(uu->parent->mx);
+        uu->balance-=gasLimit*gasPrice;
+        b.node_rewards+=gasLimit*gasPrice;
+        return "gas exceeds limit";
+    }
+    _db_to_save db_dump;
+    db_state->root->calc_tree_hash(db_dump);
+    size_t sz=db_dump.size();
+    t.gasUsed+=sz;
+    if(t.gasUsed>gasLimit)
+    {
+        t.rollback();
+        b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
+        M_LOCK(uu->parent->mx);
+        uu->balance-=gasLimit*gasPrice;
+        b.node_rewards+=gasLimit*gasPrice;
+        return "gas exceeds limit";
+    }
+    {
+        M_LOCK(uu->parent->mx);
+        uu->balance-=t.gasUsed*gasPrice+value-t.value;
+    }
+    db_state->root->calc_tree_hash(db_dump);
+    db_to_save_Z.add(db_dump);
+    return std::nullopt;
+}
+
 
 inline uint64_t read_uint64(const uint8_t* data) {
     return (static_cast<uint64_t>(data[0]) << 56) |

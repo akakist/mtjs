@@ -1,60 +1,95 @@
 import { StreamModule } from "./stream";
 
+declare global {
 
-// export type Request =
-//     | { type: "stake"; sk: string; node: string; amount:string }
-//     | { type: "unstake"; sk: string; node: string; amount:string }
-//     | { type: "create_contract"; sk: string; name: string; amount:string; src: string }
-//     // | { type: "transfer"; to: string; amount:string; src: string }
-
-//     // | { type: CreateUser; name: string; email: string }
-//     // | { type: RequestType.DeleteUser; id: string }
-//     // | { type: RequestType.GetUser; id: string }
-//     | { type: "register_user"; nick: string; pk: string  };
-
-
-declare global
-{
-
-    interface userInfo{
+    interface userInfo {
         nonce: string;
-        balance:string
+        balance: string;
     }
-    interface mintRequest
-    {
-        sk:string
-        amount:string
-        nonce: string
-        timeout: number
+
+    interface mintRequest {
+        sk: string;
+        amount: string;
+        nonce: string;
+        timeout: number;
     }
-    interface tx_report
-    {
+
+    interface tx_report {
         tx_hash: string;
         errcode: number;
         errstring: string;
         fee: string;
         logMsgs: string[];
     }
-    interface mtjsModule
-    {
-        telnet:telnetModule;
+
+    interface AddTxRsp {
+        err: number;
+        err_str: string;
+        tx_hash: string;
+    }
+
+    interface Block {
+        readonly tx_hashes: string[];
+        readonly finalized: boolean;
+        readonly block_hash: string;
+        readonly block_timestamp: number;
+        status(tx_hash: string): "ok" | "err" | "unknown";
+        errstr(tx_hash: string): string | null;
+        emits(tx_hash: string): [string, unknown][] | null;
+        children(tx_hash: string): { [seqId: string]: unknown } | null;
+    }
+    interface NodeInfo {
+        found: boolean;
+        name: string;
+        owner: string;
+        ed_pk: string;
+        bls_pk: string;
+        ip: string;
+        enabled: boolean;
+        missed_rounds: number;
+        full_stake: string;
+        stakes: { [addr: string]: string };
+    }
+    interface ValuesInfo {
+        found: boolean;
+        fees: { [k: string]: string };
+    }
+    interface ContractData {
+        found: boolean;
+        contract: string;
+        key: string;
+        value: string;   // JSON-строка, JSON.parse() в тестах
+    }
+    interface mtjsModule {
+        telnet: telnetModule;
         http: httpModule;
         async asyncExecute(command: string): Promise<void>;
-        addInstance(name:string, conf:string);
-        get_user_nonce(nodeaddr:string, nick:string, timeout: number): Promise<userInfo>;
-        // mint(nodeaddr:string, sk:string, params:object): Promise<object>;
-        // tx_sign(tx:Objectstring, sk:string): string;
-        tx_submit(nodeaddr:string,  timeout:number, msg:string,sk:string, nonce:string, callback:(params:object) => void ): Promise<object>;
-        tx_subscribe(nodeaddr:string, callback: (params:tx_report) => void): void;
-        addr_from_pk(pk:string): string;
+        addInstance(name: string, conf: string): void;
+        get_user_nonce(nodeaddr: string, addr_hex: string, timeout: number): Promise<userInfo>;
+        tx_submit(
+            nodeaddr: string,
+            timeout: number,
+            msg: string,
+            sk: string,
+            nonce: string,
+            callback: (params: object) => void
+        ): Promise<AddTxRsp>;
+        tx_subscribe(nodeaddr: string, callback: (block: Block) => void): void;
+        tx_wait_block(nodeaddr: string, tx_hash_hex: string, timeout: number): Promise<Block>;
+        get_block(nodeaddr: string, timeout: number): Promise<Block>;
+        get_node_info(nodeaddr: string, name: string, timeout: number): Promise<NodeInfo>;
+        get_values(nodeaddr: string, timeout: number): Promise<ValuesInfo>;
+        get_contract_data(nodeaddr: string, contract: string, key: string, timeout: number): Promise<ContractData>;
+        addr_from_pk(pk: string): string;
         pipe: Pipe;
         STDIN: STDIN;
-        rpc:rpcModule;
-        stream:StreamModule;
-        utils:UtilsModule;
+        rpc: rpcModule;
+        stream: StreamModule;
+        utils: UtilsModule;
         fs: fsModule;
     }
-    const mtjs: mtjsModule;
 
+    const mtjs: mtjsModule;
 }
-export {  };
+
+export {};export {  };
