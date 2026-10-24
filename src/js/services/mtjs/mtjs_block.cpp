@@ -246,6 +246,27 @@ JSValue js_block_new(JSContext* ctx,
     b->att = att;
     b->tx_hashes = tx_hashes;
     b->finalized = finalized;
+    {
+        std::string txh;
+        for (auto& h : tx_hashes) { txh += base16::encode(h.container) + " "; }
+        std::string ch;
+        if (att.valid()) for (auto& kv : att->blockRoot.children) { ch += kv.first + "(" + std::to_string(kv.second.emits.size()) + ") "; }
+
+       for (auto& kv : att->blockRoot.children) {
+            std::string chs;
+            for (auto& c : kv.second.children) {
+                chs += c.first + "(";
+                for (auto& e : c.second.emits) chs += e.first + ",";
+                chs += ") ";
+            }
+            ch += kv.first + "(emits=" + std::to_string(kv.second.emits.size()) + " children=[" + chs + "]) ";
+        } 
+        logErr2("js_block_new: ba2=%d att=%d blockRoot_children=%d tx_hashes=%d | tx=[%s] children=[%s]",
+            ba2.valid(), att.valid(),
+            att.valid() ? (int)att->blockRoot.children.size() : -1,
+            (int)tx_hashes.size(),
+            txh.c_str(), ch.c_str());
+    }
 
     JSValue obj = JS_NewObjectClass(ctx, js_block_class_id);
     if (JS_IsException(obj)) {

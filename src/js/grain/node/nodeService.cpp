@@ -459,6 +459,7 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li, const
 THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
 {
     MUTEX_INSPECTOR;
+    
     for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
     {
         MUTEX_INSPECTOR;
@@ -509,6 +510,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
                         u->incNonce();
                     }
                     u->setDirty(NULL);
+                    logNode("execute_block: after tx att_blockRoot_children=%d", (int)b.att_data->blockRoot.children.size());
 
                 }
             }
@@ -1087,6 +1089,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     db_state->root->calc_tree_hash(db_to_save_Z);
 
     err=execute_tx_commands(b,t,j_tx);
+
     if(err)
     {
         logNode("error:%s",err->c_str());
