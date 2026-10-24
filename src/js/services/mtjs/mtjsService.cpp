@@ -382,9 +382,9 @@ bool MTJS::Service::TickTimer(const timerEvent::TickTimer *e)
     JSScope<10, 10> scope(js_ctx);
     if (e->tid == Timers::TIMER_REPORT_MEM)
     {
-        printf("REPORT_MEM MTJS ");
-        dump_memory_usage(js_rt);
-        printf("\n");
+        // printf("REPORT_MEM MTJS ");
+        // dump_memory_usage(js_rt);
+        // printf("\n");
         return true;
     }
     else if (e->tid == Timers::TIMER_INTERVAL)

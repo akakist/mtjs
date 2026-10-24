@@ -115,16 +115,16 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
 
     auto tw_local=time(NULL) / HB_TIME_WINDOW;
     auto tw_remote=h->block_timestamp / HB_TIME_WINDOW;
-        logNode("HBREQ from=%s leader=%s ts_remote=%lld ts_local=%lld tw_remote=%lld tw_local=%lld diff_win=%lld prev=%s epoch=%llu",
-        src_node.container.c_str(),
-        h->node_leader.container.c_str(),
-        (long long)h->block_timestamp,
-        (long long)time(NULL),
-        (long long)tw_remote,
-        (long long)tw_local,
-        (long long)(tw_remote - tw_local),
-        h->prev_root_hash_1.str().c_str(),
-        (unsigned long long)h->new_epoch);
+        // logNode("HBREQ from=%s leader=%s ts_remote=%lld ts_local=%lld tw_remote=%lld tw_local=%lld diff_win=%lld prev=%s epoch=%llu",
+        // src_node.container.c_str(),
+        // h->node_leader.container.c_str(),
+        // (long long)h->block_timestamp,
+        // (long long)time(NULL),
+        // (long long)tw_remote,
+        // (long long)tw_local,
+        // (long long)(tw_remote - tw_local),
+        // h->prev_root_hash_1.str().c_str(),
+        // (unsigned long long)h->new_epoch);
     if(tw_remote < tw_local-1 || tw_remote > tw_local+1)
     {
         MUTEX_INSPECTOR;
@@ -142,29 +142,36 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         logNode("HeartBeatREQ if(!db_state->sync_empty)");
         return true;
     }
+    time_t now = time(NULL);
+    // auto tw_local = now / HB_TIME_WINDOW;
+    // auto tw_remote = h->block_timestamp / HB_TIME_WINDOW;
 
     auto& cli=cli_leader_info[h->prev_root_hash_1];
         {
-        time_t now = time(NULL);
-        auto tw_local = now / HB_TIME_WINDOW;
-        auto tw_remote = h->block_timestamp / HB_TIME_WINDOW;
-        logNode("HBREQ from=%s leader=%s ts_remote=%lld ts_local=%lld tw_remote=%lld tw_local=%lld diff_win=%lld cli_leader=%s",
-            src_node.container.c_str(),
-            h->node_leader.container.c_str(),
-            (long long)h->block_timestamp,
-            (long long)now,
-            (long long)tw_remote,
-            (long long)tw_local,
-            (long long)(tw_remote - tw_local),
-            cli.node_leader.valid() ? cli.node_leader->node_leader.container.c_str() : "(none)");
+        // logNode("HBREQ from=%s leader=%s ts_remote=%lld ts_local=%lld tw_remote=%lld tw_local=%lld diff_win=%lld cli_leader=%s",
+        //     src_node.container.c_str(),
+        //     h->node_leader.container.c_str(),
+        //     (long long)h->block_timestamp,
+        //     (long long)now,
+        //     (long long)tw_remote,
+        //     (long long)tw_local,
+        //     (long long)(tw_remote - tw_local),
+        //     cli.node_leader.valid() ? cli.node_leader->node_leader.container.c_str() : "(none)");
     }
 
     if(cli.node_leader.valid())
     {
         MUTEX_INSPECTOR;
-        if(cli.node_leader->block_timestamp / HB_TIME_WINDOW < h->block_timestamp / HB_TIME_WINDOW)
+        auto cli_tw=cli.node_leader->block_timestamp / HB_TIME_WINDOW;
+        // auto hb_tw=h->block_timestamp / HB_TIME_WINDOW;
+        // if(cli_tw < tw_remote)
+        // {
+        //     logNode("cli.node_leader=NULL; t_WIN not match");
+        //     cli.node_leader=NULL;
+        // }
+        if(cli_tw< tw_local-1 || cli_tw> tw_local+1)
         {
-            logNode("cli.node_leader=NULL; t_WIN not match");
+            logNode("if(cli_tw< tw_local-1 || cli_tw> tw_local+1)");
             cli.node_leader=NULL;
         }
     }
