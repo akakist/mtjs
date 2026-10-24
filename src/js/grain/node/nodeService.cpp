@@ -510,7 +510,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
                         u->incNonce();
                     }
                     u->setDirty(NULL);
-                    logNode("execute_block: after tx att_blockRoot_children=%d", (int)b.att_data->blockRoot.children.size());
+                    // logNode("execute_block: after tx att_blockRoot_children=%d", (int)b.att_data->blockRoot.children.size());
 
                 }
             }

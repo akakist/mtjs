@@ -246,6 +246,7 @@ JSValue js_block_new(JSContext* ctx,
     b->att = att;
     b->tx_hashes = tx_hashes;
     b->finalized = finalized;
+#ifdef KALL
     {
         std::string txh;
         for (auto& h : tx_hashes) { txh += base16::encode(h.container) + " "; }
@@ -267,7 +268,7 @@ JSValue js_block_new(JSContext* ctx,
             (int)tx_hashes.size(),
             txh.c_str(), ch.c_str());
     }
-
+#endif
     JSValue obj = JS_NewObjectClass(ctx, js_block_class_id);
     if (JS_IsException(obj)) {
         delete b;
