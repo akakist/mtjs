@@ -29,10 +29,10 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
         transaction_pool_of_leader.insert({h, z});
     }
     auto &li = l_blocks[prev_root_hash_Z()].leader_info;
-    if(iUtils->getNow()-li.TIMER_VALIDATE_BLOCK_DELAY_set < _1sec)
-    {
-        return true;
-    }
+    // if(iUtils->getNow()-li.TIMER_VALIDATE_BLOCK_DELAY_set < _1sec)
+    // {
+    //     return true;
+    // }
     li.transaction_responders.insert(src_node);
     auto mf=getMetaFull(li.leader_cert_2->block_timestamp);
 
@@ -56,10 +56,11 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
 
     if (pers >  QUORUM)
     {
-        auto curtime=iUtils->getNow();
-        auto diff_mks=curtime-li.request_for_transactions_time;
-        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_VALIDATE_BLOCK_DELAY,NULL,NULL,double(diff_mks)/1000000., this));
-        li.TIMER_VALIDATE_BLOCK_DELAY_set=iUtils->getNow();
+        // auto curtime=iUtils->getNow();
+        // auto diff_mks=curtime-li.request_for_transactions_time;
+        // logNode("GetTransactionRSP: diff_mks %ld", diff_mks);
+        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_VALIDATE_BLOCK_DELAY,NULL,NULL,0.05, this));
+        // li.TIMER_VALIDATE_BLOCK_DELAY_set=iUtils->getNow();
 
     }
     XPASS;
@@ -68,6 +69,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
 bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
+    logNode("BlockDiffValidateRSP");
     if(!db_state->sync_empty)
     {
         logNode("ValidateBlockRSP if(!db_state->sync_empty)");
@@ -75,7 +77,11 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     }
     auto& bt=l_blocks[prev_root_hash_Z()];
     if(!bt.blockDiffValidateREQ.valid())
+    {
+        logNode("if(!bt.blockDiffValidateREQ.valid())");
         return true;
+
+    }
 
     if (bt.blockDiffValidateREQ->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1 != prev_root_hash_Z())
     {
@@ -122,6 +128,8 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     {
         diffreplied.insert(z->node_validator);
     }
+    auto pers=(stakeVal * 100) / fullstakeVal;
+    logNode("BlockDiffValidateRSP: pers %ld",pers);
     if ((stakeVal * 100) / fullstakeVal > QUORUM && iUtils->getNow()-bt.blockAccepted2REQ_sent > BLOCK_ACCEPTED_SENT_TIMEOUT * _1sec)
     {
         MUTEX_INSPECTOR;
@@ -170,8 +178,9 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         bds->diffs=bt.blockDiffValidateREQ->diffs;
         bds->att_data=bt.blockDiffValidateREQ->att_data;
         logNode("broadcast MsgData::BlockDBStore");
-        auto mf=getMetaFull(bt.blockDiffValidateREQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
-        broadcast_MsgEvent_via_broadcaster(bds.get(),mf->tree_all_nodes);
+
+        sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(TIMER_BlockDBStore,NULL,bds.get(),0.05,this));
+
         XPASS;
     }
 
@@ -213,7 +222,7 @@ REF_getter<MsgData::LeaderCert> Node::Service::makeLeaderCert(const MsgData::Hea
     auto hb_hash=hb->getHash();
     std::vector<blst_cpp::PublicKey> agg_pk_lc;
     uint64_t stake_lc=0;
-    for(auto& z:bt.leader_info.ConfirmLeaderRSP_m[hb_hash])
+    for(auto& z:bt.leader_info.ConfirmLeaderRSP_m_copy[hb_hash])
     {
         auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
         if(!n.valid())
@@ -316,13 +325,19 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
             return true;
         }
-
         REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(ba,r->tx_hashes,r->diffs,r->att_data);
+        sendEvent(ServiceEnum::Timer,
+            new timerEvent::ResetAlarm(
+                TIMER_BlockDiffValidateREQ,
+                toRef(r->blockInfo->heart_beat->getBuffer()),
+                bdv.get(),
+                0.05,
+                this));
 
         bt.blockDiffValidateREQ=bdv;
 
 
-        broadcast_MsgEvent_via_broadcaster(bdv.get(),mf->tree_all_nodes);
+        // broadcast_MsgEvent_via_broadcaster(bdv.get(),mf->tree_all_nodes);
 
         logNode("validators %s",iUtils->join(" ",nnn).c_str());
 

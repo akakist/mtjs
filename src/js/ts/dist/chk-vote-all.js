@@ -1,6 +1,6 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
-const node = "127.0.0.1:2301";
+const node = "127.0.0.1:2309";
 const sk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk");
 const pk = std.getenv("k_root_ed_pk");
 const GREEN = "\x1b[32m";

@@ -58,16 +58,6 @@ static REF_getter<ContractHost> make_test() {
     h->source = new TestContractSourceIO();
     return h;
 }
-#ifdef KALL
-static REF_getter<ContractHost> make_node() {
-    REF_getter<ContractHost> h = new ContractHost();
-    h->granules = new NodeGranuleIO();
-    h->events = new NodeEventSink();
-    h->clock = new NodeClock();
-    h->source = new NodeContractSourceIO();
-    return h;
-}
-#endif
 
 
 struct TxCommand {

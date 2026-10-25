@@ -46,7 +46,7 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
     CallContext* parent_ctx = (CallContext*)JSI_GetContextOpaque(ctx);
     call_ctx.t = (parent_ctx && parent_ctx->t) ? parent_ctx->t : t;
     call_ctx.b = (parent_ctx && parent_ctx->b) ? parent_ctx->b : b;
-
+    call_ctx.roll = t->roll;
     void* saved = JSI_GetContextOpaque(ctx);
     JSI_SetContextOpaque(ctx, &call_ctx);
 

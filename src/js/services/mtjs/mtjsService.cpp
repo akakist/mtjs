@@ -352,7 +352,7 @@ bool MTJS::Service::TickAlarm(const timerEvent::TickAlarm *e)
         JSValue func_result = JS_Call(js_ctx, t->cb.get(), global_obj, t->fargs.size(), ac);
         scope.addValue(func_result);
         auto id = std::stoll(e->data->container);
-        logErr2("TickAlarm: %lld", id);
+        // logErr2("TickAlarm: %lld", id);
         rconf->timers.timers_refed.erase(id);
         rconf->timers.timers_unrefed.erase(id);
 
@@ -554,7 +554,7 @@ bool MTJS::Service::AddTxRSP(const bcEvent::AddTxRSP* e)
 bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
 {
     MUTEX_INSPECTOR;
-    logErr2("ClientMsgReply");
+    // logErr2("ClientMsgReply");
     auto it = opaque.node_req_promises.find(e->hash_of_request.container);
     if (it == opaque.node_req_promises.end())
         throw CommonError("if(it==opaque.node_req_promises.end())");
@@ -696,39 +696,11 @@ void to_json(nlohmann::json& j, const EmitNode& node) {
     }
     XPASS;
 }
-#ifdef KALL
-JSValue emit_node_to_js(JSContext* ctx, const EmitNode& node) {
-    JSValue obj = JS_NewObject(ctx);
-    
-    // ===== emits =====
-    JSValue emits_arr = JS_NewArray(ctx);
-    for (size_t i = 0; i < node.emits.size(); ++i) {
-        JSValue emit_arr = JS_NewArray(ctx);
-        JS_SetPropertyUint32(ctx, emit_arr, 0, JS_NewString(ctx, node.emits[i].first.c_str()));
-        JSValue data_obj = JS_ParseJSON(ctx, node.emits[i].second.c_str(), node.emits[i].second.size(), "");
-        JS_SetPropertyUint32(ctx, emit_arr, 1, data_obj);
-        // JS_SetPropertyUint32(ctx, emit_arr, 1, JS_NewString(ctx, node.emits[i].second.c_str()));
-        JS_SetPropertyUint32(ctx, emits_arr, i, emit_arr);
-    }
-    JS_SetPropertyStr(ctx, obj, "emits", emits_arr);
-    
-    // ===== children (только если не пустые) =====
-    if (!node.children.empty()) {
-        JSValue children_obj = JS_NewObject(ctx);
-        for (const auto& [key, child] : node.children) {
-            JS_SetPropertyStr(ctx, children_obj, key.c_str(), emit_node_to_js(ctx, child));
-        }
-        JS_SetPropertyStr(ctx, obj, "children", children_obj);
-    }
-    
-    return obj;
-}
-#endif
 bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 {
     MUTEX_INSPECTOR;
     XTRY;
-logErr2("MTJS::ClientTxSubscribeRSP: tx=%d, promises=%d, keys=", (int)e->tx_hashes.size(), (int)opaque.tx_wait_promises.size());
+// logErr2("MTJS::ClientTxSubscribeRSP: tx=%d, promises=%d, keys=", (int)e->tx_hashes.size(), (int)opaque.tx_wait_promises.size());
 for (auto& kv : opaque.tx_wait_promises) logErr2("  %s", kv.first.c_str());
     if (!e->att_data.valid()) {
         logErr2("ClientTxSubscribeRSP: att_data invalid");

@@ -22,6 +22,7 @@ struct b_params
         va_list ap; char str[1024]; va_start(ap, fmt);
         int len = vsnprintf(str, sizeof(str), fmt, ap);
         bool overflow = (len >= (int)sizeof(str)); va_end(ap);
+        // logErr2("emit_command : %с %s", command.c_str(),str);
         att_data->blockRoot.children[base16::encode(txId.container)].children[std::to_string(seqId)].emits.push_back({command, overflow?"\"overflow\"":str});
     }
     void emit_tx(const THASH_id& txId, const std::string& command, const char* fmt, ...)

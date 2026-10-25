@@ -132,7 +132,7 @@ JSValue js_tx_subscribe(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 ////////////////
 JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
-    logErr2("js_tx_submit");
+    // logErr2("js_tx_submit");
     JSScope<10, 10> scope(ctx);
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
     if (argc != 6)
@@ -213,7 +213,7 @@ JSValue js_addr_from_pk(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     auto pk = base16::decode(scope.toStdString(argv[0]));
     auto addr = blake2b_hash(pk);
     auto addr_str = base16::encode(addr.container);
-    logErr2("addr from pk: %s", addr_str.c_str());
+    // logErr2("addr from pk: %s", addr_str.c_str());
     return JS_NewString(ctx, addr_str.c_str());
 }
 /////////////////
@@ -310,7 +310,7 @@ JSValue js_tx_wait_block(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     JSValueGuard g_prom(ctx, promise);
     pd.resolve = g_resolve;
     pd.reject = g_reject;
-    logErr2("js_tx_wait_block: node=%s tx=%s timeout=%lf", node_addr.c_str(), tx_hash_hex.c_str(), timeout);
+    // logErr2("js_tx_wait_block: node=%s tx=%s timeout=%lf", node_addr.c_str(), tx_hash_hex.c_str(), timeout);
     op->broadcaster->sendEvent(node_addr, ServiceEnum::BlockStreamer,
         new bcEvent::ClientTxSubscribeREQ(op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,

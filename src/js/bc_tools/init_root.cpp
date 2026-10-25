@@ -19,6 +19,27 @@ void init_root(IDatabase* db)
         v=db->getValuesOrCreate(NULL);
         if(!v->emitters_bin.count(u_root_address))
             v->emitters_bin.insert(u_root_address);
+        
+        for(int i=0;i<20;i++)
+        {
+            // k_u6_ed_pk
+                std::string key="k_u"+std::to_string(i)+"_ed_pk";
+                logErr2("key %s %s",key.c_str(),getenv2(key.c_str()).c_str());
+                std::string u_pk=base16::decode(getenv2(key.c_str()));
+                ADDRESS_id u_address;
+                u_address.addr=blake2b_hash(u_pk).container;
+                if(!v->emitters_bin.count(u_address))
+                {
+                    v->emitters_bin.insert(u_address);
+                    logErr2("v->emitters_bin.insert %s",key.c_str());
+                }
+                auto u=db->getAddressStateOrCreate(u_address,NULL);
+                {
+                    M_LOCK(u->parent->mx);
+                    u->balance=10000000;
+                }
+                u->setDirty(NULL);
+        }
 
         int total=0;
         for(auto &z: stakes)
@@ -27,6 +48,7 @@ void init_root(IDatabase* db)
         }
         v->setDirty(NULL);
     }
+
     // u_root pk
     if(!db->getAddressStateNoCreate(u_root_address).valid())
     {

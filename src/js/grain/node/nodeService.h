@@ -58,6 +58,8 @@ namespace Node
         TIMER_SYNC_TIMEDOUT,
         TIMER_REPORT_MEM,
         TIMER_BROADCAST_ACK_TIMEDOUT,
+        TIMER_BlockDiffValidateREQ,
+        TIMER_BlockDBStore,
     };
     struct heart_beat_node_info
     {
@@ -65,16 +67,18 @@ namespace Node
 
 
         }
-        int64_t TIMER_VALIDATE_BLOCK_DELAY_set=0;
-        int64_t request_for_transactions_sent=0;
+        // int64_t TIMER_VALIDATE_BLOCK_DELAY_set=0;
+        // int64_t validate_req_sent=0;
+        // int64_t request_for_transactions_sent=0;
         int64_t confirm_leader_sent=0;
         REF_getter< MsgData::HeartBeatREQ> leader_cert_2;
         std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > HeartBeatRSP_m;
         // std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > ConfirmLeaderRSP_m;
 
-        std::map<THASH_id /*payload hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m;
+        std::map<THASH_id /*payload hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m; /// сбрасывается после посылки гетТХ
+        std::map<THASH_id /*payload hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m_copy; /// для подсчета ответивших нод
         std::set<NODE_id> transaction_responders;
-        uint64_t request_for_transactions_time=0;
+        // uint64_t request_for_transactions_time=0;
 
     };
     struct heart_beat_info
@@ -183,6 +187,7 @@ namespace Node
         };
         _db_to_save db_to_save_Z;
 
+        void dump(nlohmann::json& j);
 
 
 

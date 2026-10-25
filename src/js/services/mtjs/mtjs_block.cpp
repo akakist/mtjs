@@ -22,36 +22,6 @@ struct JS_Block {
 };
 
 // ---- emit_node_to_js (перенесён из mtjsService.cpp) ----
-#ifdef KALL
-static void to_json_emit_node(nlohmann::json& j, const EmitNode& node)
-{
-    MUTEX_INSPECTOR;
-    XTRY;
-    nlohmann::json emits_array = nlohmann::json::array();
-    for (const auto& emit_pair : node.emits)
-    {
-        XTRY;
-        MUTEX_INSPECTOR;
-        nlohmann::json emit_obj;
-        emit_obj["cmd"] = emit_pair.first;
-        try {
-            MUTEX_INSPECTOR;
-            emit_obj["data"] = nlohmann::json::parse(emit_pair.second);
-        } catch (std::exception& e) {
-            logErr2("Failed to parse JSON for emit data: %s, error: %s", emit_pair.second.c_str(), e.what());
-        }
-        emits_array.push_back(emit_obj);
-        XPASS;
-    }
-    j["emits"] = emits_array;
-    for (const auto& child_pair : node.children) {
-        XTRY;
-        j["children"][child_pair.first] = child_pair.second;
-        XPASS;
-    }
-    XPASS;
-}
-#endif
 JSValue emit_node_to_js(JSContext* ctx, const EmitNode& node)
 {
     JSValue obj = JS_NewObject(ctx);
@@ -246,29 +216,6 @@ JSValue js_block_new(JSContext* ctx,
     b->att = att;
     b->tx_hashes = tx_hashes;
     b->finalized = finalized;
-#ifdef KALL
-    {
-        std::string txh;
-        for (auto& h : tx_hashes) { txh += base16::encode(h.container) + " "; }
-        std::string ch;
-        if (att.valid()) for (auto& kv : att->blockRoot.children) { ch += kv.first + "(" + std::to_string(kv.second.emits.size()) + ") "; }
-
-       for (auto& kv : att->blockRoot.children) {
-            std::string chs;
-            for (auto& c : kv.second.children) {
-                chs += c.first + "(";
-                for (auto& e : c.second.emits) chs += e.first + ",";
-                chs += ") ";
-            }
-            ch += kv.first + "(emits=" + std::to_string(kv.second.emits.size()) + " children=[" + chs + "]) ";
-        } 
-        logErr2("js_block_new: ba2=%d att=%d blockRoot_children=%d tx_hashes=%d | tx=[%s] children=[%s]",
-            ba2.valid(), att.valid(),
-            att.valid() ? (int)att->blockRoot.children.size() : -1,
-            (int)tx_hashes.size(),
-            txh.c_str(), ch.c_str());
-    }
-#endif
     JSValue obj = JS_NewObjectClass(ctx, js_block_class_id);
     if (JS_IsException(obj)) {
         delete b;

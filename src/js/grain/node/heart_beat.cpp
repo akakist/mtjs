@@ -27,6 +27,19 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         return false;
     }
 
+    // RSP должен быть на текущего лидера (не на «теневой» HB)
+    {
+        auto &cli = cli_leader_info[prev_root_hash];
+        if (cli.node_leader.valid() &&
+            cli.node_leader->getHash().container != m->payload_heart_beat->getHash().container)
+        {
+            logNode("HB RSP for stale leader %s (current %s), ignore",
+                    m->payload_heart_beat->node_leader.container.c_str(),
+                    cli.node_leader->node_leader.container.c_str());
+            return true;
+        }
+    }
+
     auto n = db_state->getNodeNoCreate(m->node_signer);
     if (!n.valid())
     {
@@ -39,7 +52,6 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     auto mf=getMetaFull(m->payload_heart_beat->block_timestamp);
 
     uint64_t fullstake=0;
-    // auto ls=db_state->getAllNodes();
     for(auto& z: mf->all_nodes_enabled)
     {
         fullstake+=mf->getPrevStake(z);
@@ -76,6 +88,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     XPASS;
     return true;
 }
+
 void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route)
 {
     MUTEX_INSPECTOR;
@@ -92,10 +105,8 @@ void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const rou
 }
 bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAccepted2REQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast)
 {
-    // logNode("HeartBeatREQ from %s",h->node_leader.container.c_str());
-
     MUTEX_INSPECTOR;
-    
+
     if(!need_continue_broadcast)
     {
         logNode("if(!need_continue_broadcast)");
@@ -110,21 +121,10 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         reply_HeartBeatRSP(h,route);
         *need_continue_broadcast=true;
         return true;
-
     }
 
     auto tw_local=time(NULL) / HB_TIME_WINDOW;
     auto tw_remote=h->block_timestamp / HB_TIME_WINDOW;
-        // logNode("HBREQ from=%s leader=%s ts_remote=%lld ts_local=%lld tw_remote=%lld tw_local=%lld diff_win=%lld prev=%s epoch=%llu",
-        // src_node.container.c_str(),
-        // h->node_leader.container.c_str(),
-        // (long long)h->block_timestamp,
-        // (long long)time(NULL),
-        // (long long)tw_remote,
-        // (long long)tw_local,
-        // (long long)(tw_remote - tw_local),
-        // h->prev_root_hash_1.str().c_str(),
-        // (unsigned long long)h->new_epoch);
     if(tw_remote < tw_local-1 || tw_remote > tw_local+1)
     {
         MUTEX_INSPECTOR;
@@ -136,39 +136,19 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         logNode("if(tw_remote < tw_local)");
     }
 
-    // logNode("HeartBeatREQ");
     if(!db_state->sync_empty)
     {
         logNode("HeartBeatREQ if(!db_state->sync_empty)");
         return true;
     }
     time_t now = time(NULL);
-    // auto tw_local = now / HB_TIME_WINDOW;
-    // auto tw_remote = h->block_timestamp / HB_TIME_WINDOW;
 
     auto& cli=cli_leader_info[h->prev_root_hash_1];
-        {
-        // logNode("HBREQ from=%s leader=%s ts_remote=%lld ts_local=%lld tw_remote=%lld tw_local=%lld diff_win=%lld cli_leader=%s",
-        //     src_node.container.c_str(),
-        //     h->node_leader.container.c_str(),
-        //     (long long)h->block_timestamp,
-        //     (long long)now,
-        //     (long long)tw_remote,
-        //     (long long)tw_local,
-        //     (long long)(tw_remote - tw_local),
-        //     cli.node_leader.valid() ? cli.node_leader->node_leader.container.c_str() : "(none)");
-    }
 
     if(cli.node_leader.valid())
     {
         MUTEX_INSPECTOR;
         auto cli_tw=cli.node_leader->block_timestamp / HB_TIME_WINDOW;
-        // auto hb_tw=h->block_timestamp / HB_TIME_WINDOW;
-        // if(cli_tw < tw_remote)
-        // {
-        //     logNode("cli.node_leader=NULL; t_WIN not match");
-        //     cli.node_leader=NULL;
-        // }
         if(cli_tw< tw_local-1 || cli_tw> tw_local+1)
         {
             logNode("if(cli_tw< tw_local-1 || cli_tw> tw_local+1)");
@@ -176,7 +156,6 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         }
     }
 
-    // bool need_reply = false;
     auto local_prev_block=prev_block;
 
     bool remote_verified=false;
@@ -184,11 +163,9 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
     remote_verified=verify_block_all(remote_prev_lc);
     local_verified=verify_block_all(local_prev_block);
 
-
     if(local_verified && !remote_verified)
     {
         MUTEX_INSPECTOR;
-        /// не отвечаем, поскольку ремоте нода не имеет сертификата
         logNode("if(local_verified && !remote_verified) return send DelayNotificationREQ");
         REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
         d->lc=local_prev_block;
@@ -202,10 +179,8 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         return true;
     }
 
-
     if(!remote_verified && !local_verified)    /// block 0
     {
-        /// отвечаем, поскольку это кейс старта с генезиса
         logNode("if(!remote_verified && !local_verified) ");
         auto mf=getMetaFull(h->block_timestamp);
 
@@ -218,12 +193,18 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             else
             {
                 MUTEX_INSPECTOR;
+                // 1) почистить старое (клиент + лидер)
+                cli.heart_beat_sent.clear();
+                cli.confirm_leader_sent = 0;
+                l_blocks.clear();
+                // 2) записать нового лидера
+                cli.node_leader = h;
+                l_blocks[h->prev_root_hash_1].leader_info.leader_cert_2 = h;
+                // 3) ответить
                 reply_HeartBeatRSP(h,route);
                 *need_continue_broadcast=true;
-                cli.node_leader=h;
                 return true;
             }
-
         }
         else
         {
@@ -240,25 +221,28 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             else
             {
                 MUTEX_INSPECTOR;
+                // 1) почистить старое (клиент + лидер)
+                cli.heart_beat_sent.clear();
+                cli.confirm_leader_sent = 0;
+                l_blocks.clear();
+                // 2) записать нового лидера
+                cli.node_leader = h;
+                l_blocks[h->prev_root_hash_1].leader_info.leader_cert_2 = h;
+                // 3) ответить
                 reply_HeartBeatRSP(h,route);
                 *need_continue_broadcast=true;
-                cli.node_leader=h;
                 return true;
             }
-
         }
     }
 
     if(remote_verified && !local_verified)
     {
-        /// если локально нет сертиката, нода стартанула с генезиса, а у удаленной есть сертификат
-        /// то надо синхронизироваться, переходим в синк, не отвечаем
         logNode("if(remote_verified && !local_verified) do sync return");
         *need_continue_broadcast=true;
         if(db_state->sync_empty)
         {
             MUTEX_INSPECTOR;
-            // state_Z = STATE_SYNCING;
             logNode("start SYNC");
             prev_block=remote_prev_lc;
             do_sync(src_node, remote_prev_lc->blockAcceptedREQ->blockInfo->new_root_hash1);
@@ -272,7 +256,6 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         if(remote_prev_lc->blockAcceptedREQ->blockInfo->heart_beat->new_epoch < local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch)
         {
             MUTEX_INSPECTOR;
-            /// проверка на эпоху, если эпоха у ремоте меньше, то командуем ей обновиться.
             logNode("if(remote_prev_lc->heart_beat->new_epoch (%s) < local_lc->heart_beat->new_epoch) return",src_node.container.c_str());
             REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
             d->lc=local_prev_block;
@@ -288,7 +271,6 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         }
         else if(remote_prev_lc->blockAcceptedREQ->blockInfo->heart_beat->new_epoch > local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch)
         {
-            /// если наша эпоха меньше , то сами делаем догон
             MUTEX_INSPECTOR;
             logNode("START SYNCING");
             prev_block=remote_prev_lc;
@@ -300,12 +282,8 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         {
             MUTEX_INSPECTOR;
 
-            /// оба в одинаковой эпохе
-
-            /// просто проверка на всякий случай.
             if(remote_prev_lc->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1!=local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1)
             {
-                /// сплит брейн. в сохраненных блоках
                 logNode(R"( --------------- SPLIT BRAIN DETECTED
 if(remote_prev_lc->blockInfo->heart_beat->prev_root_hash!=local_lc->blockInfo->heart_beat->prev_root_hash)
 remote_prev_lc->blockInfo->heart_beat->prev_root_hash %s local_lc->blockInfo->heart_beat->prev_root_hash %s)",
@@ -316,15 +294,6 @@ remote_prev_lc->blockInfo->heart_beat->prev_root_hash %s local_lc->blockInfo->he
 
             if(prev_root_hash_Z()!=h->prev_root_hash_1)
             {
-                /// сплит брейн для текущего блока.
-
-                /// нужно сделать голосование за прев-блок
-                /// делаем просто хартбит. В это случае поврежденная нода отваливается
-                // по missed_rounds. Вывезет та нода, у которой консенсусный рут хеш
-                /// нужно искать гонки, где-то с мутексами проблема есть.
-                /// с другой стороны такой вариант,
-                /// когда нода отваливается из-за очень редкой ошибки, уже пойдет.
-                /// главное - нет затыкания протокола
                 logNode(R"( --------------- SPLIT BRAIN 2 DETECTED
 if(prev_root_hash_Z!=h->prev_root_hash)
         prev_root_hash_Z %s 
@@ -345,16 +314,21 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 return true;
             }
 
-
             if(cli.node_leader.valid())
             {
                 if(cli.node_leader->block_timestamp/HB_TIME_WINDOW == h->block_timestamp/HB_TIME_WINDOW)
                 {
-
                     auto mf=getMetaFull(h->block_timestamp);
                     if(isNodeGreater(h->node_leader, cli.node_leader->node_leader, mf) )
                     {
-                        cli.node_leader=h;
+                        // 1) почистить старое (клиент + лидер)
+                        cli.heart_beat_sent.clear();
+                        cli.confirm_leader_sent = 0;
+                        l_blocks.clear();
+                        // 2) записать нового лидера
+                        cli.node_leader = h;
+                        l_blocks[h->prev_root_hash_1].leader_info.leader_cert_2 = h;
+                        // 3) ответить
                         reply_HeartBeatRSP(h,route);
                         *need_continue_broadcast=true;
                         return true;
@@ -363,13 +337,11 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                     {
                         *need_continue_broadcast=false;
                     }
-
                 }
                 else
                 {
                     logNode("timewin not matched");
                 }
-
             }
             else /// !cli.node_leader.valid()
             {
@@ -384,19 +356,25 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 }
                 else
                 {
-                    cli.node_leader=h;
+                    // 1) почистить старое (клиент + лидер)
+                    cli.heart_beat_sent.clear();
+                    cli.confirm_leader_sent = 0;
+                    l_blocks.clear();
+                    // 2) записать нового лидера
+                    cli.node_leader = h;
+                    l_blocks[h->prev_root_hash_1].leader_info.leader_cert_2 = h;
+                    // 3) ответить
                     reply_HeartBeatRSP(h,route);
                     *need_continue_broadcast=true;
                     return true;
-
                 }
-
             }
-
         }
     }
     return true;
 }
+
+
 bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const NODE_id &src_node, const route_t &route)
 
 {
@@ -453,8 +431,6 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     }
     stage_is_working=iUtils->getNow();
 
-
-
     auto prev_root_hash=prev_root_hash_Z();
     auto &li = l_blocks[prev_root_hash].leader_info;
     if (prev_root_hash != m->hb->prev_root_hash_1)
@@ -463,9 +439,23 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         return false;
     }
 
+    // RSP должен быть на текущего лидера (не на «теневой» HB)
+    {
+        auto &cli = cli_leader_info[prev_root_hash];
+        if (cli.node_leader.valid() &&
+            cli.node_leader->getHash().container != m->hb->getHash().container)
+        {
+            logNode("ConfirmLeader RSP for stale leader %s (current %s), ignore",
+                    m->hb->node_leader.container.c_str(),
+                    cli.node_leader->node_leader.container.c_str());
+            return true;
+        }
+    }
+
     auto clh=m->hb->getHash();
     {
         li.ConfirmLeaderRSP_m[clh].insert_or_assign(m->node_signer, m);
+        li.ConfirmLeaderRSP_m_copy[clh].insert_or_assign(m->node_signer, m);
     }
     auto mf=getMetaFull(m->hb->block_timestamp);
     uint64_t hb_staked = 0;
@@ -490,16 +480,18 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 
     if (pers > QUORUM)
     {
-        if (!li.request_for_transactions_sent)
+        // if (!li.request_for_transactions_sent)
         {
             logNode("lEAder approved %s", m->hb->node_leader.container.c_str());
-            li.request_for_transactions_sent = true;
+            // li.request_for_transactions_sent = true;
             do_request_for_transactions(li,mf);
+            li.ConfirmLeaderRSP_m.clear();
         }
     }
     XPASS;
     return true;
 }
+
 bool Node::Service::LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* m, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast)
 {
     MUTEX_INSPECTOR;
@@ -535,12 +527,37 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t tnow)
 
     stage_is_working=iUtils->getNow();
 
+    // 1) не стартуем свой HB, если уже есть валидный лидер на это окно (и это не я)
+    {
+        auto& cli = cli_leader_info[prev_root_hash_Z()];
+        if (cli.node_leader.valid()) {
+            auto cli_tw = cli.node_leader->block_timestamp / HB_TIME_WINDOW;
+            auto new_tw = tnow / HB_TIME_WINDOW;
+            if (cli_tw == new_tw && cli.node_leader->node_leader != this_node_name) {
+                logNode("do_heart_beat: skip, leader=%s", cli.node_leader->node_leader.container.c_str());
+                return cli.node_leader;
+            }
+        }
+    }
+
     auto meta=getMetaFull(tnow);
 
     REF_getter<MsgData::HeartBeatREQ> hb_req =
         new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                                   epoch_current(),
                                   this_node_name,  tnow);
+
+    // 2) новый HB — старый раунд в мусор (если leader_cert_2 был другой)
+    {
+        auto& li = l_blocks[prev_root_hash_Z()].leader_info;
+        if (li.leader_cert_2.valid() &&
+            li.leader_cert_2->getHash().container != hb_req->getHash().container) {
+            logNode("do_heart_beat: new HB %s (old %s), l_blocks.clear",
+                    hb_req->getHash().str().c_str(),
+                    li.leader_cert_2->getHash().str().c_str());
+            l_blocks.clear();
+        }
+    }
 
     REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),prev_block.valid()?prev_block->getBuffer():"");
     l_blocks[prev_root_hash_Z()].leader_info.leader_cert_2=hb_req;
@@ -551,4 +568,3 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t tnow)
 
     return hb_req;
 }
-

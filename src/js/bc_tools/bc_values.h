@@ -47,7 +47,6 @@ struct bc_values: public data_base
         auto it=fees.find(fee_type);
         if(it!=fees.end())
             return it->second;
-        if (fee_type == "vote") return 4000;   // fallback: старая БД без fees["vote"]
         throw CommonError("fee '%s' not found", fee_type.c_str());
         return 0;
     }
