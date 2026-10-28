@@ -130,9 +130,10 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
     if(pathes.size())
     {
         auto n=db_state->getNodeNoCreate(m->responder);
-        if(!n.valid())
-            throw CommonError("if(!n.valid())");
-
+        if (!n.valid()) {
+            logNode("GetGranulesRSP: responder %s not found locally, ignore (sync)", m->responder.container.c_str());
+            return true;   // не throw — responder ещё не досинкан
+        }
         auto ip=n->get_ip();
         sendEvent(ip,ServiceEnum::Node,new bcEvent::GetGranulesREQ(pathes,ListenerBase::serviceId));
 
@@ -151,15 +152,15 @@ void Node::Service::continue_sync()
 void Node::Service::do_sync(const NODE_id &src_node, const THASH_id& prev_root_hash_remote)
 {
     MUTEX_INSPECTOR;
+    logNode("do_sync START: src=%s prev_root=%s", src_node.container.c_str(), prev_root_hash_remote.str().c_str());
 
-
-    logNode ("do_sync");
+    // logNode ("do_sync");
 
     db_state->add_sync_out("");
 
     auto n=db_state->getNodeNoCreate(src_node);
     if(!n.valid())
-        throw CommonError("if(!n.valid())");
+        throw CommonError("if(!n.valid()) eer@##");
     // root=NULL;
     auto ip=n->get_ip();
     db_state->setIp(ip);

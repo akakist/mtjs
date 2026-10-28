@@ -38,7 +38,6 @@ struct bc_values: public data_base
         {
             sz+=z.addr.size();
         }
-        // sz+=sizoef(validator_count);
         return sz;
     }
 
@@ -55,7 +54,6 @@ struct bc_values: public data_base
         data_base::pack(o);
         o<<1;
         o<<fees<<emitters_bin;
-        // o<<validator_count<<validator_minstake;
     }
     void unpack(inBuffer& o) final
     {
@@ -63,7 +61,6 @@ struct bc_values: public data_base
         auto v=o.get_PN();
 
         o>>fees>>emitters_bin;
-        // o>>validator_count>>validator_minstake;
     }
 
 };

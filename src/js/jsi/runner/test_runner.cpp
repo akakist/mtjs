@@ -520,6 +520,7 @@ std::vector<std::string> list_directory(const std::string& path) {
 }
 
 int main() {
+    // iUtils=new Cut
     JSIRuntime* rt = JSI_NewRuntime();
     if (!rt) return 1;
     JSIContext* ctx = JSI_NewContext(rt);

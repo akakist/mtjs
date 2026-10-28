@@ -2,7 +2,6 @@
 #include "REF.h"
 #include <string>
 #include "commonError.h"
-// #include "IDatabase.h"
 #include <vector>
 #include "db_to_save.h"
 #include "hsh.h"
@@ -18,11 +17,9 @@ struct data_base : public Refcountable
     time_t create_time=0;
     int ttl=-1;
 
-    // uint64_t last_update_epoch;
 
     data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
         type(t), parent(_parent), create_time(_create_time),ttl(_ttl) {
-        // last_update_epoch=0;
     }
     ~data_base()
     {
@@ -39,14 +36,12 @@ struct data_base : public Refcountable
         o<<1;
         o<<type;
         o<<create_time<<ttl;
-        // o<<last_update_epoch;
     }
     virtual void unpack(inBuffer& in)
     {
         int ver=in.get_PN();
         in>>type;
         in>>create_time>>ttl;
-        // in>>last_update_epoch;
     }
     std::string getBuffer()
     {
@@ -54,7 +49,6 @@ struct data_base : public Refcountable
         pack(o);
         return o.asString()->container;
     }
-    // virtual std::string dump()=0;
 
 };
 struct Dirty
@@ -189,11 +183,8 @@ public:
     virtual void pack_mx(outBuffer& o)
     {
         o<<1;
-        // o<<m_id;
         o<<payload_ctor_idx;
-        // o<<last_update_epoch;
         {
-            // MutexLocker lk(mx);
             o<<children_hashes_mx;
             bool valid=data.valid();
             o<<valid;
@@ -205,11 +196,8 @@ public:
     virtual void unpack_mx(inBuffer& in)
     {
         int v=in.get_PN();
-        // in>>m_id;
         in>>payload_ctor_idx;
-        // in>>last_update_epoch;
         {
-            // MutexLocker lk(mx);
             in>>children_hashes_mx;
             bool valid;
             in>>valid;
@@ -246,7 +234,6 @@ public:
     }
 
 
-    // REF_getter<Cellable> replaceLeafOrCreate(const std::string& id, IDatabase* db, MutexLockerDeferred &l);
 
     void calc_tree_hash(_db_to_save &db_dump);
     void get_dirty_leaves(_db_to_save &db_dump);

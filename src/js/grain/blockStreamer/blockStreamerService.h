@@ -10,13 +10,26 @@
 #include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
 
-struct clientTxSubscription
+
+enum BlockStreamerTimers { TIMER_CLEAN_SUBSCRIPTIONS = 1000 };
+
+struct clientTxSubscription : public Refcountable
 {
     time_t created_at;
-    clientTxSubscription():created_at(time(NULL)) {}
+    time_t ttl;
+    route_t backRoute;
+    clientTxSubscription(const route_t& br, time_t _ttl)
+        : Refcountable("clientTxSubscription"), created_at(time(NULL)), ttl(_ttl), backRoute(br) {}
 };
 
-
+struct txWaitSubscription : public Refcountable
+{
+    time_t created_at;
+    time_t ttl;
+    route_t backRoute;
+    txWaitSubscription(const route_t& br, time_t _ttl)
+        : Refcountable("txWaitSubscription"), created_at(time(NULL)), ttl(_ttl), backRoute(br) {}
+};
 namespace BlockStreamer
 {
     enum timers
@@ -46,6 +59,11 @@ namespace BlockStreamer
 
 
     public:
+        std::vector<REF_getter<clientTxSubscription>> allBlocksSubscriptions;
+        std::map<THASH_id, std::vector<REF_getter<txWaitSubscription>>> txWaitSubscriptions;
+
+        bool ClientTxWaitREQ(const bcEvent::ClientTxWaitREQ*);
+        bool ClientTxUnsubscribeREQ(const bcEvent::ClientTxUnsubscribeREQ*);
         void deinit()
         {
             ListenerBuffered1Thread::deinit();
@@ -59,7 +77,7 @@ namespace BlockStreamer
         }
 
 
-        std::map<route_t,clientTxSubscription> clientTxSubscriptions;
+        // std::map<route_t,clientTxSubscription> clientTxSubscriptions;
 
     };
 

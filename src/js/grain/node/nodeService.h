@@ -1,7 +1,7 @@
 #pragma once
 
 #include "broadcaster.h"
-
+#include "QUORUM.h"
 // #include "signedBuffer.h"
 #include "listenerBuffered1Thread.h"
 #include <map>
@@ -52,9 +52,9 @@ namespace Node
     enum timers
     {
         // TIMER_START_HEART_BEAT,
-        TIMER_RESTART_BLOCK,
+        // TIMER_RESTART_BLOCK,
         TIMER_PERIODIC_CLOCK,
-        TIMER_VALIDATE_BLOCK_DELAY,
+        TIMER_GetTransactionRSP,
         TIMER_SYNC_TIMEDOUT,
         TIMER_REPORT_MEM,
         TIMER_BROADCAST_ACK_TIMEDOUT,
@@ -63,22 +63,9 @@ namespace Node
     };
     struct heart_beat_node_info
     {
-        heart_beat_node_info() : leader_cert_2(nullptr) {
-
-
-        }
-        // int64_t TIMER_VALIDATE_BLOCK_DELAY_set=0;
-        // int64_t validate_req_sent=0;
-        // int64_t request_for_transactions_sent=0;
-        int64_t confirm_leader_sent=0;
-        REF_getter< MsgData::HeartBeatREQ> leader_cert_2;
-        std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > HeartBeatRSP_m;
-        // std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > ConfirmLeaderRSP_m;
-
-        std::map<THASH_id /*payload hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m; /// сбрасывается после посылки гетТХ
-        std::map<THASH_id /*payload hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m_copy; /// для подсчета ответивших нод
-        std::set<NODE_id> transaction_responders;
-        // uint64_t request_for_transactions_time=0;
+        // int64_t confirm_leader_sent=0;
+        // REF_getter< MsgData::HeartBeatREQ> leader_cert_2=nullptr;
+        // std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > HeartBeatRSP_m;
 
     };
     struct heart_beat_info
@@ -161,7 +148,6 @@ namespace Node
         void fix_missed_rounds(const std::set<NODE_id>& node_validators);
 
 
-        void do_request_for_transactions( Node::heart_beat_node_info& li, const REF_getter<BlockMetaFull>& meta);
 
         void broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& p,  const TreeNode &tree);
         void broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>& p,  const TreeNode &tree);
@@ -175,14 +161,25 @@ namespace Node
 
         struct block_leader
         {
-            std::map<THASH_id /*payload hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
+            REF_getter< MsgData::HeartBeatREQ> leader_cert_2=nullptr;
+            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > >HeartBeatRSP_m;
+            bool is_HeartBeatRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf);
 
-            std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
-            std::map<THASH_id /*payload hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
+            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m; /// сбрасывается после посылки гетТХ
+            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m_copy; /// для подсчета ответивших нод
+
+            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTransactionRSP> > >GetTransactionRSP_m; /// для подсчета ответивших нод
+            bool is_GetTransactionRSP_m_quorum(const THASH_id& h,  IDatabase* mf);
+
+            std::map<THASH_id /*hb hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
+
+            std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
+            bool is_ValidateBlockRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf);
+
+            std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
+            bool is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, IDatabase* db);
+
             REF_getter<MsgData::BlockDiffValidateREQ> blockDiffValidateREQ=nullptr;
-            int64_t blockDiffValidateREQ_sent=0;
-            int64_t blockAccepted2REQ_sent=0;
-            heart_beat_node_info leader_info;
 
         };
         _db_to_save db_to_save_Z;
@@ -190,38 +187,15 @@ namespace Node
         void dump(nlohmann::json& j);
 
 
+        void do_request_for_transactions( block_leader& li, const REF_getter<BlockMetaFull>& meta);
 
-        struct block_validator
-        {
-            // REF_getter<MsgData::BlockDBStore> blockDBStore_V=nullptr;
-
-            int64_t block_validated=0;
-            size_t size()
-            {
-                size_t sz=0;
-                // if(blockDBStore_V.valid())
-                //     sz+=blockDBStore_V->size();
-                // if(att_data_Z.valid())
-                //     sz+=att_data_Z->size();
-                sz+=sizeof(block_validated);
-
-                // for(auto&z:  diffs)
-                // {
-                //     sz+=z.first.size();
-                //     sz+=z.second.size();
-                // }
-                return sz;
-
-            }
-        };
         struct client_leader_info
         {
             REF_getter<MsgData::HeartBeatREQ> node_leader;
             std::map<time_t /*time_window*/, int64_t> heart_beat_sent;
-            int64_t confirm_leader_sent=0;
+            // int64_t confirm_leader_sent_c=0;
         };
 
-        std::map<THASH_id, block_validator> v_blocks;
         std::map<THASH_id,block_leader> l_blocks;
         std::map<THASH_id, client_leader_info> cli_leader_info;
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
@@ -248,18 +222,15 @@ namespace Node
         REF_getter<MsgData::BlockAccepted2REQ> prev_block;
         // State state_Z=STATE_NORMAL;
         int64_t stage_is_working = 0;
-        uint64_t last_activity_time=0;
         int64_t node_start_timestamp=0;
         int64_t seqId2=0;
         void clear()
         {
-            v_blocks.clear();
             l_blocks.clear();
             block_meta_full.clear();
             cli_leader_info.clear();
             transaction_pool_of_leader.clear();
             stage_is_working=false;
-            last_activity_time=0;
             contracts.clear();
             prev_block=NULL;
 

@@ -1,7 +1,6 @@
 #include "commonError.h"
 #include "ioBuffer.h"
 #include "blake2bHasher.h"
-// #include "bigint.h"
 #include "REF.h"
 #include "mutexInspector.h"
 #include "nodeService.h"
@@ -20,7 +19,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     stage_is_working=iUtils->getNow();
 
     auto prev_root_hash=prev_root_hash_Z();
-    auto &li = l_blocks[prev_root_hash].leader_info;
+    auto &li = l_blocks[prev_root_hash];
     if (prev_root_hash != m->payload_heart_beat->prev_root_hash_1)
     {
         logNode("heat beat expired %s %s", prev_root_hash.str().c_str(), m->payload_heart_beat->prev_root_hash_1.str().c_str());
@@ -47,42 +46,44 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         return false;
     }
     {
-        li.HeartBeatRSP_m.insert_or_assign(m->node_signer, m);
+        li.HeartBeatRSP_m[m->payload_heart_beat->getHash()].insert_or_assign(m->node_signer, m);
     }
     auto mf=getMetaFull(m->payload_heart_beat->block_timestamp);
 
-    uint64_t fullstake=0;
-    for(auto& z: mf->all_nodes_enabled)
-    {
-        fullstake+=mf->getPrevStake(z);
-    }
+    // uint64_t fullstake=0;
+    // for(auto& z: mf->all_nodes_enabled)
+    // {
+    //     fullstake+=mf->getPrevStake(z);
+    // }
 
-    uint64_t hb_staked = 0;
-    if (iUtils->getNow() > li.confirm_leader_sent + _1sec)
-    {
-        bool matched = true;
-        if (li.HeartBeatRSP_m.empty())
-            throw CommonError("if(li.responses.empty())");
+    auto h=m->payload_heart_beat->getHash();
+    // uint64_t hb_staked = 0;
+    // if (iUtils->getNow() > li.confirm_leader_sent_l + _1sec)
+    // {
+    //     bool matched = true;
+    //     if (li.HeartBeatRSP_m.empty())
+    //         throw CommonError("if(li.responses.empty())");
 
-        {
-            for (auto &z : li.HeartBeatRSP_m)
-            {
-                hb_staked+=mf->getPrevStake(z.second->node_signer);
-            }
-        }
-    }
-    auto pers = (hb_staked * 100) / fullstake;
+    //     {
+    //         auto &mmm=li.HeartBeatRSP_m[h];
+    //         for (auto &z : mmm)
+    //         {
+    //             hb_staked+=mf->getPrevStake(z.second->node_signer);
+    //         }
+    //     }
+    // }
+    // auto pers = (hb_staked * 100) / fullstake;
 
-    if (pers > QUORUM && (iUtils->getNow() > li.confirm_leader_sent+ _1sec))
+    if (li.is_HeartBeatRSP_m_quorum(h,mf.get()))
     {
         logNode("HB quorum OK");
-        li.confirm_leader_sent = iUtils->getNow();
         {
 
             REF_getter<MsgData::ConfirmLeaderREQ> rt = new MsgData::ConfirmLeaderREQ();
             rt->hb = m->payload_heart_beat;
 
             broadcast_MsgEvent_via_broadcaster(rt.get(),mf->tree_all_nodes);
+            li.HeartBeatRSP_m[h].clear();
         }
     }
     XPASS;
@@ -172,7 +173,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         auto buffer = d->getBuffer();
         auto n=db_state->getNodeNoCreate(src_node);
         if(!n.valid())
-            throw CommonError("if(!n.valid())");
+            throw CommonError("if(!n.valid()) #45555");
         sendEvent(n->get_ip(), ServiceEnum::Node,
                   new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
         *need_continue_broadcast=false;
@@ -195,11 +196,11 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
                 MUTEX_INSPECTOR;
                 // 1) почистить старое (клиент + лидер)
                 cli.heart_beat_sent.clear();
-                cli.confirm_leader_sent = 0;
-                l_blocks.clear();
+                // cli.confirm_leader_sent_c = 0;
+                // l_blocks.clear();
                 // 2) записать нового лидера
                 cli.node_leader = h;
-                l_blocks[h->prev_root_hash_1].leader_info.leader_cert_2 = h;
+                // l_blocks[h->prev_root_hash_1].leader_cert_2 = h;
                 // 3) ответить
                 reply_HeartBeatRSP(h,route);
                 *need_continue_broadcast=true;
@@ -223,11 +224,11 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
                 MUTEX_INSPECTOR;
                 // 1) почистить старое (клиент + лидер)
                 cli.heart_beat_sent.clear();
-                cli.confirm_leader_sent = 0;
-                l_blocks.clear();
+                // cli.confirm_leader_sent_c = 0;
+                // l_blocks.clear();
                 // 2) записать нового лидера
                 cli.node_leader = h;
-                l_blocks[h->prev_root_hash_1].leader_info.leader_cert_2 = h;
+                l_blocks[h->prev_root_hash_1].leader_cert_2 = h;
                 // 3) ответить
                 reply_HeartBeatRSP(h,route);
                 *need_continue_broadcast=true;
@@ -245,6 +246,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             MUTEX_INSPECTOR;
             logNode("start SYNC");
             prev_block=remote_prev_lc;
+            logNode("SYNC-1: remote_verified && !local_verified, src=%s", src_node.container.c_str());
             do_sync(src_node, remote_prev_lc->blockAcceptedREQ->blockInfo->new_root_hash1);
         }
         return true;
@@ -262,7 +264,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             auto buffer = d->getBuffer();
             auto n=db_state->getNodeNoCreate(src_node);
             if(!n.valid())
-                throw CommonError("if(!n.valid())");
+                throw CommonError("if(!n.valid()) @3455");
 
             sendEvent(n->get_ip(), ServiceEnum::Node,
                       new bcEvent::NodeMsgREQ(this_node_name, node_start_timestamp, seqId2++, sign_ed(my_sk_ed, blake2b_hash(buffer).container), buffer, ListenerBase::serviceId));
@@ -274,6 +276,8 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             MUTEX_INSPECTOR;
             logNode("START SYNCING");
             prev_block=remote_prev_lc;
+            logNode("SYNC-2: remote epoch %ld > local %ld, src=%s",
+                (long)remote_prev_lc->blockAcceptedREQ->blockInfo->heart_beat->new_epoch, (long)local_prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch, src_node.container.c_str());
             do_sync(src_node,remote_prev_lc->blockAcceptedREQ->blockInfo->new_root_hash1);
             *need_continue_broadcast=true;
             return true;
@@ -323,11 +327,11 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                     {
                         // 1) почистить старое (клиент + лидер)
                         cli.heart_beat_sent.clear();
-                        cli.confirm_leader_sent = 0;
+                        // cli.confirm_leader_sent_c = 0;
                         l_blocks.clear();
                         // 2) записать нового лидера
                         cli.node_leader = h;
-                        l_blocks[h->prev_root_hash_1].leader_info.leader_cert_2 = h;
+                        // l_blocks[h->prev_root_hash_1].leader_cert_2 = h;
                         // 3) ответить
                         reply_HeartBeatRSP(h,route);
                         *need_continue_broadcast=true;
@@ -358,11 +362,11 @@ if(prev_root_hash_Z!=h->prev_root_hash)
                 {
                     // 1) почистить старое (клиент + лидер)
                     cli.heart_beat_sent.clear();
-                    cli.confirm_leader_sent = 0;
-                    l_blocks.clear();
+                    // cli.confirm_leader_sent_c = 0;
+                    // l_blocks.clear();
                     // 2) записать нового лидера
                     cli.node_leader = h;
-                    l_blocks[h->prev_root_hash_1].leader_info.leader_cert_2 = h;
+                    // l_blocks[h->prev_root_hash_1].leader_cert_2 = h;
                     // 3) ответить
                     reply_HeartBeatRSP(h,route);
                     *need_continue_broadcast=true;
@@ -415,7 +419,7 @@ bool Node::Service::ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ *h, const N
         hbr->signature.sign(my_sk_bls,h->hb->getHash().container);
 
         pass_NodeMsgRSP(hbr.get(),route);
-        cli.confirm_leader_sent=iUtils->getNow();
+        // cli.confirm_leader_sent_c=iUtils->getNow();
     }
     return true;
 }
@@ -432,7 +436,8 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     stage_is_working=iUtils->getNow();
 
     auto prev_root_hash=prev_root_hash_Z();
-    auto &li = l_blocks[prev_root_hash].leader_info;
+    auto &bt= l_blocks[prev_root_hash];
+    auto &li = l_blocks[prev_root_hash];
     if (prev_root_hash != m->hb->prev_root_hash_1)
     {
         logNode("heat beat expired %s %s", prev_root_hash.str().c_str(), m->hb->prev_root_hash_1.str().c_str());
@@ -454,17 +459,17 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
 
     auto clh=m->hb->getHash();
     {
-        li.ConfirmLeaderRSP_m[clh].insert_or_assign(m->node_signer, m);
-        li.ConfirmLeaderRSP_m_copy[clh].insert_or_assign(m->node_signer, m);
+        bt.ConfirmLeaderRSP_m[clh].insert_or_assign(m->node_signer, m);
+        bt.ConfirmLeaderRSP_m_copy[clh].insert_or_assign(m->node_signer, m);
     }
     auto mf=getMetaFull(m->hb->block_timestamp);
     uint64_t hb_staked = 0;
     {
         bool matched = true;
-        if (li.ConfirmLeaderRSP_m.empty())
+        if (bt.ConfirmLeaderRSP_m.empty())
             throw CommonError("if(li.responses.empty())");
 
-        for (auto &z : li.ConfirmLeaderRSP_m[clh])
+        for (auto &z : bt.ConfirmLeaderRSP_m[clh])
         {
             auto stake = mf->getPrevStake(z.second->node_signer);
             hb_staked += stake;
@@ -477,7 +482,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
     }
 
     auto pers = (hb_staked * 100) / fullstake;
-
+    
     if (pers > QUORUM)
     {
         // if (!li.request_for_transactions_sent)
@@ -485,7 +490,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
             logNode("lEAder approved %s", m->hb->node_leader.container.c_str());
             // li.request_for_transactions_sent = true;
             do_request_for_transactions(li,mf);
-            li.ConfirmLeaderRSP_m.clear();
+            bt.ConfirmLeaderRSP_m.clear();
         }
     }
     XPASS;
@@ -549,7 +554,7 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t tnow)
 
     // 2) новый HB — старый раунд в мусор (если leader_cert_2 был другой)
     {
-        auto& li = l_blocks[prev_root_hash_Z()].leader_info;
+        auto& li = l_blocks[prev_root_hash_Z()];
         if (li.leader_cert_2.valid() &&
             li.leader_cert_2->getHash().container != hb_req->getHash().container) {
             logNode("do_heart_beat: new HB %s (old %s), l_blocks.clear",
@@ -560,7 +565,7 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t tnow)
     }
 
     REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),prev_block.valid()?prev_block->getBuffer():"");
-    l_blocks[prev_root_hash_Z()].leader_info.leader_cert_2=hb_req;
+    l_blocks[prev_root_hash_Z()].leader_cert_2=hb_req;
     cli_leader_info[prev_root_hash_Z()].node_leader=hb_req;
     cli_leader_info[prev_root_hash_Z()].heart_beat_sent[tnow/HB_TIME_WINDOW]=iUtils->getNow();
 

@@ -2,7 +2,6 @@
 #include "IDatabase.h"
 #include <iostream>
 #include <ctime>
-// #include "DBH.h"
 #include <rocksdb/db.h>
 #include <rocksdb/options.h>
 #include <rocksdb/write_batch.h>
@@ -69,8 +68,6 @@ struct CDatabaseRocksdb: public IDatabase
         rocksdb::WriteBatch batch;
 
         for (const auto& [key, data] : v.cells) {
-            // rocksdb::Slice key_slice(reinterpret_cast<const char*>(key.data()), key.size());
-            // rocksdb::Slice value_slice(reinterpret_cast<const char*>(data.data()), data.size());
             batch.Put(key, data);
         }
 
@@ -84,67 +81,12 @@ struct CDatabaseRocksdb: public IDatabase
         return true;
         return 0;
     }
-// #include <iostream>
-// #include <vector>
-// #include <array>
-// #include <memory>
-
-// // Размер гранулы: 16 хешей × 32 байта = 512 байт
-// constexpr size_t GRANULE_SIZE = 512;
-
-// Ключ в БД — путь в дереве (8 нибблов = 4 байта для 8 уровней)
-
-/// Создание подключения к RocksDB
-
-// /// Чтение одной гранулы по ключу
-// bool read_granule(rocksdb::DB* db, const GranuleKey& key, GranuleData& out_data) {
-//     std::string value;
-//     rocksdb::Slice key_slice(reinterpret_cast<const char*>(key.data()), key.size());
-
-//     rocksdb::Status status = db->Get(rocksdb::ReadOptions(), key_slice, &value);
-
-//     if (status.ok()) {
-//         if (value.size() == GRANULE_SIZE) {
-//             std::memcpy(out_data.data(), value.data(), GRANULE_SIZE);
-//             return true;
-//         } else {
-//             std::cerr << "Неверный размер гранулы: " << value.size() << std::endl;
-//             return false;
-//         }
-//     } else if (status.IsNotFound()) {
-//         return false;
-//     } else {
-//         std::cerr << "Ошибка чтения гранулы: " << status.ToString() << std::endl;
-//         return false;
-//     }
-// }
-
-/// Запись батча гранул (атомарно, после консенсуса)
-// bool write_granules_batch(rocksdb::DB* db, const std::vector<std::pair<GranuleKey, GranuleData>>& granules) {
-//     rocksdb::WriteBatch batch;
-
-//     for (const auto& [key, data] : granules) {
-//         rocksdb::Slice key_slice(reinterpret_cast<const char*>(key.data()), key.size());
-//         rocksdb::Slice value_slice(reinterpret_cast<const char*>(data.data()), data.size());
-//         batch.Put(key_slice, value_slice);
-//     }
-
-//     rocksdb::Status status = db->Write(rocksdb::WriteOptions(), &batch);
-
-//     if (!status.ok()) {
-//         std::cerr << "Ошибка записи батча: " << status.ToString() << std::endl;
-//         return 1;
-//     }
-
-//     return 0;
-// }
 
 /// Удаление гранул батчем
     bool delete_granules_batch(rocksdb::DB* db, const std::vector<std::string>& keys) {
         rocksdb::WriteBatch batch;
 
         for (const auto& key : keys) {
-            // rocksdb::Slice key_slice(reinterpret_cast<const char*>(key.data()), key.size());
             batch.Delete(key);
         }
 
@@ -160,19 +102,10 @@ struct CDatabaseRocksdb: public IDatabase
 
     int getGranule(const std::string& k, std::string* v)
     {
-        //   std::string value;
-        // rocksdb::Slice key_slice(reinterpret_cast<const char*>(key.data()), key.size());
 
         rocksdb::Status status = db_ptr->Get(rocksdb::ReadOptions(), k, v);
 
         if (status.ok()) {
-            // if (value.size() == GRANULE_SIZE) {
-            //     std::memcpy(out_data.data(), value.data(), GRANULE_SIZE);
-            //     return true;
-            // } else {
-            //     std::cerr << "Неверный размер гранулы: " << value.size() << std::endl;
-            //     return false;
-            // }
             return 0;
         } else if (status.IsNotFound()) {
             return 1;
@@ -182,8 +115,11 @@ struct CDatabaseRocksdb: public IDatabase
         }
         return 0;
     }
-    ~CDatabaseRocksdb()
-    {
+    ~CDatabaseRocksdb() {
+        if (db_ptr) {
+            delete db_ptr;
+            db_ptr = nullptr;
+        }
     }
     std::string timestr()
     {

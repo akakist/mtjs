@@ -10,7 +10,6 @@ namespace MsgData
     {
 
         BlockDiffValidateRSP(): Base(msgid::BlockDiffValidateRSP)
-        // , blockAcceptedREQ(new BlockAcceptedREQ)
         {
 
         }
@@ -20,11 +19,13 @@ namespace MsgData
         }
         blst_cpp::Signature sig;
         NODE_id node_validator;
+        THASH_id hb_hash;
 
         void update(Blake2bHasher& h) const
         {
             h.update(sig.serialize());
             h.update(node_validator.container);
+            h.update(hb_hash.container);
 
         }
         void pack(outBuffer& b) const final
@@ -32,12 +33,14 @@ namespace MsgData
             Base::pack(b);
             b<<sig;
             b<<node_validator;
+            b<<hb_hash;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
             b>>sig;
             b>>node_validator;
+            b>>hb_hash;
         }
 
     };

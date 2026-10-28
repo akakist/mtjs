@@ -325,19 +325,38 @@ bool MTJS::Service::TickAlarm(const timerEvent::TickAlarm *e)
     {
         JSScope<10, 10> scope(js_ctx);
         std::string h = e->data->container;
+        // logErr2("[mtjs] TickAlarm TX_WAIT_BLOCK h=%s node_tx_cb=%d tx_wait_promises=%d",
+        //     base16::encode(h).c_str(), (int)opaque.node_tx_cb.size(), (int)opaque.tx_wait_promises.size());
+
+        // 1) tx_wait_promises (hex) — tx_wait_block, если есть
         auto it = opaque.tx_wait_promises.find(h);
-        if (it == opaque.tx_wait_promises.end())
-            return true;
-        JSValue global_obj = JS_GetGlobalObject(js_ctx);
-        scope.addValue(global_obj);
-        JSValue o = makeError(it->second.ctx, BCERR_TIMEDOUT, "timed out");
-        scope.addValue(o);
-        JSValue r = JS_Call(it->second.ctx, it->second.reject.get(), global_obj, 1, &o);
-        scope.addValue(r);
-        opaque.tx_wait_promises.erase(h);
+        if (it != opaque.tx_wait_promises.end()) {
+            JSValue global_obj = JS_GetGlobalObject(js_ctx);
+            scope.addValue(global_obj);
+            JSValue o = makeError(it->second.ctx, BCERR_TIMEDOUT, "timed out");
+            scope.addValue(o);
+            JSValue r = JS_Call(it->second.ctx, it->second.reject.get(), global_obj, 1, &o);
+            scope.addValue(r);
+            opaque.tx_wait_promises.erase(it);
+        }
+
+        // 2) node_tx_cb (бинарный) — tx_submit(cb) → timeout, независимо
+        auto cbIt = opaque.node_tx_cb.find(h);
+        if (cbIt != opaque.node_tx_cb.end()) {
+            // logErr2("[mtjs] TickAlarm cb BEFORE h=%s", base16::encode(h).c_str());
+            JSValue obj = JS_NewObject(js_ctx);
+            scope.addValue(obj);
+            JS_SetPropertyStr(js_ctx, obj, "tx_hash", JS_NewString(js_ctx, base16::encode(h).c_str()));  // hex!
+            JS_SetPropertyStr(js_ctx, obj, "status", JS_NewString(js_ctx, "timeout"));
+            JSValue ret = JS_Call(js_ctx, cbIt->second.get(), JS_UNDEFINED, 1, &obj);
+            scope.addValue(ret);
+            // logErr2("[mtjs] TickAlarm cb AFTER exc=%d", JS_IsException(ret) ? 1 : 0);
+            qjs::checkForException(js_ctx, ret, "TickAlarm: node_tx_cb timeout");
+            opaque.node_tx_cb.erase(cbIt);
+        }
+
         return true;
-    }
-    if (e->tid == Timers::TIMER_TIMER)
+}    if (e->tid == Timers::TIMER_TIMER)
     {
         JSScope<10, 10> scope(js_ctx);
         TimerTask *t = (TimerTask *)e->cookie.get();
@@ -546,6 +565,23 @@ bool MTJS::Service::AddTxRSP(const bcEvent::AddTxRSP* e)
 
     opaque.node_req_promises.erase(e->tx_hash.container);
 
+    {
+        auto cbIt = opaque.node_tx_cb.find(e->tx_hash.container);
+        if (cbIt != opaque.node_tx_cb.end()) {
+            JSValue obj = JS_NewObject(ctx);
+            scope.addValue(obj);
+            JS_SetPropertyStr(ctx, obj, "tx_hash", JS_NewString(ctx, base16::encode(e->tx_hash.container).c_str()));
+            JS_SetPropertyStr(ctx, obj, "status", JS_NewString(ctx, e->errcode == 0 ? "submitted" : "err"));
+            if (e->errcode != 0) JS_SetPropertyStr(ctx, obj, "errstr", JS_NewString(ctx, e->errmsg.c_str()));
+            JSValue ret = JS_Call(js_ctx, cbIt->second.get(), JS_UNDEFINED, 1, &obj);
+            scope.addValue(ret);
+            qjs::checkForException(js_ctx, ret, "AddTxRSP: node_tx_cb");
+            if (e->errcode != 0) {
+                opaque.node_tx_cb.erase(cbIt);
+                sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(e->tx_hash.container), this));
+            }
+        }
+    }
     sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->tx_hash.container), this));
 
     return true;
@@ -700,8 +736,9 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 {
     MUTEX_INSPECTOR;
     XTRY;
-// logErr2("MTJS::ClientTxSubscribeRSP: tx=%d, promises=%d, keys=", (int)e->tx_hashes.size(), (int)opaque.tx_wait_promises.size());
-for (auto& kv : opaque.tx_wait_promises) logErr2("  %s", kv.first.c_str());
+    // logErr2("[mtjs] ClientTxSubscribeRSP ENTER: tx_hashes=%d tx_wait_promises=%d node_tx_cb=%d",
+        // (int)e->tx_hashes.size(), (int)opaque.tx_wait_promises.size(), (int)opaque.node_tx_cb.size());
+    for (auto& kv : opaque.tx_wait_promises) logErr2("  %s", kv.first.c_str());
     if (!e->att_data.valid()) {
         logErr2("ClientTxSubscribeRSP: att_data invalid");
         return true;
@@ -719,6 +756,11 @@ for (auto& kv : opaque.tx_wait_promises) logErr2("  %s", kv.first.c_str());
 
     for (size_t ti = 0; ti < e->tx_hashes.size(); ++ti) {
         auto hex = base16::encode(e->tx_hashes[ti].container);
+        auto &th = e->tx_hashes[ti];
+        // logErr2("[mtjs] ClientTxSubscribeRSP th=%s node_tx_cb.find=%s",
+        //         th.str().c_str(), opaque.node_tx_cb.count(th.container) ? "found" : "not found");
+
+        // 1) tx_wait_promises (hex) — tx_wait_block
         auto it = opaque.tx_wait_promises.find(hex);
         if (it != opaque.tx_wait_promises.end()) {
             JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &js_block);
@@ -726,6 +768,22 @@ for (auto& kv : opaque.tx_wait_promises) logErr2("  %s", kv.first.c_str());
             qjs::checkForException(it->second.ctx, ret, "ClientTxSubscribeRSP: resolve tx_wait_promises");
             opaque.tx_wait_promises.erase(it);
             sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(hex), this));
+        }
+
+        // 2) node_tx_cb (бинарный) — tx_submit(cb) → finalized
+        auto cbIt = opaque.node_tx_cb.find(th.container);
+        if (cbIt != opaque.node_tx_cb.end()) {
+            // logErr2("[mtjs] cb BEFORE JS_Call th=%s", th.str().c_str());
+            JSValue obj = JS_NewObject(js_ctx);
+            scope.addValue(obj);
+            JS_SetPropertyStr(js_ctx, obj, "tx_hash", JS_NewString(js_ctx, hex.c_str()));
+            JS_SetPropertyStr(js_ctx, obj, "status", JS_NewString(js_ctx, "finalized"));
+            JSValue ret = JS_Call(js_ctx, cbIt->second.get(), JS_UNDEFINED, 1, &obj);
+            scope.addValue(ret);
+            // logErr2("[mtjs] cb AFTER JS_Call th=%s exc=%d", th.str().c_str(), JS_IsException(ret) ? 1 : 0);
+            qjs::checkForException(js_ctx, ret, "ClientTxSubscribeRSP: node_tx_cb");
+            opaque.node_tx_cb.erase(cbIt);
+            sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(th.container), this));
         }
     }
 

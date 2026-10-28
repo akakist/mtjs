@@ -91,16 +91,17 @@ JSValue js_add_instance(JSContext *ctx, JSValueConst this_val, int argc, JSValue
             return JS_ThrowInternalError(ctx, "number of argument must be 2");
 
         std::string iname = (std::string)scope.toStdStringView(argv[0]);
-
         std::string cnf = (std::string)scope.toStdStringView(argv[1]);
-
 
         IInstance *instance1 = iUtils->createNewInstance(iname);
         ConfigObj *cnf1 = new ConfigObj(iname, cnf);
         instance1->setConfig(cnf1);
         instance1->initServices();
 
-        return JS_UNDEFINED;
+        // handle — hex-строка (без потери точности через double)
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%llx", (unsigned long long)(uintptr_t)instance1);
+        return JS_NewString(ctx, buf);
     }
     catch (std::exception &e)
     {
@@ -109,6 +110,23 @@ JSValue js_add_instance(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     }
     return JS_ThrowInternalError(ctx, "return values wrong");
 }
+JSValue js_kill_instance(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    JSScope<10,10> scope(ctx);
+    if (argc != 1 || !JS_IsString(argv[0]))
+        return JS_ThrowTypeError(ctx, "killInstance(handle)");
+    std::string hex = scope.toStdString(argv[0]);
+    if (hex.empty())
+        return JS_ThrowTypeError(ctx, "killInstance: empty handle");
+    uintptr_t h = (uintptr_t)strtoull(hex.c_str(), NULL, 16);
+    IInstance* instance1 = (IInstance*)h;
+    if (!instance1)
+        return JS_ThrowTypeError(ctx, "killInstance: null handle");
+    iUtils->unregisterInstance(instance1);   // delete i → ~CInstance → deinitServices (stop+join+delete)
+    return JS_UNDEFINED;
+}
+
+
 JSValue js_tx_subscribe(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     JSScope<10, 10> scope(ctx);
@@ -180,10 +198,20 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     auto hash = t->getHash();
     t->sig_ed_bin = sign_ed(sk, hash.container);
     op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(t, op->listener_->serviceId));
+    if (JS_IsFunction(ctx, argv[5])) {
+        op->node_tx_cb.emplace(hash.container, JSValueGuard(ctx, JS_DupValue(ctx, argv[5])));
+        // подписка на блок с этой TX (BlockStreamer шлёт RSP только если tx_hash в блоке)
+        THASH_id h; h.container = hash.container;
+        op->broadcaster->sendEvent(node_addr, ServiceEnum::BlockStreamer,
+            new bcEvent::ClientTxWaitREQ(h, (time_t)timeout, op->listener_->serviceId));
+        // таймер на блок (TIMER_TX_WAIT_BLOCK)
+        op->broadcaster->sendEvent(ServiceEnum::Timer,
+            new timerEvent::SetAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(hash.container), NULL, timeout, op->listener_));
+    }    
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, timeout, op->listener_));
 
-    op->node_tx_cb.emplace(hash.container,JSValueGuard(ctx,JS_DupValue(ctx,argv[5])));
+    // op->node_tx_cb.emplace(hash.container,JSValueGuard(ctx,JS_DupValue(ctx,argv[5])));
     auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
     JSValue prom[2];
@@ -470,11 +498,30 @@ JSValue js_get_contract_data(JSContext *ctx, JSValueConst this_val, int argc, JS
     return g_prom.release();
 }
 
+JSValue js_tx_unsubscribe(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    JSScope<10, 10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
+    if (!op) return JS_ThrowInternalError(ctx, "!op");
+    if (argc < 1 || argc > 2) return JS_ThrowInternalError(ctx, "tx_unsubscribe(node[, tx_hash])");
+    if (!JS_IsString(argv[0])) return JS_ThrowInternalError(ctx, "node must be string");
+    std::string node_addr = scope.toStdString(argv[0]);
+    THASH_id h;
+    if (argc == 2 && JS_IsString(argv[1])) {
+        auto hex = scope.toStdString(argv[1]);
+        h.container = base16::decode(hex);
+    }
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::BlockStreamer,
+        new bcEvent::ClientTxUnsubscribeREQ(h, op->listener_->serviceId));
+    if (h.container.empty()) op->tx_subscription_cb.reset();
+    return JS_UNDEFINED;
+}
 void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
 {
     MUTEX_INSPECTOR;
     // logErr2("js_register_add_instance");
     JS_SetPropertyStr(ctx, mtjs_obj, "addInstance",       JS_NewCFunction(ctx, js_add_instance,       "addInstance", 2));
+     JS_SetPropertyStr(ctx, mtjs_obj, "killInstance",     JS_NewCFunction(ctx, js_kill_instance,     "killInstance", 1));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_submit",         JS_NewCFunction(ctx, js_tx_submit,          "tx_submit", 6));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_subscribe",      JS_NewCFunction(ctx, js_tx_subscribe,       "tx_subscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_user_nonce",    JS_NewCFunction(ctx, js_get_user_nonce,     "get_user_nonce", 3));
@@ -483,5 +530,6 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     JS_SetPropertyStr(ctx, mtjs_obj, "get_block",         JS_NewCFunction(ctx, js_get_block,          "get_block", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_node_info",     JS_NewCFunction(ctx, js_get_node_info,      "get_node_info", 3));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_values",        JS_NewCFunction(ctx, js_get_values,         "get_values", 2));
+    JS_SetPropertyStr(ctx, mtjs_obj, "tx_unsubscribe", JS_NewCFunction(ctx, js_tx_unsubscribe, "tx_unsubscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_contract_data", JS_NewCFunction(ctx, js_get_contract_data,  "get_contract_data", 4));
 }

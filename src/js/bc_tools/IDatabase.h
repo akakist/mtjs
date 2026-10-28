@@ -35,16 +35,35 @@ struct IDatabase: public Refcountable
         M_LOCK(mx);
         sync_out[k.size()].insert(k);
     }
+    // void remove_sync_out(const std::string &k)
+    // {
+    //     M_LOCK(mx);
+    //     auto &s=sync_out[k.size()];
+    //     s.erase(k);
+    //     if(s.empty())
+    //         sync_out.erase(k.size());
+    //     if(sync_out.empty())
+    //         sync_empty=true;
+    // }
+    std::function<void()> on_sync_finished;   // вызывается при переходе sync_empty false→true
+
     void remove_sync_out(const std::string &k)
     {
-        M_LOCK(mx);
-        auto &s=sync_out[k.size()];
+        // M_LOCK(mx);
+        MutexLockerDeferred l(mx);
+        l.lock();
+        auto &s = sync_out[k.size()];
         s.erase(k);
-        if(s.empty())
-            sync_out.erase(k.size());
-        if(sync_out.empty())
-            sync_empty=true;
+        if (s.empty()) sync_out.erase(k.size());
+        if (sync_out.empty() && !sync_empty.exchange(true)) {
+            // был false → стал true: sync завершён
+            auto cb = on_sync_finished;   // копия под локом
+            // unlock перед вызовом? см. ниже
+            l.unlock();
+            if (cb) cb();
+        }
     }
+
     std::vector<std::string> getPathes()
     {
         std::vector<std::string> pathes;
@@ -141,7 +160,7 @@ public:
 
     REF_getter<Cellable> getByPathNoCreate(const REF_getter<Cellable>&cur, const std::vector<std::string>& v);
 
-
+// IDatabase.h
 };
 
 REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAccepted2REQ>& pb);

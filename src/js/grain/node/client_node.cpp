@@ -103,6 +103,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
     bdvrs->node_validator=this_node_name;
     bdvrs->sig.sign(my_sk_bls,r->blockAcceptedREQ->getHash().container);
+    bdvrs->hb_hash=r->blockAcceptedREQ->blockInfo->heart_beat->getHash();
     pass_NodeMsgRSP(bdvrs.get(),route);
     return true;
 }
@@ -245,7 +246,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         XPASS;
     }
     cli_leader_info.clear();
-    v_blocks.clear();
 
     stage_is_working=0;
 
@@ -289,6 +289,7 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     {
         rsp->trs.push_back(z.second);
     }
+    rsp->hb_hash=r->hb->getHash();
     pass_NodeMsgRSP(rsp.get(), route);
     return true;
 }
@@ -352,8 +353,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         return true;
     }
     auto prev_root_hash=prev_root_hash_Z();
-    if(v_blocks[prev_root_hash].block_validated)
-        return true;
     b_params t(db_state.get());
     t.meta=getMetaFull(r->heart_beat->block_timestamp);
     bool err = false;
@@ -461,6 +460,5 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     //     printf("calcer %s\n", z.c_str());
     // }
 #endif
-    v_blocks[prev_root_hash].block_validated = true;
     return true;
 }

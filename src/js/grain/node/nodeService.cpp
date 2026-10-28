@@ -124,30 +124,29 @@ void Node::Service::dump(nlohmann::json& j)
         if (cli.node_leader.valid()) {
             c["node_leader"] = dump_hb(cli.node_leader);
         }
-        c["confirm_leader_sent"] = cli.confirm_leader_sent;
+        // c["confirm_leader_sent"] = cli.confirm_leader_sent_c;
         for (auto& [tw, ts] : cli.heart_beat_sent) c["hb_sent"][std::to_string(tw)] = ts;
     }
 
     // l_blocks (все события)
     for (auto& [prev, bt] : l_blocks) {
         auto& lb = j["l_blocks"][base16::encode(prev.container)];
-        auto& li = bt.leader_info;
+        auto& li = bt;
 
         lb["leader_cert"] = dump_hb(li.leader_cert_2);
         // lb["TIMER_VALIDATE_BLOCK_DELAY_set"] = li.TIMER_VALIDATE_BLOCK_DELAY_set;
-        lb["confirm_leader_sent"] = li.confirm_leader_sent;
 
         // heart_beat rsp
-        for (auto& [signer, rsp] : li.HeartBeatRSP_m) {
-            if (!rsp.valid()) continue;
-            lb["hb_rsp"].push_back({
-                {"signer", signer.container},
-                {"hb",     dump_hb(rsp->payload_heart_beat)}
-            });
-        }
+        // for (auto& [signer, rsp] : li.HeartBeatRSP_m) {
+        //     if (!rsp.valid()) continue;
+        //     lb["hb_rsp"].push_back({
+        //         {"signer", signer.container},
+        //         {"hb",     dump_hb(rsp->payload_heart_beat)}
+        //     });
+        // }
 
         // confirm_leader rsp (по hb_hash)
-        for (auto& [hb_hash, m] : li.ConfirmLeaderRSP_m) {
+        for (auto& [hb_hash, m] : bt.ConfirmLeaderRSP_m) {
             for (auto& [signer, rsp] : m) {
                 if (!rsp.valid()) continue;
                 lb["confirm_rsp"].push_back({
@@ -201,8 +200,8 @@ void Node::Service::dump(nlohmann::json& j)
             }
             rr["tx_count"] = (int)r->tx_hashes.size();
             rr["diffs_count"] = (int)r->diffs.size();
-            rr["sent"] = bt.blockDiffValidateREQ_sent;
-            rr["accepted2_sent"] = bt.blockAccepted2REQ_sent;
+            // rr["sent"] = bt.blockDiffValidateREQ_sent;
+            // rr["accepted2_sent"] = bt.blockAccepted2REQ_sent;
         }
     }
 
@@ -253,7 +252,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     MUTEX_INSPECTOR;
 
 
-    last_activity_time=iUtils->getNow();
+    // last_activity_time=iUtils->getNow();
 
     SECURE sec;
     sec.use_ssl = false;
@@ -266,6 +265,11 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 
     prev_block=load_last_block(db_state.get());
     db_state->root=getRoot(db_state.get(),prev_block);
+    db_state->on_sync_finished = [this]() {
+            // prev_block = load_last_block(db_state.get());
+            db_state->root = getRoot(db_state.get(), prev_block);
+            block_meta_full.clear();
+    };
     init_root(db_state.get());
 
     if(prev_block.valid())
@@ -354,19 +358,19 @@ void Node::Service::do_start_block()
     }
 
     // 2) лидер-сертификат должен быть валиден
-    auto &li = l_blocks[prev].leader_info;
+    auto &li = l_blocks[prev];
     if (!li.leader_cert_2.valid()) {
         logNode("do_start_block: leader_cert_2 invalid");
         return;
     }
 
     // 3) пустой пул — не собираем пустой блок, ждём TX (по политике "нет TX — нет блока")
-    if (transaction_pool_of_leader.empty()) {
-        logNode("do_start_block: tx pool empty");
-        sendEvent(ServiceEnum::Timer,
-                  new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK, NULL, NULL, 0.5, this));
-        return;
-    }
+    // if (transaction_pool_of_leader.empty()) {
+    //     logNode("do_start_block: tx pool empty");
+    //     sendEvent(ServiceEnum::Timer,
+    //               new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK, NULL, NULL, 0.5, this));
+    //     return;
+    // }
 
     auto mf = getMetaFull(li.leader_cert_2->block_timestamp);
     if (!mf.valid()) {
@@ -390,7 +394,7 @@ void Node::Service::do_start_block()
             li.leader_cert_2->node_leader.container.c_str());
 
     broadcast_MsgEvent_via_broadcaster(vb.get(), mf->tree_committe);
-    l_blocks[prev_root_hash_Z()].leader_info.transaction_responders.clear();
+    
 }
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
@@ -407,29 +411,58 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     switch (e->tid)
     {
+    case timers::TIMER_GetTransactionRSP:
+    {
+        if(!db_state->sync_empty)
+        {
+            return true;
+        }
+        auto &bt = l_blocks[prev_root_hash_Z()];
+        THASH_id hb_hash;
+        hb_hash.container=e->data->container;
+        if(bt.is_GetTransactionRSP_m_quorum(hb_hash,db_state.get()))
+        {
+            do_start_block();
+            logNode("do_start_block();");
+            bt.GetTransactionRSP_m[hb_hash].clear();
+        }
+        return true;
+    }
     case TIMER_BlockDBStore:
     {
         logNode("case TIMER_BlockDBStore:");
         auto r=dynamic_cast<MsgData::BlockDBStore*>(e->cookie.get());
         if(!r)
             throw CommonError("!r BlockDBStore");
-        auto mf=getMetaFull(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
-        broadcast_MsgEvent_via_broadcaster(r,mf->tree_all_nodes);
+        auto & bt= l_blocks[prev_root_hash_Z()];
+        auto h=r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->getHash();
+        if(bt.is_BlockDiffValidateRSP_m_quorum(h,db_state.get()))
+        {
+            auto mf=getMetaFull(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+            broadcast_MsgEvent_via_broadcaster(r,mf->tree_all_nodes);
+            bt.BlockDiffValidateRSP_m[h].clear();
 
+        }
     }
     break;
     case TIMER_BlockDiffValidateREQ:
     {
         logNode("case TIMER_BlockDiffValidateREQ:");
-        REF_getter<MsgData::HeartBeatREQ> hb= new MsgData::HeartBeatREQ;
-        inBuffer in(e->data->container);
-        hb->unpack2(in);
+        auto & bt= l_blocks[prev_root_hash_Z()];
+        // REF_getter<MsgData::HeartBeatREQ> hb= new MsgData::HeartBeatREQ;
+        // inBuffer in(e->data->container);
+        // hb->unpack2(in);
         auto r=dynamic_cast<MsgData::BlockDiffValidateREQ*>(e->cookie.get());
         if(!r)
             throw CommonError("!r BlockDiffValidateREQ");
         auto mf=getMetaFull(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
-        broadcast_MsgEvent_via_broadcaster(r,mf->tree_all_nodes);
-        l_blocks[prev_root_hash_Z()].ValidateBlockRSP_m.clear();
+        auto h=r->blockAcceptedREQ->blockInfo->heart_beat->getHash();
+        if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
+        {
+            broadcast_MsgEvent_via_broadcaster(r,mf->tree_all_nodes);
+            bt.ValidateBlockRSP_m[h].clear();
+
+        }
         return true;
     }
     break;        
@@ -451,44 +484,29 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     case timers::TIMER_SYNC_TIMEDOUT:
         logNode("FAILED SYNC, NODE STOPPED---------------------------------------------------------------");
         break;
-    case timers::TIMER_VALIDATE_BLOCK_DELAY:
-    {
-        if(!db_state->sync_empty)
-        {
-            logNode("TIMER_VALIDATE_BLOCK_DELAY if(!db_state->sync_empty)");
-            return true;
-        }
-        auto &li = l_blocks[prev_root_hash_Z()].leader_info;
-        // auto &li = hbs.leader_info;
-        do_start_block();
-        logNode("do_start_block();");
-        // li.request_for_transactions_sent
-        li.transaction_responders.clear();
-        return true;
-    }
-    case timers::TIMER_RESTART_BLOCK:
-    {
-        if(!db_state->sync_empty)
-        {
-            logNode("TIMER_RESTART_BLOCK if(!db_state->sync_empty)");
-            return true;
-        }
-        auto &li = l_blocks[prev_root_hash_Z()].leader_info;
-        if (!li.leader_cert_2.valid()) {
-            // нет лидера — попробовать стартовать (do_heart_beat сам проверит cli)
-            do_heart_beat(time(NULL));
-            return true;
-        }
-        // лидер есть — не перебиваем; если это я, запрашиваем TX
-        auto& cli = cli_leader_info[prev_root_hash_Z()];
-        if (cli.node_leader.valid() && cli.node_leader->node_leader != this_node_name) {
-            return true; // не мой раунд
-        }
-        // li.request_for_transactions_sent = true;
-        auto meta=getMetaFull(li.leader_cert_2->block_timestamp);
-        do_request_for_transactions(li,meta);
-        return true;
-    }
+    // case timers::TIMER_RESTART_BLOCK:
+    // {
+    //     if(!db_state->sync_empty)
+    //     {
+    //         logNode("TIMER_RESTART_BLOCK if(!db_state->sync_empty)");
+    //         return true;
+    //     }
+    //     auto &li = l_blocks[prev_root_hash_Z()];
+    //     if (!li.leader_cert_2.valid()) {
+    //         // нет лидера — попробовать стартовать (do_heart_beat сам проверит cli)
+    //         do_heart_beat(time(NULL));
+    //         return true;
+    //     }
+    //     // лидер есть — не перебиваем; если это я, запрашиваем TX
+    //     auto& cli = cli_leader_info[prev_root_hash_Z()];
+    //     if (cli.node_leader.valid() && cli.node_leader->node_leader != this_node_name) {
+    //         return true; // не мой раунд
+    //     }
+    //     // li.request_for_transactions_sent = true;
+    //     auto meta=getMetaFull(li.leader_cert_2->block_timestamp);
+    //     do_request_for_transactions(li,meta);
+    //     return true;
+    // }
     }
     return false;
 }
@@ -714,7 +732,7 @@ bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
     return true;
 }
 
-void Node::Service::do_request_for_transactions( heart_beat_node_info& li, const REF_getter<BlockMetaFull>& meta)
+void Node::Service::do_request_for_transactions( block_leader& li, const REF_getter<BlockMetaFull>& meta)
 {
     MUTEX_INSPECTOR;
 
@@ -723,7 +741,7 @@ void Node::Service::do_request_for_transactions( heart_beat_node_info& li, const
     {
         throw CommonError("if(!li.leader_cert_2.valid())");
     }
-    rt->lc = li.leader_cert_2;
+    rt->hb = li.leader_cert_2;
     // li.request_for_transactions_time = iUtils->getNow();
 
     broadcast_MsgEvent_via_broadcaster(rt.get(),meta->tree_all_nodes);
@@ -812,7 +830,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
             ns.insert(z);
             auto n=db_state->getNodeNoCreate(z);
             if(!n.valid())
-                throw CommonError("if(!n.valid())");
+                throw CommonError("if(!n.valid()) --@34");
 
             total_staked+=n->get_full_stake();
         }
@@ -820,7 +838,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
         {
             auto n=db_state->getNodeNoCreate(z);
             if(!n.valid())
-                throw CommonError("if(!n.valid())");
+                throw CommonError("if(!n.valid())00@@");
 
             auto portion=n->get_full_stake()*b.node_rewards/total_staked;
             auto u = db_state->getAddressStateOrCreate(n->get_owner(),NULL);
@@ -862,10 +880,10 @@ bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRi
     MUTEX_INSPECTOR;
     auto itL=m->position_of_node.find(nodeLeft);
     if(itL == m->position_of_node.end())
-        throw CommonError("if(itL == m->position_of_node.end())");
+        throw CommonError("if(itL == m->position_of_node.end()) %s", nodeLeft.container.c_str());
     auto itR=m->position_of_node.find(nodeRight);
     if(itR == m->position_of_node.end())
-        throw CommonError("if(itR == m->position_of_node.end())");
+        throw CommonError("if(itR == m->position_of_node.end()) %s", nodeRight.container.c_str());
     return itL->second < itR->second;
 }
 bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ> &lc)
@@ -962,10 +980,10 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     case msgid::GetTransactionREQ:
         return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::ValidateBlockREQ:
-        last_activity_time=iUtils->getNow();
+        // last_activity_time=iUtils->getNow();
         return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
     case msgid::BlockAccepted2REQ:
-        last_activity_time=iUtils->getNow();
+        // last_activity_time=iUtils->getNow();
         return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
     case msgid::ConfirmLeaderREQ:
         return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
@@ -993,7 +1011,10 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     auto n = db_state->getNodeNoCreate(m->node_signer);
     if(!n.valid())
-        throw CommonError("if(!n.valid())");
+    { 
+        logNode("NodeMsgRSP from unknown node %s, ignore", m->node_signer.container.c_str()); 
+        return true; 
+    }
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
     {
         logNode("verify failed @4");
@@ -1155,7 +1176,10 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
             return "not enough funds to reserve gasLimit*gasPrice+value";
     }
     db_state->root->calc_tree_hash(db_to_save_Z);
-
+    // logNode("execute_transaction: db_state.valid=%d db=%p root.valid=%d",
+    //         db_state.valid() ? 1 : 0,
+    //         (void*)db_state.get(),
+    //         (db_state.valid() && db_state->root.valid()) ? 1 : 0);
     err=execute_tx_commands(b,t,j_tx);
 
     if(err)
@@ -1312,6 +1336,88 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 
     return m;
 }
+bool Node::Service::block_leader::is_HeartBeatRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf)
+{
+    uint64_t stakeVal = 0;
+    for (auto &z : HeartBeatRSP_m[h])
+    {
+        stakeVal += mf->getPrevStake(z.first);
+    }
+    uint64_t fullstake=0;
+    for(auto &z: mf->all_nodes_enabled)
+    {
+        fullstake += mf->getPrevStake(z);
+
+    }
+    if ((stakeVal * 100) / fullstake > QUORUM )
+        return true;
+    return false;
+    
+}
+
+bool Node::Service::block_leader::is_ValidateBlockRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf)
+{
+    uint64_t stakeVal = 0;
+    for (auto &z : ValidateBlockRSP_m[h])
+    {
+        stakeVal += mf->getPrevStake(z->node_validator);;
+    }
+    uint64_t fullstake=0;
+    for(auto &z: mf->committe_members)
+    {
+        fullstake += mf->getPrevStake(z);
+
+    }
+
+    if ((stakeVal * 100) / fullstake > QUORUM )
+        return true;
+    return false;
+
+}
+bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& h, IDatabase* db)
+{
+    uint64_t fullstakeVal = 0;
+    auto ls=db->getAllNodes();
+    for (auto &z : ls)
+    {
+        if(z->isEnabled())
+            fullstakeVal += z->get_full_stake();
+    }
+    uint64_t stakeVal = 0;
+    auto &mm=GetTransactionRSP_m[h];
+    for (auto &z : mm)
+    {
+        auto n=db->getNodeNoCreateConst(z.first);
+        if(!n.valid())
+            throw CommonError("if(!n.valid()) $555");
+        stakeVal += n->get_full_stake();
+    }
+    if ((stakeVal * 100) / fullstakeVal > QUORUM )
+        return true;
+    return false;
+}
+bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, IDatabase* db)
+{
+    uint64_t fullstakeVal = 0;
+    auto ls=db->getAllNodes();
+    for (auto &z : ls)
+    {
+        if(z->isEnabled())
+            fullstakeVal += z->get_full_stake();
+    }
+    uint64_t stakeVal = 0;
+    for (auto &z : BlockDiffValidateRSP_m[h])
+    {
+        auto n=db->getNodeNoCreateConst(z->node_validator);
+        if(!n.valid())
+            throw CommonError("if(!n.valid()) $555");
+        stakeVal += n->get_full_stake();
+    }
+    if ((stakeVal * 100) / fullstakeVal > QUORUM )
+        return true;
+    return false;
+}
+
 void Node::Service::logNode(const char *fmt, ...)
 {
 

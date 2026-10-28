@@ -64,7 +64,8 @@ declare global {
         telnet: telnetModule;
         http: httpModule;
         async asyncExecute(command: string): Promise<void>;
-        addInstance(name: string, conf: string): void;
+        addInstance(name: string, conf: string): string;
+        killInstance(handle: string): void;
         get_user_nonce(nodeaddr: string, addr_hex: string, timeout: number): Promise<userInfo>;
         tx_submit(
             nodeaddr: string,
@@ -80,6 +81,8 @@ declare global {
         get_node_info(nodeaddr: string, name: string, timeout: number): Promise<NodeInfo>;
         get_values(nodeaddr: string, timeout: number): Promise<ValuesInfo>;
         get_contract_data(nodeaddr: string, contract: string, key: string, timeout: number): Promise<ContractData>;
+        tx_unsubscribe(nodeaddr: string, tx_hash_hex?: string): void;
+        tx_subscribe(nodeaddr: string, callback: (block: Block) => void): void;
         addr_from_pk(pk: string): string;
         pipe: Pipe;
         STDIN: STDIN;

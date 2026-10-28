@@ -15,11 +15,14 @@ inline std::set<EVENT_id> getEvents_blockStreamerService()
 	std::set<EVENT_id> out;
 	out.insert(bcEventEnum::ClientTxSubscribeREQ);
 	out.insert(bcEventEnum::ClientTxSubscribeRSP);
+	out.insert(bcEventEnum::ClientTxUnsubscribeREQ);
+	out.insert(bcEventEnum::ClientTxWaitREQ);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(bcEventEnum::StreamBlock);
 	out.insert(rpcEventEnum::IncomingOnAcceptor);
 	out.insert(rpcEventEnum::IncomingOnConnector);
 	out.insert(systemEventEnum::startService);
+	out.insert(timerEventEnum::SetTimer);
 	out.insert(timerEventEnum::TickAlarm);
 	out.insert(timerEventEnum::TickTimer);
 
@@ -30,11 +33,14 @@ inline void regEvents_blockStreamerService()
 {
 	iUtils->registerEvent(bcEvent::ClientTxSubscribeREQ::construct);
 	iUtils->registerEvent(bcEvent::ClientTxSubscribeRSP::construct);
+	iUtils->registerEvent(bcEvent::ClientTxUnsubscribeREQ::construct);
+	iUtils->registerEvent(bcEvent::ClientTxWaitREQ::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(bcEvent::StreamBlock::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnAcceptor::construct);
 	iUtils->registerEvent(rpcEvent::IncomingOnConnector::construct);
 	iUtils->registerEvent(systemEvent::startService::construct);
+	iUtils->registerEvent(timerEvent::SetTimer::construct);
 	iUtils->registerEvent(timerEvent::TickAlarm::construct);
 	iUtils->registerEvent(timerEvent::TickTimer::construct);
 }

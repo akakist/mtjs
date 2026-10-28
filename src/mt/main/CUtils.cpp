@@ -1476,14 +1476,29 @@ void CUtils::registerInstance(IInstance *i)
 }
 void CUtils::unregisterInstance(IInstance *i)
 {
-    delete i;
-    W_LOCK (instances.lk);
-    instances.container.erase(i);
+    // delete i;
+    IInstance *tmp=nullptr;
+    {
+        W_LOCK (instances.lk);
+        auto it=instances.container.find(i);
+        if(it!=instances.container.end())
+        {
+            tmp=i;
+            instances.container.erase(i);
+        }
+
+    }
+    if(tmp)
+        delete tmp;
+
+
+    // instances.container.erase(i);
 }
 IInstance* CUtils::createNewInstance(const std::string& nm)
 {
     if(m_isTerminating) return NULL;
     IInstance *ins=new CInstance(this,nm);
+    logErr2("@@@@@@@@@@@@@@@ INS %p",ins);
     {
         W_LOCK (instances.lk);
         instances.container.insert(ins);

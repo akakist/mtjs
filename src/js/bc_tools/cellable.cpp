@@ -77,7 +77,6 @@ void Cellable::get_dirty_leaves(_db_to_save &db_dump)
 
 
     }
-    // is_dirty = false;
 
 }
 
@@ -99,7 +98,6 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
         if (c->is_dirty)
         {
             MUTEX_INSPECTOR;
-            // lk.unlock();
             c->calc_tree_hash(db_dump);
             lk.lock();
             auto child_buf = c->getBuffer_mx();
@@ -108,7 +106,6 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
             {
                 MUTEX_INSPECTOR;
                 db_dump.add(c->getDbId(), child_buf);
-                // c->last_size = child_buf.size();
                 children_hashes_mx[cid] = ch;
             }
             lk.unlock();
@@ -120,7 +117,6 @@ void data_base::setDirty(Rollback* roll)
 {
     MUTEX_INSPECTOR;
 
-    // last_update_epoch=epoch;
     parent->setDirty__(roll);
 }
 

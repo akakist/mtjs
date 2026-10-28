@@ -7,13 +7,13 @@ namespace MsgData
     struct GetTransactionREQ: public Base
     {
 
-        GetTransactionREQ():Base(msgid::GetTransactionREQ),lc(new MsgData::HeartBeatREQ())
+        GetTransactionREQ():Base(msgid::GetTransactionREQ),hb(new MsgData::HeartBeatREQ())
         {
         }
-        REF_getter<MsgData::HeartBeatREQ> lc;
+        REF_getter<MsgData::HeartBeatREQ> hb;
         void update(Blake2bHasher& h) const
         {
-            lc->update(h);
+            hb->update(h);
         }
 
         void pack(outBuffer& b) const final
@@ -21,13 +21,13 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<lc;
+            b<<hb;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>lc;
+            b>>hb;
         }
 
         static Base* construct()

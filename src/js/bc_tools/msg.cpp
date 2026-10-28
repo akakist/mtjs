@@ -4,11 +4,6 @@
 
 
 thread_local MsgFactory msgFactory;
-// MsgData::BlockAcceptedREQ::BlockAcceptedREQ()
-//     : Base(msgid::BlockAcceptedREQ),
-//       blockInfo(new BlockInfo)
-// {
-// }
 
 const char *msgName(int id)
 {

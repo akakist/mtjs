@@ -2,6 +2,168 @@
 #include "IDatabase.h"
 #include "md_BlockAccepted2REQ.h"
 
+// ============================================================
+// NODE
+// ============================================================
+REF_getter<bc_node> IDatabase::getNodeNoCreate(const NODE_id &name)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getNodePath(name));
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        return NULL;                      // гранула не загружена локально — штатно (sync)
+    return dynamic_cast<bc_node *>(cc->data.get());
+}
+
+REF_getter<const bc_node> IDatabase::getNodeNoCreateConst(const NODE_id &name)
+{
+    auto n = getNodeNoCreate(name);
+    if (!n.valid()) return NULL;
+    return dynamic_cast<const bc_node*>(n.get());
+}
+
+// ============================================================
+// NODE LIST
+// ============================================================
+REF_getter<bc_nodelist> IDatabase::getNodeListNoCreate()
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getPath("NODE LIST"));
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        return NULL;
+    return dynamic_cast<bc_nodelist *>(cc->data.get());
+}
+
+REF_getter<const bc_nodelist> IDatabase::getNodeListNoCreateConst()
+{
+    auto n = getNodeListNoCreate();
+    if (!n.valid()) return NULL;
+    return dynamic_cast<const bc_nodelist*>(n.get());
+}
+
+// ============================================================
+// VALUES
+// ============================================================
+REF_getter<bc_values> IDatabase::getValuesNoCreate()
+{
+    MUTEX_INSPECTOR;
+    auto r = this;
+    MutexLockerDeferred lk(r->mx);
+    auto l = getByPathNoCreate(root.get(), getPath("VALUES"));
+    if (!l.valid())
+        return NULL;
+    if (!l->data.valid())
+        return NULL;
+    return dynamic_cast<bc_values *>(l->data.get());
+}
+
+REF_getter<const bc_values> IDatabase::getValuesNoCreateConst()
+{
+    MUTEX_INSPECTOR;
+    auto v = getValuesNoCreate();
+    if (!v.valid()) return NULL;
+    return dynamic_cast<const bc_values *>(v.get());
+}
+
+// ============================================================
+// VOTES
+// ============================================================
+REF_getter<bc_votes> IDatabase::getVotesNoCreate()
+{
+    MUTEX_INSPECTOR;
+    auto r = this;
+    MutexLockerDeferred lk(r->mx);
+    auto l = getByPathNoCreate(root.get(), getPath("VOTES"));
+    if (!l.valid())
+        return NULL;
+    if (!l->data.valid())
+        return NULL;
+    return dynamic_cast<bc_votes *>(l->data.get());
+}
+
+REF_getter<const bc_votes> IDatabase::getVotesNoCreateConst()
+{
+    MUTEX_INSPECTOR;
+    auto v = getVotesNoCreate();
+    if (!v.valid()) return NULL;
+    return dynamic_cast<const bc_votes *>(v.get());
+}
+
+// ============================================================
+// ADDRESS STATE
+// ============================================================
+REF_getter<bc_address_state> IDatabase::getAddressStateNoCreate(const ADDRESS_id &addr)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getAddressStatePath(addr));
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        return NULL;
+    return dynamic_cast<bc_address_state *>(cc->data.get());
+}
+
+REF_getter<const bc_address_state> IDatabase::getAddressStateNoCreateConst(const ADDRESS_id &addr)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getAddressStatePath(addr));
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        return NULL;
+    return dynamic_cast<const bc_address_state *>(cc->data.get());
+}
+
+// ============================================================
+// CONTRACT / CONTRACT DATA (тот же паттерн — на всякий)
+// ============================================================
+REF_getter<bc_contract> IDatabase::getContractNoCreate(const CONTRACT_id &name)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getContractPath(name));
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        return NULL;
+    return dynamic_cast<bc_contract *>(cc->data.get());
+}
+
+REF_getter<const bc_contract> IDatabase::getContractNoCreateConst(const CONTRACT_id &name)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getContractPath(name));
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        return NULL;
+    return dynamic_cast<const bc_contract *>(cc->data.get());
+}
+
+REF_getter<bc_contract_data> IDatabase::getContractDataNoCreate(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getContractDataPath(contract,dataId));
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        return NULL;
+    return dynamic_cast<bc_contract_data *>(cc->data.get());
+}
+
+REF_getter<const bc_contract_data> IDatabase::getContractDataNoCreateConst(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getContractDataPath(contract,dataId));
+    if (!cc.valid())
+        return NULL;
+    if (!cc->data.valid())
+        return NULL;
+    return dynamic_cast<const bc_contract_data *>(cc->data.get());
+}
+
 REF_getter<Cellable> IDatabase::replaceLeafOrCreate(const REF_getter<Cellable>& _cur, const std::string &id, MutexLockerDeferred &l, Rollback* roll)
 {
     MUTEX_INSPECTOR;
@@ -65,7 +227,7 @@ REF_getter<Cellable> IDatabase::replaceLeafNoCreate(const REF_getter<Cellable>& 
     auto dbId=cc->getDbId();
     int r = getGranule(dbId, &result);
     if (r)
-        logErr2("db->getGranule err %s", cc->getDbId().c_str());
+        logErr2("db->getGranule err %s", base16::encode(cc->getDbId()).c_str());
 
     if (result.size())
     {
@@ -193,47 +355,47 @@ std::vector<std::string> IDatabase::getNodePath(const NODE_id &name)
     return getPath("NODE_"+name.container);
 }
 
-REF_getter<bc_contract> IDatabase::getContractNoCreate(const CONTRACT_id &name)
-{
-    MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(root.get(), getContractPath(name));
-    if (!cc.valid())
-        return NULL;
-    if (!cc->data.valid())
-        throw CommonError("if(!cc->data.valid())");
-    return dynamic_cast<bc_contract *>(cc->data.get());
-}
-REF_getter<const bc_contract> IDatabase::getContractNoCreateConst(const CONTRACT_id &name)
-{
-    MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(root.get(), getContractPath(name));
-    if (!cc.valid())
-        return NULL;
-    if (!cc->data.valid())
-        throw CommonError("if(!cc->data.valid())");
-    return dynamic_cast<const bc_contract *>(cc->data.get());
-}
+// REF_getter<bc_contract> IDatabase::getContractNoCreate(const CONTRACT_id &name)
+// {
+//     MUTEX_INSPECTOR;
+//     auto cc = getByPathNoCreate(root.get(), getContractPath(name));
+//     if (!cc.valid())
+//         return NULL;
+//     if (!cc->data.valid())
+//         throw CommonError("if(!cc->data.valid())");
+//     return dynamic_cast<bc_contract *>(cc->data.get());
+// }
+// REF_getter<const bc_contract> IDatabase::getContractNoCreateConst(const CONTRACT_id &name)
+// {
+//     MUTEX_INSPECTOR;
+//     auto cc = getByPathNoCreate(root.get(), getContractPath(name));
+//     if (!cc.valid())
+//         return NULL;
+//     if (!cc->data.valid())
+//         throw CommonError("if(!cc->data.valid())");
+//     return dynamic_cast<const bc_contract *>(cc->data.get());
+// }
 
-REF_getter<bc_contract_data> IDatabase::getContractDataNoCreate(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId)
-{
-    MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(root.get(), getContractDataPath(contract,dataId));
-    if (!cc.valid())
-        return NULL;
-    if (!cc->data.valid())
-        throw CommonError("if(!cc->data.valid())");
-    return dynamic_cast<bc_contract_data *>(cc->data.get());
-}
-REF_getter<const bc_contract_data> IDatabase::getContractDataNoCreateConst(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId)
-{
-    MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(root.get(), getContractDataPath(contract,dataId));
-    if (!cc.valid())
-        return NULL;
-    if (!cc->data.valid())
-        throw CommonError("if(!cc->data.valid())");
-    return dynamic_cast<const bc_contract_data *>(cc->data.get());
-}
+// REF_getter<bc_contract_data> IDatabase::getContractDataNoCreate(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId)
+// {
+//     MUTEX_INSPECTOR;
+//     auto cc = getByPathNoCreate(root.get(), getContractDataPath(contract,dataId));
+//     if (!cc.valid())
+//         return NULL;
+//     if (!cc->data.valid())
+//         throw CommonError("if(!cc->data.valid())");
+//     return dynamic_cast<bc_contract_data *>(cc->data.get());
+// }
+// REF_getter<const bc_contract_data> IDatabase::getContractDataNoCreateConst(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId)
+// {
+//     MUTEX_INSPECTOR;
+//     auto cc = getByPathNoCreate(root.get(), getContractDataPath(contract,dataId));
+//     if (!cc.valid())
+//         return NULL;
+//     if (!cc->data.valid())
+//         throw CommonError("if(!cc->data.valid())");
+//     return dynamic_cast<const bc_contract_data *>(cc->data.get());
+// }
 REF_getter<bc_nodelist> IDatabase::getNodeListOrCreate(Rollback* roll)
 {
     MUTEX_INSPECTOR;
@@ -250,23 +412,23 @@ REF_getter<bc_nodelist> IDatabase::getNodeListOrCreate(Rollback* roll)
     cc->payload_ctor_idx = hsh::bc_nodelist;
     return u;
 }
-REF_getter<const bc_nodelist> IDatabase::getNodeListNoCreateConst()
-{
-    return dynamic_cast<const bc_nodelist*>(getNodeListNoCreate().get());
-}
-REF_getter<bc_nodelist> IDatabase::getNodeListNoCreate()
-{
-    MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(root.get(), getPath("NODE LIST"));
-    if (!cc.valid())
-        return NULL;
-    if (cc->data.valid())
-    {
-        return dynamic_cast<bc_nodelist *>(cc->data.get());
-    }
+// REF_getter<const bc_nodelist> IDatabase::getNodeListNoCreateConst()
+// {
+//     auto n = getNodeListNoCreate();
+//     if (!n.valid()) return NULL;
+//     return dynamic_cast<const bc_nodelist*>(n.get());
+// }
 
-    return NULL;
-}
+// REF_getter<bc_nodelist> IDatabase::getNodeListNoCreate()
+// {
+//     MUTEX_INSPECTOR;
+//     auto cc = getByPathNoCreate(root.get(), getPath("NODE LIST"));
+//     if (!cc.valid())
+//         return NULL;
+//     if (!cc->data.valid())
+//         return NULL;
+//     return dynamic_cast<bc_nodelist *>(cc->data.get());
+// }
 
 REF_getter<bc_contract> IDatabase::getContractOrCreate(const CONTRACT_id &name, Rollback* roll)
 {
@@ -320,27 +482,27 @@ REF_getter<bc_values> IDatabase::getValuesOrCreate(Rollback* roll)
     lk.unlock();
     return v;
 }
-REF_getter<bc_values> IDatabase::getValuesNoCreate()
-{
-    MUTEX_INSPECTOR;
-    auto r = this;
-    MutexLockerDeferred lk(r->mx);
-    auto l = getByPathNoCreate(root.get(), getPath("VALUES"));
-    if(!l.valid())
-        return NULL;
-    if (l->data.valid())
-    {
-        return dynamic_cast<bc_values *>(l->data.get());
-    }
-    return NULL;
+// REF_getter<bc_values> IDatabase::getValuesNoCreate()
+// {
+//     MUTEX_INSPECTOR;
+//     auto r = this;
+//     MutexLockerDeferred lk(r->mx);
+//     auto l = getByPathNoCreate(root.get(), getPath("VALUES"));
+//     if (!l.valid())
+//         return NULL;
+//     if (!l->data.valid())
+//         return NULL;
+//     return dynamic_cast<bc_values *>(l->data.get());
+// }
 
-}
-REF_getter<const bc_values> IDatabase::getValuesNoCreateConst()
-{
-    MUTEX_INSPECTOR;
-    return dynamic_cast<const bc_values *> (getValuesNoCreate().get());
+// REF_getter<const bc_values> IDatabase::getValuesNoCreateConst()
+// {
+//     MUTEX_INSPECTOR;
+//     auto v = getValuesNoCreate();
+//     if (!v.valid()) return NULL;
+//     return dynamic_cast<const bc_values *>(v.get());
+// }
 
-}
 ////////////// VOTES
 REF_getter<bc_votes> IDatabase::getVotesOrCreate(Rollback* roll)
 {
@@ -362,27 +524,26 @@ REF_getter<bc_votes> IDatabase::getVotesOrCreate(Rollback* roll)
     lk.unlock();
     return v;
 }
-REF_getter<bc_votes> IDatabase::getVotesNoCreate()
-{
-    MUTEX_INSPECTOR;
-    auto r = this;
-    MutexLockerDeferred lk(r->mx);
-    auto l = getByPathNoCreate(root.get(), getPath("VOTES"));
-    if(!l.valid())
-        return NULL;
-    if (l->data.valid())
-    {
-        return dynamic_cast<bc_votes *>(l->data.get());
-    }
-    return NULL;
+// REF_getter<bc_votes> IDatabase::getVotesNoCreate()
+// {
+//     MUTEX_INSPECTOR;
+//     auto r = this;
+//     MutexLockerDeferred lk(r->mx);
+//     auto l = getByPathNoCreate(root.get(), getPath("VOTES"));
+//     if (!l.valid())
+//         return NULL;
+//     if (!l->data.valid())
+//         return NULL;
+//     return dynamic_cast<bc_votes *>(l->data.get());
+// }
 
-}
-REF_getter<const bc_votes> IDatabase::getVotesNoCreateConst()
-{
-    MUTEX_INSPECTOR;
-    return dynamic_cast<const bc_votes *> (getVotesNoCreate().get());
-
-}
+// REF_getter<const bc_votes> IDatabase::getVotesNoCreateConst()
+// {
+//     MUTEX_INSPECTOR;
+//     auto v = getVotesNoCreate();
+//     if (!v.valid()) return NULL;
+//     return dynamic_cast<const bc_votes *>(v.get());
+// }
 
 ////////////////////
 
@@ -413,24 +574,24 @@ REF_getter<bc_address_state> IDatabase::getAddressStateOrCreate(const ADDRESS_id
     cc->payload_ctor_idx = hsh::bc_address_state;
     return u;
 }
-REF_getter<bc_address_state> IDatabase::getAddressStateNoCreate(const ADDRESS_id &addr)
-{
-    MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(root.get(), getAddressStatePath(addr));
-    if (!cc.valid())
-        return NULL;
+// REF_getter<bc_address_state> IDatabase::getAddressStateNoCreate(const ADDRESS_id &addr)
+// {
+//     MUTEX_INSPECTOR;
+//     auto cc = getByPathNoCreate(root.get(), getAddressStatePath(addr));
+//     if (!cc.valid())
+//         return NULL;
 
-    return dynamic_cast<bc_address_state *>(cc->data.get());
-}
-REF_getter<const bc_address_state> IDatabase::getAddressStateNoCreateConst(const ADDRESS_id &addr)
-{
-    MUTEX_INSPECTOR;
-    auto cc = getByPathNoCreate(root.get(), getAddressStatePath(addr));
-    if (!cc.valid())
-        return NULL;
+//     return dynamic_cast<bc_address_state *>(cc->data.get());
+// }
+// REF_getter<const bc_address_state> IDatabase::getAddressStateNoCreateConst(const ADDRESS_id &addr)
+// {
+//     MUTEX_INSPECTOR;
+//     auto cc = getByPathNoCreate(root.get(), getAddressStatePath(addr));
+//     if (!cc.valid())
+//         return NULL;
 
-    return dynamic_cast<bc_address_state *>(cc->data.get());
-}
+//     return dynamic_cast<bc_address_state *>(cc->data.get());
+// }
 
 std::vector<REF_getter<bc_node>> IDatabase::getAllNodes()
 {
@@ -470,23 +631,24 @@ REF_getter<bc_node> IDatabase::addNode(const NODE_id &name, Rollback* roll)
     cc->payload_ctor_idx = hsh::bc_node;
     return n;
 }
-REF_getter<const bc_node> IDatabase::getNodeNoCreateConst(const NODE_id &name)
-{
-    return dynamic_cast<const bc_node*>(getNodeNoCreate(name).get());
-}
+// REF_getter<const bc_node> IDatabase::getNodeNoCreateConst(const NODE_id &name)
+// {
+//     auto n = getNodeNoCreate(name);
+//     if (!n.valid()) return NULL;
+//     return dynamic_cast<const bc_node*>(n.get());
+// }
 
-REF_getter<bc_node> IDatabase::getNodeNoCreate(const NODE_id &name)
-{
-    MUTEX_INSPECTOR;
+// REF_getter<bc_node> IDatabase::getNodeNoCreate(const NODE_id &name)
+// {
+//     MUTEX_INSPECTOR;
+//     auto cc = getByPathNoCreate(root.get(), getNodePath(name));
+//     if (!cc.valid())
+//         return NULL;
+//     if (!cc->data.valid())
+//         return NULL;                      // гранула не загружена локально — штатно (sync)
+//     return dynamic_cast<bc_node *>(cc->data.get());
+// }
 
-    auto cc = getByPathNoCreate(root.get(), getNodePath(name));
-    if (!cc.valid())
-        return NULL;
-    if (cc->data.valid())
-        return dynamic_cast<bc_node *>(cc->data.get());
-    else
-        throw CommonError("if(cc->data.valid())");
-}
 
 REF_getter<MsgData::BlockAccepted2REQ> load_last_block(IDatabase *db)
 {

@@ -40,6 +40,7 @@ public:
     {
         M_LOCK(parent->mx);
         enabled=_enabled;
+        missed_rounds=0;
     }
     bool isEnabled()
     {
@@ -128,6 +129,7 @@ public:
         bls_pk=_bls_pk;
         ed_pk=_ed_pk;
         ip=_ip;
+        enabled=true;
     }
     void add_stake(const ADDRESS_id& user, const uint64_t &amount)
     {

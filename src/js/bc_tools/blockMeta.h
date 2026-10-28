@@ -6,8 +6,6 @@
 struct BlockMetaFull: public Refcountable
 {
     std::map<NODE_id, uint64_t> prev_stakes;
-    // std::map<NODE_id, blst_cpp::PublicKey> prevpks;
-    // blst_cpp::PublicKey bls_pk;
     uint64_t getPrevStake(const NODE_id& n) const
     {
         auto it=prev_stakes.find(n);

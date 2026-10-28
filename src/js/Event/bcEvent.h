@@ -31,6 +31,8 @@ namespace bcEventEnum
     const EVENT_id ClientMsg(ghash("@g_bcClientMsg"));
     const EVENT_id ClientMsgReply(ghash("@g_bcClientMsgReply"));
     const EVENT_id ClientTxSubscribeREQ(ghash("@g_ClientTxSubscribeREQ"));
+    const EVENT_id ClientTxWaitREQ(ghash("@g_ClientTxWaitREQ"));
+    const EVENT_id ClientTxUnsubscribeREQ(ghash("@g_ClientTxUnsubscribeREQ"));
     const EVENT_id ClientTxSubscribeRSP(ghash("@g_ClientTxSubscribeRSP"));
     const EVENT_id ServiceInit(ghash("@g_ServiceInit"));
     // const EVENT_id InvalidateRoot(ghash("@g_InvalidateRoot"));
@@ -246,6 +248,32 @@ namespace bcEvent
         }
     };
 
+    // «одна TX» (tx_wait_block / tx_submit с cb)
+    class ClientTxWaitREQ : public Event::Base
+    {
+    public:
+        static Base *construct(const route_t &r) { return new ClientTxWaitREQ(r); }
+        THASH_id tx_hash;
+        time_t ttl;
+        ClientTxWaitREQ(const THASH_id& _h, time_t _ttl, const route_t &r)
+            : Base(bcEventEnum::ClientTxWaitREQ, r), tx_hash(_h), ttl(_ttl) {}
+        ClientTxWaitREQ(const route_t &r) : Base(bcEventEnum::ClientTxWaitREQ, r) {}
+        void unpack(inBuffer &o) { o >> tx_hash >> ttl; }
+        void pack(outBuffer &o) const { o << tx_hash << ttl; }
+    };
+
+    // отписка (tx_hash пусто = «все блоки»)
+    class ClientTxUnsubscribeREQ : public Event::Base
+    {
+    public:
+        static Base *construct(const route_t &r) { return new ClientTxUnsubscribeREQ(r); }
+        THASH_id tx_hash;
+        ClientTxUnsubscribeREQ(const THASH_id& _h, const route_t &r)
+            : Base(bcEventEnum::ClientTxUnsubscribeREQ, r), tx_hash(_h) {}
+        ClientTxUnsubscribeREQ(const route_t &r) : Base(bcEventEnum::ClientTxUnsubscribeREQ, r) {}
+        void unpack(inBuffer &o) { o >> tx_hash; }
+        void pack(outBuffer &o) const { o << tx_hash; }
+    };
     class ServiceInit : public Event::NoPacked
     {
 
