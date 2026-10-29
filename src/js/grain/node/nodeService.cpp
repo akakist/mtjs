@@ -42,6 +42,7 @@
 #include "init_root.h"
 #include "nodeService.h"
 #include "CDatabaseRocksdb.h"
+#include "NodeMsgSource.h"
 
 
 #include "tr_exec.h"
@@ -54,8 +55,6 @@
 static REF_getter<ContractHost> make_node_contract_host(const REF_getter<IDatabase>& db) {
     REF_getter<ContractHost> h = new ContractHost();
     h->granules = new NodeGranuleIO(db);
-    h->events = new NodeEventSink();
-    h->clock = new NodeClock();
     h->source = new NodeContractSourceIO(db);
     return h;
 }
@@ -665,7 +664,6 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 
 Node::Service::~Service()
 {
-    JS_FreeRuntime(contract_runtime);
 
 }
 
@@ -683,7 +681,6 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
     this_node_name.container = ins->getConfig()->get_string("this_node_name", "n0", "registered name of node");
 
     db_name=ins->getConfig()->get_string2("db_name", "grain", "db name");
-    contract_runtime=JS_NewRuntime();
     node_start_timestamp=iUtils->getNow();
 }
 
@@ -1112,8 +1109,9 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 
                 jsiMsg m; // в ноде msg собирается лениво из t; m — для совместимости, поля не используются геттерами
                 REF_getter<CallStack> call_stack = new CallStack;
-                JSIValue result = cc->call_contract_method(method_str, params_json, m, false,
-                                                           call_stack, contractHost, &t, &b);
+                NodeMsgSource src(&t);
+                JSIValue result = cc->call_contract_method(method_str, params_json, &src, false,
+                                                           call_stack, contractHost);
                 if (JSI_IsException(result)) {
                     JSI_FreeValue(cc->ctx, result);
                     return "contract call failed: " + contract_str + "." + method_str;

@@ -4,7 +4,7 @@ FROM   ubuntu:latest AS builder
 USER root
 
 RUN apt-get update && \
-    apt-get install -y cmake  g++ libssl-dev libsqlite3-dev git pkg-config libpq-dev libmariadb-dev nlohmann-json3-dev librocksdb-dev/noble python3 clang libgmp-dev libsodium-dev libsqlitecpp-dev libsqlite3-dev \
+    apt-get install -y cmake  g++ libssl-dev libsqlite3-dev git pkg-config libpq-dev libmariadb-dev nlohmann-json3-dev librocksdb-dev python3 clang libgmp-dev libsodium-dev libsqlitecpp-dev libsqlite3-dev \
     libzstd-dev liblz4-dev libbz2-dev libsnappy-dev\
  &&  apt-get clean \
  &&  rm -rf /var/lib/apt/lists/*

@@ -199,7 +199,6 @@ namespace Node
         std::map<THASH_id,block_leader> l_blocks;
         std::map<THASH_id, client_leader_info> cli_leader_info;
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
-        std::map<CONTRACT_id, REF_getter<contract_rt> > contracts;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         std::map<THASH_id, std::map< time_t,REF_getter<BlockMetaFull>>> block_meta_full;
         REF_getter<BlockMetaFull> getMetaFull(time_t ti);
@@ -231,7 +230,6 @@ namespace Node
             cli_leader_info.clear();
             transaction_pool_of_leader.clear();
             stage_is_working=false;
-            contracts.clear();
             prev_block=NULL;
 
         }
@@ -290,7 +288,6 @@ namespace Node
         std::optional<std::string> load_contract(const CONTRACT_id& contract);
         std::optional<std::string> execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params);
 
-        JSRuntime *contract_runtime=NULL;
 
         REF_getter<ContractHost> contractHost=nullptr;
 

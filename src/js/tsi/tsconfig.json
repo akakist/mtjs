@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "none",
+    "lib": ["es5"],
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "noEmitOnError": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/types/**/*.d.ts", "src/contracts/**/*.ts", "src/tx/**/*.ts"],
+  "exclude": ["dist"]
+}

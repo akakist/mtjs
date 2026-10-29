@@ -48,23 +48,6 @@ struct NodeGranuleIO : GranuleIO {
     }
 };
 
-struct NodeEventSink : EventSink
-{
-
-    NodeEventSink() : EventSink() {}
-    void emit(const CONTRACT_id& contract, const std::string& name,
-              const std::string& value) override {
-        (void)contract; (void)name; (void)value;
-        // TODO: блок-очередь событий, flush в БД/лог
-    }
-};
-
-struct NodeClock : Clock
-{
-    NodeClock() : Clock() {}
-    int64_t current_time() override { return 0; }   // TODO: реальное время блока
-    int64_t current_block_height() override { return 0; }   // TODO
-};
 
 struct NodeContractSourceIO : ContractSourceIO
 {

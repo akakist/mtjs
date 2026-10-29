@@ -149,7 +149,6 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
         int seqId)
 {
     MUTEX_INSPECTOR;
-    logErr2("KALL %s %d",__FILE__,__LINE__);
     auto v = b.db->getValuesNoCreateConst();
     NODE_id name;
     auto err=yy_get_string(params,"name",name.container);
@@ -165,23 +164,18 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
             return "allowed only lowercase symbols";
         }
     }
-    logErr2("KALL %s %d",__FILE__,__LINE__);
-    logErr2("b.db valid %p",b.db);
     auto nn = b.db->getNodeNoCreateConst(name);
     if (nn.valid())
         return "Node already registered with name";
-    logErr2("KALL %s %d",__FILE__,__LINE__);
 
     auto us = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
 
-    logErr2("KALL %s %d",__FILE__,__LINE__);
 
     auto n = b.db->addNode(name, t.roll);
     if(!n.valid())
         return "addNode failed";
-    logErr2("KALL %s %d",__FILE__,__LINE__);
 
     std::string ip,pk_ed,pk_bls;
     err=yy_get_string(params,"ip",ip);
@@ -190,7 +184,6 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
     if(err) return err;
     err=yy_get_string(params,"pk_bls",pk_bls);
     if(err) return err;
-    logErr2("KALL %s %d",__FILE__,__LINE__);
 
     blst_cpp::PublicKey bls;
     bls.deserializeHexStr(pk_bls);
@@ -201,15 +194,12 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
 
     t.markDirty(n.get());
 
-    logErr2("KALL %s %d",__FILE__,__LINE__);
 
 
     t.gasUsed+=v->getGas("node_create");
-    logErr2("KALL %s %d",__FILE__,__LINE__);
 
     // t.logMsg(txid, seqId, "node %s registered", name.container.c_str());
     b.emit_command(t.tx_id, seqId, "node_create",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
-    logErr2("KALL %s %d",__FILE__,__LINE__);
 
     return std::nullopt;
 }

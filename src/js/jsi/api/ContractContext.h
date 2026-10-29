@@ -8,10 +8,9 @@
 #include "jsiValueGuard.h"
 #include "jsiMsg.h"
 #include "CONTRACT_id.h"
+#include "IMsgSource.h"
 struct CallStack;
 struct ContractHost;
-struct t_params;
-struct b_params;
 
 struct ContractContext : public Refcountable {
     JSIRuntime* rt = nullptr;
@@ -43,11 +42,9 @@ struct ContractContext : public Refcountable {
 
     JSIValue call_contract_method(const std::string& method_name,
                              const nlohmann::json& params,
-                             const jsiMsg& m, bool is_view,
+                             IMsgSource* msg_source, bool is_view,
                              const REF_getter<CallStack>& call_stack,
-                             const REF_getter<ContractHost>& host,
-                             t_params* t = nullptr,
-                             b_params* b = nullptr);
+                             const REF_getter<ContractHost>& host);
 };
 
 

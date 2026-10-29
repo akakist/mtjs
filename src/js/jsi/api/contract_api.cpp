@@ -12,6 +12,8 @@
 #include "contract_api.h"
 #include "t_params.h"
 using json = nlohmann::json;
+static CallContext* require_ctx(JSIContext* ctx) ;
+
 
 void delete_prop_str(JSIContext* ctx, JSIValueConst obj, const char* name) {
     JSAtom atom = JSI_NewAtom(ctx, name);
@@ -25,7 +27,8 @@ CallContext* get_call_context(JSIContext* ctx) {
     return (CallContext*)JSI_GetContextOpaque(ctx);
 }
 
-static CallContext* require_ctx(JSIContext* ctx) {
+static CallContext* require_ctx(JSIContext* ctx) 
+{
     CallContext* c = get_call_context(ctx);
     if (!c) JSI_ThrowTypeError(ctx, "no call context");
     return c;
@@ -33,56 +36,52 @@ static CallContext* require_ctx(JSIContext* ctx) {
 
 // ---------- msg getters: читают из root t_params ----------
 static JSIValue msg_sender(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
-    CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    if (!c->t) return JSI_NewString(ctx, "");
-    auto hex = base16::encode(c->t->senderAddress.addr);
-    return JSI_NewStringLen(ctx, hex.data(), hex.size());
+  CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    if (!c->msg_source) return JSI_NewString(ctx, "");
+    auto s = c->msg_source->get_sender();
+    return JSI_NewStringLen(ctx, s.data(), s.size());
 }
 static JSIValue msg_value(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->t ? (int64_t)c->t->value : 0);
+    return JSI_NewInt64(ctx, c->msg_source ? c->msg_source->get_value() : 0);
 }
 static JSIValue msg_gasLimit(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->t ? (int64_t)c->t->gasLimit : 0);
+    return JSI_NewInt64(ctx, c->msg_source? c->msg_source->get_gasLimit() : 0);
 }
 static JSIValue msg_gasUsed(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->t ? (int64_t)c->t->gasUsed : 0);
+    return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_gasUsed() : 0);
 }
 static JSIValue msg_blockTimestamp(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->t ? (int64_t)c->t->block_timestamp : 0);
+    return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_blockTimestamp() : 0);
 }
 static JSIValue msg_blockHeight(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->t ? (int64_t)c->t->block_height : 0);
+    return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_blockHeight() : 0);
 }
 static JSIValue msg_nonce(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->t ? (int64_t)c->t->nonce : 0);
+    return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_nonce() : 0);
 }
 static JSIValue msg_chainId(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->t ? (int64_t)c->t->chain_id : 0);
+    return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_chainId() : 0);
 }
 static JSIValue msg_txHash(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    if (!c->t) return JSI_NewString(ctx, "");
-    auto hex = base16::encode(c->t->tx_id.container);
+    if (!c->msg_source) return JSI_NewString(ctx, "");
+    auto hex = base16::encode(c->msg_source->get_txHash());
     return JSI_NewStringLen(ctx, hex.data(), hex.size());
 }
 static JSIValue msg_txIndex(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     CallContext* c = require_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->t ? (int64_t)c->t->tx_index : 0);
+    return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_txIndex() : 0);
 }
 
-JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& /*m*/) 
+JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& /*m*/)
 {
-    JSIValue global = JSI_GetGlobalObject(ctx);
-    JSIValue existing = JSI_GetPropertyStr(ctx, global, "msg");
-    if (!JSI_IsUndefined(existing)) { JSI_FreeValue(ctx, global); return existing; }
-
     JSIValue obj = JSI_NewObject(ctx);
     auto def = [&](const char* name, JSIValue (*fn)(JSIContext*, JSIValueConst, int, JSIValueConst*)) {
         JSIValue getter = JSI_NewCFunction(ctx, fn, name, 0);
@@ -98,9 +97,6 @@ JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& /*m*/)
     def("chainId", msg_chainId);
     def("txHash", msg_txHash);
     def("txIndex", msg_txIndex);
-
-    JSI_SetPropertyStr(ctx, global, "msg", obj);
-    JSI_FreeValue(ctx, global);
     return obj;
 }
 
@@ -139,10 +135,17 @@ JSIValue jsi_registerView(JSIContext* ctx, JSIValueConst, int argc, JSIValueCons
 JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     try {
         if (argc < 2 || !JSI_IsString(argv[0])) return JSI_ThrowTypeError(ctx, "createGranule(key, value[, ttl])");
-        if (JSI_IsUndefined(argv[1])) return JSI_ThrowTypeError(ctx, "createGranule: undefined not allowed");
+        if (JSI_IsUndefined(argv[1])){
+            return JSI_ThrowTypeError(ctx, "createGranule: undefined not allowed");
+        } 
         CallContext* call = (CallContext*)JSI_GetContextOpaque(ctx);
-        if (!call) return JSI_ThrowTypeError(ctx, "no call context");
-        if (call->in_view) return JSI_ThrowTypeError(ctx, "createGranule is not allowed in view");
+        if (!call){
+            return JSI_ThrowTypeError(ctx, "no call context");
+        } 
+        if (call->in_view) 
+        {
+            return JSI_ThrowTypeError(ctx, "createGranule is not allowed in view");
+        }
         ContractContext* cc = call->contract.get();
         GranuleIO* io = call->host->granules.get();
         JSIScope<20,20> scope(ctx);
@@ -150,18 +153,32 @@ JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueCon
         if (key.empty()) return JSI_EXCEPTION;
         int64_t ttl = 0;
         if (argc >= 3 && !JSI_IsUndefined(argv[2])) {
-            if (JSI_ToInt64(ctx, &ttl, argv[2]) != 0) return JSI_ThrowTypeError(ctx, "createGranule: ttl must be int64");
-            if (ttl < 0) return JSI_ThrowTypeError(ctx, "createGranule: ttl must be >= 0");
+            if (JSI_ToInt64(ctx, &ttl, argv[2]) != 0){
+                return JSI_ThrowTypeError(ctx, "createGranule: ttl must be int64");
+            }
+            if (ttl < 0){
+                 return JSI_ThrowTypeError(ctx, "createGranule: ttl must be >= 0");
+            }
         }
         CONTRACT_DATA_id cid; cid.container=key;
         if (io->exists(cc->name, cid))
+        {
             return JSI_ThrowTypeError(ctx, "createGranule: already exists: %s%s", cc->name.container.c_str(), key.c_str());
+
+        }
         std::string s = serialize_value(ctx, argv[1]);
-        if (!is_serializable(s)) return JSI_ThrowTypeError(ctx, "createGranule(%s%s): cannot serialize value", cc->name.container.c_str(), key.c_str());
-        if (s.size() > MAX_GRANULE_SIZE) return JSI_ThrowTypeError(ctx, "createGranule(%s%s): value too large", cc->name.container.c_str(), key.c_str());
-        int64_t now = call->host->clock->current_time();
+        if (!is_serializable(s)){
+            return JSI_ThrowTypeError(ctx, "createGranule(%s%s): cannot serialize value", cc->name.container.c_str(), key.c_str());
+        } 
+        if (s.size() > MAX_GRANULE_SIZE){
+            return JSI_ThrowTypeError(ctx, "createGranule(%s%s): value too large", cc->name.container.c_str(), key.c_str());
+        } 
+        int64_t now = call->msg_source->get_blockTimestamp();
         if (auto err = io->create(cc->name, cid, s, now, ttl, call->roll))
+        {
             return JSI_ThrowTypeError(ctx, "createGranule(%s%s): %s", cc->name.container.c_str(), key.c_str(), err->c_str());
+
+        }
         return JSI_UNDEFINED;
     } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
     catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "createGranule: %s", e.what()); }
@@ -186,7 +203,9 @@ JSIValue jsi_setGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
         if (!is_serializable(s)) return JSI_ThrowTypeError(ctx, "setGranule(%s%s): cannot serialize value", cc->name.container.c_str(), key.c_str());
         if (s.size() > MAX_GRANULE_SIZE) return JSI_ThrowTypeError(ctx, "setGranule(%s%s): value too large", cc->name.container.c_str(), key.c_str());
         if (auto err = io->set(cc->name, cid, s, call->roll))
+        {
             return JSI_ThrowTypeError(ctx, "setGranule(%s%s): %s", cc->name.container.c_str(), key.c_str(), err->c_str());
+        }
         return JSI_UNDEFINED;
     } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
     catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "setGranule: %s", e.what()); }
@@ -195,21 +214,32 @@ JSIValue jsi_setGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
 
 JSIValue jsi_getGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     try {
-        if (argc < 1 || !JSI_IsString(argv[0])) return JSI_ThrowTypeError(ctx, "getGranule(key)");
+        if (argc < 1 || !JSI_IsString(argv[0])){
+            return JSI_ThrowTypeError(ctx, "getGranule(key)");
+        }
+         
         CallContext* call = (CallContext*)JSI_GetContextOpaque(ctx);
-        if (!call) return JSI_ThrowTypeError(ctx, "no call context");
+        if (!call){
+            return JSI_ThrowTypeError(ctx, "no call context");
+        } 
         ContractContext* cc = call->contract.get();
         GranuleIO* io = call->host->granules.get();
         JSIScope<20,20> scope(ctx);
         auto key = scope.toStdString(argv[0]);
-        if (key.empty()) return JSI_EXCEPTION;
+        if (key.empty()){
+             return JSI_EXCEPTION;
+        }
         CONTRACT_DATA_id cid; cid.container=key;
         std::string value;
-        if (!io->get(cc->name,cid, value)) return JSI_UNDEFINED;
+        if (!io->get(cc->name,cid, value)){
+            return JSI_UNDEFINED;
+        } 
         json j = json::parse(value);
         return json_to_jsi(ctx, j);
     } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
-    catch (const json::exception& e) { return JSI_ThrowTypeError(ctx, "getGranule: %s", e.what()); }
+    catch (const json::exception& e) { 
+        return JSI_ThrowTypeError(ctx, "getGranule: %s", e.what()); 
+    }
     catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "getGranule: %s", e.what()); }
     catch (...) { return JSI_ThrowInternalError(ctx, "getGranule: unknown C++ exception"); }
 }
@@ -248,8 +278,8 @@ JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
         auto cc = self->host->get_contract(contract_name);
         if (!cc.valid()) return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.container.c_str());
         json params = json_from_jsi(ctx, argv[2]);
-        JSIValue r = cc->call_contract_method(method_name, params, self->msg, false,
-                                               self->call_stack, self->host, self->t, self->b);
+        JSIValue r = cc->call_contract_method(method_name, params, self->msg_source, false,
+                                               self->call_stack, self->host);
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
         JSIValue r_caller = convert_value(cc->ctx, ctx, r);
         JSI_FreeValue(cc->ctx, r);
@@ -274,8 +304,8 @@ JSIValue jsi_callView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* a
         auto cc = self->host->get_contract(contract_name);
         if (!cc.valid()) return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.container.c_str());
         json params = json_from_jsi(ctx, argv[2]);
-        JSIValue r = cc->call_contract_method(view_name, params, self->msg, true,
-                                               self->call_stack, self->host, self->t, self->b);
+        JSIValue r = cc->call_contract_method(view_name, params, self->msg_source, true,
+                                               self->call_stack, self->host);
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
         JSIValue r_caller = convert_value(cc->ctx, ctx, r);
         JSI_FreeValue(cc->ctx, r);
@@ -295,10 +325,7 @@ void register_api(JSIContext* ctx) {
     JSI_SetPropertyStr(ctx, global, "emit",           JSI_NewCFunction(ctx, jsi_emit,           "emit", 2));
     JSI_SetPropertyStr(ctx, global, "callMethod",     JSI_NewCFunction(ctx, jsi_callMethod,     "callMethod", 3));
     JSI_SetPropertyStr(ctx, global, "callView",       JSI_NewCFunction(ctx, jsi_callView,       "callView", 3));
-
-    build_msg_object(ctx, jsiMsg{});
     JSI_FreeValue(ctx, global);
 }
-
 
 

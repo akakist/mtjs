@@ -14,11 +14,9 @@ JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& /*m*/) ;
 
 JSIValue ContractContext::call_contract_method(const std::string& method_name,
                              const json& params,
-                             const jsiMsg& m, bool is_view,
+                             IMsgSource* msg_source, bool is_view,
                              const REF_getter<CallStack>& call_stack,
-                             const REF_getter<ContractHost>& host,
-                             t_params* t,
-                             b_params* b)
+                             const REF_getter<ContractHost>& host)
 {
     if (call_stack->call_stack.size() >= (size_t)MAX_CALL_DEPTH)
         return JSI_ThrowTypeError(ctx, "call stack too deep (%zu >= %d)", call_stack->call_stack.size(), MAX_CALL_DEPTH);
@@ -38,15 +36,11 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
     CallContext call_ctx;
     call_ctx.contract = this;
     call_ctx.in_view = is_view;
-    call_ctx.msg = m;
+    call_ctx.msg_source = msg_source;
     call_ctx.depth = (int)call_stack->call_stack.size() - 1;
     call_ctx.call_stack = call_stack;
     call_ctx.host = host;
 
-    CallContext* parent_ctx = (CallContext*)JSI_GetContextOpaque(ctx);
-    call_ctx.t = (parent_ctx && parent_ctx->t) ? parent_ctx->t : t;
-    call_ctx.b = (parent_ctx && parent_ctx->b) ? parent_ctx->b : b;
-    call_ctx.roll = t->roll;
     void* saved = JSI_GetContextOpaque(ctx);
     JSI_SetContextOpaque(ctx, &call_ctx);
 
@@ -59,24 +53,29 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
         return params_js;
     }
 
-    JSIValue msg_ref = build_msg_object(ctx, m);
-
-    JSIValue argv[2] = { params_js, msg_ref };
-    int nargs = is_view ? 1 : 2;
+    JSIValue argv[2];
+    int nargs = 0;
+    argv[0] = params_js;
+    nargs = 1;
+    if (!is_view) {
+        jsiMsg m;
+        argv[1] = build_msg_object(ctx, m);
+        nargs = 2;
+    }
 
     JSIValue r;
     try {
         r = JSI_Call(ctx, fn, JSI_UNDEFINED, nargs, argv);
     } catch (...) {
         JSI_SetContextOpaque(ctx, saved);
-        JSI_FreeValue(ctx, msg_ref);
+        if (nargs == 2) JSI_FreeValue(ctx, argv[1]);
         JSI_FreeValue(ctx, params_js);
         call_stack->call_stack.pop_back();
         throw;
     }
 
     JSI_SetContextOpaque(ctx, saved);
-    JSI_FreeValue(ctx, msg_ref);
+    if (nargs == 2) JSI_FreeValue(ctx, argv[1]);
     JSI_FreeValue(ctx, params_js);
     call_stack->call_stack.pop_back();
 
@@ -87,6 +86,3 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
 
     return r;
 }
-
-
-

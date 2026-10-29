@@ -8,8 +8,6 @@
 
 struct ContractHost : public Refcountable {
     REF_getter<GranuleIO> granules;
-    REF_getter<EventSink> events;
-    REF_getter<Clock> clock;
     REF_getter<ContractSourceIO> source;
 
     std::map<CONTRACT_id, REF_getter<ContractContext>> contract_cache;

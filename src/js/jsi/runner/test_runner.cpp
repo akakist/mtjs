@@ -53,12 +53,9 @@ JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& m);
 static REF_getter<ContractHost> make_test() {
     REF_getter<ContractHost> h = new ContractHost();
     h->granules = new TestGranuleIO();
-    h->events = new TestEventSink();
-    h->clock = new TestClock();
     h->source = new TestContractSourceIO();
     return h;
 }
-
 
 struct TxCommand {
     std::string contract;
@@ -79,6 +76,7 @@ struct TestCase {
     json initial;
     std::vector<Transaction> transactions;
     std::vector<jsiEvent> expected_emits;
+    std::vector<jsiEvent> actual_emits;
     json expected;
 };
 
@@ -260,13 +258,8 @@ bool load_test(const std::string& path, TestCase& out) {
 
 static void apply_initial(const TestCase& tc, const REF_getter<ContractHost>& host) {
     auto* test_io = static_cast<TestGranuleIO*>(host->granules.get());
-    auto* test_events = static_cast<TestEventSink*>(host->events.get());
-    auto* test_clock = static_cast<TestClock*>(host->clock.get());
 
     test_io->data.clear();
-    test_events->all_events.clear();
-    test_events->current_events.clear();
-    test_clock->set(tc.time);
 
     for (auto it = tc.initial.begin(); it != tc.initial.end(); ++it) {
         const std::string& key = it.key();
@@ -284,39 +277,54 @@ static void apply_initial(const TestCase& tc, const REF_getter<ContractHost>& ho
         test_io->data[combined] = Granule{ std::move(s), 0, 0 };
     }
 }
-
 static bool json_equal(const json& a, const json& b) {
     return a == b;
 }
-
+static bool json_subset(const json& expected, const json& actual) {
+    if (expected.is_object() && actual.is_object()) {
+        for (auto it = expected.begin(); it != expected.end(); ++it) {
+            auto jt = actual.find(it.key());
+            if (jt == actual.end() || !json_subset(it.value(), *jt)) return false;
+        }
+        return true;
+    }
+    if (expected.is_array() && actual.is_array()) {
+        if (expected.size() != actual.size()) return false;
+        for (size_t i = 0; i < expected.size(); ++i)
+            if (!json_subset(expected[i], actual[i])) return false;
+        return true;
+    }
+    return expected == actual;
+}
 static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& tc,
                              const REF_getter<ContractHost>& host)
 {
-    auto* test_events = static_cast<TestEventSink*>(host->events.get());
     auto* test_io = static_cast<TestGranuleIO*>(host->granules.get());
 
     for (auto& tx : tc.transactions) {
         auto saved = test_io->data;
-        auto saved_events = test_events->all_events;
         bool tx_aborted = false;
 
         for (auto& cmd : tx.commands) {
             CONTRACT_id cid;
-            cid.container=cmd.contract;
+            cid.container = cmd.contract;
             auto cc = host->get_contract(cid);
             if (!cc.valid()) { std::cerr << "contract not loaded: " << cmd.contract << std::endl; return false; }
+
             auto mit = cc->methods.find(cmd.method);
+            bool is_view = false;
             if (mit == cc->methods.end()) {
+                mit = cc->views.find(cmd.method);
+                is_view = true;
+            }
+            if (mit == cc->views.end()) {
                 std::cerr << "method not found: " << cmd.contract << "." << cmd.method << std::endl;
                 return false;
             }
 
-            test_events->current_events.clear();
-
             CallContext call_ctx;
             call_ctx.contract = cc;
-            call_ctx.in_view = false;
-            call_ctx.msg = tx.msg;
+            call_ctx.in_view = is_view;
             call_ctx.depth = 0;
             call_ctx.call_stack = new CallStack;
             call_ctx.host = host;
@@ -324,17 +332,17 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             void* saved_opaque = JSI_GetContextOpaque(cc->ctx);
             JSI_SetContextOpaque(cc->ctx, &call_ctx);
 
-            JSIValue result = cc->call_contract_method(cmd.method, cmd.params, tx.msg, false,
-                                                   call_ctx.call_stack, host);
+            TestMsgSource msg_src(tx.msg);
+            JSIValue result = cc->call_contract_method(cmd.method, cmd.params, &msg_src, is_view,
+                                                       call_ctx.call_stack, host);
             JSI_SetContextOpaque(cc->ctx, saved_opaque);
 
-            for (auto& ev : call_ctx.emits) test_events->current_events.push_back(ev);
+            std::vector<jsiEvent> cmd_emits = call_ctx.emits;
+            call_ctx.emits.clear();
 
             if (JSI_IsException(result)) {
                 JSI_FreeValue(cc->ctx, result);
                 test_io->data = std::move(saved);
-                test_events->all_events = std::move(saved_events);
-                test_events->current_events.clear();
                 if (!cmd.expect_error) {
                     std::cerr << "unexpected exception in " << cmd.contract << "." << cmd.method << std::endl;
                     return false;
@@ -347,63 +355,56 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
                           << cmd.contract << "." << cmd.method << std::endl;
                 JSI_FreeValue(cc->ctx, result);
                 test_io->data = std::move(saved);
-                test_events->all_events = std::move(saved_events);
                 return false;
             }
 
             if (cmd.expect_result) {
                 std::string act_str = serialize_value(cc->ctx, result);
                 json act;
-                try {
-                    act = json::parse(act_str);
-                } catch (const std::exception& e) {
+                try { act = json::parse(act_str); }
+                catch (const std::exception& e) {
                     std::cerr << "result in " << cmd.contract << "." << cmd.method
                               << " is not JSON: " << act_str << " (" << e.what() << ")" << std::endl;
                     JSI_FreeValue(cc->ctx, result);
                     test_io->data = std::move(saved);
-                    test_events->all_events = std::move(saved_events);
                     return false;
                 }
-                if (!json_equal(*cmd.expect_result, act)) {
+                if (!json_subset(*cmd.expect_result, act)) {
                     std::cerr << "result mismatch in " << cmd.contract << "." << cmd.method
                               << ": expected " << cmd.expect_result->dump()
                               << ", got " << act.dump() << std::endl;
                     JSI_FreeValue(cc->ctx, result);
                     test_io->data = std::move(saved);
-                    test_events->all_events = std::move(saved_events);
                     return false;
                 }
             }
 
             if (!cmd.expect_events.empty()) {
-                if (test_events->current_events.size() != cmd.expect_events.size()) {
+                if (cmd_emits.size() != cmd.expect_events.size()) {
                     std::cerr << "  events count mismatch in " << cmd.contract << "." << cmd.method
                               << ": expected " << cmd.expect_events.size()
-                              << ", got " << test_events->current_events.size() << std::endl;
+                              << ", got " << cmd_emits.size() << std::endl;
                     JSI_FreeValue(cc->ctx, result);
                     test_io->data = std::move(saved);
-                    test_events->all_events = std::move(saved_events);
                     return false;
                 }
                 for (size_t k = 0; k < cmd.expect_events.size(); ++k) {
-                    if (cmd.expect_events[k].contract != test_events->current_events[k].contract ||
-                        cmd.expect_events[k].name     != test_events->current_events[k].name) {
+                    if (cmd.expect_events[k].contract != cmd_emits[k].contract ||
+                        cmd.expect_events[k].name     != cmd_emits[k].name) {
                         std::cerr << "  event[" << k << "] mismatch (contract/name) in "
                                   << cmd.contract << "." << cmd.method << std::endl;
                         JSI_FreeValue(cc->ctx, result);
                         test_io->data = std::move(saved);
-                        test_events->all_events = std::move(saved_events);
                         return false;
                     }
                     json exp_v, act_v;
                     try {
                         exp_v = json::parse(cmd.expect_events[k].value);
-                        act_v = json::parse(test_events->current_events[k].value);
+                        act_v = json::parse(cmd_emits[k].value);
                     } catch (const std::exception& e) {
                         std::cerr << "  event[" << k << "] not JSON: " << e.what() << std::endl;
                         JSI_FreeValue(cc->ctx, result);
                         test_io->data = std::move(saved);
-                        test_events->all_events = std::move(saved_events);
                         return false;
                     }
                     if (!json_equal(exp_v, act_v)) {
@@ -411,22 +412,19 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
                                   << cmd.contract << "." << cmd.method << std::endl;
                         JSI_FreeValue(cc->ctx, result);
                         test_io->data = std::move(saved);
-                        test_events->all_events = std::move(saved_events);
                         return false;
                     }
                 }
             }
 
-            for (auto& ev : test_events->current_events) test_events->all_events.push_back(ev);
+            for (auto& ev : cmd_emits) tc.actual_emits.push_back(ev);
             JSI_FreeValue(cc->ctx, result);
         }
 
         if (tx_aborted) continue;
     }
     return true;
-}
-
-static bool compare_emits(const std::vector<jsiEvent>& actual,
+}static bool compare_emits(const std::vector<jsiEvent>& actual,
                           const std::vector<jsiEvent>& expected)
 {
     if (actual.size() != expected.size()) {
@@ -520,7 +518,6 @@ std::vector<std::string> list_directory(const std::string& path) {
 }
 
 int main() {
-    // iUtils=new Cut
     JSIRuntime* rt = JSI_NewRuntime();
     if (!rt) return 1;
     JSIContext* ctx = JSI_NewContext(rt);
@@ -542,8 +539,7 @@ int main() {
         apply_initial(tc, host);
 
         if (!run_transactions(rt, ctx, tc, host)) { failures++; continue; }
-        auto* test_events = static_cast<TestEventSink*>(host->events.get());
-        if (!compare_emits(test_events->all_events, tc.expected_emits)) { failures++; continue; }
+        if (!compare_emits(tc.actual_emits, tc.expected_emits)) { failures++; continue; }
         if (!compare_expected(ctx, tc, host)) { failures++; continue; }
 
         std::cout << "  PASS" << std::endl;

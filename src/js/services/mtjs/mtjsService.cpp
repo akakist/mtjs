@@ -744,17 +744,20 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
         return true;
     }
 
-    JSScope<10, 10> scope(js_ctx);
+    JSScope<10, 10> scope1(js_ctx);
 
     bool finalized = e->blockAccepted2REQ.valid();
     JSValue js_block = js_block_new(js_ctx, e->blockAccepted2REQ, e->att_data, e->tx_hashes, finalized);
-    scope.addValue(js_block);
+    scope1.addValue(js_block);
     if (JS_IsException(js_block)) {
         logErr2("ClientTxSubscribeRSP: js_block_new exception");
         return true;
     }
 
     for (size_t ti = 0; ti < e->tx_hashes.size(); ++ti) {
+
+        JSScope<10, 10> scope2(js_ctx);
+
         auto hex = base16::encode(e->tx_hashes[ti].container);
         auto &th = e->tx_hashes[ti];
         // logErr2("[mtjs] ClientTxSubscribeRSP th=%s node_tx_cb.find=%s",
@@ -764,7 +767,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
         auto it = opaque.tx_wait_promises.find(hex);
         if (it != opaque.tx_wait_promises.end()) {
             JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &js_block);
-            scope.addValue(ret);
+            scope2.addValue(ret);
             qjs::checkForException(it->second.ctx, ret, "ClientTxSubscribeRSP: resolve tx_wait_promises");
             opaque.tx_wait_promises.erase(it);
             sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(hex), this));
@@ -775,11 +778,11 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
         if (cbIt != opaque.node_tx_cb.end()) {
             // logErr2("[mtjs] cb BEFORE JS_Call th=%s", th.str().c_str());
             JSValue obj = JS_NewObject(js_ctx);
-            scope.addValue(obj);
+            scope2.addValue(obj);
             JS_SetPropertyStr(js_ctx, obj, "tx_hash", JS_NewString(js_ctx, hex.c_str()));
             JS_SetPropertyStr(js_ctx, obj, "status", JS_NewString(js_ctx, "finalized"));
             JSValue ret = JS_Call(js_ctx, cbIt->second.get(), JS_UNDEFINED, 1, &obj);
-            scope.addValue(ret);
+            scope2.addValue(ret);
             // logErr2("[mtjs] cb AFTER JS_Call th=%s exc=%d", th.str().c_str(), JS_IsException(ret) ? 1 : 0);
             qjs::checkForException(js_ctx, ret, "ClientTxSubscribeRSP: node_tx_cb");
             opaque.node_tx_cb.erase(cbIt);
@@ -791,8 +794,10 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
         std::string next_key = "next:";
         auto it = opaque.tx_wait_promises.find(next_key);
         if (it != opaque.tx_wait_promises.end()) {
+            JSScope<10, 10> scope2(js_ctx);
+
             JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &js_block);
-            scope.addValue(ret);
+            scope2.addValue(ret);
             qjs::checkForException(it->second.ctx, ret, "ClientTxSubscribeRSP: resolve next");
             opaque.tx_wait_promises.erase(it);
             sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(next_key), this));
@@ -801,7 +806,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 
     if (opaque.tx_subscription_cb.has_value() && JS_IsFunction(js_ctx, opaque.tx_subscription_cb->get())) {
         JSValue ret = JS_Call(js_ctx, opaque.tx_subscription_cb->get(), JS_UNDEFINED, 1, &js_block);
-        scope.addValue(ret);
+        scope1.addValue(ret);
         qjs::checkForException(js_ctx, ret, "ClientTxSubscribeRSP: tx_subscription_cb");
     }
 

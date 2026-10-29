@@ -1,0 +1,13 @@
+src/types/jsi.d.ts(1,1): error TS1109: Expression expected.
+src/types/jsi.d.ts(1,9): error TS1005: ';' expected.
+src/types/jsi.d.ts(11,11): error TS1005: ';' expected.
+src/types/jsi.d.ts(12,5): error TS1128: Declaration or statement expected.
+src/types/jsi.d.ts(13,5): error TS1128: Declaration or statement expected.
+src/types/jsi.d.ts(14,5): error TS1128: Declaration or statement expected.
+src/types/jsi.d.ts(15,5): error TS1128: Declaration or statement expected.
+src/types/jsi.d.ts(16,5): error TS1128: Declaration or statement expected.
+src/types/jsi.d.ts(17,5): error TS1128: Declaration or statement expected.
+src/types/jsi.d.ts(18,5): error TS1128: Declaration or statement expected.
+src/types/jsi.d.ts(19,5): error TS1128: Declaration or statement expected.
+src/types/jsi.d.ts(20,5): error TS1128: Declaration or statement expected.
+src/types/jsi.d.ts(21,5): error TS1128: Declaration or statement expected.
