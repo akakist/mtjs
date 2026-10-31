@@ -21,8 +21,8 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
         logErr2("insufficient_privileges");
         return "insufficient_privileges";
     }
-    uint64_t amount=0;
-    auto err=yy_get_uint64_t(params,"amount",amount);
+    int64_t amount=0;
+    auto err=yy_get_int64_t(params,"amount",amount);
     if(err) return err;
 
 
@@ -51,8 +51,8 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
 
-    uint64_t amount=0;
-    auto err=yy_get_uint64_t(params,"amount",amount);
+    int64_t amount=0;
+    auto err=yy_get_int64_t(params,"amount",amount);
     if(err) return err;
 
     std::string to_;
@@ -155,9 +155,9 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
     if(err) return err;
     for (auto &z : name.container)
     {
-        if (!isalnum(z))
+        if (!isalnum(z) && z!='_')
         {
-            return "allowed only isalnum symbols";
+            return "allowed only isalnum symbols and '_'";
         }
         if (isalpha(z) && isupper(z))
         {
@@ -209,8 +209,8 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
 
-    uint64_t amount=0;
-    auto err=yy_get_uint64_t(params,"amount",amount);
+    int64_t amount=0;
+    auto err=yy_get_int64_t(params,"amount",amount);
     if(err) return err;
 
     NODE_id node;
@@ -251,8 +251,8 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
 {
     MUTEX_INSPECTOR;
     auto v = b.db->getValuesNoCreateConst();
-    uint64_t amount=0;
-    auto err=yy_get_uint64_t(params,"amount",amount);
+    int64_t amount=0;
+    auto err=yy_get_int64_t(params,"amount",amount);
     if(err) return err;
     NODE_id node;
     err=yy_get_string(params,"node",node.container);
@@ -367,14 +367,10 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     if(err) return err;
     for (auto &z : name)
     {
-        if (!isalnum(z))
-        {
-            return "allowed only isalnum symbols";
-        }
+        if (!isalnum(z) && z!='_')
+            return "allowed only isalnum symbols and '_'";
         if (isalpha(z) && isupper(z))
-        {
             return "allowed only lowercase symbols";
-        }
     }
     CONTRACT_id cn;
     cn.container=name;
@@ -386,7 +382,6 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     if (!us.valid())
         return "if(!us.valid())";
 
-
     auto n = b.db->getContractOrCreate(cn, t.roll);
 
     std::string src;
@@ -396,11 +391,11 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     {
         M_LOCK(n->parent->mx);
         n->src=src;
-        n->owner=t.senderAddress;
+        n->owners.clear();
+        n->owners.insert(t.senderAddress);   // создатель — owner
     }
 
     t.markDirty(n.get());
-
 
     t.gasUsed+=v->getGas("contract_deploy");
 
@@ -408,6 +403,8 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
 
     return std::nullopt;
 }
+
+
 std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_params &b, t_params &t,
         int seqId)
 {
@@ -422,15 +419,12 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     if (!n.valid())
         return "contract not exists";
 
-    if(t.senderAddress!=n->owner)
-    {
+    if (!n->isOwner(t.senderAddress))
         return "sender is not contract owner";
-    }
+
     auto us = b.db->getAddressStateNoCreateConst(t.senderAddress);
     if (!us.valid())
         return "if(!us.valid())";
-
-
 
     std::string src;
     err=yy_get_string(params,"src",src);
@@ -448,6 +442,8 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
 
     return std::nullopt;
 }
+
+
 std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_params &t,
         int seqId)
 {
@@ -468,7 +464,7 @@ std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_p
     if (err) return err;
 
     bool has_ttl = false;
-    uint64_t ttl = 0;
+    int64_t ttl = 0;
     {
         auto tv = yyjson_obj_get(params, "ttl");
         if (tv) {
@@ -532,7 +528,7 @@ std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_p
         l.unlock();
         t.markDirty(votes.get());
 
-        uint64_t stake = 0;
+        int64_t stake = 0;
         for (auto& z : voted) {
             auto nn = b.db->getNodeNoCreateConst(z);
             if (!nn.valid())

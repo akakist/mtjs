@@ -16,7 +16,7 @@ private:
     blst_cpp::PublicKey bls_pk;
     std::string ed_pk;
     std::string ip;
-    std::map<ADDRESS_id /*user*/, uint64_t> stakes;
+    std::map<ADDRESS_id /*user*/, int64_t> stakes;
     bool enabled=true;
 public:
     int missed_rounds=0;
@@ -32,7 +32,7 @@ public:
         for(auto& z: stakes)
         {
             r+=z.first.addr.size();
-            r+=sizeof(uint64_t);
+            r+=sizeof(int64_t);
         }
         return r;
     }
@@ -90,9 +90,9 @@ public:
         M_LOCK(parent->mx);
         return name_;
     }
-    uint64_t get_full_stake() const
+    int64_t get_full_stake() const
     {
-        uint64_t ret=0;
+        int64_t ret=0;
         M_LOCK(parent->mx);
         for(auto &z: stakes)
         {
@@ -100,7 +100,7 @@ public:
         }
         return ret;
     }
-    uint64_t get_user_stake(const ADDRESS_id& user) const
+    int64_t get_user_stake(const ADDRESS_id& user) const
     {
         M_LOCK(parent->mx);
         auto it = stakes.find(user);
@@ -115,7 +115,7 @@ public:
         M_LOCK(parent->mx);
         return bls_pk;
     }
-    std::map<ADDRESS_id, uint64_t> getStakes() const
+    std::map<ADDRESS_id, int64_t> getStakes() const
     {
         M_LOCK(parent->mx);
         return stakes;
@@ -131,12 +131,12 @@ public:
         ip=_ip;
         enabled=true;
     }
-    void add_stake(const ADDRESS_id& user, const uint64_t &amount)
+    void add_stake(const ADDRESS_id& user, const int64_t &amount)
     {
         M_LOCK (parent->mx);
         stakes[user]+=amount;
     }
-    void sub_stake(const ADDRESS_id& user, const uint64_t &amount)
+    void sub_stake(const ADDRESS_id& user, const int64_t &amount)
     {
         M_LOCK (parent->mx);
         stakes[user]-=amount;

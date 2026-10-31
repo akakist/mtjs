@@ -21,18 +21,29 @@ interface JsiMsg {
     readonly chainId: number;
     readonly txHash: string;
     readonly txIndex: number;
+    readonly caller: string;   // CONTRACT_id.container ("" для внешнего)
 }
 
 type JsiGranule = Record<string, any>;
 
 declare function registerMethod(name: string, fn: (params: any, msg: JsiMsg) => any): void;
+
 declare function registerView(name: string, fn: (params: any) => any): void;
 
 declare function getGranule(key: string): JsiGranule | undefined;
+
 declare function createGranule(key: string, value: JsiGranule, ttl?: number): void;
+
 declare function setGranule(key: string, value: JsiGranule): void;
 
 declare function emit(name: string, value: JsiGranule): void;
 
 declare function callMethod(contract: string, method: string, params: object): any;
+
 declare function callView(contract: string, view: string, params: object): any;
+
+declare function consumeValue(amount: number): void;
+
+declare function refundValue(amount: number): void;
+
+declare function remainingValue(): number;

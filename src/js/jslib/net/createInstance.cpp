@@ -30,6 +30,7 @@
 #include "md/md_GetContractDataREQ.h"
 #include "md/md_GetNodeInfoREQ.h"
 #include "md/md_GetValuesREQ.h"
+#include "md/md_GetContractREQ.h"
 #include "js_tools.h"
 // #include ""
 
@@ -74,7 +75,41 @@ static std::string js_obj_to_kv(JSContext *ctx,
 
     return result;
 }
+JSValue js_get_contract(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    MUTEX_INSPECTOR;
+    JSScope<10, 10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
+    if (!op) return JS_ThrowInternalError(ctx, "get_contract: !op");
+    if (argc != 3) return JS_ThrowInternalError(ctx, "get_contract(node, contract, timeout)");
+    if (!JS_IsString(argv[0])) return JS_ThrowInternalError(ctx, "get_contract: node must be string");
+    if (!JS_IsString(argv[1])) return JS_ThrowInternalError(ctx, "get_contract: contract must be string");
+    if (!JS_IsNumber(argv[2])) return JS_ThrowInternalError(ctx, "get_contract: timeout must be number");
+    std::string node_addr = scope.toStdString(argv[0]);
+    std::string contract = scope.toStdString(argv[1]);
+    double to = 0;
+    if (JS_ToFloat64(ctx, &to, argv[2])) return JS_ThrowInternalError(ctx, "get_contract: timeout parse error");
 
+    REF_getter<MsgData::GetContractREQ> rq = new MsgData::GetContractREQ();
+    rq->contract.container = contract;
+    auto hash = rq->getHash();
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+        new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+    op->broadcaster->sendEvent(ServiceEnum::Timer,
+        new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+
+    auto &pd = op->node_req_promises[hash.container];
+    pd.ctx = ctx;
+    JSValue prom[2];
+    JSValue promise = JS_NewPromiseCapability(ctx, prom);
+    JSValueGuard g_resolve(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[1]);
+    JSValueGuard g_prom(ctx, promise);
+    if (JS_IsException(promise)) return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
+    pd.resolve = g_resolve;
+    pd.reject = g_reject;
+    return g_prom.release();
+}
 JSValue js_add_instance(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     MUTEX_INSPECTOR;
@@ -181,7 +216,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     auto pk = extract_public_ed(sk);
     auto nonce_str = scope.toStdString(argv[4]);
     // JSValueGuard g_func(ctx,JS_DupValue(ctx,argv[5]));
-    uint64_t nonce=0;
+    int64_t nonce=0;
     try
     {        nonce=std::atoll(nonce_str.c_str());
     }    
@@ -532,4 +567,5 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     JS_SetPropertyStr(ctx, mtjs_obj, "get_values",        JS_NewCFunction(ctx, js_get_values,         "get_values", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_unsubscribe", JS_NewCFunction(ctx, js_tx_unsubscribe, "tx_unsubscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_contract_data", JS_NewCFunction(ctx, js_get_contract_data,  "get_contract_data", 4));
+    JS_SetPropertyStr(ctx, mtjs_obj, "get_contract", JS_NewCFunction(ctx, js_get_contract, "get_contract", 3));
 }

@@ -9,7 +9,7 @@
 
 extern JSClassID js_timeout_class_id;
 
-static uint64_t idGen = 0;
+static int64_t idGen = 0;
 static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueConst *argv, bool isInterval)
 {
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
@@ -102,7 +102,7 @@ static JSValue js_clearCommon(JSContext *ctx, JSValueConst val, int argc, JSValu
         logErr2("Expected Timeout object as first argument");
         return JS_ThrowTypeError(ctx, "Expected Timeout object as first argument");
     }
-    uint64_t timerId = timeoutObj->timerTask->timerId;
+    int64_t timerId = timeoutObj->timerTask->timerId;
 
     if (isInterval)
     {

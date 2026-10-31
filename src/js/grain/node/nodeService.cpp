@@ -51,6 +51,7 @@
 #include "jsi/api/ContractHost.h"
 #include "NodeGranuleIO.h"
 #include "CallStack.h"
+#include "CallContext.h"
 
 static REF_getter<ContractHost> make_node_contract_host(const REF_getter<IDatabase>& db) {
     REF_getter<ContractHost> h = new ContractHost();
@@ -308,11 +309,11 @@ void Node::Service::collectTransactions()
 {
     MUTEX_INSPECTOR;
     std::map<std::string /*user addr*/,
-        std::map<uint64_t /*nonce*/, std::vector<REF_getter<MsgData::TX> > > > ordered;
+        std::map<int64_t /*nonce*/, std::vector<REF_getter<MsgData::TX> > > > ordered;
     for (auto &z : transaction_pool_of_leader)
     {
         std::string &pk = z.second->pk_ed_bin;
-        uint64_t nonce;
+        int64_t nonce;
         auto err=z.second->getNonce(nonce);
         if(err)
             throw CommonError(err->c_str());
@@ -434,7 +435,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         if(!r)
             throw CommonError("!r BlockDBStore");
         auto & bt= l_blocks[prev_root_hash_Z()];
-        auto h=r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->getHash();
+        auto h=r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->getHash();
         if(bt.is_BlockDiffValidateRSP_m_quorum(h,db_state.get()))
         {
             auto mf=getMetaFull(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
@@ -455,7 +456,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         if(!r)
             throw CommonError("!r BlockDiffValidateREQ");
         auto mf=getMetaFull(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
-        auto h=r->blockAcceptedREQ->blockInfo->heart_beat->getHash();
+        auto h=r->blockAcceptedREQ->blockInfo->getHash();
         if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
         {
             broadcast_MsgEvent_via_broadcaster(r,mf->tree_all_nodes);
@@ -774,7 +775,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
             }
             if (!t_err)
             {
-                uint64_t nonce;
+                int64_t nonce;
                 auto err=tt->getNonce(nonce);
                 if(err) throw CommonError(*err);
                 if (u->getNonce() != nonce)
@@ -892,7 +893,7 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
         MUTEX_INSPECTOR;
         std::vector<blst_cpp::PublicKey> agg_pk;
 
-        uint64_t stake=0;
+        int64_t stake=0;
         for (auto &z : lc->node_diff_validators)
         {
             auto n = db_state->getNodeNoCreateConst(z);
@@ -901,7 +902,7 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
             agg_pk.push_back(n->get_bls_pk());
             stake += n->get_full_stake();
         }
-        uint64_t full_stake=0;
+        int64_t full_stake=0;
         auto ls=db_state->getAllNodes();
         for(auto& z:ls )
         {
@@ -1042,6 +1043,8 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     return true;
 }
+void print_exception(JSIContext* ctx);
+
 std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_params& t,
         yyjson_val * j_tx)
 {
@@ -1107,17 +1110,46 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                     catch (const std::exception& e) { return std::string("params parse error: ") + e.what(); }
                 } else params_json = nlohmann::json::object();
 
-                jsiMsg m; // в ноде msg собирается лениво из t; m — для совместимости, поля не используются геттерами
                 REF_getter<CallStack> call_stack = new CallStack;
+
+                // внешний CallContext — чтобы call_contract_method докладывал emits в него (parent->emits)
+                CallContext ext_ctx;
+                ext_ctx.contract = cc;
+                ext_ctx.host = contractHost;
+                ext_ctx.call_stack = call_stack;
+                ext_ctx.value_ptr = &t.value;   // текущий value (нода)
+                void* prev_ctx = JSI_GetContextOpaque(cc->ctx);
+                JSI_SetContextOpaque(cc->ctx, &ext_ctx);
+
                 NodeMsgSource src(&t);
+                CONTRACT_id caller;
                 JSIValue result = cc->call_contract_method(method_str, params_json, &src, false,
-                                                           call_stack, contractHost);
+                                                           call_stack, contractHost, t.roll, caller);
+
+                JSI_SetContextOpaque(cc->ctx, prev_ctx);
+
                 if (JSI_IsException(result)) {
+                    std::string emsg;
+                    JSIValue exc = JSI_GetException(cc->ctx);
+                    if (!JSI_IsUndefined(exc)) {
+                        const char* s = JSI_ToCString(cc->ctx, exc);
+                        if (s) { emsg = s; JSI_FreeCString(cc->ctx, s); }
+                        JSI_FreeValue(cc->ctx, exc);
+                    }
                     JSI_FreeValue(cc->ctx, result);
-                    return "contract call failed: " + contract_str + "." + method_str;
+                    return "contract call failed: " + contract_str + "." + method_str + (emsg.empty() ? "" : ": " + emsg);
                 }
+                logNode("execute_tx_commands: contract=%s method=%s index=%d ext_ctx.emits.size=%d",
+                    contract_str.c_str(), method_str.c_str(), (int)index, (int)ext_ctx.emits.size());
+                for (auto& ev : ext_ctx.emits)
+                    logNode("  emit: %s = %s", ev.name.c_str(), ev.value.c_str());
+
                 JSI_FreeValue(cc->ctx, result);
-                // эмиты: TBD (out-параметр call_contract_method или NodeEventSink с контекстом)
+
+                // эмиты текущей команды → b.emit_command(tx_id, seqId=index, name, value_json)
+                for (auto& ev : ext_ctx.emits) {
+                    b.emit_command(t.tx_id, (int)index, ev.name, "%s", ev.value.c_str());
+                }
             }
             ++index;
         }
@@ -1125,16 +1157,16 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
     return std::nullopt;
 }
 std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
-        const REF_getter<MsgData::TX> &tx, uint64_t epoch)
+        const REF_getter<MsgData::TX> &tx, int64_t epoch)
 {
     MUTEX_INSPECTOR;
-    uint64_t gasLimit=0, gasPrice=0, value=0;
+    int64_t gasLimit=0, gasPrice=0, value=0;
     yyjson_val *jroot=yyjson_doc_get_root(tx->doc);
     yyjson_val * j_tx = yyjson_obj_get(jroot,"tx");
     if(!j_tx) throw CommonError("if(!j_tx)");
-    auto err=yy_get_uint64_t(jroot,"value",value);
-    if(!err) err=yy_get_uint64_t(jroot,"gasLimit",gasLimit);
-    if(!err) err=yy_get_uint64_t(jroot,"gasPrice",gasPrice);
+    auto err=yy_get_int64_t(jroot,"value",value);
+    if(!err) err=yy_get_int64_t(jroot,"gasLimit",gasLimit);
+    if(!err) err=yy_get_int64_t(jroot,"gasPrice",gasPrice);
     if(err)
     {
         b.emit_tx(tx_id,"error",R"({"error":"%s"})",err->c_str());
@@ -1155,7 +1187,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         : 0;
     t.block_height = 0; // TBD
     {
-        uint64_t n=0;
+        int64_t n=0;
         if(!tx->getNonce(n)) t.nonce = (int64_t)n;
     }
     // chainId из TX (если есть)
@@ -1182,9 +1214,16 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
     if(err)
     {
+        logNode("execute_transaction: err='%s' roll->size=%d gasUsed=%llu", err->c_str(), (int)t.roll->size(), (unsigned long long)t.gasUsed);
+        // посмотреть, что в roll->data (какие гранулы)
+        for (auto& z : t.roll->data) {
+            logNode("  roll: cell=%p id='%s' buf_size=%d", (void*)z.first, z.first->m_id.c_str(), (int)z.second.size());
+        }
+            ///////////
         logNode("error:%s",err->c_str());
         b.emit_tx(t.tx_id,"error",R"({"error":"%s"})",err->c_str());
         t.gasUsed+=t.roll->size();
+        logNode("rollback: data.size=%d", (int)t.roll->size());
         t.rollback();
         auto gu=t.gasUsed;
         if(gu>gasLimit) gu=gasLimit;
@@ -1195,6 +1234,11 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     }
     if(t.value<0)
     {
+        // logNode("execute_transaction: err='%s' roll->size=%d gasUsed=%llu", err->c_str(), (int)t.roll->size(), (unsigned long long)t.gasUsed);
+        // посмотреть, что в roll->data (какие гранулы)
+        for (auto& z : t.roll->data) {
+            logNode("  roll: cell=%p id='%s' buf_size=%d", (void*)z.first, z.first->m_id.c_str(), (int)z.second.size());
+        }
         t.gasUsed+=t.roll->size();
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
@@ -1205,6 +1249,11 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     }
     if(t.gasUsed>gasLimit)
     {
+        // logNode("execute_transaction: err='%s' roll->size=%d gasUsed=%llu", err->c_str(), (int)t.roll->size(), (unsigned long long)t.gasUsed);
+        // посмотреть, что в roll->data (какие гранулы)
+        for (auto& z : t.roll->data) {
+            logNode("  roll: cell=%p id='%s' buf_size=%d", (void*)z.first, z.first->m_id.c_str(), (int)z.second.size());
+        }
         t.rollback();
         b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
         M_LOCK(uu->parent->mx);
@@ -1283,7 +1332,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
     size_t validator_count=(live_nodes * validators_percent)/100;
 
     std::vector<NodeElement> vne;
-    std::map<uint64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
+    std::map<int64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
 
     for(auto &x: an)
     {
@@ -1336,12 +1385,12 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 }
 bool Node::Service::block_leader::is_HeartBeatRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf)
 {
-    uint64_t stakeVal = 0;
+    int64_t stakeVal = 0;
     for (auto &z : HeartBeatRSP_m[h])
     {
         stakeVal += mf->getPrevStake(z.first);
     }
-    uint64_t fullstake=0;
+    int64_t fullstake=0;
     for(auto &z: mf->all_nodes_enabled)
     {
         fullstake += mf->getPrevStake(z);
@@ -1355,12 +1404,12 @@ bool Node::Service::block_leader::is_HeartBeatRSP_m_quorum(const THASH_id& h,  B
 
 bool Node::Service::block_leader::is_ValidateBlockRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf)
 {
-    uint64_t stakeVal = 0;
+    int64_t stakeVal = 0;
     for (auto &z : ValidateBlockRSP_m[h])
     {
         stakeVal += mf->getPrevStake(z->node_validator);;
     }
-    uint64_t fullstake=0;
+    int64_t fullstake=0;
     for(auto &z: mf->committe_members)
     {
         fullstake += mf->getPrevStake(z);
@@ -1374,14 +1423,14 @@ bool Node::Service::block_leader::is_ValidateBlockRSP_m_quorum(const THASH_id& h
 }
 bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& h, IDatabase* db)
 {
-    uint64_t fullstakeVal = 0;
+    int64_t fullstakeVal = 0;
     auto ls=db->getAllNodes();
     for (auto &z : ls)
     {
         if(z->isEnabled())
             fullstakeVal += z->get_full_stake();
     }
-    uint64_t stakeVal = 0;
+    int64_t stakeVal = 0;
     auto &mm=GetTransactionRSP_m[h];
     for (auto &z : mm)
     {
@@ -1396,14 +1445,14 @@ bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& 
 }
 bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, IDatabase* db)
 {
-    uint64_t fullstakeVal = 0;
+    int64_t fullstakeVal = 0;
     auto ls=db->getAllNodes();
     for (auto &z : ls)
     {
         if(z->isEnabled())
             fullstakeVal += z->get_full_stake();
     }
-    uint64_t stakeVal = 0;
+    int64_t stakeVal = 0;
     for (auto &z : BlockDiffValidateRSP_m[h])
     {
         auto n=db->getNodeNoCreateConst(z->node_validator);
@@ -1419,7 +1468,7 @@ bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_i
 void Node::Service::logNode(const char *fmt, ...)
 {
 
-    uint64_t ep=epoch_current();
+    int64_t ep=epoch_current();
     {
         va_list ap;
         va_start(ap, fmt);

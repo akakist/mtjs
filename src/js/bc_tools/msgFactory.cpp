@@ -27,6 +27,8 @@
 #include "md/md_GetContractDataREQ.h"
 #include "md/md_GetContractDataRSP.h"
 #include "md/md_DelayNotificationREQ.h"
+#include "md/md_GetContractREQ.h"
+#include "md/md_GetContractRSP.h"
 
 
 MsgFactory::MsgFactory()
@@ -56,5 +58,7 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::BlockDiffValidateREQ, MsgData::BlockDiffValidateREQ::construct);
     registerMsg(msgid::BlockDiffValidateRSP, MsgData::BlockDiffValidateRSP::construct);
     registerMsg(msgid::BlockDBStore, MsgData::BlockDBStore::construct);
+    registerMsg(msgid::GetContractREQ, MsgData::GetContractREQ::construct);
+    registerMsg(msgid::GetContractRSP, MsgData::GetContractRSP::construct);
 
 }

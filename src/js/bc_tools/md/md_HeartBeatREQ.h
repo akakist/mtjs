@@ -13,12 +13,12 @@ namespace MsgData
         {
 
         }
-        HeartBeatREQ(const THASH_id& _prev_block_hash, uint64_t _newepoch, const NODE_id& _node_leader, time_t _block_ts):Base(msgid::HeartBeatREQ),
+        HeartBeatREQ(const THASH_id& _prev_block_hash, int64_t _newepoch, const NODE_id& _node_leader, time_t _block_ts):Base(msgid::HeartBeatREQ),
             prev_root_hash_1(_prev_block_hash), new_epoch(_newepoch), node_leader(_node_leader), block_timestamp(_block_ts)
         {
         }
         THASH_id prev_root_hash_1;
-        uint64_t new_epoch;
+        int64_t new_epoch;
         NODE_id node_leader;
         time_t block_timestamp;
         bool equals(const REF_getter<HeartBeatREQ> &a)

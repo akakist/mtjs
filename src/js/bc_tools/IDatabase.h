@@ -15,6 +15,7 @@
 #include "CONTRACT_DATA_id.h"
 #include "md/md_BlockAcceptedREQ.h"
 #include "md/md_BlockAccepted2REQ.h"
+#include "bc_contract_balance.h"
 
 struct IDatabase: public Refcountable
 {
@@ -125,6 +126,10 @@ public:
     REF_getter<const bc_contract_data> getContractDataNoCreateConst(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId);
     REF_getter<bc_contract_data> getContractDataOrCreate(const CONTRACT_id& con, const CONTRACT_DATA_id &name, Rollback* roll, int ttl, time_t create_time);
 
+    std::vector<std::string> getContractBalancePath(const CONTRACT_id& contract);
+    REF_getter<bc_contract_balance> getContractBalanceOrCreate(const CONTRACT_id& contract, Rollback* roll);
+    REF_getter<bc_contract_balance> getContractBalanceNoCreate(const CONTRACT_id& contract);
+    REF_getter<const bc_contract_balance> getContractBalanceNoCreateConst(const CONTRACT_id& contract);
 
     REF_getter<bc_values> getValuesOrCreate(Rollback*);
     REF_getter<bc_values> getValuesNoCreate();

@@ -8,8 +8,6 @@
 struct ContractContext;
 struct CallStack;
 struct ContractHost;
-// struct t_params;
-// struct b_params;
 
 struct CallContext {
     REF_getter<ContractContext> contract;
@@ -20,8 +18,9 @@ struct CallContext {
     Rollback * roll = nullptr;
     std::vector<jsiEvent> emits;
 
-    IMsgSource* msg_source = nullptr;  
+    IMsgSource* msg_source = nullptr;
+    int64_t* value_ptr = nullptr;   // текущий value (нода: &t.value; test_runner: &test_value)
+
+    CONTRACT_id caller;
 };
-
-
 

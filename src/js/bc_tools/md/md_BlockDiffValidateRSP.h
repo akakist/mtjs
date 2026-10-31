@@ -19,13 +19,13 @@ namespace MsgData
         }
         blst_cpp::Signature sig;
         NODE_id node_validator;
-        THASH_id hb_hash;
+        THASH_id blockInfoHash;
 
         void update(Blake2bHasher& h) const
         {
             h.update(sig.serialize());
             h.update(node_validator.container);
-            h.update(hb_hash.container);
+            h.update(blockInfoHash.container);
 
         }
         void pack(outBuffer& b) const final
@@ -33,14 +33,14 @@ namespace MsgData
             Base::pack(b);
             b<<sig;
             b<<node_validator;
-            b<<hb_hash;
+            b<<blockInfoHash;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
             b>>sig;
             b>>node_validator;
-            b>>hb_hash;
+            b>>blockInfoHash;
         }
 
     };

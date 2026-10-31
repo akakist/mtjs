@@ -13,18 +13,18 @@ struct NodeGranuleIO : GranuleIO {
 
     REF_getter<IDatabase> db;
 
-    bool get(const CONTRACT_id& contract,  const CONTRACT_DATA_id& key, std::string& out) override {
+    bool getGranule(const CONTRACT_id& contract,  const CONTRACT_DATA_id& key, std::string& out) override {
         auto d=db->getContractDataNoCreateConst(contract,key);
         if(!d.valid()) return false;
         M_LOCK(d->parent->mx);
         out=d->container;
         return true;
     }
-    bool exists(const CONTRACT_id& contract,  const CONTRACT_DATA_id& key) override {
+    bool existsGranule(const CONTRACT_id& contract,  const CONTRACT_DATA_id& key) override {
         auto d=db->getContractDataNoCreateConst(contract,key);
         return d.valid();
     }
-    std::optional<std::string> create(const CONTRACT_id& contract,  const CONTRACT_DATA_id& key, const std::string& value,
+    std::optional<std::string> createGranule(const CONTRACT_id& contract,  const CONTRACT_DATA_id& key, const std::string& value,
                 int64_t create_time, int64_t ttl, Rollback* roll) override {
         auto d=db->getContractDataNoCreateConst(contract,key);
         if(d.valid()) return std::string("create: leaf already exists");
@@ -36,7 +36,8 @@ struct NodeGranuleIO : GranuleIO {
         }
         return std::nullopt;
     }
-    std::optional<std::string> set(const CONTRACT_id& contract,  const CONTRACT_DATA_id& key, const std::string& value, Rollback* roll) override {
+
+    std::optional<std::string> setGranule(const CONTRACT_id& contract,  const CONTRACT_DATA_id& key, const std::string& value, Rollback* roll) override {
         auto d=db->getContractDataNoCreate(contract,key);
         if(!d.valid()) return std::string("granule not exists");
         d->setDirty(roll);
@@ -46,6 +47,20 @@ struct NodeGranuleIO : GranuleIO {
         }
         return std::nullopt;
     }
+
+    bool getContractBalance(const CONTRACT_id& c, int64_t& out) override {
+        auto b = db->getContractBalanceNoCreateConst(c);
+        if (!b.valid()) return false;
+        out = b->getAmount();
+        return true;
+    }
+    std::optional<std::string> addContractBalance(const CONTRACT_id& c, int64_t delta, Rollback* roll) override {
+        auto b = db->getContractBalanceOrCreate(c, roll);
+        if (!b.valid()) return std::string("balance create failed");
+        b->addAmount(delta);
+        return std::nullopt;
+    }
+
 };
 
 

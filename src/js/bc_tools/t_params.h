@@ -14,7 +14,7 @@ struct b_params
     IDatabase* db;
     REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
     REF_getter<MsgData::attachment_data> att_data;
-    uint64_t node_rewards=0;
+    int64_t node_rewards=0;
     REF_getter<BlockMetaFull> meta;
 
     void emit_command(const THASH_id& txId, int seqId, const std::string& command, const char* fmt, ...)
@@ -47,11 +47,11 @@ struct t_params
     REF_getter<IDatabase> db;
     ADDRESS_id senderAddress;       // sender (hex берём через base16::encode(addr))
     REF_getter<MsgData::TX> tx;
-    uint64_t epoch = 0;
+    int64_t epoch = 0;
     THASH_id tx_id;
-    uint64_t gasUsed = 0;
-    uint64_t gasLimit = 0;
-    uint64_t value = 0;
+    int64_t gasUsed = 0;
+    int64_t gasLimit = 0;
+    int64_t value = 0;
     Rollback *roll = NULL;
     Dirty dirty;
 

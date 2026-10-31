@@ -72,11 +72,11 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         logNode("block response not validated");
         return true;
     }
-    auto h=r->hb_hash;
-    bt.BlockDiffValidateRSP_m[h].push_back(r);
+    // auto h=r->blockInfoHash;
+    bt.BlockDiffValidateRSP_m[r->blockInfoHash].push_back(r);
 
 
-    if(bt.is_BlockDiffValidateRSP_m_quorum(h,db_state.get()))
+    if(bt.is_BlockDiffValidateRSP_m_quorum(r->blockInfoHash,db_state.get()))
     {
         MUTEX_INSPECTOR;
         XTRY;
@@ -85,7 +85,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         ba2->blockAcceptedREQ = bt.blockDiffValidateREQ->blockAcceptedREQ;
         std::vector<blst_cpp::PublicKey> agg_pk;
         std::set<std::string> nnn;
-        for (auto &z : bt.BlockDiffValidateRSP_m[h])
+        for (auto &z : bt.BlockDiffValidateRSP_m[r->blockInfoHash])
         {
             auto n = db_state->getNodeNoCreateConst(z->node_validator);
             if(!n.valid())
@@ -109,9 +109,13 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
 
 
         std::string nodelist;
-        for(auto &z: bt.HeartBeatRSP_m[h])
+        if(bt.ConfirmLeaderRSP_m_copy.size())
         {
-            nodelist+=z.first.container+" ";
+            auto cfh=bt.ConfirmLeaderRSP_m_copy.begin()->first;
+            for(auto &z: bt.ConfirmLeaderRSP_m_copy[cfh])
+            {
+                nodelist+=z.first.container+" ";
+            }
         }
         if(src_node==bt.blockDiffValidateREQ->blockAcceptedREQ->blockInfo->heart_beat->node_leader)
             logNode("hb list %s",nodelist.c_str());
@@ -122,7 +126,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         bds->tx_hashes=bt.blockDiffValidateREQ->tx_hashes;
         bds->diffs=bt.blockDiffValidateREQ->diffs;
         bds->att_data=bt.blockDiffValidateREQ->att_data;
-        auto h=bt.blockDiffValidateREQ->blockAcceptedREQ->blockInfo->heart_beat->getHash();
+        auto h=bt.blockDiffValidateREQ->blockAcceptedREQ->blockInfo->getHash();
 
         sendEvent(ServiceEnum::Timer,new timerEvent::ResetAlarm(TIMER_BlockDBStore,toRef(h.container),bds.get(),0.05,this));
 
@@ -136,7 +140,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
 bool Node::Service::verifyLeaderCert(const MsgData::LeaderCert* lc, const BlockMetaFull* mf)
 {
     std::vector<blst_cpp::PublicKey> agg_pk_lc;
-    uint64_t stake_lc=0;
+    int64_t stake_lc=0;
     for(auto &z: lc->node_validators)
     {
         auto n=db_state->getNodeNoCreateConst(z);
@@ -166,7 +170,7 @@ REF_getter<MsgData::LeaderCert> Node::Service::makeLeaderCert(const MsgData::Hea
     lc->hb=hb;
     auto hb_hash=hb->getHash();
     std::vector<blst_cpp::PublicKey> agg_pk_lc;
-    uint64_t stake_lc=0;
+    int64_t stake_lc=0;
     for(auto& z:bt.ConfirmLeaderRSP_m_copy[hb_hash])
     {
         auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
@@ -213,7 +217,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     }
 
     auto &bt = l_blocks[prev_root_hash_Z()];
-    auto h=r->blockInfo->heart_beat->getHash();
+    auto h=r->blockInfo->getHash();
 
     bt.ValidateBlockRSP_m[h].push_back(r);
     auto mf=getMetaFull(r->blockInfo->heart_beat->block_timestamp);
@@ -225,8 +229,8 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         {
             bt.blockInfo_Z[h] = r->blockInfo;
         }
-        else if (bt.blockInfo_Z[h]->getBuffer() != r->blockInfo->getBuffer())
-            throw CommonError("else if(bh.block_payload!=r->payload_block)");
+        // else if (bt.blockInfo_Z[h]->getBuffer() != r->blockInfo->getBuffer())
+        //     throw CommonError("else if(bh.block_payload!=r->payload_block)");
 
         ba->blockInfo = r->blockInfo;
         std::vector<blst_cpp::PublicKey> agg_pk;
@@ -251,7 +255,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         }
         else
         {
-            logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!!");
+            logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!! val count %d",bt.ValidateBlockRSP_m[h].size());
             return true;
         }
         REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(ba,r->tx_hashes,r->diffs,r->att_data);

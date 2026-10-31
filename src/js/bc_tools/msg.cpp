@@ -55,6 +55,8 @@ const char *msgName(int id)
     case msgid::GetValuesRSP: return "GetValuesRSP";
     case msgid::GetContractDataREQ: return "GetContractDataREQ";
     case msgid::GetContractDataRSP: return "GetContractDataRSP";
+    case msgid::GetContractREQ: return "GetContractREQ";
+    case msgid::GetContractRSP: return "GetContractRSP";
     case msgid::LeaderCert:
         return "LeaderCert";
 

@@ -4,7 +4,7 @@
 #include "NODE_id.h"
 struct NodeElement {
     NODE_id name;
-    uint64_t stake_A;
+    int64_t stake_A;
     std::string ip;
     void hash(Blake2bHasher&h)
     {

@@ -8,9 +8,12 @@
 struct GranuleIO : public Refcountable {
     GranuleIO() : Refcountable("GranuleIO") {}
     virtual ~GranuleIO() = default;
-    virtual bool get(const CONTRACT_id& c, const CONTRACT_DATA_id& cd, std::string& out) = 0;
-    virtual bool exists(const CONTRACT_id& c, const CONTRACT_DATA_id& cd) = 0;
-    virtual std::optional<std::string> create(const CONTRACT_id& c, const CONTRACT_DATA_id& cd, const std::string& value,
+    virtual bool getGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& cd, std::string& out) = 0;
+    virtual bool existsGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& cd) = 0;
+    virtual std::optional<std::string> createGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& cd, const std::string& value,
                         int64_t create_time, int64_t ttl, Rollback* r) = 0;
-    virtual std::optional<std::string> set(const CONTRACT_id& c, const CONTRACT_DATA_id& cd, const std::string& value, Rollback* roll) = 0;
+    virtual std::optional<std::string> setGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& cd, const std::string& value, Rollback* roll) = 0;
+
+    virtual bool getContractBalance(const CONTRACT_id& c, int64_t& out) = 0;
+    virtual std::optional<std::string> addContractBalance(const CONTRACT_id& c, int64_t delta, Rollback* roll) = 0;
 };

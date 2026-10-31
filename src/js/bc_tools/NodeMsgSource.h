@@ -13,4 +13,8 @@ struct NodeMsgSource : IMsgSource {
     int64_t get_chainId() const override { return (int64_t)t->chain_id; }
     std::string get_txHash() const override { return base16::encode(t->tx_id.container); }
     int64_t get_txIndex() const override { return (int64_t)t->tx_index; }
+
+    void consume_value(int64_t amount) override { t->value -= amount; }
+    void refund_value(int64_t amount) override { t->value += amount; }
+    void consume_gas(int64_t amount) override { t->gasUsed += amount; }
 };

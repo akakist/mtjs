@@ -49,7 +49,7 @@ namespace MsgData
             h.update(tx_body);
             h.update(pk_ed_bin);
         }
-        std::optional<std::string> getNonce(uint64_t & nonce)
+        std::optional<std::string> getNonce(int64_t & nonce)
         {
             if(!doc)
                 return "yyjson: !doc";
@@ -72,7 +72,7 @@ namespace MsgData
             else return "yyjson: nonce must be string or num";
             return std::nullopt;
         }
-        std::optional<std::string> getGasLimit(uint64_t & gasLimit)
+        std::optional<std::string> getGasLimit(int64_t & gasLimit)
         {
             if(!doc)
                 return "yyjson: !doc";
@@ -95,7 +95,7 @@ namespace MsgData
             else return "yyjson: gasLimit must be string or num";
             return std::nullopt;
         }
-        std::optional<std::string> getGasPrice(uint64_t & gasPrice)
+        std::optional<std::string> getGasPrice(int64_t & gasPrice)
         {
             if(!doc)
                 return "yyjson: !doc";
@@ -118,7 +118,7 @@ namespace MsgData
             else return "yyjson: gasPrice must be string or num";
             return std::nullopt;
         }
-        std::optional<std::string> getValue(uint64_t & value)
+        std::optional<std::string> getValue(int64_t & value)
         {
             if(!doc)
                 return "yyjson: !doc";

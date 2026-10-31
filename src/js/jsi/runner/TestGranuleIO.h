@@ -7,7 +7,20 @@ struct TestGranuleIO : GranuleIO {
     std::map<std::string, Granule> data;
     TestGranuleIO() : GranuleIO() {}
 
-    bool get(const CONTRACT_id& c, const CONTRACT_DATA_id& d, std::string& out) override {
+    std::map<std::string, int64_t> balances;   // contract -> amount
+
+    bool getContractBalance(const CONTRACT_id& c, int64_t& out) override {
+        auto it = balances.find(c.container);
+        if (it == balances.end()) return false;
+        out = it->second;
+        return true;
+    }
+    std::optional<std::string> addContractBalance(const CONTRACT_id& c, int64_t delta, Rollback* roll) override {
+        balances[c.container] += delta;
+        return std::nullopt;
+    }
+
+    bool getGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d, std::string& out) override {
         printf("get: %s %s\n",c.container.c_str(),d.container.c_str());
         auto it = data.find(c.container+d.container);
         if (it == data.end())
@@ -19,10 +32,10 @@ struct TestGranuleIO : GranuleIO {
         out = it->second.value;
         return true;
     }
-    bool exists(const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
+    bool existsGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
         return data.find(c.container+d.container) != data.end();
     }
-    std::optional<std::string> create(const CONTRACT_id& c, const CONTRACT_DATA_id& d, const std::string& value,
+    std::optional<std::string> createGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d, const std::string& value,
                 int64_t create_time, int64_t ttl, Rollback* roll) override {
         if (data.find(c.container+d.container) != data.end())
         {
@@ -33,7 +46,7 @@ struct TestGranuleIO : GranuleIO {
         data[c.container+d.container] = Granule{ value, create_time, ttl };
         return std::nullopt;
     }
-    std::optional<std::string> set(const CONTRACT_id& c, const CONTRACT_DATA_id& d, const std::string& value, Rollback* roll) override {
+    std::optional<std::string> setGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d, const std::string& value, Rollback* roll) override {
         auto it = data.find(c.container+d.container);
         if (it == data.end())
         {
@@ -79,4 +92,9 @@ struct TestMsgSource : IMsgSource {
     int64_t get_chainId() const override { return m.chainId; }
     std::string get_txHash() const override { return m.txHash; }
     int64_t get_txIndex() const override { return m.txIndex; }
+
+    void consume_value(int64_t amount) override { m.value -= amount; }
+    void refund_value(int64_t amount) override { m.value += amount; }
+    void consume_gas(int64_t amount) override { m.gasUsed += amount; }
 };
+

@@ -9,6 +9,7 @@
 #include "jsiMsg.h"
 #include "CONTRACT_id.h"
 #include "IMsgSource.h"
+#include "Rollback.h"
 struct CallStack;
 struct ContractHost;
 
@@ -44,7 +45,7 @@ struct ContractContext : public Refcountable {
                              const nlohmann::json& params,
                              IMsgSource* msg_source, bool is_view,
                              const REF_getter<CallStack>& call_stack,
-                             const REF_getter<ContractHost>& host);
+                             const REF_getter<ContractHost>& host, Rollback* roll, const CONTRACT_id& caller);
 };
 
 

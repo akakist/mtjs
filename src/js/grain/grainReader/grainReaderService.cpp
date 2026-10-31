@@ -32,6 +32,8 @@
 #include "md/md_GetContractDataRSP.h"
 #include "md/md_GetValuesREQ.h"
 #include "md/md_GetValuesRSP.h"
+#include "md/md_GetContractREQ.h"
+#include "md/md_GetContractRSP.h"
 
 bool GrainReader::Service::on_startService(const systemEvent::startService *)
 {
@@ -201,6 +203,20 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
             if (d.valid()) {
                 rsp->found = true;
                 rsp->value = d->container;
+            }
+            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
+            break;
+        }
+        case msgid::GetContractREQ:
+        {
+            auto pp=(MsgData::GetContractREQ*) b.get();
+            REF_getter<MsgData::GetContractRSP> rsp = new MsgData::GetContractRSP;
+            rsp->contract = pp->contract;
+            auto c = db_state_3->getContractNoCreateConst(pp->contract);
+            if (c.valid()) {
+                rsp->found = true;
+                rsp->owners = c->owners;
+                rsp->src = c->src;
             }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;

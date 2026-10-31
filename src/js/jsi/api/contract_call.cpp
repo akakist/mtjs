@@ -16,7 +16,7 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
                              const json& params,
                              IMsgSource* msg_source, bool is_view,
                              const REF_getter<CallStack>& call_stack,
-                             const REF_getter<ContractHost>& host)
+                             const REF_getter<ContractHost>& host, Rollback* roll, const CONTRACT_id& caller)
 {
     if (call_stack->call_stack.size() >= (size_t)MAX_CALL_DEPTH)
         return JSI_ThrowTypeError(ctx, "call stack too deep (%zu >= %d)", call_stack->call_stack.size(), MAX_CALL_DEPTH);
@@ -40,10 +40,13 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
     call_ctx.depth = (int)call_stack->call_stack.size() - 1;
     call_ctx.call_stack = call_stack;
     call_ctx.host = host;
+    call_ctx.roll = roll;
+    call_ctx.caller = caller;
 
     void* saved = JSI_GetContextOpaque(ctx);
     JSI_SetContextOpaque(ctx, &call_ctx);
-
+    // interrupt handler: прерывание JS по газу (каждые GAS_STEP инструкций)
+    JSI_SetInterruptHandler(rt, interrupt_handler, &call_ctx);
     JSI_UpdateStackTop(rt);
 
     JSIValue params_js = json_to_jsi(ctx, params);
@@ -67,6 +70,7 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
     try {
         r = JSI_Call(ctx, fn, JSI_UNDEFINED, nargs, argv);
     } catch (...) {
+        JSI_SetInterruptHandler(rt, nullptr, nullptr);
         JSI_SetContextOpaque(ctx, saved);
         if (nargs == 2) JSI_FreeValue(ctx, argv[1]);
         JSI_FreeValue(ctx, params_js);
@@ -74,6 +78,7 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
         throw;
     }
 
+    JSI_SetInterruptHandler(rt, nullptr, nullptr);
     JSI_SetContextOpaque(ctx, saved);
     if (nargs == 2) JSI_FreeValue(ctx, argv[1]);
     JSI_FreeValue(ctx, params_js);

@@ -16,8 +16,8 @@ namespace MsgData
         std::string ip;
         bool enabled = false;
         int64_t missed_rounds = 0;
-        uint64_t full_stake = 0;
-        std::map<ADDRESS_id, uint64_t> stakes;
+        int64_t full_stake = 0;
+        std::map<ADDRESS_id, int64_t> stakes;
         void update(Blake2bHasher& h) const
         {
             h.update(found ? "1" : "0");

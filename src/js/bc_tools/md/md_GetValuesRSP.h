@@ -7,7 +7,7 @@ namespace MsgData
     {
         GetValuesRSP():Base(msgid::GetValuesRSP) {}
         bool found = false;
-        std::map<std::string, uint64_t> fees;
+        std::map<std::string, int64_t> fees;
         void update(Blake2bHasher& h) const
         {
             h.update(found ? "1" : "0");

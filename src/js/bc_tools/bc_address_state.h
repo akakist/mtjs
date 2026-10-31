@@ -7,15 +7,15 @@ struct bc_address_state: public data_base
         nonce=0;
         balance=0;
     }
-    uint64_t balance;
-    uint64_t nonce;
+    int64_t balance;
+    int64_t nonce;
 private:
 public:
     size_t size() const
     {
         return size_()+sizeof(balance)+sizeof(nonce);
     }
-    uint64_t getNonce()
+    int64_t getNonce()
     {
         M_LOCK(parent->mx);
         return nonce;

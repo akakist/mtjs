@@ -429,6 +429,39 @@ REF_getter<bc_nodelist> IDatabase::getNodeListOrCreate(Rollback* roll)
 //         return NULL;
 //     return dynamic_cast<bc_nodelist *>(cc->data.get());
 // }
+std::vector<std::string> IDatabase::getContractBalancePath(const CONTRACT_id& contract)
+{
+    return getPath("CONTRACT_BALANCE_"+contract.container);
+}
+REF_getter<bc_contract_balance> IDatabase::getContractBalanceOrCreate(const CONTRACT_id& contract, Rollback* roll)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathOrCreate(root.get(), getContractBalancePath(contract), roll);
+    if (!cc.valid())
+        throw CommonError("if(!cc.valid())");
+    if (cc->data.valid())
+        return dynamic_cast<bc_contract_balance *>(cc->data.get());   // ← уже есть — вернуть
+    REF_getter<bc_contract_balance> bc = new bc_contract_balance(cc.get());
+    cc->data = bc.get();
+    cc->payload_ctor_idx = hsh::bc_contract_balance;
+    cc->data->setDirty(roll);
+    return bc;
+}
+REF_getter<bc_contract_balance> IDatabase::getContractBalanceNoCreate(const CONTRACT_id& contract)
+{
+    MUTEX_INSPECTOR;
+    auto cc = getByPathNoCreate(root.get(), getContractBalancePath(contract));
+    if (!cc.valid()) return NULL;
+    if (!cc->data.valid()) return NULL;
+    return dynamic_cast<bc_contract_balance *>(cc->data.get());
+}
+REF_getter<const bc_contract_balance> IDatabase::getContractBalanceNoCreateConst(const CONTRACT_id& contract)
+{
+    auto v = getContractBalanceNoCreate(contract);
+    if (!v.valid()) return NULL;
+    return dynamic_cast<const bc_contract_balance*>(v.get());
+}
+
 
 REF_getter<bc_contract> IDatabase::getContractOrCreate(const CONTRACT_id &name, Rollback* roll)
 {

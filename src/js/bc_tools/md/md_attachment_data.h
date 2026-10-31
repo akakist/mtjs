@@ -43,8 +43,8 @@ namespace MsgData
 
         }
         EmitNode blockRoot;
-        std::map<ADDRESS_id,uint64_t> fees;
-        std::map<NODE_id,uint64_t> rewards;
+        std::map<ADDRESS_id,int64_t> fees;
+        std::map<NODE_id,int64_t> rewards;
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;

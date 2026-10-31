@@ -67,12 +67,12 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     /// TODO: проверка стейка
     auto mf=getMetaFull(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
 
-    uint64_t staked=0;
+    int64_t staked=0;
     for(auto &z: r->blockAcceptedREQ->node_validators)
     {
         staked+=mf->getPrevStake(z);
     }
-    uint64_t fullstake=0;
+    int64_t fullstake=0;
     for(auto &z: mf->committe_members)
     {
         fullstake+=mf->getPrevStake(z);
@@ -103,7 +103,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
     bdvrs->node_validator=this_node_name;
     bdvrs->sig.sign(my_sk_bls,r->blockAcceptedREQ->getHash().container);
-    bdvrs->hb_hash=r->blockAcceptedREQ->blockInfo->heart_beat->getHash();
+    bdvrs->blockInfoHash=r->blockAcceptedREQ->blockInfo->getHash();
     pass_NodeMsgRSP(bdvrs.get(),route);
     return true;
 }
@@ -146,7 +146,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         return true;
     }
 
-    uint64_t stake_val=0;
+    int64_t stake_val=0;
     std::vector<blst_cpp::PublicKey> agg_pk_v;
     for (auto &z : r->blockAccepted2REQ->blockAcceptedREQ->node_validators)
     {
@@ -159,7 +159,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         stake_val+=mf->getPrevStake(z);
         XPASS;
     }
-    uint64_t full_stake_val=0;
+    int64_t full_stake_val=0;
     for(auto& z: mf->committe_members)
     {
         full_stake_val+=mf->getPrevStake(z);
@@ -180,7 +180,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         }
         XPASS;
     }
-    uint64_t stake_n=0;
+    int64_t stake_n=0;
     std::vector<blst_cpp::PublicKey> agg_pk_n;
     for(auto & z: r->blockAccepted2REQ->node_diff_validators)
     {
@@ -190,7 +190,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         stake_n+=n->get_full_stake();
         agg_pk_n.push_back(n->get_bls_pk());
     }
-    uint64_t full_stake=0;
+    int64_t full_stake=0;
     auto ls=db_state->getAllNodes();
     for(auto &z: ls)
     {

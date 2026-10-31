@@ -4,7 +4,7 @@
 struct vote
 {
     std::string param;
-    uint64_t value;
+    int64_t value;
     std::set<NODE_id> nodes;
     time_t create_time;
     int64_t ttl = 0;                     // <-- новое

@@ -104,7 +104,7 @@ inline std::optional<std::string> yy_get_string(yyjson_val *params, const char *
     return std::nullopt;
 
 }
-inline std::optional<std::string> yy_get_uint64_t(yyjson_val *params, const char *key, uint64_t& out)
+inline std::optional<std::string> yy_get_int64_t(yyjson_val *params, const char *key, int64_t& out)
 {
     auto _name=yyjson_obj_get(params,key);
     if(!_name)

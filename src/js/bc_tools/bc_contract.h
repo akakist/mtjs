@@ -3,28 +3,32 @@
 #include "ADDRESS_id.h"
 struct bc_contract:  public data_base
 {
-
     bc_contract(Cellable *p):data_base(hsh::bc_contract,p, 0,-1) {}
     std::string name_;
-    ADDRESS_id  owner;
+    std::set<ADDRESS_id> owners;
     std::string src;
     size_t size() const
     {
         M_LOCK(parent->mx);
-        return size_() + name_.size()+ owner.addr.size() + src.size();
+        size_t sz = size_() + name_.size() + src.size();
+        for (auto& o : owners) sz += o.addr.size();
+        return sz;
+    }
+    bool isOwner(const ADDRESS_id& a) const
+    {
+        M_LOCK(parent->mx);
+        return owners.count(a) != 0;
     }
     void pack(outBuffer&b) const final
     {
         data_base::pack(b);
         b<<1;
-        b<<name_<<owner<<src;
-
+        b<<name_<<owners<<src;
     }
     void unpack(inBuffer&b) final
     {
         data_base::unpack(b);
         auto v=b.get_PN();
-        b>>name_>>owner>>src;
-
+        b>>name_>>owners>>src;
     }
 };

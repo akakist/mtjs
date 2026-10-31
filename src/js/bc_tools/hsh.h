@@ -12,6 +12,7 @@ namespace hsh
         // bc_epoch,
         bc_contract_data,
         bc_votes,
+        bc_contract_balance,
         HSH_END
     };
 }

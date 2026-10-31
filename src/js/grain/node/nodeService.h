@@ -41,7 +41,7 @@
 #include "contract_rt.h"
 #include "ContractHost.h"
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
-std::set<NODE_id> getValidators(uint64_t block_timestamp, IDatabase* db);
+std::set<NODE_id> getValidators(int64_t block_timestamp, IDatabase* db);
 
 // #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 #define HB_TIME_WINDOW 10
@@ -211,7 +211,7 @@ namespace Node
             r.container="";
             return r;
         }
-        uint64_t epoch_current()
+        int64_t epoch_current()
         {
             if(prev_block.valid())
                 return prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch+1;
@@ -254,7 +254,7 @@ namespace Node
         bool verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ>& lc);
 
         std::optional<std::string> execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
-                const REF_getter<MsgData::TX> &tx, uint64_t epoch);
+                const REF_getter<MsgData::TX> &tx, int64_t epoch);
 
         std::optional<std::string> execute_tx_commands(b_params &b, t_params& t,
                 yyjson_val * j_tx);

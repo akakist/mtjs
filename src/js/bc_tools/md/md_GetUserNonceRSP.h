@@ -9,8 +9,8 @@ namespace MsgData
         GetUserNonceRSP():Base(msgid::GetUserNonceRSP)
         {
         }
-        uint64_t balance;
-        uint64_t nonce;
+        int64_t balance;
+        int64_t nonce;
         void update(Blake2bHasher& h) const
         {
             h.update(std::to_string(balance));

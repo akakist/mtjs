@@ -50,29 +50,8 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
     }
     auto mf=getMetaFull(m->payload_heart_beat->block_timestamp);
 
-    // uint64_t fullstake=0;
-    // for(auto& z: mf->all_nodes_enabled)
-    // {
-    //     fullstake+=mf->getPrevStake(z);
-    // }
 
     auto h=m->payload_heart_beat->getHash();
-    // uint64_t hb_staked = 0;
-    // if (iUtils->getNow() > li.confirm_leader_sent_l + _1sec)
-    // {
-    //     bool matched = true;
-    //     if (li.HeartBeatRSP_m.empty())
-    //         throw CommonError("if(li.responses.empty())");
-
-    //     {
-    //         auto &mmm=li.HeartBeatRSP_m[h];
-    //         for (auto &z : mmm)
-    //         {
-    //             hb_staked+=mf->getPrevStake(z.second->node_signer);
-    //         }
-    //     }
-    // }
-    // auto pers = (hb_staked * 100) / fullstake;
 
     if (li.is_HeartBeatRSP_m_quorum(h,mf.get()))
     {
@@ -463,7 +442,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         bt.ConfirmLeaderRSP_m_copy[clh].insert_or_assign(m->node_signer, m);
     }
     auto mf=getMetaFull(m->hb->block_timestamp);
-    uint64_t hb_staked = 0;
+    int64_t hb_staked = 0;
     {
         bool matched = true;
         if (bt.ConfirmLeaderRSP_m.empty())
@@ -475,7 +454,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
             hb_staked += stake;
         }
     }
-    uint64_t fullstake=0;
+    int64_t fullstake=0;
     for(auto &z:mf->all_nodes_enabled)
     {
         fullstake+=mf->getPrevStake(z);

@@ -159,9 +159,9 @@ JSIValue json_to_jsi(JSIContext* ctx, const json& j)
     if (j.is_boolean()) return JSI_NewBool(ctx, j.get<bool>());
     if (j.is_number_integer()) return JSI_NewInt64(ctx, j.get<int64_t>());
     if (j.is_number_unsigned()) {
-        uint64_t u = j.get<uint64_t>();
-        if (u > (uint64_t)INT64_MAX)
-            return JSI_ThrowTypeError(ctx, "uint64 too large");
+        int64_t u = j.get<int64_t>();
+        // if (u > (int64_t)INT64_MAX)
+        //     return JSI_ThrowTypeError(ctx, "uint64 too large");
         return JSI_NewInt64(ctx, (int64_t)u);
     }
     if (j.is_number_float())

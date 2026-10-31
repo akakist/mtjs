@@ -26,6 +26,8 @@
 #include "md/md_GetContractDataRSP.h"
 #include "md/md_GetNodeInfoRSP.h"
 #include "md/md_GetValuesRSP.h"
+#include "md/md_GetContractREQ.h"
+#include "md/md_GetContractRSP.h"
 // #include <yyjson.h>
 #include <nlohmann/json.hpp>
 #include "js_tools.h"
@@ -601,6 +603,28 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
     b->unpack(in);
     switch(p)
     {
+    case msgid::GetContractRSP:
+    {
+        auto *rs=(MsgData::GetContractRSP*) b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20, 20> scope(it->second.ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "contract", JS_NewString(ctx, rs->contract.container.c_str()));
+        JSValue owners_arr = JS_NewArray(ctx);
+        uint32_t oi = 0;
+        for (auto& o : rs->owners) {
+            JS_SetPropertyUint32(ctx, owners_arr, oi++, JS_NewString(ctx, base16::encode(o.addr).c_str()));
+        }
+        JS_SetPropertyStr(ctx, obj, "owners", owners_arr);
+        JS_SetPropertyStr(ctx, obj, "src", JS_NewStringLen(ctx, rs->src.data(), rs->src.size()));
+        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
+    }
     case msgid::GetUserNonceRSP:
     {
         auto *rs=(MsgData::GetUserNonceRSP*) b.get();

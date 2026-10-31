@@ -7,6 +7,7 @@ struct bc_values: public data_base
 
     bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         fees["contract_deploy"]=5000;
+        fees["contract_update"]=5000;
         fees["contract_transfer"]=1000;
         fees["node_create"]=20000;
         fees["node_update"]=10000;
@@ -21,7 +22,7 @@ struct bc_values: public data_base
         fees["vote"]=4000;
         fees["validator_min_stake"]=100;   // дефолт для новой БД; активация — только через vote (validator_min_stake_activated)
     }
-    std::map<std::string,uint64_t> fees;
+    std::map<std::string,int64_t> fees;
     std::set<ADDRESS_id> emitters_bin;
 
     size_t size() const
@@ -32,7 +33,7 @@ struct bc_values: public data_base
         for(auto &z: fees)
         {
             sz+=z.first.size();
-            sz+=sizeof(uint64_t);
+            sz+=sizeof(int64_t);
         }
         for(auto& z: emitters_bin)
         {
@@ -41,7 +42,7 @@ struct bc_values: public data_base
         return sz;
     }
 
-    uint64_t getGas(const std::string &fee_type) const
+    int64_t getGas(const std::string &fee_type) const
     {
         auto it=fees.find(fee_type);
         if(it!=fees.end())

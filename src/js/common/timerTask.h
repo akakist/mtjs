@@ -11,7 +11,7 @@ struct TimerTask: public Refcountable
     JSValueGuard cb;
     double timeout;
     bool unrefed=false;
-    uint64_t timerId;
+    int64_t timerId;
     std::vector<JSValueGuard> fargs;
     TimerTask():Refcountable("ToimerTask") {}
     ~TimerTask()
