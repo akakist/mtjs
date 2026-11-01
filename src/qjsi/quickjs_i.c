@@ -403,7 +403,7 @@ typedef enum {
 
 /* must be large enough to have a negligible runtime cost and small
    enough to call the interrupt callback often. */
-#define JSI_INTERRUPT_COUNTER_INIT 10000
+#define JSI_INTERRUPT_COUNTER_INIT 10
 
 struct JSIContext {
     JSIGCObjectHeader header; /* must come first */

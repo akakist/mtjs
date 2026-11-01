@@ -1498,7 +1498,7 @@ IInstance* CUtils::createNewInstance(const std::string& nm)
 {
     if(m_isTerminating) return NULL;
     IInstance *ins=new CInstance(this,nm);
-    logErr2("@@@@@@@@@@@@@@@ INS %p",ins);
+    // logErr2("@@@@@@@@@@@@@@@ INS %p",ins);
     {
         W_LOCK (instances.lk);
         instances.container.insert(ins);

@@ -113,7 +113,7 @@ inline std::optional<std::string> yy_get_int64_t(yyjson_val *params, const char 
     if(yyjson_is_str(_name))
         out=std::stoull(yyjson_get_str(_name));
     else if(yyjson_is_num(_name))
-        out=yyjson_get_uint(_name);
+        out=yyjson_get_sint(_name);
     else return "'"+(std::string)key+"' must be string or num";
 
     return std::nullopt;

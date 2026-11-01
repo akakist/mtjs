@@ -69,7 +69,7 @@ async function waitNonceGt(addr, lastNonce, timeoutSec = 10) {
 }
 async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT) {
     const ui = await mtjs.get_user_nonce(node1, addr, 3);
-    const req = { tx, nonce: ui.nonce, value, gasLimit, gasPrice: 10 };
+    const req = { tx, nonce: ui.nonce, value, gasLimit, priority: 0 };
     const rsp = await mtjs.tx_submit(node1, 1, JSON.stringify(req), sk, ui.nonce, () => { });
     if (rsp.err)
         throw new Error("submit: " + rsp.err_str);
@@ -79,7 +79,7 @@ async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT) {
 }
 async function submitAndWaitErr(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT) {
     const ui = await mtjs.get_user_nonce(node1, addr, 3);
-    const req = { tx, nonce: ui.nonce, value, gasLimit, gasPrice: 10 };
+    const req = { tx, nonce: ui.nonce, value, gasLimit, priority: 0 };
     const rsp = await mtjs.tx_submit(node1, 1, JSON.stringify(req), sk, ui.nonce, () => { });
     if (rsp.err)
         throw new Error("submit: " + rsp.err_str);

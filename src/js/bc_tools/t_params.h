@@ -7,7 +7,7 @@
 #include "ADDRESS_id.h"
 #include "THASH_id.h"
 #include <cstdint>
-
+#include "FeesSnapshot.h"
 struct b_params
 {
     b_params(IDatabase* _db): att_data(new MsgData::attachment_data()),db(_db) {}
@@ -16,6 +16,7 @@ struct b_params
     REF_getter<MsgData::attachment_data> att_data;
     int64_t node_rewards=0;
     REF_getter<BlockMetaFull> meta;
+    FeesSnapshot fees;
 
     void emit_command(const THASH_id& txId, int seqId, const std::string& command, const char* fmt, ...)
     {
@@ -50,11 +51,11 @@ struct t_params
     int64_t epoch = 0;
     THASH_id tx_id;
     int64_t gasUsed = 0;
-    int64_t gasLimit = 0;
+    int64_t gasLimitGas = 0;
     int64_t value = 0;
     Rollback *roll = NULL;
     Dirty dirty;
-
+    // FeesSnapshot fees;
     // для msg-геттеров (источник истины — t_params; jsiMsg не собираем)
     int64_t  block_timestamp = 0;   // из prev_block->heart_beat->block_timestamp
     int64_t  block_height    = 0;   // TBD

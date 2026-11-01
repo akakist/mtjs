@@ -13,7 +13,7 @@ async function main() {
 
     const nonce = BigInt(ui.nonce);
     const tx = [{ contract: "root", method: "mint", params: { amount: "1" } }];
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, gasPrice: 10 };
+    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk!, nonce.toString(), () => {});
     console.log("submit:", rsp.err, rsp.err_str, rsp.tx_hash);
 

@@ -313,7 +313,7 @@ int interrupt_handler(JSIRuntime* rt, void* opaque) {
     (void)rt;
     CallContext* call = (CallContext*)opaque;
     if (!call || !call->msg_source) return 0;
-    call->msg_source->consume_gas(GAS_STEP);
+    call->msg_source->consume_gas(call->fees->gas_per_jsi_step);
     int64_t gasUsed = call->msg_source->get_gasUsed();
     int64_t gasLimit = call->msg_source->get_gasLimit();
     if (gasUsed > gasLimit) return 1;   // прервать (exception)
@@ -403,7 +403,7 @@ JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
         void* prev = JSI_GetContextOpaque(cc->ctx);      // ContractContext* (или nullptr)
         JSI_SetContextOpaque(cc->ctx, self);             // CallContext* caller
         JSIValue r = cc->call_contract_method(method_name, params, self->msg_source, false,
-                                               self->call_stack, self->host, self->roll, self->contract->name);
+                                               self->call_stack, self->host, self->roll, self->contract->name,self->fees);
         JSI_SetContextOpaque(cc->ctx, prev);             // восстановить
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
         JSIValue r_caller = convert_value(cc->ctx, ctx, r);
@@ -431,7 +431,7 @@ JSIValue jsi_callView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* a
         void* prev = JSI_GetContextOpaque(cc->ctx);      // ContractContext* (или nullptr)
         JSI_SetContextOpaque(cc->ctx, self);             // CallContext* caller
         JSIValue r = cc->call_contract_method(view_name, params, self->msg_source, true,
-                                               self->call_stack, self->host, self->roll, self->contract->name);
+                                               self->call_stack, self->host, self->roll, self->contract->name,self->fees);
         JSI_SetContextOpaque(cc->ctx, prev);             // восстановить
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
         JSIValue r_caller = convert_value(cc->ctx, ctx, r);

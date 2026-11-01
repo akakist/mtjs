@@ -5,6 +5,7 @@
 #include "jsiEvent.h"
 #include <vector>
 #include "IMsgSource.h"
+#include "FeesSnapshot.h"
 struct ContractContext;
 struct CallStack;
 struct ContractHost;
@@ -22,5 +23,7 @@ struct CallContext {
     int64_t* value_ptr = nullptr;   // текущий value (нода: &t.value; test_runner: &test_value)
 
     CONTRACT_id caller;
+
+    FeesSnapshot *fees = nullptr;
 };
 

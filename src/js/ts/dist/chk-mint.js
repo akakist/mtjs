@@ -80,7 +80,7 @@ async function mintFromRoot(amount) {
         nonce: nonce.toString(),
         value: 0,
         gasLimit: 20000,
-        gasPrice: 10,
+        priority: 0,
     };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce.toString(), () => { });
     if (rsp.err)
@@ -99,7 +99,7 @@ async function transferFromRoot(to, amount) {
         nonce: nonce.toString(),
         value: 100000,
         gasLimit: 20000,
-        gasPrice: 10,
+        priority: 0,
     };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce.toString(), () => { });
     if (rsp.err)

@@ -61,7 +61,7 @@ namespace MsgData
                 return "yyjson: omitted nonce";
             if(yyjson_is_num(v))
             {
-                nonce=yyjson_get_uint(v);
+                nonce=yyjson_get_sint(v);
                 return std::nullopt;
             }
             else if(yyjson_is_str(v))
@@ -84,38 +84,38 @@ namespace MsgData
                 return "yyjson: omitted gasLimit";
             if(yyjson_is_num(v))
             {
-                gasLimit=yyjson_get_uint(v);
+                gasLimit=yyjson_get_sint(v);
                 return std::nullopt;
             }
             else if(yyjson_is_str(v))
             {
-                gasLimit=yyjson_get_uint(v);
+                gasLimit=yyjson_get_sint(v);
                 return std::nullopt;
             }
             else return "yyjson: gasLimit must be string or num";
             return std::nullopt;
         }
-        std::optional<std::string> getGasPrice(int64_t & gasPrice)
+        std::optional<std::string> getPriority(int64_t & priority)
         {
             if(!doc)
                 return "yyjson: !doc";
             auto root=yyjson_doc_get_root(doc);
             if(!root)
                 return "yyjson: !root";
-            auto v=yyjson_obj_get(root,"gasPrice");
+            auto v=yyjson_obj_get(root,"priority");
             if(!v)
-                return "yyjson: omitted gasPrice";
+                return "yyjson: omitted priority";
             if(yyjson_is_num(v))
             {
-                gasPrice=yyjson_get_uint(v);
+                priority=yyjson_get_sint(v);
                 return std::nullopt;
             }
             else if(yyjson_is_str(v))
             {
-                gasPrice=std::stoull(yyjson_get_str(v));
+                priority=std::stoull(yyjson_get_str(v));
                 return std::nullopt;
             }
-            else return "yyjson: gasPrice must be string or num";
+            else return "yyjson: priority must be string or num";
             return std::nullopt;
         }
         std::optional<std::string> getValue(int64_t & value)
@@ -130,12 +130,12 @@ namespace MsgData
                 return "yyjson: omitted value";
             if(yyjson_is_num(v))
             {
-                value=yyjson_get_uint(v);
+                value=yyjson_get_sint(v);
                 return std::nullopt;
             }
             else if(yyjson_is_str(v))
             {
-                value=yyjson_get_uint(v);
+                value=yyjson_get_sint(v);
                 return std::nullopt;
             }
             else return "yyjson: value must be string or num";

@@ -13,7 +13,7 @@ async function main() {
     console.log("bad nonce:", bad, "(real:", ui.nonce, ")");
 
     const tx = [{ contract: "root", method: "mint", params: { amount: "1" } }];
-    const req = { tx, nonce: bad, value: 1000000, gasLimit: 100000, gasPrice: 10 };
+    const req = { tx, nonce: bad, value: 1000000, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk!, bad, () => {});
     console.log("submit:", rsp.err, rsp.err_str, rsp.tx_hash);
     if (rsp.err) { console.log("rejected before block"); return; }

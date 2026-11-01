@@ -6,21 +6,25 @@ struct bc_values: public data_base
 
 
     bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
-        fees["contract_deploy"]=5000;
-        fees["contract_update"]=5000;
-        fees["contract_transfer"]=1000;
-        fees["node_create"]=20000;
-        fees["node_update"]=10000;
-        fees["node_enable"]=5000;
-        fees["node_unstake"]=2000;
-        fees["node_stake"]=2000;
-        fees["mint"]=95;
-        fees["transfer"]=1000;
-        fees["cashback_percent"]=200;
-        fees["validator_count_percent"]=50;
-        fees["missed_rounds_max"]=100;
-        fees["vote"]=4000;
-        fees["validator_min_stake"]=100;   // дефолт для новой БД; активация — только через vote (validator_min_stake_activated)
+        /// gas
+        fees["gas_per_token"]    = 1000;
+        fees["gas_per_byte"]     = 1;
+        fees["gas_per_jsi_step"] = 10;      // = interrupt_counter
+        fees["gas_per_hostcall"] = 500;
+        fees["gas_per_call"]     = 1000;
+        fees["min_tx_fee"]       = 1;
+        fees["gas_node_create"]  = 10000;
+        fees["gas_node_enable"]  = 5000;
+        fees["gas_node_stake"]   = 2000;
+        fees["gas_node_update"]  = 1000;
+        fees["gas_node_disable"] = 5000;
+        /// another params
+        fees["validator_count_percent"] = 50;
+        fees["validator_min_stake"] = 50;
+        fees["missed_rounds_max"] = 100;
+        
+        
+
     }
     std::map<std::string,int64_t> fees;
     std::set<ADDRESS_id> emitters_bin;

@@ -73,6 +73,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         return true;
     }
     // auto h=r->blockInfoHash;
+    logNode("[BlockDiffValidateRSP] blockInfoHash %s from %s",r->blockInfoHash.str().c_str(),src_node.container.c_str());
     bt.BlockDiffValidateRSP_m[r->blockInfoHash].push_back(r);
 
 
@@ -218,7 +219,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 
     auto &bt = l_blocks[prev_root_hash_Z()];
     auto h=r->blockInfo->getHash();
-
+    logNode("blockInfo->getHash() %s from node %s",h.str().c_str(),src_node.container.c_str());
     bt.ValidateBlockRSP_m[h].push_back(r);
     auto mf=getMetaFull(r->blockInfo->heart_beat->block_timestamp);
     if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))

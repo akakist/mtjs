@@ -24,7 +24,7 @@ const USERS          = envInt("USERS", 20);
 const ITERS          = envInt("ITERS", 30);
 const PAUSE_EVERY    = envInt("PAUSE_EVERY", 5);
 const PAUSE_SEC      = envInt("PAUSE_SEC", 15);
-const GAS_PRICE      = envStr("GAS_PRICE", "1");
+const PRIORITY      = envStr("PRIORITY", "1");
 const GAS_LIMIT      = envStr("GAS_LIMIT", "200000");
 const MINT_AMOUNT    = envStr("MINT_AMOUNT", "1000000");
 const THROTTLE_MS    = envInt("THROTTLE_MS", 100);
@@ -101,7 +101,7 @@ async function waitNonceGt(addr: string, lastNonce: bigint, timeoutSec: number):
 // пачка TX: submit -> waitTx -> waitNonceGt
 async function submitBatch(u: User, tx: any[]) {
     const nonce = await getNonce(u.addr);
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: Number(GAS_LIMIT), gasPrice: Number(GAS_PRICE) };
+    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: Number(GAS_LIMIT), priority: Number(PRIORITY) };
     const now = Date.now();
     lastTxSubmitTs = now;
     if (!firstTxTs) firstTxTs = now;
@@ -187,7 +187,7 @@ async function userLoop(u: User, ui: number) {
 (async () => {
     console.log("=== B_TEST-NODE-LOAD-PAUSE ===");
     console.log("users=" + users.length + " iters=" + ITERS + " pauseEvery=" + PAUSE_EVERY + " pauseSec=" + PAUSE_SEC +
-                " gasPrice=" + GAS_PRICE + " gasLimit=" + GAS_LIMIT + " throttle=" + THROTTLE_MS + "ms");
+                " priority=" + PRIORITY + " gasLimit=" + GAS_LIMIT + " throttle=" + THROTTLE_MS + "ms");
     if (users.length === 0) { console.log(RED + "no users" + RESET); return; }
 
     await sleep(500);

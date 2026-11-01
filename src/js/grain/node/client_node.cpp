@@ -355,6 +355,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     auto prev_root_hash=prev_root_hash_Z();
     b_params t(db_state.get());
     t.meta=getMetaFull(r->heart_beat->block_timestamp);
+
     bool err = false;
 
     auto &cli=cli_leader_info[prev_root_hash];
@@ -404,7 +405,20 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         MUTEX_INSPECTOR;
         // auto new_root_hash =
         t.validateBlockREQ = r;
-
+        auto v = db_state->getValuesNoCreateConst();
+        t.fees = FeesSnapshot{
+            .gas_per_token      = v->getGas("gas_per_token"),
+            .gas_per_byte       = v->getGas("gas_per_byte"),
+            .gas_per_jsi_step   = v->getGas("gas_per_jsi_step"),
+            .gas_per_hostcall   = v->getGas("gas_per_hostcall"),
+            .gas_per_call       = v->getGas("gas_per_call"),
+            .min_tx_fee         = v->getGas("min_tx_fee"),
+            .gas_node_create    = v->getGas("gas_node_create"),
+            .gas_node_enable    = v->getGas("gas_node_enable"),
+            .gas_node_stake     = v->getGas("gas_node_stake"),
+            .gas_node_update    = v->getGas("gas_node_update"),
+            .gas_node_disable   = v->getGas("gas_node_disable"),
+        };
         auto new_root_hash = execute_block(t, r->heart_beat);
 
         std::map<std::string, std::string> diffs;

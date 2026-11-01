@@ -37,7 +37,6 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     }
     t.markDirty(u.get());
 
-    t.gasUsed+=v->getGas("mint");
 
     b.emit_command(t.tx_id, seqId,"mint",R"({"to":"%s","amount":"%s"})",
                    base16::encode(t.senderAddress.addr).c_str(),
@@ -92,7 +91,6 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     }
     t.markDirty(to.get());
 
-    t.gasUsed+=v->getGas("transfer");
 
 
 
@@ -139,7 +137,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     t.markDirty(nn.get());
 
 
-    t.gasUsed+=v->getGas("node_update");
+    t.gasUsed+=b.fees.gas_node_update;
 
 
     return std::nullopt;
@@ -196,7 +194,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
 
 
 
-    t.gasUsed+=v->getGas("node_create");
+    t.gasUsed+=b.fees.gas_node_create;
 
     // t.logMsg(txid, seqId, "node %s registered", name.container.c_str());
     b.emit_command(t.tx_id, seqId, "node_create",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
@@ -234,7 +232,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     t.value-=amount;
     n->add_stake(t.senderAddress, amount);
 
-    t.gasUsed += v->getGas("node_stake");
+    t.gasUsed += b.fees.gas_node_stake;
 
     b.emit_command(t.tx_id, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
                    node.container.c_str(),
@@ -280,7 +278,6 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     n->sub_stake(t.senderAddress, amount);
 
     t.markDirty(n.get());
-    t.gasUsed+=v->getGas("node_unstake");
 
     b.emit_command(t.tx_id, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
                    node.container.c_str(),
@@ -314,7 +311,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     n->setEnabled(1);
     t.markDirty(n.get());
 
-    t.gasUsed+=v->getGas("node_enable");
+    t.gasUsed+=b.fees.gas_node_enable;
 
     b.emit_command(t.tx_id, seqId, "node_enable",R"({"node":"%s"})", node.container.c_str());
 
@@ -346,7 +343,7 @@ std::optional<std::string> TR::execute_node_disable(yyjson_val *params, b_params
     n->setEnabled(0);
     t.markDirty(n.get());
 
-    t.gasUsed+=v->getGas("node_enable");
+    t.gasUsed+=b.fees.gas_node_disable;
 
     b.emit_command(t.tx_id, seqId, "node_disable",R"({"node":"%s"})", node.container.c_str());
 
@@ -397,7 +394,6 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
 
     t.markDirty(n.get());
 
-    t.gasUsed+=v->getGas("contract_deploy");
 
     b.emit_command(t.tx_id, seqId, "contract_deploy",R"({"name":"%s","owner":"%s"})",name.c_str(),base16::encode(t.senderAddress.addr).c_str());
 
@@ -436,7 +432,6 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
     }
     t.markDirty(n.get());
 
-    t.gasUsed+=v->getGas("contract_update");
 
     b.emit_command(t.tx_id, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",cn.container.c_str(),base16::encode(t.senderAddress.addr).c_str());
 
@@ -469,7 +464,7 @@ std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_p
         auto tv = yyjson_obj_get(params, "ttl");
         if (tv) {
             if (yyjson_is_num(tv)) {
-                ttl = yyjson_get_uint(tv);
+                ttl = yyjson_get_sint(tv);
             } else if (yyjson_is_str(tv)) {
                 try { ttl = std::stoull(yyjson_get_str(tv)); }
                 catch (...) { return "param 'ttl' invalid"; }
@@ -551,7 +546,6 @@ std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_p
         }
     }
 
-    t.gasUsed += v->getGas("vote");
     b.emit_command(t.tx_id, seqId, "vote_counted",
         R"({"node":"%s","param":"%s","value":"%s"})",
         node.container.c_str(), param.c_str(), value.c_str());

@@ -55,7 +55,7 @@ async function waitNonceGt(lastNonce: bigint, timeoutSec = 10): Promise<bigint> 
 // ok TX: submit → wait block → waitNonceGt (nonce+1)
 async function submitAndWait(tx: any[], timeoutSec = 10) {
     const nonce = await getNonce();
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, gasPrice: 10 };
+    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk!, nonce.toString(), () => {});
     if (rsp.err) throw new Error("submit: " + rsp.err_str);
     const b = await waitTx(rsp.tx_hash, timeoutSec);
@@ -66,7 +66,7 @@ async function submitAndWait(tx: any[], timeoutSec = 10) {
 // err TX: submit → wait block (nonce не inc, waitNonceGt не нужен)
 async function submitAndWaitErr(tx: any[], timeoutSec = 10) {
     const nonce = await getNonce();
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, gasPrice: 10 };
+    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk!, nonce.toString(), () => {});
     if (rsp.err) throw new Error("submit: " + rsp.err_str);
     const b = await waitTx(rsp.tx_hash, timeoutSec);
@@ -202,8 +202,8 @@ async function t4_vote_not_owner() {
     const nonce = BigInt(ui.nonce);
     const param = "vote_owner_" + String(Date.now());
     const tx = [{ contract: "root", method: "vote", params: { node: "n5", param, value: "1", ttl: "60" } }];
-    // value: 0 — vote не тратит value; u1 1000000 >= gasLimit*gasPrice=1,000,000 → ok → execute_vote → owner-ошибка
-    const req = { tx, nonce: nonce.toString(), value: 0, gasLimit: 100000, gasPrice: 10 };
+    // value: 0 — vote не тратит value; u1 1000000 >= gasLimit*priority=1,000,000 → ok → execute_vote → owner-ошибка
+    const req = { tx, nonce: nonce.toString(), value: 0, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), u1sk, nonce.toString(), () => {});
     if (rsp.err) { check(false, "submit: " + rsp.err_str); return; }
     const b = await waitTx(rsp.tx_hash, 10);

@@ -333,11 +333,11 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
 
             void* saved_opaque = JSI_GetContextOpaque(cc->ctx);
             JSI_SetContextOpaque(cc->ctx, &call_ctx);
-
+            FeesSnapshot fees;
             TestMsgSource msg_src(tx.msg);
             CONTRACT_id caller;
             JSIValue result = cc->call_contract_method(cmd.method, cmd.params, &msg_src, is_view,
-                                                       call_ctx.call_stack, host, NULL,caller);
+                                                       call_ctx.call_stack, host, NULL,caller,&fees);
             JSI_SetContextOpaque(cc->ctx, saved_opaque);
 
             std::vector<jsiEvent> cmd_emits = call_ctx.emits;

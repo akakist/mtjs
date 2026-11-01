@@ -73,7 +73,7 @@ async function waitNonceGt(addr: string, lastNonce: bigint, timeoutSec = 10): Pr
 // ok TX: submit → wait block → waitNonceGt
 async function submitAndWait(sk: string, addr: string, tx: any[], timeoutSec = 10) {
     const { nonce } = await getNonceBal(addr);
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, gasPrice: 10 };
+    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
     if (rsp.err) throw new Error("submit: " + rsp.err_str);
     const b = await waitTx(rsp.tx_hash, timeoutSec);
@@ -83,7 +83,7 @@ async function submitAndWait(sk: string, addr: string, tx: any[], timeoutSec = 1
 // err TX: submit → wait block → waitNonceGt (nonce инкрементится ВСЕГДА)
 async function submitAndWaitErr(sk: string, addr: string, tx: any[], timeoutSec = 10) {
     const { nonce } = await getNonceBal(addr);
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, gasPrice: 10 };
+    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
     if (rsp.err) throw new Error("submit: " + rsp.err_str);
     const b = await waitTx(rsp.tx_hash, timeoutSec);
@@ -102,7 +102,7 @@ async function mintFromRoot(amount: string) {
     const { nonce } = await getNonceBal(rootAddr);
     const req = {
         tx: [{ contract: "root", method: "mint", params: { amount } }],
-        nonce: nonce.toString(), value: 0, gasLimit: 20000, gasPrice: 10,
+        nonce: nonce.toString(), value: 0, gasLimit: 20000, priority: 0,
     };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk!, nonce.toString(), () => {});
     if (rsp.err) throw new Error("submit: " + rsp.err_str);
@@ -115,7 +115,7 @@ async function voteFromRoot(vnode: string, param: string, value: string, ttl: st
     const { nonce } = await getNonceBal(rootAddr);
     const req = {
         tx: [{ contract: "root", method: "vote", params: { node: vnode, param, value, ttl } }],
-        nonce: nonce.toString(), value: 0, gasLimit: 20000, gasPrice: 10,
+        nonce: nonce.toString(), value: 0, gasLimit: 20000, priority: 0,
     };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk!, nonce.toString(), () => {});
     if (rsp.err) throw new Error("submit: " + rsp.err_str);

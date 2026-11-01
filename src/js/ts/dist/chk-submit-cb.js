@@ -77,7 +77,7 @@ async function setup() {
     {
         const ui = await mtjs.get_user_nonce(node, rootAddr, 3);
         const req = { tx: [{ contract: "root", method: "mint", params: { amount: "5000000" } }],
-            nonce: ui.nonce, value: 0, gasLimit: 20000, gasPrice: 10 };
+            nonce: ui.nonce, value: 0, gasLimit: 20000, priority: 0 };
         const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, ui.nonce, () => { });
         if (rsp.err)
             throw new Error("setup mint: " + rsp.err_str);
@@ -89,7 +89,7 @@ async function setup() {
     {
         const ui = await mtjs.get_user_nonce(node, rootAddr, 3);
         const req = { tx: [{ contract: "root", method: "transfer", params: { to: u1Addr, amount: "1000" } }],
-            nonce: ui.nonce, value: 100000, gasLimit: 20000, gasPrice: 10 };
+            nonce: ui.nonce, value: 100000, gasLimit: 20000, priority: 0 };
         const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, ui.nonce, () => { });
         if (rsp.err)
             throw new Error("setup transfer: " + rsp.err_str);
@@ -108,7 +108,7 @@ async function t1_ok() {
     const ui = await mtjs.get_user_nonce(node, u1Addr, 3);
     const cbs = [];
     const tx = [{ contract: "root", method: "transfer", params: { to: rootAddr, amount: "100" } }];
-    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, gasPrice: 10 };
+    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1sk, ui.nonce, (st) => {
         cbs.push(st);
         console.log("  cb:", JSON.stringify(st));
@@ -144,7 +144,7 @@ async function t2_err() {
     const ui = await mtjs.get_user_nonce(node, u1Addr, 3);
     const cbs = [];
     const tx = [{ contract: "root", method: "transfer", params: { to: rootAddr, amount: "2000000" } }];
-    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, gasPrice: 10 };
+    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1sk, ui.nonce, (st) => {
         cbs.push(st);
         console.log("  cb:", JSON.stringify(st));
@@ -177,7 +177,7 @@ async function t3_timeout() {
     const ui = await mtjs.get_user_nonce(node, u1Addr, 3);
     const cbs = [];
     const tx = [{ contract: "root", method: "transfer", params: { to: rootAddr, amount: "100" } }];
-    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, gasPrice: 10 };
+    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 0.001, JSON.stringify(req), u1sk, ui.nonce, (st) => {
         cbs.push(st);
         console.log("  cb:", JSON.stringify(st));
@@ -207,7 +207,7 @@ async function t4_two_tx() {
     // два tx_submit с nonce n0, n0+1 (в один блок, если успеют)
     for (let i = 0; i < 2; i++) {
         const tx = [{ contract: "root", method: "transfer", params: { to: rootAddr, amount: "10" } }];
-        const req = { tx, nonce: (n0 + BigInt(i)).toString(), value: 1000000, gasLimit: 100000, gasPrice: 10 };
+        const req = { tx, nonce: (n0 + BigInt(i)).toString(), value: 1000000, gasLimit: 100000, priority: 0 };
         const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1sk, (n0 + BigInt(i)).toString(), (st) => {
             if (!cbs[st.tx_hash])
                 cbs[st.tx_hash] = [];

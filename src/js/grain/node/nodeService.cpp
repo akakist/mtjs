@@ -25,6 +25,7 @@
 #include <time.h>
 #include <map>
 #include <vector>
+#include "token2gas.h"
 #include "nodeService.h"
 #include "epoll_socket_info.h"
 #include "event_mt.h"
@@ -748,7 +749,6 @@ void Node::Service::do_request_for_transactions( block_leader& li, const REF_get
 THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
 {
     MUTEX_INSPECTOR;
-    
     for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
     {
         MUTEX_INSPECTOR;
@@ -1059,7 +1059,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
     yyjson_val* item;
     {
         MUTEX_INSPECTOR;
-        if(t.gasUsed>t.gasLimit) return "gas exceeds limit";
+        if(t.gasUsed>t.gasLimitGas) return "gas exceeds limit";
         while ((item = yyjson_arr_iter_next(&iter)))
         {
             MUTEX_INSPECTOR;
@@ -1124,7 +1124,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 NodeMsgSource src(&t);
                 CONTRACT_id caller;
                 JSIValue result = cc->call_contract_method(method_str, params_json, &src, false,
-                                                           call_stack, contractHost, t.roll, caller);
+                                                           call_stack, contractHost, t.roll, caller, & b.fees);
 
                 JSI_SetContextOpaque(cc->ctx, prev_ctx);
 
@@ -1156,133 +1156,193 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
     }
     return std::nullopt;
 }
+std::optional<std::string> token_2_gas(int64_t tokens, int64_t priority,
+                                       int64_t gas_per_token_base, int64_t& result)
+{
+    if (priority < 0 || priority > 99)
+        return "priority must be 0..99";
+    if (tokens < 0)
+        return "tokens must be >= 0";
+    if (gas_per_token_base <= 0)
+        return "gas_per_token must be > 0";
+
+    int64_t gas_per_token = gas_per_token_base * (100 - priority) / 100;   // base=1000 → 1000..10
+    if (gas_per_token <= 0)
+        return "gas_per_token <= 0";
+
+    __int128 gasLimit_gas = (__int128)tokens * gas_per_token;
+    if (gasLimit_gas > INT64_MAX)
+        return "gasLimit overflow";
+    result = (int64_t)gasLimit_gas;
+    return std::nullopt;
+}
+
+std::optional<std::string> gas_2_token(int64_t gasUsed, int64_t priority,
+                                       int64_t gas_per_token_base, int64_t& result)
+{
+    if (priority < 0 || priority > 99)
+        return "priority must be 0..99";
+    if (gasUsed < 0)
+        return "gasUsed must be >= 0";
+    if (gas_per_token_base <= 0)
+        return "gas_per_token must be > 0";
+
+    int64_t gas_per_token = gas_per_token_base * (100 - priority) / 100;   // base=1000 → 1000..10
+    if (gas_per_token <= 0)
+        return "gas_per_token <= 0";
+
+    // округление вверх: ceil(gasUsed / gas_per_token); минимум 1 токен (анти-спам)
+    int64_t tokens = (gasUsed + gas_per_token - 1) / gas_per_token;
+    if (tokens < 1) tokens = 1;
+
+    result = tokens;
+    return std::nullopt;
+}
 std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
         const REF_getter<MsgData::TX> &tx, int64_t epoch)
 {
     MUTEX_INSPECTOR;
-    int64_t gasLimit=0, gasPrice=0, value=0;
-    yyjson_val *jroot=yyjson_doc_get_root(tx->doc);
-    yyjson_val * j_tx = yyjson_obj_get(jroot,"tx");
-    if(!j_tx) throw CommonError("if(!j_tx)");
-    auto err=yy_get_int64_t(jroot,"value",value);
-    if(!err) err=yy_get_int64_t(jroot,"gasLimit",gasLimit);
-    if(!err) err=yy_get_int64_t(jroot,"gasPrice",gasPrice);
-    if(err)
+    int64_t gasLimitTokens = 0, priority = 0, value = 0;
+    yyjson_val *jroot = yyjson_doc_get_root(tx->doc);
+    yyjson_val *j_tx = yyjson_obj_get(jroot, "tx");
+    if (!j_tx)
+        throw CommonError("if(!j_tx)");
+    auto err = yy_get_int64_t(jroot, "value", value);
+    if (!err) err = yy_get_int64_t(jroot, "gasLimit", gasLimitTokens);   // в токенах
+    if (!err) err = yy_get_int64_t(jroot, "priority", priority);
+    if (err)
     {
-        b.emit_tx(tx_id,"error",R"({"error":"%s"})",err->c_str());
+        b.emit_tx(tx_id, "error", R"({"error":"%s"})", err->c_str());
         return err;
     }
+
+    auto v = db_state->getValuesNoCreateConst();
+    int64_t gas_per_token_base = b.fees.gas_per_token;
+
+    int64_t gasLimit_gas = 0;
+    if (auto e = token_2_gas(gasLimitTokens, priority, gas_per_token_base, gasLimit_gas))
+    {
+        // b.emit_tx(tx_id, "error", R"({"error":"%s"})", e->c_str());
+        return e;
+    }
+
     Rollback roll;
     t_params t(db_state);
-    t.senderAddress=senderAddress;
-    t.tx=tx;
-    t.epoch=epoch;
-    t.tx_id=tx_id;
-    t.roll=&roll;
-    t.value=value;
-    t.gasLimit=gasLimit;
-    // new: заполняем msg-поля из актуальных источников
+    t.senderAddress = senderAddress;
+    t.tx = tx;
+    t.epoch = epoch;
+    t.tx_id = tx_id;
+    t.roll = &roll;
+    t.value = value;
+    t.gasLimitGas = gasLimit_gas;
     t.block_timestamp = prev_block.valid()
         ? (int64_t)prev_block->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp
         : 0;
     t.block_height = 0; // TBD
     {
-        int64_t n=0;
-        if(!tx->getNonce(n)) t.nonce = (int64_t)n;
+        int64_t n = 0;
+        if (!tx->getNonce(n)) t.nonce = (int64_t)n;
     }
-    // chainId из TX (если есть)
     {
-        yyjson_val* cid = yyjson_obj_get(jroot, "chainId");
-        if (cid && yyjson_is_num(cid)) t.chain_id = (int64_t)yyjson_get_uint(cid);
+        yyjson_val *cid = yyjson_obj_get(jroot, "chainId");
+        if (cid && yyjson_is_num(cid)) t.chain_id = (int64_t)yyjson_get_sint(cid);
         else if (cid && yyjson_is_str(cid)) t.chain_id = (int64_t)std::atoll(yyjson_get_str(cid));
     }
-    t.tx_index = 0; // TBD (индекс TX/команды)
+    t.tx_index = 0; // TBD
 
-    auto uu=db_state->getAddressStateNoCreate(senderAddress);
-    if(!uu.valid()) throw CommonError("if(!uu.valid())");
+    auto uu = db_state->getAddressStateNoCreate(senderAddress);
+    if (!uu.valid())
+        throw CommonError("if(!uu.valid())");
+
+    int64_t bal0 = 0;
     {
         M_LOCK(uu->parent->mx);
-        if(uu->balance < gasLimit*gasPrice+value)
-            return "not enough funds to reserve gasLimit*gasPrice+value";
+        bal0 = uu->balance;
+        if (uu->balance < gasLimitTokens + value)
+        {
+            // b.emit_tx(tx_id, "error", R"({"error":"not enough funds to reserve gasLimit+value"})");
+            return "not enough funds to reserve gasLimit+value";
+
+        }
     }
+
     db_state->root->calc_tree_hash(db_to_save_Z);
-    // logNode("execute_transaction: db_state.valid=%d db=%p root.valid=%d",
-    //         db_state.valid() ? 1 : 0,
-    //         (void*)db_state.get(),
-    //         (db_state.valid() && db_state->root.valid()) ? 1 : 0);
-    err=execute_tx_commands(b,t,j_tx);
 
-    if(err)
-    {
-        logNode("execute_transaction: err='%s' roll->size=%d gasUsed=%llu", err->c_str(), (int)t.roll->size(), (unsigned long long)t.gasUsed);
-        // посмотреть, что в roll->data (какие гранулы)
-        for (auto& z : t.roll->data) {
-            logNode("  roll: cell=%p id='%s' buf_size=%d", (void*)z.first, z.first->m_id.c_str(), (int)z.second.size());
-        }
-            ///////////
-        logNode("error:%s",err->c_str());
-        b.emit_tx(t.tx_id,"error",R"({"error":"%s"})",err->c_str());
-        t.gasUsed+=t.roll->size();
-        logNode("rollback: data.size=%d", (int)t.roll->size());
-        t.rollback();
-        auto gu=t.gasUsed;
-        if(gu>gasLimit) gu=gasLimit;
+    // helper: списать газ (в токенах) с баланса и вернуть ошибку (если priority/gas невалидны)
+    auto charge_gas = [&](int64_t gas_charged, int64_t& spent) -> std::optional<std::string> {
+        if (auto e = gas_2_token(gas_charged, priority, gas_per_token_base, spent))
+            return e;
         M_LOCK(uu->parent->mx);
-        uu->balance-=gu*gasPrice;
-        b.node_rewards+=gu*gasPrice;
-        return err;
-    }
-    if(t.value<0)
-    {
-        // logNode("execute_transaction: err='%s' roll->size=%d gasUsed=%llu", err->c_str(), (int)t.roll->size(), (unsigned long long)t.gasUsed);
-        // посмотреть, что в roll->data (какие гранулы)
-        for (auto& z : t.roll->data) {
-            logNode("  roll: cell=%p id='%s' buf_size=%d", (void*)z.first, z.first->m_id.c_str(), (int)z.second.size());
-        }
-        t.gasUsed+=t.roll->size();
+        uu->balance -= spent;
+        b.node_rewards += spent;
+        return std::nullopt;
+    };
+
+    // helper: rollback + emit error + списать газ + лог; возвращает сообщение
+    auto fail = [&](const std::string& msg, int64_t gas_charged) -> std::optional<std::string> {
+        t.gasUsed += t.roll->size() * b.fees.gas_per_byte;
         t.rollback();
-        b.emit_tx(t.tx_id,"error",R"({"error":"value exceeds limit"})");
-        M_LOCK(uu->parent->mx);
-        uu->balance-=t.gasUsed*gasPrice;
-        b.node_rewards+=t.gasUsed*gasPrice;
-        return "value exceeds limit";
-    }
-    if(t.gasUsed>gasLimit)
-    {
-        // logNode("execute_transaction: err='%s' roll->size=%d gasUsed=%llu", err->c_str(), (int)t.roll->size(), (unsigned long long)t.gasUsed);
-        // посмотреть, что в roll->data (какие гранулы)
-        for (auto& z : t.roll->data) {
-            logNode("  roll: cell=%p id='%s' buf_size=%d", (void*)z.first, z.first->m_id.c_str(), (int)z.second.size());
-        }
-        t.rollback();
-        b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        M_LOCK(uu->parent->mx);
-        uu->balance-=gasLimit*gasPrice;
-        b.node_rewards+=gasLimit*gasPrice;
-        return "gas exceeds limit";
-    }
+        // b.emit_tx(t.tx_id, "error", R"({"error":"%s"})", msg.c_str());
+        int64_t spent = 0;
+        if (auto e = charge_gas(gas_charged, spent))
+            return e;
+        int64_t bal1 = 0;
+        { M_LOCK(uu->parent->mx); bal1 = uu->balance; }
+        logNode("[t] tx=%s value=%lld gasLimitTokens=%lld priority=%lld gasLimit_gas=%lld gpt=%lld "
+                "gasUsed=%lld rollback=%d total=%lld spentTokens=%lld value_spent=0 bal %lld->%lld status=err msg=\"%s\"",
+                base16::encode(tx_id.container).c_str(),
+                (long long)value, (long long)gasLimitTokens, (long long)priority,
+                (long long)gasLimit_gas,
+                (long long)(gas_per_token_base * (100 - priority) / 100),
+                (long long)t.gasUsed, (int)t.roll->size(), (long long)t.gasUsed,
+                (long long)spent,
+                (long long)bal0, (long long)bal1, msg.c_str());
+        return msg;
+    };
+
+    err = execute_tx_commands(b, t, j_tx);
+    if (err)
+        return fail(*err, t.gasUsed);
+
+    if (t.value < 0)
+        return fail("value exceeds limit", t.gasUsed);
+
+    if (t.gasUsed > gasLimit_gas)
+        return fail("gas exceeds limit", gasLimit_gas);
+
     _db_to_save db_dump;
     db_state->root->calc_tree_hash(db_dump);
-    size_t sz=db_dump.size();
-    t.gasUsed+=sz;
-    if(t.gasUsed>gasLimit)
-    {
-        t.rollback();
-        b.emit_tx(t.tx_id,"error",R"({"error":"gas exceeds limit"})");
-        M_LOCK(uu->parent->mx);
-        uu->balance-=gasLimit*gasPrice;
-        b.node_rewards+=gasLimit*gasPrice;
-        return "gas exceeds limit";
-    }
+    // t.gasUsed += db_dump.size();
+    t.gasUsed += db_dump.size_leaves() * b.fees.gas_per_byte;
+    if (t.gasUsed > gasLimit_gas)
+        return fail("gas exceeds limit", gasLimit_gas);
+
+    int64_t spent = 0;
+    if (auto e = charge_gas(t.gasUsed, spent))
+        return e;
+
     {
         M_LOCK(uu->parent->mx);
-        uu->balance-=t.gasUsed*gasPrice+value-t.value;
+        uu->balance -= value - t.value;
     }
+    int64_t bal1 = 0;
+    { M_LOCK(uu->parent->mx); bal1 = uu->balance; }
+
     db_state->root->calc_tree_hash(db_dump);
     db_to_save_Z.add(db_dump);
+
+    logNode("[t] tx=%s value=%lld gasLimitTokens=%lld priority=%lld gasLimit_gas=%lld gpt=%lld "
+            "gasUsed=%lld db_dump=%d total=%lld spentTokens=%lld value_spent=%lld bal %lld->%lld status=ok",
+            base16::encode(tx_id.container).c_str(),
+            (long long)value, (long long)gasLimitTokens, (long long)priority,
+            (long long)gasLimit_gas,
+            (long long)(gas_per_token_base * (100 - priority) / 100),
+            (long long)(t.gasUsed - db_dump.size()), (int)db_dump.size(), (long long)t.gasUsed,
+            (long long)spent, (long long)(value - t.value),
+            (long long)bal0, (long long)bal1);
+
     return std::nullopt;
 }
-
 
 inline uint64_t read_uint64(const uint8_t* data) {
     return (static_cast<uint64_t>(data[0]) << 56) |
