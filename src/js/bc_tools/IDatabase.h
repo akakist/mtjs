@@ -16,6 +16,7 @@
 #include "md/md_BlockAcceptedREQ.h"
 #include "md/md_BlockAccepted2REQ.h"
 #include "bc_contract_balance.h"
+#include "bc_state.h"
 
 struct IDatabase: public Refcountable
 {
@@ -24,6 +25,7 @@ struct IDatabase: public Refcountable
 
     virtual int getGranule(const std::string& k, std::string* v)=0;
     virtual int write_granules_batch(const _db_to_save &v)=0;
+    virtual int deleteGranule(const std::string& k) = 0;
     std::atomic<bool> clear_root=false;
 
     REF_getter<Cellable> root;
@@ -156,6 +158,13 @@ public:
     REF_getter<bc_nodelist> getNodeListNoCreate();
     REF_getter<const bc_nodelist> getNodeListNoCreateConst();
 
+
+    // ---- STATE (bc_state) ----
+    static std::vector<std::string> getStatePath();          // getPath("STATE")
+    REF_getter<bc_state> getStateOrCreate(Rollback* roll);
+    REF_getter<bc_state> getStateNoCreate();
+    REF_getter<const bc_state> getStateNoCreateConst();
+
     REF_getter<Cellable> replaceLeafNoCreate(const REF_getter<Cellable>&cur, const std::string& id, MutexLockerDeferred &l);
     REF_getter<Cellable> replaceLeafOrCreate(const REF_getter<Cellable>&cur, const std::string &id, MutexLockerDeferred &l, Rollback *roll);
 
@@ -164,8 +173,9 @@ public:
     REF_getter<Cellable> getByPathOrCreate(const REF_getter<Cellable>&cur, const std::deque<std::string> &v, Rollback*);
 
     REF_getter<Cellable> getByPathNoCreate(const REF_getter<Cellable>&cur, const std::vector<std::string>& v);
-
+    REF_getter<Cellable> getByDbIdNoCreate(const THASH_id& h);   // root + getPathFromHash + getByPathNoCreate
 // IDatabase.h
+
 };
 
 REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAccepted2REQ>& pb);

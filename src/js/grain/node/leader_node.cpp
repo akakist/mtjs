@@ -259,7 +259,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
             logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!! val count %d",bt.ValidateBlockRSP_m[h].size());
             return true;
         }
-        REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(ba,r->tx_hashes,r->diffs,r->att_data);
+        REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(ba,r->tx_hashes,r->diffs,r->deleted, r->att_data);
         sendEvent(ServiceEnum::Timer,
             new timerEvent::ResetAlarm(
                 TIMER_BlockDiffValidateREQ,

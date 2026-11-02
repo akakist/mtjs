@@ -6,6 +6,8 @@
 #include <vector>
 #include "IMsgSource.h"
 #include "FeesSnapshot.h"
+#include "db_to_save.h"
+#include "cellable.h"
 struct ContractContext;
 struct CallStack;
 struct ContractHost;
@@ -25,5 +27,6 @@ struct CallContext {
     CONTRACT_id caller;
 
     FeesSnapshot *fees = nullptr;
+    std::set<REF_getter<data_base>> * deleted_granules = nullptr;
 };
 

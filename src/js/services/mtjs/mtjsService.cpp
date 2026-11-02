@@ -28,6 +28,7 @@
 #include "md/md_GetValuesRSP.h"
 #include "md/md_GetContractREQ.h"
 #include "md/md_GetContractRSP.h"
+#include "md/md_GetStateRSP.h"
 // #include <yyjson.h>
 #include <nlohmann/json.hpp>
 #include "js_tools.h"
@@ -603,6 +604,31 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
     b->unpack(in);
     switch(p)
     {
+
+// в ClientMsgReply switch(p):
+    case msgid::GetStateRSP:
+    {
+        auto *rs = (MsgData::GetStateRSP*) b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20, 20> scope(it->second.ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "total_supply", JS_NewString(ctx, rs->total_supply.c_str()));
+        JS_SetPropertyStr(ctx, obj, "total_stake",  JS_NewString(ctx, rs->total_stake.c_str()));
+        JS_SetPropertyStr(ctx, obj, "account_count",  JS_NewInt64(ctx, rs->account_count));
+        JS_SetPropertyStr(ctx, obj, "node_count",     JS_NewInt64(ctx, rs->node_count));
+        JS_SetPropertyStr(ctx, obj, "contract_count", JS_NewInt64(ctx, rs->contract_count));
+        JS_SetPropertyStr(ctx, obj, "tx_count",       JS_NewInt64(ctx, rs->tx_count));
+        JS_SetPropertyStr(ctx, obj, "block_height",   JS_NewInt64(ctx, rs->block_height));
+        JS_SetPropertyStr(ctx, obj, "genesis_time",   JS_NewInt64(ctx, rs->genesis_time));
+        JS_SetPropertyStr(ctx, obj, "chain_id",       JS_NewInt64(ctx, rs->chain_id));
+        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
+    }        
     case msgid::GetContractRSP:
     {
         auto *rs=(MsgData::GetContractRSP*) b.get();

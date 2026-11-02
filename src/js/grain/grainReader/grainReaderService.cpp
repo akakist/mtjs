@@ -34,6 +34,8 @@
 #include "md/md_GetValuesRSP.h"
 #include "md/md_GetContractREQ.h"
 #include "md/md_GetContractRSP.h"
+#include "md/md_GetStateREQ.h"
+#include "md/md_GetStateRSP.h"
 
 bool GrainReader::Service::on_startService(const systemEvent::startService *)
 {
@@ -147,19 +149,20 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
     {
         case msgid::GetUserNonceREQ:
         {
-            ADDRESS_id addr;
             auto pp=(MsgData::GetUserNonceREQ*) b.get();
-            auto u = db_state_3->getAddressStateOrCreate(pp->user_address,NULL);
-
-            REF_getter<MsgData::GetUserNonceRSP> rsp=new MsgData::GetUserNonceRSP;
-            {
+            // ▼▼▼ NoCreate — не создаём адрес (спам RPC)
+            auto u = db_state_3->getAddressStateNoCreate(pp->user_address);
+            REF_getter<MsgData::GetUserNonceRSP> rsp = new MsgData::GetUserNonceRSP;
+            if (u.valid()) {
                 M_LOCK(u->parent->mx);
-                rsp->nonce=u->nonce;
-                rsp->balance=u->balance;
+                rsp->nonce = u->nonce;
+                rsp->balance = u->balance;
+            } else {
+                rsp->nonce = 0;
+                rsp->balance = 0;
             }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
-
-
+            // ▲▲▲
         }
         break;
         case msgid::GetNodeInfoREQ:
@@ -221,6 +224,27 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }
+
+// в ClientMsg switch(p):
+        case msgid::GetStateREQ:
+        {
+            REF_getter<MsgData::GetStateRSP> rsp = new MsgData::GetStateRSP;
+            auto st = db_state_3->getStateNoCreateConst();
+            if (st.valid()) {
+                rsp->found = true;
+                rsp->total_supply = st->total_supply.str();
+                rsp->total_stake  = st->total_stake.str();
+                rsp->account_count = st->account_count;
+                rsp->node_count = st->node_count;
+                rsp->contract_count = st->contract_count;
+                rsp->tx_count = st->tx_count;
+                rsp->block_height = st->block_height;
+                rsp->genesis_time = st->genesis_time;
+                rsp->chain_id = st->chain_id;
+            }
+            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
+            break;
+        }        
         default: logErr2("unhanddledf msg %s",msgName(p));
     }
 

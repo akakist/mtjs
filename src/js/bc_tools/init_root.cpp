@@ -5,6 +5,23 @@ void init_root(IDatabase* db)
 {
     MUTEX_INSPECTOR;
     // uint64_t e=0;
+    // init_root.cpp (в начале, после getValuesNoCreate)
+    {
+        auto st = db->getStateNoCreate();
+        if (!st.valid()) {
+            st = db->getStateOrCreate(NULL);
+            st->total_supply = i128(0);
+            st->total_stake = i128(0);
+            st->account_count = 0;
+            st->node_count = 0;
+            st->contract_count = 0;
+            st->tx_count = 0;
+            st->block_height = 0;
+            st->genesis_time = (int64_t)time(NULL);
+            st->chain_id = 1;   // TBD
+            st->setDirty(NULL);
+        }
+    }
     std::vector<int> stakes;
     for(int i=0; i<10; i++)
     {

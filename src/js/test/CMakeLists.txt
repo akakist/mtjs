@@ -22,6 +22,12 @@
 target_link_libraries(keygen blst crypto sodium)
 target_link_libraries(keygen2 blst crypto sodium)
 target_link_libraries(test_qjs quickjs)
+
+ add_executable(test_i128
+  test_i128.cpp
+ )
+target_link_libraries(test_i128 megatron-core)
+
 # add_executable(client
   # client.cpp
 #  base16.cpp

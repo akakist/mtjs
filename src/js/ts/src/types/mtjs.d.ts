@@ -1,6 +1,19 @@
 import { StreamModule } from "./stream";
 
-declare global {
+    declare global {
+        interface StateInfo {
+        found: boolean;
+        total_supply: string;
+        total_stake: string;
+        account_count: number;
+        node_count: number;
+        contract_count: number;
+        tx_count: number;
+        block_height: number;
+        genesis_time: number;
+        chain_id: number;
+    }
+
     interface ContractInfo {
         found: boolean;
         contract: string;
@@ -86,7 +99,10 @@ declare global {
         get_node_info(nodeaddr: string, name: string, timeout: number): Promise<NodeInfo>;
         get_values(nodeaddr: string, timeout: number): Promise<ValuesInfo>;
         get_contract_data(nodeaddr: string, contract: string, key: string, timeout: number): Promise<ContractData>;
-	get_contract(nodeaddr: string, contract: string, timeout: number): Promise<ContractInfo>;
+    	get_contract(nodeaddr: string, contract: string, timeout: number): Promise<ContractInfo>;
+
+        get_state(nodeaddr: string, timeout: number): Promise<StateInfo>;
+
         tx_unsubscribe(nodeaddr: string, tx_hash_hex?: string): void;
         tx_subscribe(nodeaddr: string, callback: (block: Block) => void): void;
         addr_from_pk(pk: string): string;

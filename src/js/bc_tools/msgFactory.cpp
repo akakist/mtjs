@@ -29,6 +29,8 @@
 #include "md/md_DelayNotificationREQ.h"
 #include "md/md_GetContractREQ.h"
 #include "md/md_GetContractRSP.h"
+#include "md/md_GetStateREQ.h"
+#include "md/md_GetStateRSP.h"
 
 
 MsgFactory::MsgFactory()
@@ -61,4 +63,7 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetContractREQ, MsgData::GetContractREQ::construct);
     registerMsg(msgid::GetContractRSP, MsgData::GetContractRSP::construct);
 
+    // в MsgFactory::MsgFactory():
+    registerMsg(msgid::GetStateREQ, MsgData::GetStateREQ::construct);
+    registerMsg(msgid::GetStateRSP, MsgData::GetStateRSP::construct);
 }

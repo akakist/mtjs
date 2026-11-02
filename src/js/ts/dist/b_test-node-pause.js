@@ -112,7 +112,7 @@ async function waitNonceGt(addr, lastNonce, timeoutSec) {
 // пачка TX: submit -> waitTx -> waitNonceGt
 async function submitBatch(u, tx) {
     const nonce = await getNonce(u.addr);
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: Number(GAS_LIMIT), priority: 0 };
+    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: Number(GAS_LIMIT), priority: Number(PRIORITY) };
     const now = Date.now();
     lastTxSubmitTs = now;
     if (!firstTxTs)

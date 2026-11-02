@@ -17,7 +17,7 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
                              const json& params,
                              IMsgSource* msg_source, bool is_view,
                              const REF_getter<CallStack>& call_stack,
-                             const REF_getter<ContractHost>& host, Rollback* roll, const CONTRACT_id& caller, FeesSnapshot* fees)
+                             const REF_getter<ContractHost>& host, Rollback* roll, const CONTRACT_id& caller, FeesSnapshot* fees, std::set<REF_getter<data_base>> * deleted_granules)
 {
     if (call_stack->call_stack.size() >= (size_t)MAX_CALL_DEPTH)
         return JSI_ThrowTypeError(ctx, "call stack too deep (%zu >= %d)", call_stack->call_stack.size(), MAX_CALL_DEPTH);
@@ -44,6 +44,7 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
     call_ctx.roll = roll;
     call_ctx.caller = caller;
     call_ctx.fees=fees;
+    call_ctx.deleted_granules = deleted_granules;
 
     void* saved = JSI_GetContextOpaque(ctx);
     JSI_SetContextOpaque(ctx, &call_ctx);

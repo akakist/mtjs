@@ -32,6 +32,7 @@
 #include "md/md_GetValuesREQ.h"
 #include "md/md_GetContractREQ.h"
 #include "js_tools.h"
+#include "md/md_GetStateREQ.h"
 // #include ""
 
 static std::string js_obj_to_kv(JSContext *ctx,
@@ -533,6 +534,42 @@ JSValue js_get_contract_data(JSContext *ctx, JSValueConst this_val, int argc, JS
     return g_prom.release();
 }
 
+
+JSValue js_get_state(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    MUTEX_INSPECTOR;
+    JSScope<10, 10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
+    if (!op) return JS_ThrowInternalError(ctx, "get_state: !op");
+    if (argc != 2) return JS_ThrowInternalError(ctx, "get_state(node, timeout)");
+    if (!JS_IsString(argv[0])) return JS_ThrowInternalError(ctx, "get_state: node must be string");
+    if (!JS_IsNumber(argv[1])) return JS_ThrowInternalError(ctx, "get_state: timeout must be number");
+    std::string node_addr = scope.toStdString(argv[0]);
+    double to = 0;
+    if (JS_ToFloat64(ctx, &to, argv[1])) return JS_ThrowInternalError(ctx, "get_state: timeout parse error");
+
+    REF_getter<MsgData::GetStateREQ> rq = new MsgData::GetStateREQ();
+    auto hash = rq->getHash();
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+        new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+    op->broadcaster->sendEvent(ServiceEnum::Timer,
+        new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+
+    auto &pd = op->node_req_promises[hash.container];
+    pd.ctx = ctx;
+    JSValue prom[2];
+    JSValue promise = JS_NewPromiseCapability(ctx, prom);
+    JSValueGuard g_resolve(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[1]);
+    JSValueGuard g_prom(ctx, promise);
+    if (JS_IsException(promise)) return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
+    pd.resolve = g_resolve;
+    pd.reject = g_reject;
+    return g_prom.release();
+}
+
+// в js_register_add_instance:
+
 JSValue js_tx_unsubscribe(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     JSScope<10, 10> scope(ctx);
@@ -568,4 +605,5 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_unsubscribe", JS_NewCFunction(ctx, js_tx_unsubscribe, "tx_unsubscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_contract_data", JS_NewCFunction(ctx, js_get_contract_data,  "get_contract_data", 4));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_contract", JS_NewCFunction(ctx, js_get_contract, "get_contract", 3));
+    JS_SetPropertyStr(ctx, mtjs_obj, "get_state", JS_NewCFunction(ctx, js_get_state, "get_state", 2));
 }

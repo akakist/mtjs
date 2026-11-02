@@ -67,6 +67,7 @@ struct CDatabaseRocksdb: public IDatabase
     {
         rocksdb::WriteBatch batch;
 
+        for (const auto& key : v.deleted) batch.Delete(key);
         for (const auto& [key, data] : v.cells) {
             batch.Put(key, data);
         }
@@ -81,6 +82,7 @@ struct CDatabaseRocksdb: public IDatabase
         return true;
         return 0;
     }
+    
 
 /// Удаление гранул батчем
     bool delete_granules_batch(rocksdb::DB* db, const std::vector<std::string>& keys) {
@@ -115,6 +117,10 @@ struct CDatabaseRocksdb: public IDatabase
         }
         return 0;
     }
+    int deleteGranule(const std::string& k) override {
+        auto s = db_ptr->Delete(rocksdb::WriteOptions(), k);
+        return s.ok() ? 0 : 1;
+    }    
     ~CDatabaseRocksdb() {
         if (db_ptr) {
             delete db_ptr;

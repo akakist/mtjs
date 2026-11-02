@@ -83,8 +83,20 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         return true;
     }
 
-/// применяем диффы
     Rollback roll;
+    // _db_to_save db_dump;
+/// применяем диффы
+    for(auto& z: r->deleted)
+    {
+        if(z.size()!=32) throw CommonError("if(z.first.size()!=32)");
+            THASH_id h;
+            h.container=z;
+            auto cc = db_state->getByDbIdNoCreate(h);
+            if (!cc.valid()) { logNode("deleted: cell not found %s", base16::encode(z).c_str()); continue; }
+            if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }
+            deleteGranule(cc->data.get(),&roll,db_to_save_Z);
+    }
+    // for(auto &z: db_dump)
     for(auto& z: r->diffs)
     {
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
@@ -407,17 +419,21 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         t.validateBlockREQ = r;
         auto v = db_state->getValuesNoCreateConst();
         t.fees = FeesSnapshot{
-            .gas_per_token      = v->getGas("gas_per_token"),
-            .gas_per_byte       = v->getGas("gas_per_byte"),
-            .gas_per_jsi_step   = v->getGas("gas_per_jsi_step"),
-            .gas_per_hostcall   = v->getGas("gas_per_hostcall"),
-            .gas_per_call       = v->getGas("gas_per_call"),
-            .min_tx_fee         = v->getGas("min_tx_fee"),
-            .gas_node_create    = v->getGas("gas_node_create"),
-            .gas_node_enable    = v->getGas("gas_node_enable"),
-            .gas_node_stake     = v->getGas("gas_node_stake"),
-            .gas_node_update    = v->getGas("gas_node_update"),
-            .gas_node_disable   = v->getGas("gas_node_disable"),
+            .gas_per_token        = v->getGas("gas_per_token"),
+            .gas_per_byte         = v->getGas("gas_per_byte"),
+            .gas_per_jsi_step     = v->getGas("gas_per_jsi_step"),
+            .gas_per_hostcall     = v->getGas("gas_per_hostcall"),
+            .gas_per_call         = v->getGas("gas_per_call"),
+            .min_tx_fee           = v->getGas("min_tx_fee"),
+            .gas_node_create      = v->getGas("gas_node_create"),
+            .gas_node_enable      = v->getGas("gas_node_enable"),
+            .gas_node_stake       = v->getGas("gas_node_stake"),
+            .gas_node_update      = v->getGas("gas_node_update"),
+            .gas_node_disable     = v->getGas("gas_node_disable"),
+            .gas_contract_deploy  = v->getGas("gas_contract_deploy"),
+            .gas_create_base      = v->getGas("gas_create_base"),
+            .ttl_seconds_per_gas  = v->getGas("ttl_seconds_per_gas"),
+            .gas_create_address   = v->getGas("gas_create_address"),
         };
         auto new_root_hash = execute_block(t, r->heart_beat);
 
@@ -428,7 +444,10 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             {
                 diffs[z.first]=z.second;
             }
+            
         }
+        std::set<std::string> deleted;
+        for (auto& z : db_to_save_Z.deleted) if (z.size() == 32) deleted.insert(z);
 
         std::vector<THASH_id> tx_hashes;
         THASH_id tx_hash;
@@ -448,6 +467,10 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             dh.update(z.first);
             dh.update(z.second);
         }
+        for(auto& z: deleted)
+        {
+            dh.update(z);
+        }
         diff_hash.container=dh.final();
 
 
@@ -456,6 +479,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
         rsp->blockInfo = blockInfo;
         rsp->diffs=diffs;
+        rsp->deleted=deleted;
         rsp->tx_hashes=tx_hashes;
         rsp->att_data = t.att_data;
 

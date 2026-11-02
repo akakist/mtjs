@@ -605,6 +605,16 @@ REF_getter<bc_address_state> IDatabase::getAddressStateOrCreate(const ADDRESS_id
     REF_getter<bc_address_state> u = new bc_address_state(cc.get());
     cc->data = u.get();
     cc->payload_ctor_idx = hsh::bc_address_state;
+    // ▼▼▼ INSERT: bc_state account_count++ (новый)
+    {
+        auto st = getStateOrCreate(roll);
+        if (st.valid()) {
+            M_LOCK(st->parent->mx);
+            st->account_count++;
+        }
+        st->setDirty(roll);
+    }
+    // ▲▲▲    
     return u;
 }
 // REF_getter<bc_address_state> IDatabase::getAddressStateNoCreate(const ADDRESS_id &addr)
@@ -662,6 +672,17 @@ REF_getter<bc_node> IDatabase::addNode(const NODE_id &name, Rollback* roll)
     REF_getter<bc_node> n = new bc_node(cc.get());
     cc->data = n.get();
     cc->payload_ctor_idx = hsh::bc_node;
+
+ // ▼▼▼ INSERT: bc_state node_count++
+    {
+        auto st = getStateOrCreate(roll);
+        if (st.valid()) {
+            M_LOCK(st->parent->mx);
+            st->node_count++;
+        }
+        st->setDirty(roll);
+    }
+    // ▲▲▲    
     return n;
 }
 // REF_getter<const bc_node> IDatabase::getNodeNoCreateConst(const NODE_id &name)
@@ -682,6 +703,56 @@ REF_getter<bc_node> IDatabase::addNode(const NODE_id &name, Rollback* roll)
 //     return dynamic_cast<bc_node *>(cc->data.get());
 // }
 
+// IDatabase.cpp (рядом с getValuesOrCreate/NoCreate)
+
+std::vector<std::string> IDatabase::getStatePath()
+{
+    return getPath("STATE");
+}
+
+REF_getter<bc_state> IDatabase::getStateOrCreate(Rollback* roll)
+{
+    MUTEX_INSPECTOR;
+    auto r = this;
+    MutexLockerDeferred lk(r->mx);
+    auto l = getByPathOrCreate(root.get(), getStatePath(), roll);
+    if (!l.valid())
+        throw CommonError("if(!l.valid())");
+    if (l->data.valid())
+        return dynamic_cast<bc_state *>(l->data.get());
+    REF_getter<bc_state> v = new bc_state(l.get());
+    lk.lock();
+    l->data = v.get();
+    l->payload_ctor_idx = hsh::bc_state;
+    lk.unlock();
+    return v;
+}
+
+REF_getter<bc_state> IDatabase::getStateNoCreate()
+{
+    MUTEX_INSPECTOR;
+    auto r = this;
+    MutexLockerDeferred lk(r->mx);
+    auto l = getByPathNoCreate(root.get(), getStatePath());
+    if (!l.valid())
+        return NULL;
+    if (!l->data.valid())
+        return NULL;
+    return dynamic_cast<bc_state *>(l->data.get());
+}
+
+REF_getter<const bc_state> IDatabase::getStateNoCreateConst()
+{
+    MUTEX_INSPECTOR;
+    auto r = this;
+    MutexLockerDeferred lk(r->mx);
+    auto l = getByPathNoCreate(root.get(), getStatePath());
+    if (!l.valid())
+        return NULL;
+    if (!l->data.valid())
+        return NULL;
+    return dynamic_cast<const bc_state *>(l->data.get());
+}
 
 REF_getter<MsgData::BlockAccepted2REQ> load_last_block(IDatabase *db)
 {
@@ -732,6 +803,11 @@ REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAcce
 
     return r;
 }
+REF_getter<Cellable> IDatabase::getByDbIdNoCreate(const THASH_id& h)
+{
+    MUTEX_INSPECTOR;
+    return getByPathNoCreate(root.get(), getPathFromHash(h));
+}
 size_t getSize(data_base* p)
 {
     size_t sz=p->size();
@@ -743,3 +819,4 @@ size_t getSize(data_base* p)
     }
     return sz;
 }
+

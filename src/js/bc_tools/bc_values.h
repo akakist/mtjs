@@ -18,11 +18,16 @@ struct bc_values: public data_base
         fees["gas_node_stake"]   = 2000;
         fees["gas_node_update"]  = 1000;
         fees["gas_node_disable"] = 5000;
+
+        fees["gas_contract_deploy"]  = 10000;
+        fees["gas_create_base"]      = 100;
+        fees["ttl_seconds_per_gas"]  = 86400;        
+        fees["gas_create_address"]   = 1000;
+
         /// another params
         fees["validator_count_percent"] = 50;
         fees["validator_min_stake"] = 50;
-        fees["missed_rounds_max"] = 100;
-        
+        fees["missed_rounds_max"] = 100 ;
         
 
     }

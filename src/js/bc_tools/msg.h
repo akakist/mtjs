@@ -85,6 +85,7 @@ namespace msgid
         GetValuesREQ=24, GetValuesRSP=25,
         GetContractDataREQ=26, GetContractDataRSP=27,
         GetContractREQ=28, GetContractRSP=29,
+        GetStateREQ=30, GetStateRSP=31,
     };
 
 }

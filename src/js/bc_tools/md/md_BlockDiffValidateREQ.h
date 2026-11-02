@@ -15,12 +15,14 @@ namespace MsgData
         BlockDiffValidateREQ(const REF_getter<BlockAcceptedREQ> & ba,
         const std::vector<THASH_id> & _tx,
         const std::map<std::string, std::string> &_diffs,
+        const std::set<std::string> &_deleted,
         const REF_getter<MsgData::attachment_data> &_att_data
 
     ): Base(msgid::BlockDiffValidateREQ), 
             blockAcceptedREQ(ba),
             tx_hashes(_tx),
             diffs(_diffs),
+            deleted(_deleted),
             att_data(_att_data)
         {
 
@@ -34,6 +36,7 @@ namespace MsgData
 
         std::vector<THASH_id> tx_hashes;
         std::map<std::string, std::string> diffs;
+        std::set<std::string> deleted;
         REF_getter<MsgData::attachment_data> att_data;
         void update(Blake2bHasher& h) const
         {
@@ -49,6 +52,9 @@ namespace MsgData
                 h.update(t.second);
             }
             att_data->update(h);
+
+            for(auto& z: deleted)
+                h.update(z.c_str());
             // lc->update(h);
         }
         void pack(outBuffer& b) const final
@@ -56,14 +62,14 @@ namespace MsgData
     MUTEX_INSPECTOR;
             Base::pack(b);
             b << blockAcceptedREQ;
-            b << tx_hashes << diffs << att_data;
+            b << tx_hashes << diffs << deleted << att_data;
         }
         void unpack(inBuffer& b) final
         {
     MUTEX_INSPECTOR;
             Base::unpack(b);
             b >> blockAcceptedREQ;
-            b >> tx_hashes >> diffs >> att_data;
+            b >> tx_hashes >> diffs >> deleted >> att_data;
         }
     };
 

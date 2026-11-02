@@ -257,7 +257,7 @@ namespace Node
                 const REF_getter<MsgData::TX> &tx, int64_t epoch);
 
         std::optional<std::string> execute_tx_commands(b_params &b, t_params& t,
-                yyjson_val * j_tx);
+                yyjson_val * j_tx, std::set<REF_getter<data_base>> * deleted_granules);
 
         REF_getter<MsgData::LeaderCert> makeLeaderCert(const MsgData::HeartBeatREQ* hb, const BlockMetaFull* mf);
         bool verifyLeaderCert(const MsgData::LeaderCert* lc, const BlockMetaFull* mf);

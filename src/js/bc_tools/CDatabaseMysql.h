@@ -38,6 +38,10 @@ struct CDatabaseMysql: public IDatabase
     int write_granules_batch(const _db_to_save &v)
     {
         st_TRANSACTION tr(dbh);
+        for (const auto& key : v.deleted) {
+            tr.dbh->execSimple((QUERY) R"(DELETE FROM ?.granule_storage WHERE path = UNHEX('?'))"
+                           << db_name << base16::encode(key));
+        }
         for (const auto& [key, value] : v.cells) {
             tr.dbh->execSimple((QUERY) R"(
                 REPLACE INTO ?.granule_storage (path, granule_data)
@@ -58,6 +62,11 @@ struct CDatabaseMysql: public IDatabase
         *v=res->operator[](0)[0];
         return 0;
     }
+    int deleteGranule(const std::string& k) override {
+        dbh->execSimple((QUERY) "DELETE FROM ?.granule_storage WHERE path = UNHEX('?')"
+                        << db_name << base16::encode(k));
+        return 0;
+    }    
     ~CDatabaseMysql()
     {
     }

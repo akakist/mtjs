@@ -2,7 +2,7 @@
 #include "GranuleIO.h"
 #include <map>
 #include <optional>
-
+#include "cellable.h"
 struct TestGranuleIO : GranuleIO {
     std::map<std::string, Granule> data;
     TestGranuleIO() : GranuleIO() {}
@@ -32,6 +32,13 @@ struct TestGranuleIO : GranuleIO {
         out = it->second.value;
         return true;
     }
+    std::optional<std::string> deleteGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d,
+                                            Rollback* roll, std::set<REF_getter<data_base>> * deleted_granules)  override {
+        auto it = data.find(c.container + d.container);
+        if (it == data.end()) return std::string("not found");
+        data.erase(it);   // сразу (rollback — saved/restore)
+        return std::nullopt;
+    }    
     bool existsGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
         return data.find(c.container+d.container) != data.end();
     }
@@ -46,16 +53,21 @@ struct TestGranuleIO : GranuleIO {
         data[c.container+d.container] = Granule{ value, create_time, ttl };
         return std::nullopt;
     }
-    std::optional<std::string> setGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d, const std::string& value, Rollback* roll) override {
-        auto it = data.find(c.container+d.container);
-        if (it == data.end())
-        {
-            printf("set: not found\n");
-            return std::string("not found");
-        } 
+    std::optional<std::string> setGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d,
+                                        const std::string& value,
+                                        int64_t now, int64_t ttl,
+                                        Rollback* roll) override {
+        auto it = data.find(c.container + d.container);
+        if (it == data.end()) return std::string("not found");
         it->second.value = value;
-        printf("set: value %s\n",it->second.value.c_str());
+        it->second.create_time = now;
+        it->second.ttl = ttl;
         return std::nullopt;
+    }
+    int64_t getGranuleTTL(const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
+        auto it = data.find(c.container + d.container);
+        if (it == data.end()) return 0;
+        return it->second.ttl;
     }
 };
 

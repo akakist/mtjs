@@ -25,6 +25,7 @@ namespace MsgData
         std::vector<THASH_id> tx_hashes;
         REF_getter<attachment_data> att_data;
         std::map<std::string,std::string> diffs;
+        std::set<std::string> deleted;
         blst_cpp::Signature sig;
         NODE_id node_validator;
 
@@ -43,6 +44,9 @@ namespace MsgData
                 h.update(t.second);
 
             }
+            for(auto& z: deleted)
+                h.update(z);
+
             att_data->update(h);
         }
         void pack(outBuffer& b) const final
@@ -53,7 +57,7 @@ namespace MsgData
             b<<blockInfo;
             b<<sig;
             b<<node_validator;
-            b<<tx_hashes<<att_data<<diffs;
+            b<<tx_hashes<<att_data<<diffs << deleted;
         }
         void unpack(inBuffer& b) final
         {
@@ -62,7 +66,7 @@ namespace MsgData
             b>>blockInfo;
             b>>sig;
             b>>node_validator;
-            b>>tx_hashes>>att_data>>diffs;
+            b>>tx_hashes>>att_data>>diffs >> deleted;
         }
         void sign(const blst_cpp::SecretKey &sk)
         {

@@ -2,6 +2,7 @@
 #include <optional>
 #include "t_params.h"
 #include "ADDRESS_id.h"
+#include "db_to_save.h"
 
 namespace TR {
     std::optional<std::string> execute_mint(yyjson_val *params, b_params & b,t_params &t,   int seqId);
@@ -15,5 +16,6 @@ namespace TR {
     std::optional<std::string> execute_contract_deploy(yyjson_val *params, b_params &,t_params &t,  int seqId);
     std::optional<std::string> execute_contract_update(yyjson_val *params, b_params &,t_params &t,  int seqId);
     std::optional<std::string> execute_vote(yyjson_val *params, b_params &,t_params &t,  int seqId);
+    std::optional<std::string> execute_gc(yyjson_val* params, b_params& b, t_params& t, int seqId, _db_to_save& dbd);
 
 }

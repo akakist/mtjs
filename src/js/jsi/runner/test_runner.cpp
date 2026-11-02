@@ -321,6 +321,7 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
                 std::cerr << "method not found: " << cmd.contract << "." << cmd.method << std::endl;
                 return false;
             }
+            std::set<REF_getter<data_base>> deleted_granules;
 
             CallContext call_ctx;
             call_ctx.contract = cc;
@@ -330,6 +331,7 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             call_ctx.host = host;
             int64_t test_value = tx.msg.value;
             call_ctx.value_ptr = &test_value;
+            call_ctx.deleted_granules=& deleted_granules;
 
             void* saved_opaque = JSI_GetContextOpaque(cc->ctx);
             JSI_SetContextOpaque(cc->ctx, &call_ctx);
@@ -337,7 +339,7 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             TestMsgSource msg_src(tx.msg);
             CONTRACT_id caller;
             JSIValue result = cc->call_contract_method(cmd.method, cmd.params, &msg_src, is_view,
-                                                       call_ctx.call_stack, host, NULL,caller,&fees);
+                                                       call_ctx.call_stack, host, NULL,caller,&fees,& deleted_granules);
             JSI_SetContextOpaque(cc->ctx, saved_opaque);
 
             std::vector<jsiEvent> cmd_emits = call_ctx.emits;

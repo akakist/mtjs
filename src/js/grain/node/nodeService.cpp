@@ -632,6 +632,11 @@ static bool match(const std::string &re, const std::string &buf, std::vector<std
     }
     return false;
 }
+#include <rocksdb/db.h>
+#include <rocksdb/options.h>
+#include <rocksdb/write_batch.h>
+#include <rocksdb/snapshot.h>
+#include <rocksdb/utilities/checkpoint.h>
 bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 {
     MUTEX_INSPECTOR;
@@ -640,7 +645,22 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
     auto ds = "^ds$";
     auto go = "^go\\s+(.+)$";
     auto back = "^back$";
-
+    if (match("^make_snapshot$", e->command, tokens)) {
+        auto db = dynamic_cast<CDatabaseRocksdb*>(db_state.get());
+        if (!db) {
+            sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId, "make_snapshot: not rocksdb\n", this));
+            return true;
+        }
+        std::string ts = std::to_string(time(NULL));
+        std::string snap_path = db_name + "_snapshot_" + ts;
+        rocksdb::Checkpoint* cp = nullptr;
+        rocksdb::Status s = rocksdb::Checkpoint::Create(db->db_ptr, &cp);
+        if (s.ok()) s = cp->CreateCheckpoint(snap_path);
+        delete cp;
+        sendEvent(ServiceEnum::Telnet, new telnetEvent::Reply(e->socketId,
+            (std::string)"make_snapshot: " + (s.ok() ? "ok " : "err ") + snap_path + "\n", this));
+        return true;
+    }
     if (match(ds, e->command, tokens))
     {
     }
@@ -749,6 +769,17 @@ void Node::Service::do_request_for_transactions( block_leader& li, const REF_get
 THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
 {
     MUTEX_INSPECTOR;
+    // ▼▼▼ INSERT: bc_state block_height++ (NULL — не rollback)
+    {
+        auto st = b.db->getStateOrCreate(NULL);
+        auto bh=lc->new_epoch;
+        if (st.valid()) {
+            M_LOCK(st->parent->mx);
+            st->block_height=bh;
+        }
+        st->setDirty(NULL);
+    }
+    // ▲▲▲    
     for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
     {
         MUTEX_INSPECTOR;
@@ -839,10 +870,15 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
                 throw CommonError("if(!n.valid())00@@");
 
             auto portion=n->get_full_stake()*b.node_rewards/total_staked;
-            auto u = db_state->getAddressStateOrCreate(n->get_owner(),NULL);
-            {
+            auto u = db_state->getAddressStateNoCreate(n->get_owner());
+            if (u.valid()) {
                 M_LOCK(u->parent->mx);
-                u->balance+=portion;
+                u->balance += portion;
+                u->setDirty(NULL);
+            } else {
+                // owner не найден — аномалия (node_create owner должен быть)
+                logNode("calc_fee_rewards: owner not found for node %s (skip reward %lld)",
+                        z.container.c_str(), (long long)portion);
             }
             u->setDirty(NULL);
             b.emit_block("reward",R"({"node":"%s","fee":"%s"})",z.container.c_str(),std::to_string(portion).c_str());
@@ -1046,7 +1082,7 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 void print_exception(JSIContext* ctx);
 
 std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_params& t,
-        yyjson_val * j_tx)
+        yyjson_val * j_tx,std::set<REF_getter<data_base>> * deleted_granules)
 {
     MUTEX_INSPECTOR;
     if(!yyjson_is_arr(j_tx))
@@ -1091,6 +1127,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 else if (meth == "contract_deploy") err = TR::execute_contract_deploy(params,b, t, index);
                 else if (meth == "contract_update") err = TR::execute_contract_update(params, b,t, index);
                 else if (meth == "vote") err = TR::execute_vote(params, b,t, index);
+                else if (meth == "gc") err = TR::execute_gc(params, b,t, index, db_to_save_Z);
                 else return "unhandled method '"+method_str+"' for root contract";
                 if(err) logNode("err: %s",err->c_str());
                 if (err) return err;
@@ -1118,13 +1155,14 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 ext_ctx.host = contractHost;
                 ext_ctx.call_stack = call_stack;
                 ext_ctx.value_ptr = &t.value;   // текущий value (нода)
+                ext_ctx.deleted_granules=deleted_granules;
                 void* prev_ctx = JSI_GetContextOpaque(cc->ctx);
                 JSI_SetContextOpaque(cc->ctx, &ext_ctx);
 
                 NodeMsgSource src(&t);
                 CONTRACT_id caller;
                 JSIValue result = cc->call_contract_method(method_str, params_json, &src, false,
-                                                           call_stack, contractHost, t.roll, caller, & b.fees);
+                                                           call_stack, contractHost, t.roll, caller, & b.fees, deleted_granules);
 
                 JSI_SetContextOpaque(cc->ctx, prev_ctx);
 
@@ -1202,6 +1240,17 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         const REF_getter<MsgData::TX> &tx, int64_t epoch)
 {
     MUTEX_INSPECTOR;
+    std::set<REF_getter<data_base>> deleted_granules;
+    // ▼▼▼ INSERT: bc_state tx_count++ (TX попала в блок; NULL — не rollback)
+    {
+        auto st = b.db->getStateOrCreate(NULL);
+        if (st.valid()) {
+            M_LOCK(st->parent->mx);
+            st->tx_count++;
+        }
+        st->setDirty(NULL);
+    }
+    // ▲▲▲    
     int64_t gasLimitTokens = 0, priority = 0, value = 0;
     yyjson_val *jroot = yyjson_doc_get_root(tx->doc);
     yyjson_val *j_tx = yyjson_obj_get(jroot, "tx");
@@ -1235,6 +1284,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.roll = &roll;
     t.value = value;
     t.gasLimitGas = gasLimit_gas;
+    t.deleted_granules=&deleted_granules;
     t.block_timestamp = prev_block.valid()
         ? (int64_t)prev_block->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp
         : 0;
@@ -1299,8 +1349,8 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
                 (long long)bal0, (long long)bal1, msg.c_str());
         return msg;
     };
-
-    err = execute_tx_commands(b, t, j_tx);
+    // std::set<REF_getter<data_base>> deteled_granules;
+    err = execute_tx_commands(b, t, j_tx, &deleted_granules);
     if (err)
         return fail(*err, t.gasUsed);
 
@@ -1311,6 +1361,10 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         return fail("gas exceeds limit", gasLimit_gas);
 
     _db_to_save db_dump;
+    for(auto& z: deleted_granules)
+    {
+        deleteGranule(z.get(),&roll,db_dump);
+    }
     db_state->root->calc_tree_hash(db_dump);
     // t.gasUsed += db_dump.size();
     t.gasUsed += db_dump.size_leaves() * b.fees.gas_per_byte;

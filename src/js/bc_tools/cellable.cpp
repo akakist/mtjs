@@ -11,6 +11,7 @@
 #include "bc_values.h"
 #include "bc_vote.h"
 #include "bc_contract_balance.h"
+#include "bc_state.h"
 
 
 std::vector<data_base *(*)(Cellable *)> db_constructors = {
@@ -36,6 +37,8 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     { return new bc_votes(p); },
     
     +[](Cellable *p) -> data_base * { return new bc_contract_balance(p); }, 
+
+    +[](Cellable *p) -> data_base * { return new bc_state(p); }, 
 };
 
 
@@ -122,3 +125,33 @@ void data_base::setDirty(Rollback* roll)
     parent->setDirty__(roll);
 }
 
+void deleteGranule(data_base* g, Rollback* roll,_db_to_save &db_dump)
+{
+    
+    auto cell=g->parent;
+    if (!cell) return;
+    cell->setDirty__(roll);
+    while(cell)
+    {
+        MutexLockerDeferred l(cell->mx);
+        l.lock();
+        if(cell->children_hashes_mx.size())
+        {
+            l.unlock();
+            return;
+        }
+        auto pred=cell->parent;
+        if(!pred) return;
+        db_dump.del(cell->getDbId());
+        auto id=cell->m_id;
+        l.unlock();
+        {
+            M_LOCK(pred->mx);
+            pred->children_hashes_mx.erase(id);
+            pred->children_ptrs_mx.erase(id);
+
+        }
+        cell=pred;
+
+    }
+}

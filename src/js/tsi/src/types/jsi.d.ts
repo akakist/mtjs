@@ -32,9 +32,10 @@ declare function registerView(name: string, fn: (params: any) => any): void;
 
 declare function getGranule(key: string): JsiGranule | undefined;
 
-declare function createGranule(key: string, value: JsiGranule, ttl?: number): void;
+declare function createGranule(key: string, value: any, ttl: number): void;
 
-declare function setGranule(key: string, value: JsiGranule): void;
+declare function setGranule(key: string, value: any): void;
+
 
 declare function emit(name: string, value: JsiGranule): void;
 
@@ -47,3 +48,5 @@ declare function consumeValue(amount: number): void;
 declare function refundValue(amount: number): void;
 
 declare function remainingValue(): number;
+
+declare function deleteGranule(key: string): void;

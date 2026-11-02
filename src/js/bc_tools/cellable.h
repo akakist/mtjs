@@ -241,3 +241,4 @@ public:
 };
 
 
+void deleteGranule(data_base* g, Rollback* roll,_db_to_save &db_dump);

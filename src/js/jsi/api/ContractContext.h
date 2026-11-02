@@ -11,6 +11,8 @@
 #include "IMsgSource.h"
 #include "Rollback.h"
 #include "FeesSnapshot.h"
+#include "db_to_save.h"
+#include "cellable.h"
 struct CallStack;
 struct ContractHost;
 
@@ -46,7 +48,7 @@ struct ContractContext : public Refcountable {
                              const nlohmann::json& params,
                              IMsgSource* msg_source, bool is_view,
                              const REF_getter<CallStack>& call_stack,
-                             const REF_getter<ContractHost>& host, Rollback* roll, const CONTRACT_id& caller, FeesSnapshot* fees);
+                             const REF_getter<ContractHost>& host, Rollback* roll, const CONTRACT_id& caller, FeesSnapshot* fees, std::set<REF_getter<data_base>> * deleted_granules);
 };
 
 

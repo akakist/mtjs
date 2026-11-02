@@ -37,7 +37,14 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
     }
     t.markDirty(u.get());
 
-
+ // ▼▼▼ INSERT: bc_state total_supply
+    {
+        auto st = b.db->getStateOrCreate(t.roll);
+        if (!st.valid()) return "state create failed";
+        { M_LOCK(st->parent->mx); st->total_supply += i128(amount); }
+        t.markDirty(st.get());
+    }
+    // ▲▲▲
     b.emit_command(t.tx_id, seqId,"mint",R"({"to":"%s","amount":"%s"})",
                    base16::encode(t.senderAddress.addr).c_str(),
                    std::to_string(amount).c_str());
@@ -76,11 +83,15 @@ std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b,
     {
         return "invalid destination address";
     }
-    auto to = b.db->getAddressStateOrCreate(to_addr,t.roll);
-    if (!to.valid())
-    {
-        return "destination user not found";
+    
+    // ▼▼▼ create_address — если новый (sender платит, разово)
+    bool to_exists = b.db->getAddressStateNoCreateConst(to_addr).valid();
+    auto to = b.db->getAddressStateOrCreate(to_addr, t.roll);
+    if (!to.valid()) return "destination user not found";
+    if (!to_exists) {
+        t.gasUsed += b.fees.gas_create_address;
     }
+    // ▲▲▲
     if(amount>t.value)
         return "amount>t.value";
 
@@ -233,6 +244,14 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
     n->add_stake(t.senderAddress, amount);
 
     t.gasUsed += b.fees.gas_node_stake;
+  // ▼▼▼ INSERT: bc_state total_stake +=
+    {
+        auto st = b.db->getStateOrCreate(t.roll);
+        if (!st.valid()) return "state create failed";
+        { M_LOCK(st->parent->mx); st->total_stake += i128(amount); }
+        t.markDirty(st.get());
+    }
+    // ▲▲▲    
 
     b.emit_command(t.tx_id, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
                    node.container.c_str(),
@@ -278,6 +297,14 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     n->sub_stake(t.senderAddress, amount);
 
     t.markDirty(n.get());
+    // ▼▼▼ INSERT: bc_state total_stake -=
+    {
+        auto st = b.db->getStateOrCreate(t.roll);
+        if (!st.valid()) return "state create failed";
+        { M_LOCK(st->parent->mx); st->total_stake -= i128(amount); }
+        t.markDirty(st.get());
+    }
+    // ▲▲▲
 
     b.emit_command(t.tx_id, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
                    node.container.c_str(),
@@ -393,7 +420,14 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
     }
 
     t.markDirty(n.get());
-
+    // ▼▼▼ INSERT: bc_state contract_count++
+    {
+        auto st = b.db->getStateOrCreate(t.roll);
+        if (!st.valid()) return "state create failed";
+        { M_LOCK(st->parent->mx); st->contract_count++; }
+        t.markDirty(st.get());
+    }
+    // ▲▲▲
 
     b.emit_command(t.tx_id, seqId, "contract_deploy",R"({"name":"%s","owner":"%s"})",name.c_str(),base16::encode(t.senderAddress.addr).c_str());
 
@@ -550,5 +584,40 @@ std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_p
         R"({"node":"%s","param":"%s","value":"%s"})",
         node.container.c_str(), param.c_str(), value.c_str());
 
+    return std::nullopt;
+}
+
+
+// TR::execute_gc(yyjson_val* params, b_params& b, t_params& t, int seqId)
+// root (emitters_bin)
+// params: { dbids: [hex, ...] }  (лимит — N, TBD)
+// для каждого dbId → getByDbIdNoCreate → Cellable → data_base* → deleteGranule(data_base*, t.roll, db_dump)
+// total_supply — не меняется (delete — TTL сгорел)
+// emit gc { count }
+
+std::optional<std::string> TR::execute_gc(yyjson_val* params, b_params& b, t_params& t, int seqId, _db_to_save& dbd) 
+{
+    auto v = b.db->getValuesNoCreateConst();
+    if (v->emitters_bin.find(t.senderAddress) == v->emitters_bin.end())
+        return "insufficient_privileges";
+
+    yyjson_val* arr = yyjson_obj_get(params, "dbids");
+    if (!arr || !yyjson_is_arr(arr)) return "param 'dbids' must be array";
+    yyjson_arr_iter it; yyjson_arr_iter_init(arr, &it);
+    yyjson_val* item;
+    int n = 0;
+    _db_to_save db_dump;   // TBD — db_to_save_Z?
+    while ((item = yyjson_arr_iter_next(&it))) {
+        if (!yyjson_is_str(item)) return "dbid must be string";
+        auto hex = std::string(yyjson_get_str(item));
+        THASH_id h; h.container = base16::decode(hex);
+        if (h.container.size() != 32) return "dbid must be 32 bytes hex";
+        auto cc = b.db->getByDbIdNoCreate(h);
+        if (!cc.valid()) continue;          // уже нет — skip
+        if (!cc->data.valid()) continue;
+        deleteGranule(cc->data.get(), t.roll, dbd);
+        n++;
+    }
+    b.emit_command(t.tx_id, seqId, "gc", R"({"count":"%d"})", n);
     return std::nullopt;
 }
