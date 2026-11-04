@@ -3,7 +3,6 @@ import * as std from "std";
 const node = "127.0.0.1:2301";
 function errStr(e) { return (e && typeof e === "object" && ("errcode" in e || "errstr" in e)) ? "errcode=" + e.errcode + " errstr=" + e.errstr : String(e); }
 (async () => {
-    // 1) get_values — GrainReader жив?
     try {
         const v = await mtjs.get_values(node, 3);
         console.log("[diag] get_values found=" + v.found + " fees=" + JSON.stringify(v.fees));
@@ -11,7 +10,6 @@ function errStr(e) { return (e && typeof e === "object" && ("errcode" in e || "e
     catch (e) {
         console.log("[diag] get_values ERR: " + errStr(e));
     }
-    // 2) get_node_info для всех n0..n9
     for (let i = 0; i < 10; i++) {
         const n = "n" + i;
         try {
@@ -24,15 +22,16 @@ function errStr(e) { return (e && typeof e === "object" && ("errcode" in e || "e
             console.log("[diag] " + n + " ERR: " + errStr(e));
         }
     }
-    // 3) get_user_nonce для root — нода отвечает?
     try {
-        const addr = mtjs.addr_from_pk(std.getenv("k_root_ed_pk"));
+        const addr = mtjs.addr_from_name("root");
         const ui = await mtjs.get_user_nonce(node, addr, 3);
         console.log("[diag] root nonce=" + ui.nonce + " balance=" + ui.balance);
     }
     catch (e) {
         console.log("[diag] get_user_nonce ERR: " + errStr(e));
+        std.exit(1);
     }
     console.log("[diag] DONE");
+    std.exit(0);
 })().catch((e) => console.log("[diag] ERR:", errStr(e)));
 setInterval(() => { }, 1000000);

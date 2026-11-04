@@ -29,6 +29,8 @@
 #include "md/md_GetContractREQ.h"
 #include "md/md_GetContractRSP.h"
 #include "md/md_GetStateRSP.h"
+#include "md/md_GetAddressInfoREQ.h"
+#include "md/md_GetAddressInfoRSP.h"
 // #include <yyjson.h>
 #include <nlohmann/json.hpp>
 #include "js_tools.h"
@@ -113,7 +115,7 @@ UnknownBase *MTJS::Service::construct(const SERVICE_id &id, const std::string &n
 
 void print_mem_stats() {
     struct mallinfo2 mi = mallinfo2();
-    
+
     printf("=== Memory Stats ===\n");
     printf("Занято приложением:  %zu MB\n", mi.uordblks / 1024 / 1024);
     printf("Свободно в куче:     %zu MB\n", mi.fordblks / 1024 / 1024);
@@ -273,7 +275,7 @@ void MTJS::Service::checkForExit()
         return;
     if(opaque.node_req_promises.size())
         return;
-    if(opaque.tx_subscription_cb.has_value())    
+    if(opaque.tx_subscription_cb.has_value())
         return;
 
     {
@@ -359,7 +361,8 @@ bool MTJS::Service::TickAlarm(const timerEvent::TickAlarm *e)
         }
 
         return true;
-}    if (e->tid == Timers::TIMER_TIMER)
+    }
+    if (e->tid == Timers::TIMER_TIMER)
     {
         JSScope<10, 10> scope(js_ctx);
         TimerTask *t = (TimerTask *)e->cookie.get();
@@ -606,6 +609,31 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
     {
 
 // в ClientMsgReply switch(p):
+    case msgid::GetAddressInfoRSP: {
+        auto *rs = (MsgData::GetAddressInfoRSP*)b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20,20> scope(ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, std::to_string(rs->balance).c_str()));
+        JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, std::to_string(rs->nonce).c_str()));
+        JSValue keys_arr = JS_NewArray(ctx);
+        uint32_t ki = 0;
+        for (auto& k : rs->keys) {
+            JSValue ko = JS_NewObject(ctx);
+            JS_SetPropertyStr(ctx, ko, "id", JS_NewInt64(ctx, k.id));
+            JS_SetPropertyStr(ctx, ko, "type", JS_NewInt32(ctx, k.type));
+            JS_SetPropertyStr(ctx, ko, "keybuffer", JS_NewString(ctx, k.keybuffer.c_str()));
+            JS_SetPropertyUint32(ctx, keys_arr, ki++, ko);
+        }
+        JS_SetPropertyStr(ctx, obj, "keys", keys_arr);
+        JSValue ret = JS_Call(ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
+    }
     case msgid::GetStateRSP:
     {
         auto *rs = (MsgData::GetStateRSP*) b.get();
@@ -628,7 +656,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         opaque.node_req_promises.erase(e->hash_of_request.container);
         sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
         return true;
-    }        
+    }
     case msgid::GetContractRSP:
     {
         auto *rs=(MsgData::GetContractRSP*) b.get();
@@ -656,8 +684,21 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         auto *rs=(MsgData::GetUserNonceRSP*) b.get();
         auto *ctx = it->second.ctx;
         JSScope<20, 20> scope(it->second.ctx);
+        if (!rs->found) {
+            auto err = JS_NewError(ctx);
+            scope.addValue(err);
+            JS_DefinePropertyValueStr(ctx, err, "message",
+                JS_NewString(ctx, "get_user_nonce: address not found"),
+                JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
+            JSValue ret = JS_Call(ctx, it->second.reject.get(), JS_UNDEFINED, 1, &err);
+            scope.addValue(ret);
+            opaque.node_req_promises.erase(e->hash_of_request.container);
+            sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+            return true;
+        }
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
         JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, std::to_string(rs->nonce).c_str()));
         JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, std::to_string(rs->balance).c_str()));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
@@ -665,7 +706,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         opaque.node_req_promises.erase(e->hash_of_request.container);
         sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
         return true;
-    }
+    }    
     break;
     case msgid::GetNodeInfoRSP:
     {
@@ -751,13 +792,13 @@ void to_json(nlohmann::json& j, const EmitNode& node) {
     XTRY;
     // Сначала добавляем эмиты текущего уровня
     nlohmann::json emits_array = nlohmann::json::array();
-    for (const auto& emit_pair : node.emits) 
+    for (const auto& emit_pair : node.emits)
     {
         XTRY;
         MUTEX_INSPECTOR;
         nlohmann::json emit_obj;
         emit_obj["cmd"] = emit_pair.first;
-        try{
+        try {
             MUTEX_INSPECTOR;
             logErr2("parse %s", emit_pair.second.c_str());
             emit_obj["data"] = nlohmann::json::parse(emit_pair.second);
@@ -772,9 +813,9 @@ void to_json(nlohmann::json& j, const EmitNode& node) {
         XPASS;
     }
     j["emits"] = emits_array;
-    
+
     // Затем рекурсивно обрабатываем детей
-    for (const auto& child_pair : node.children) 
+    for (const auto& child_pair : node.children)
     {
         XTRY;
         j["children"][child_pair.first] = child_pair.second;
@@ -787,7 +828,7 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
     MUTEX_INSPECTOR;
     XTRY;
     // logErr2("[mtjs] ClientTxSubscribeRSP ENTER: tx_hashes=%d tx_wait_promises=%d node_tx_cb=%d",
-        // (int)e->tx_hashes.size(), (int)opaque.tx_wait_promises.size(), (int)opaque.node_tx_cb.size());
+    // (int)e->tx_hashes.size(), (int)opaque.tx_wait_promises.size(), (int)opaque.node_tx_cb.size());
     for (auto& kv : opaque.tx_wait_promises) logErr2("  %s", kv.first.c_str());
     if (!e->att_data.valid()) {
         logErr2("ClientTxSubscribeRSP: att_data invalid");

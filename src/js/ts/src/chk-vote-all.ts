@@ -2,8 +2,19 @@
 import * as std from "std";
 
 const node = "127.0.0.1:2301";
-const sk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk");
-const pk = std.getenv("k_root_ed_pk");
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
+
+let sk = ""; let pk = "";
+let u1sk = ""; let u1pk = "";
+async function loadKeys() {
+    const raw = await mtjs.fs.readFile(KEYS_PATH);
+    const keys = JSON.parse(raw);
+    const r = keys.users?.root?.keys?.[0];
+    if (!r?.sk || !r?.pk) throw new Error("keys_test.json: no users.root.keys[0].sk/pk");
+    sk = r.sk; pk = r.pk;
+    const u = keys.users?.u1?.keys?.[0];
+    if (u?.sk && u?.pk) { u1sk = u.sk; u1pk = u.pk; }
+}
 
 const GREEN = "\x1b[32m"; const RED = "\x1b[31m"; const RESET = "\x1b[0m";
 let pass = 0; let fail = 0;
@@ -16,9 +27,6 @@ function errStr(e: any): string {
     return String(e);
 }
 
-// ============================================================
-// pending tx → block (tx_subscribe до tx_submit)
-// ============================================================
 const pending: { [h: string]: { resolve: (b: Block) => void; reject: (e: any) => void; timer: any } } = {};
 mtjs.tx_subscribe(node, (b: Block) => {
     for (const h of b.tx_hashes) {
@@ -36,41 +44,70 @@ function waitTx(h: string, to: number): Promise<Block> {
     });
 }
 
-async function getNonce(): Promise<bigint> {
-    const ui = await mtjs.get_user_nonce(node, mtjs.addr_from_pk(pk!), 3);
+async function getNonce(addr: string): Promise<bigint> {
+    const ui = await mtjs.get_user_nonce(node, addr, 3);
+    console.log("getNonce: " + ui.nonce);
     return BigInt(ui.nonce);
 }
-
-// ждать, пока нода применит блок → nonce > lastNonce
-async function waitNonceGt(lastNonce: bigint, timeoutSec = 10): Promise<bigint> {
+async function waitNonceGt(addr: string, lastNonce: bigint, timeoutSec = 10): Promise<bigint> {
     const t0 = Date.now();
     while (Date.now() - t0 < timeoutSec * 1000) {
-        const n = await getNonce();
+        const n = await getNonce(addr);
         if (n > lastNonce) return n;
         await new Promise<void>((r) => setTimeout(() => r(), 200));
     }
     throw new Error("waitNonceGt timeout: lastNonce=" + lastNonce.toString());
 }
 
-// ok TX: submit → wait block → waitNonceGt (nonce+1)
-async function submitAndWait(tx: any[], timeoutSec = 10) {
-    const nonce = await getNonce();
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk!, nonce.toString(), () => {});
-    if (rsp.err) throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, timeoutSec);
-    await waitNonceGt(nonce, timeoutSec);
-    return { rsp, block: b };
+const rootAddr = mtjs.addr_from_name("root");
+const u1Addr   = mtjs.addr_from_name("u1");
+
+async function submitAndWait(skVal: string, addr: string, tx: any[], value = 0, gasLimit = 100000, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), skVal, nonce.toString(), () => {});
+        if (rsp.err) {
+            if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        const b = await waitTx(rsp.tx_hash, 10);
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
+    }
+    throw new Error("submitAndWait: retries exhausted");
 }
 
-// err TX: submit → wait block (nonce не inc, waitNonceGt не нужен)
-async function submitAndWaitErr(tx: any[], timeoutSec = 10) {
-    const nonce = await getNonce();
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk!, nonce.toString(), () => {});
-    if (rsp.err) throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, timeoutSec);
-    return { rsp, block: b };
+async function submitAndWaitErr(skVal: string, addr: string, tx: any[], value = 0, gasLimit = 100000, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), skVal, nonce.toString(), () => {});
+        if (rsp.err) {
+            if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        let b: Block;
+        try {
+            b = await waitTx(rsp.tx_hash, 30);
+        } catch (e) {
+            if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
+            throw e;
+        }
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
+    }
+    throw new Error("submitAndWaitErr: retries exhausted");
 }
 
 function childEmits(b: Block, txHash: string): { [seq: string]: any[] } {
@@ -84,13 +121,10 @@ function hasEmit(em: { [seq: string]: any[] }, name: string): any | null {
     return null;
 }
 
-// ============================================================
-// vote по одной TX (n0..n9), пока не наберётся кворум (vote_applied)
-// ============================================================
 async function voteUntilApplied(param: string, value: string, ttl: string) {
     const nodes = ["n0","n1","n2","n3","n4","n5","n6","n7","n8","n9"];
     for (const vnode of nodes) {
-        const { rsp, block } = await submitAndWait([
+        const { rsp, block } = await submitAndWait(sk, rootAddr, [
             { contract: "root", method: "vote", params: { node: vnode, param, value, ttl } },
         ]);
         const em = childEmits(block, rsp.tx_hash);
@@ -113,9 +147,6 @@ async function voteUntilApplied(param: string, value: string, ttl: string) {
     return { ok: false, err: "no vote_applied after all nodes" };
 }
 
-// ============================================================
-// test 1: vote_applied (quorum)
-// ============================================================
 async function t1_vote_applied() {
     console.log("\n[t1] vote_applied (quorum, sequential)");
     const param = "vote_test_" + String(Date.now());
@@ -126,23 +157,16 @@ async function t1_vote_applied() {
     check(r.applied.param === param && r.applied.value === value, "vote_applied param/value");
 }
 
-// ============================================================
-// test 2: TTL expire → vote_failed
-// ============================================================
 async function t2_vote_expire() {
     console.log("\n[t2] vote_failed (ttl_expired)");
     const param = "vote_exp_" + String(Date.now());
     const value = "99";
-
-    // первый vote (n5, ttl=1) → vote_counted
-    const { rsp: r1, block: b1 } = await submitAndWait([
+    const { rsp: r1, block: b1 } = await submitAndWait(sk, rootAddr, [
         { contract: "root", method: "vote", params: { node: "n5", param, value, ttl: "1" } },
     ]);
     check(b1.status(r1.tx_hash) === "ok", "first status ok");
     check(hasEmit(childEmits(b1, r1.tx_hash), "vote_counted") !== null, "vote_counted present");
-
-    // vote n6 (промежуток: elapsed n5→n6 < 1 → vote_counted; если уже vote_failed — ok, пропускаем)
-    const { rsp: r6, block: b6 } = await submitAndWait([
+    const { rsp: r6, block: b6 } = await submitAndWait(sk, rootAddr, [
         { contract: "root", method: "vote", params: { node: "n6", param, value, ttl: "1" } },
     ]);
     check(b6.status(r6.tx_hash) === "ok", "n6 vote ok");
@@ -150,11 +174,8 @@ async function t2_vote_expire() {
         console.log("  n6 уже vote_failed (elapsed > ttl), ok");
         return;
     }
-
     await new Promise<void>((r) => setTimeout(() => r(), 2000));
-
-    // второй vote (n6, ttl=1) → vote_failed
-    const { rsp: r2, block: b2 } = await submitAndWait([
+    const { rsp: r2, block: b2 } = await submitAndWait(sk, rootAddr, [
         { contract: "root", method: "vote", params: { node: "n6", param, value, ttl: "1" } },
     ]);
     check(b2.status(r2.tx_hash) === "ok", "second status ok (tx success, vote failed)");
@@ -166,14 +187,11 @@ async function t2_vote_expire() {
     }
 }
 
-// ============================================================
-// test 3: ttl обязателен на первом vote (err TX — nonce не inc)
-// ============================================================
 async function t3_ttl_required() {
     console.log("\n[t3] ttl required on first vote");
     const param = "vote_nottl_" + String(Date.now());
-    const { rsp, block } = await submitAndWaitErr([
-        { contract: "root", method: "vote", params: { node: "n5", param, value: "7" } }, // без ttl
+    const { rsp, block } = await submitAndWaitErr(sk, rootAddr, [
+        { contract: "root", method: "vote", params: { node: "n5", param, value: "7" } },
     ]);
     check(block.status(rsp.tx_hash) === "err", "status err (ttl missing)");
     const es = block.errstr(rsp.tx_hash);
@@ -183,41 +201,26 @@ async function t3_ttl_required() {
     }
 }
 
-// ============================================================
-// test 4: не-владелец ноды → err (налить u1, value=0 — vote не тратит value)
-// ============================================================
 async function t4_vote_not_owner() {
     console.log("\n[t4] vote from non-owner");
-    const u1sk = std.getenv("k_u1_ed_sk");
-    const u1pk = std.getenv("k_u1_ed_pk");
-    if (!u1sk || !u1pk) { console.log("  (skip: no k_u1_* keys)"); return; }
-    const u1addr = mtjs.addr_from_pk(u1pk);
+    if (!u1sk || !u1pk) { console.log("  (skip: no u1 keys)"); return; }
 
-    // налить u1 баланс: root mint 1000000 → root transfer u1 1000000
-    await submitAndWait([{ contract: "root", method: "mint", params: { amount: "1000000" } }]);
-    await submitAndWait([{ contract: "root", method: "transfer", params: { to: u1addr, amount: "1000000" } }]);
+    await submitAndWait(sk, rootAddr, [{ contract: "root", method: "mint", params: { amount: "1000000" } }]);
+    await submitAndWait(sk, rootAddr, [{ contract: "root", method: "transfer", params: { to: u1Addr, amount: "1000000" } }]);
     console.log("  u1 balance filled");
 
-    const ui = await mtjs.get_user_nonce(node, u1addr, 3);
-    const nonce = BigInt(ui.nonce);
     const param = "vote_owner_" + String(Date.now());
-    const tx = [{ contract: "root", method: "vote", params: { node: "n5", param, value: "1", ttl: "60" } }];
-    // value: 0 — vote не тратит value; u1 1000000 >= gasLimit*priority=1,000,000 → ok → execute_vote → owner-ошибка
-    const req = { tx, nonce: nonce.toString(), value: 0, gasLimit: 100000, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), u1sk, nonce.toString(), () => {});
-    if (rsp.err) { check(false, "submit: " + rsp.err_str); return; }
-    const b = await waitTx(rsp.tx_hash, 10);
-    check(b.status(rsp.tx_hash) === "err", "status err (not owner)");
-    const es = b.errstr(rsp.tx_hash);
+    const { rsp, block } = await submitAndWaitErr(u1sk, u1Addr, [
+        { contract: "root", method: "vote", params: { node: "n5", param, value: "1", ttl: "60" } },
+    ], 0, 100000);
+    check(block.status(rsp.tx_hash) === "err", "status err (not owner)");
+    const es = block.errstr(rsp.tx_hash);
     check(typeof es === "string" && es.indexOf("owner") >= 0, "errstr mentions owner");
     if (!(typeof es === "string" && es.indexOf("owner") >= 0)) {
-        console.log("  emits:", JSON.stringify(b.emits(rsp.tx_hash)));
+        console.log("  emits:", JSON.stringify(block.emits(rsp.tx_hash)));
     }
 }
 
-// ============================================================
-// test 5: introduce validator_min_stake (governance) + activated
-// ============================================================
 async function t5_introduce_param() {
     console.log("\n[t5] introduce validator_min_stake via vote (sequential)");
     const v0 = await mtjs.get_values(node, 3);
@@ -235,10 +238,8 @@ async function t5_introduce_param() {
     check(v1.fees["validator_min_stake_activated"] === "1", "validator_min_stake_activated === '1'");
 }
 
-// ============================================================
-// main
-// ============================================================
 (async () => {
+    await loadKeys();
     console.log("=== VOTE ALL TESTS ===");
     if (!sk || !pk) { console.log(RED + "no sk/pk" + RESET); return; }
 
@@ -251,6 +252,7 @@ async function t5_introduce_param() {
     console.log("\n=== RESULT: " + pass + " passed, " + fail + " failed ===");
     if (fail === 0) console.log(GREEN + "DONE" + RESET);
     else            console.log(RED + "FAIL" + RESET);
+    std.exit(fail);
 })().catch((e: any) => console.log(RED + "ERR: " + errStr(e) + RESET));
 setInterval(() => {}, 1000000);
 export {};

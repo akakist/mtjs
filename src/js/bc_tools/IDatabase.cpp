@@ -1,6 +1,7 @@
 #include "cellable.h"
 #include "IDatabase.h"
 #include "md_BlockAccepted2REQ.h"
+#include "normalizeNick.h"
 
 // ============================================================
 // NODE
@@ -580,17 +581,19 @@ REF_getter<bc_votes> IDatabase::getVotesOrCreate(Rollback* roll)
 
 ////////////////////
 
-std::vector<std::string> IDatabase::getUserPath(const ADDRESS_id &addr)
-{
-    MUTEX_INSPECTORS("getUserPath");
-    return getPath("USER_"+addr.addr);
-}
+// std::vector<std::string> IDatabase::getUserPath(const ADDRESS_id &addr)
+// {
+//     MUTEX_INSPECTORS("getUserPath");
+//     return getPath("USER_"+addr.addr);
+// }
+
 std::vector<std::string> IDatabase::getAddressStatePath(const ADDRESS_id &addr)
 {
     MUTEX_INSPECTOR;
-    return getPath("USER_STATE_"+addr.addr);
+    if (addr.addr.empty())
+        throw CommonError("getAddressStatePath: empty addr");
+    return getPath("USER_STATE_" + addr.addr);   
 }
-
 REF_getter<bc_address_state> IDatabase::getAddressStateOrCreate(const ADDRESS_id &addr, Rollback* roll)
 {
     MUTEX_INSPECTOR;

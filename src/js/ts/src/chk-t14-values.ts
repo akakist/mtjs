@@ -1,4 +1,6 @@
 #!/usr/local/bin/mtjs
+import * as std from "std";
+
 const node = "127.0.0.1:2301";
 function check(cond: boolean, msg: string) {
     if (cond) console.log("  ✅", msg); else console.log("  ❌", msg);
@@ -21,6 +23,7 @@ function errStr(e: any): string {
         console.log("  validator_min_stake:", r.fees["validator_min_stake"]);
     } catch (e: any) { check(false, "get_values: " + errStr(e)); }
     console.log("DONE");
+    std.exit(0);
 })().catch((e: any) => console.log("ERR:", errStr(e)));
 setInterval(() => {}, 1000000);
 export {};

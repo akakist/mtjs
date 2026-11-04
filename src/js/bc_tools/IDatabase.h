@@ -117,7 +117,7 @@ public:
     static std::vector<std::string> getNodePath(const NODE_id &name);
 
 
-    static std::vector<std::string> getUserPath(const ADDRESS_id &addr);
+    // static std::vector<std::string> getUserPath(const ADDRESS_id &addr);
     static std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
 
     REF_getter<bc_contract> getContractNoCreate(const CONTRACT_id &name);

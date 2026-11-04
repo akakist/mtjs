@@ -31,6 +31,8 @@
 #include "md/md_GetContractRSP.h"
 #include "md/md_GetStateREQ.h"
 #include "md/md_GetStateRSP.h"
+#include "md/md_GetAddressInfoREQ.h"
+#include "md/md_GetAddressInfoRSP.h"
 
 
 MsgFactory::MsgFactory()
@@ -66,4 +68,6 @@ MsgFactory::MsgFactory()
     // в MsgFactory::MsgFactory():
     registerMsg(msgid::GetStateREQ, MsgData::GetStateREQ::construct);
     registerMsg(msgid::GetStateRSP, MsgData::GetStateRSP::construct);
+    registerMsg(msgid::GetAddressInfoREQ, MsgData::GetAddressInfoREQ::construct);
+    registerMsg(msgid::GetAddressInfoRSP, MsgData::GetAddressInfoRSP::construct);
 }

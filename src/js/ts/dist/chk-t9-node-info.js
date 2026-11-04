@@ -1,4 +1,5 @@
 #!/usr/local/bin/mtjs
+import * as std from "std";
 const node = "127.0.0.1:2301";
 function check(cond, msg) {
     if (cond)
@@ -31,6 +32,6 @@ function errStr(e) {
         check(false, "get_node_info: " + errStr(e));
     }
     console.log("DONE");
+    std.exit(0);
 })().catch((e) => console.log("ERR:", errStr(e)));
 setInterval(() => { }, 1000000);
-export {};

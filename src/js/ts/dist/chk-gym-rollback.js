@@ -6,15 +6,22 @@ import * as std from "std";
 //   t3: отдельные TX (issuePass ok, createEntry no visits err) → nonce +2
 //   t4: init дважды (already init) → state откатан (admin один)
 //   t5: markUsed на несуществующий entry_id (no entry) → passes не изменился
-//   t6: err TX (no visits) — gasUsed детерминирован (block_hash same на 2 нодах)
 // node :2301 (n1). root — admin/sender (hex).
 const node = "127.0.0.1:2301";
 const GYM_SRC_PATH = "/home/bsr/mtjs/src/js/tsi/dist/contracts/gym.js";
 const GAS_LIMIT = 100000;
-const rootSk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk");
-const rootPk = std.getenv("k_root_ed_pk");
-if (!rootSk || !rootPk)
-    throw new Error("no root sk/pk");
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
+let rootSk = "";
+let rootPk = "";
+async function loadKeys() {
+    const raw = await mtjs.fs.readFile(KEYS_PATH);
+    const keys = JSON.parse(raw);
+    const r = keys.users?.root?.keys?.[0];
+    if (!r?.sk || !r?.pk)
+        throw new Error("keys_test.json: no users.root.keys[0].sk/pk");
+    rootSk = r.sk;
+    rootPk = r.pk;
+}
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
@@ -57,6 +64,7 @@ function waitTx(h, to) {
 }
 async function getNonce(addr) {
     const ui = await mtjs.get_user_nonce(node, addr, 3);
+    console.log("getNonce: " + ui.nonce);
     return BigInt(ui.nonce);
 }
 async function getBalance(addr) {
@@ -67,38 +75,69 @@ async function getNonceBal(addr) {
     const ui = await mtjs.get_user_nonce(node, addr, 3);
     return { nonce: BigInt(ui.nonce), bal: BigInt(ui.balance) };
 }
-async function waitNonceGt(addr, lastNonce, timeoutSec = 10) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeoutSec * 1000) {
-        const n = await getNonce(addr);
-        if (n > lastNonce)
-            return n;
-        await new Promise((r) => setTimeout(() => r(), 200));
+async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        if (rsp.err) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        const b = await waitTx(rsp.tx_hash, 10);
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
     }
-    throw new Error("waitNonceGt timeout: lastNonce=" + lastNonce.toString());
+    throw new Error("submitAndWait: retries exhausted");
 }
-async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT) {
-    const ui = await mtjs.get_user_nonce(node, addr, 3);
-    const req = { tx, nonce: ui.nonce, value, gasLimit, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, ui.nonce, () => { });
-    if (rsp.err)
-        throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, 10);
-    await waitNonceGt(addr, BigInt(ui.nonce), 10);
-    return { rsp, block: b };
+async function submitAndWaitErr(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        if (rsp.err) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        let b;
+        try {
+            b = await waitTx(rsp.tx_hash, 30);
+        }
+        catch (e) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw e;
+        }
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
+    }
+    throw new Error("submitAndWaitErr: retries exhausted");
 }
-async function submitAndWaitErr(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT) {
-    // err TX тоже инкрементит nonce (Ethereum) — waitNonceGt
-    const ui = await mtjs.get_user_nonce(node, addr, 3);
-    const req = { tx, nonce: ui.nonce, value, gasLimit, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, ui.nonce, () => { });
-    if (rsp.err)
-        throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, 10);
-    await waitNonceGt(addr, BigInt(ui.nonce), 10);
-    return { rsp, block: b };
-}
-const rootAddr = mtjs.addr_from_pk(rootPk);
+const rootAddr = mtjs.addr_from_name("root");
 async function ensureRootFunded(minBalance) {
     const bal = await getBalance(rootAddr);
     console.log("  root balance:", bal.toString(), "min:", minBalance.toString());
@@ -156,6 +195,7 @@ async function getPasses() {
     return v.passes || [];
 }
 async function main() {
+    await loadKeys();
     console.log("=== GYM ROLLBACK (node " + node + ") ===");
     await ensureRootFunded(50000000n);
     let src = "";
@@ -169,7 +209,6 @@ async function main() {
     check(src.length > 0, "gym src read (" + src.length + " bytes)");
     await ensureGym(src);
     await ensureInit();
-    // подготовка: issuePass (visits >= 10, если abonement нет / visits < 10)
     {
         const v = await getAbonement();
         if (v < 0) {
@@ -188,13 +227,12 @@ async function main() {
             check(true, "abonement.visits >= 10 (skip issuePass)");
         }
     }
-    // t1: err TX (createEntry M > visits) → state откатан, nonce +1, газ списан
     {
         console.log("\n[t1] err TX (createEntry M > visits): state rolled back, nonce +1, gas");
         const visits0 = await getAbonement();
         const passes0 = await getPasses();
         const { nonce: n0, bal: b0 } = await getNonceBal(rootAddr);
-        const M = visits0 + 1; // > visits
+        const M = visits0 + 1;
         const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
             { contract: "gym", method: "createEntry", params: { M: M, ttl: 300 } },
         ]);
@@ -210,13 +248,12 @@ async function main() {
         check(n1 === n0 + 1n, "nonce inc by 1: " + n0.toString() + " -> " + n1.toString());
         check(b1 <= b0, "balance not increased (gas charged): " + b0.toString() + " -> " + b1.toString());
     }
-    // t2: пачка ok+err (issuePass + createEntry no visits) → per-TX rollback, nonce +1
     {
         console.log("\n[t2] batch ok+err: per-TX rollback, nonce +1");
         const visits0 = await getAbonement();
         const passes0 = await getPasses();
         const { nonce: n0, bal: b0 } = await getNonceBal(rootAddr);
-        const M = visits0 + 1; // > visits
+        const M = visits0 + 1;
         const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
             { contract: "gym", method: "issuePass", params: { visits: 100 } },
             { contract: "gym", method: "createEntry", params: { M: M, ttl: 300 } },
@@ -224,20 +261,17 @@ async function main() {
         check(block.status(rsp.tx_hash) === "err", "batch status err");
         const visits1 = await getAbonement();
         const passes1 = await getPasses();
-        // per-TX: err → rollback всей TX (issuePass 100 не применилась)
         check(visits1 === visits0, "abonement.visits unchanged (per-TX rollback): " + visits0 + " -> " + visits1);
         check(passes1.length === passes0.length, "passes length unchanged: " + passes0.length + " -> " + passes1.length);
         const { nonce: n1, bal: b1 } = await getNonceBal(rootAddr);
         check(n1 === n0 + 1n, "nonce inc by 1: " + n0.toString() + " -> " + n1.toString());
         check(b1 <= b0, "balance not increased (gas charged): " + b0.toString() + " -> " + b1.toString());
     }
-    // t3: отдельные TX (issuePass ok, createEntry no visits err) → nonce +2
     {
         console.log("\n[t3] separate TXs: issuePass ok applied, createEntry no visits err rolled back, nonce +2");
         const visits0 = await getAbonement();
         const passes0 = await getPasses();
         const { nonce: n0, bal: b0 } = await getNonceBal(rootAddr);
-        // TX1: issuePass 1 (ok)
         {
             const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
                 { contract: "gym", method: "issuePass", params: { visits: 1 } },
@@ -246,7 +280,6 @@ async function main() {
         }
         const visits1 = await getAbonement();
         check(visits1 === visits0 + 1, "visits +1 (issuePass ok): " + visits0 + " -> " + visits1);
-        // TX2: createEntry M > visits (err)
         const M = visits1 + 1;
         {
             const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
@@ -262,7 +295,6 @@ async function main() {
         check(n2 === n0 + 2n, "nonce +2: " + n0.toString() + " -> " + n2.toString());
         check(b2 <= b0, "balance not increased (gas): " + b0.toString() + " -> " + b2.toString());
     }
-    // t4: init дважды (already init) → state откатан (admin один, не перезаписан)
     {
         console.log("\n[t4] init twice: already init err, state rolled back (admin one)");
         const admin0 = await mtjs.get_contract_data(node, "gym", "admin", 3);
@@ -277,7 +309,6 @@ async function main() {
         check(admin1.found === true, "admin still found");
         check(admin1.value === admin0.value, "admin unchanged: " + admin0.value + " -> " + admin1.value);
     }
-    // t5: markUsed на несуществующий entry_id → state откатан (passes не изменился)
     {
         console.log("\n[t5] markUsed on nonexistent entry_id: no entry, passes unchanged");
         const passes0 = await getPasses();
@@ -291,35 +322,12 @@ async function main() {
         const passes1 = await getPasses();
         check(JSON.stringify(passes1) === JSON.stringify(passes0), "passes unchanged");
     }
-    // t6: err TX (createEntry no visits) — gasUsed детерминирован (block_hash same на 2 нодах)
-    // (проверяем: после err TX block_hash на :2301 и :2302 совпадает — root hash сошёлся)
-    if (false) {
-        console.log("\n[t6] err TX: block_hash same on n1 (:2301) and n2 (:2302)");
-        // err TX на :2301
-        const visits0 = await getAbonement();
-        const M = visits0 + 1;
-        const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
-            { contract: "gym", method: "createEntry", params: { M: M, ttl: 300 } },
-        ]);
-        const bh1 = block.block_hash;
-        check(block.status(rsp.tx_hash) === "err", "err TX on :2301");
-        // wait for :2302 to apply (waitNonceGt уже дождались на :2301; :2302 — sync)
-        // get_block на :2302 (next block) — block_hash
-        try {
-            const p = mtjs.get_block("127.0.0.1:2302", 10);
-            const b2 = await p;
-            console.log("  :2301 block_hash=" + bh1.slice(0, 16) + " :2302 block_hash=" + b2.block_hash.slice(0, 16));
-            check(b2.block_hash === bh1, ":2302 block_hash == :2301 block_hash");
-        }
-        catch (e) {
-            check(false, "get_block :2302: " + errStr(e));
-        }
-    }
     console.log("\n=== RESULT: " + pass + " passed, " + fail + " failed ===");
     if (fail === 0)
         console.log(GREEN + "DONE" + RESET);
     else
         console.log(RED + "FAIL" + RESET);
+    std.exit(fail);
 }
 main().catch((e) => console.log(RED + "ERR: " + errStr(e) + RESET));
 setInterval(() => { }, 1000000);

@@ -73,7 +73,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         return true;
     }
     // auto h=r->blockInfoHash;
-    logNode("[BlockDiffValidateRSP] blockInfoHash %s from %s",r->blockInfoHash.str().c_str(),src_node.container.c_str());
+    // logNode("[BlockDiffValidateRSP] blockInfoHash %s from %s",r->blockInfoHash.str().c_str(),src_node.container.c_str());
     bt.BlockDiffValidateRSP_m[r->blockInfoHash].push_back(r);
 
 

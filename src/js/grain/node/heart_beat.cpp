@@ -72,7 +72,6 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
 void Node::Service::reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route)
 {
     MUTEX_INSPECTOR;
-    // logNode("@@ %s",__func__);
     stage_is_working=iUtils->getNow();
 
 

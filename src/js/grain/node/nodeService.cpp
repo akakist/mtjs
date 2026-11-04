@@ -53,6 +53,12 @@
 #include "NodeGranuleIO.h"
 #include "CallStack.h"
 #include "CallContext.h"
+#include <rocksdb/db.h>
+#include <rocksdb/options.h>
+#include <rocksdb/write_batch.h>
+#include <rocksdb/snapshot.h>
+#include <rocksdb/utilities/checkpoint.h>
+#include "s_key.h"
 
 static REF_getter<ContractHost> make_node_contract_host(const REF_getter<IDatabase>& db) {
     REF_getter<ContractHost> h = new ContractHost();
@@ -279,9 +285,9 @@ bool Node::Service::on_startService(const systemEvent::startService *)
             prev_block=NULL;
     }
 
-    my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
+    // my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
 
-    my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
+    // my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
     logNode("ServiceInit nodename %s", this_node_name.container.c_str());
     sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
     sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
@@ -431,7 +437,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     }
     case TIMER_BlockDBStore:
     {
-        logNode("case TIMER_BlockDBStore:");
         auto r=dynamic_cast<MsgData::BlockDBStore*>(e->cookie.get());
         if(!r)
             throw CommonError("!r BlockDBStore");
@@ -444,15 +449,12 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
             bt.BlockDiffValidateRSP_m[h].clear();
 
         }
+        return true;
     }
     break;
     case TIMER_BlockDiffValidateREQ:
     {
-        logNode("case TIMER_BlockDiffValidateREQ:");
         auto & bt= l_blocks[prev_root_hash_Z()];
-        // REF_getter<MsgData::HeartBeatREQ> hb= new MsgData::HeartBeatREQ;
-        // inBuffer in(e->data->container);
-        // hb->unpack2(in);
         auto r=dynamic_cast<MsgData::BlockDiffValidateREQ*>(e->cookie.get());
         if(!r)
             throw CommonError("!r BlockDiffValidateREQ");
@@ -632,11 +634,6 @@ static bool match(const std::string &re, const std::string &buf, std::vector<std
     }
     return false;
 }
-#include <rocksdb/db.h>
-#include <rocksdb/options.h>
-#include <rocksdb/write_batch.h>
-#include <rocksdb/snapshot.h>
-#include <rocksdb/utilities/checkpoint.h>
 bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 {
     MUTEX_INSPECTOR;
@@ -698,9 +695,17 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
     MUTEX_INSPECTOR;
     rpc_addr = ins->getConfig()->get_tcpaddr("rpc_addr", "127.0.0.1:2345", "rpc address(es) of node ex: ip:port,ip2:port2");
     web_addr = ins->getConfig()->get_tcpaddr("web_addr", "127.0.0.1:2347", "web address(es) of node ex: ip:port,ip2:port2");
-    my_sk_bls_env_key = ins->getConfig()->get_string("my_sk_bls_env_key", "sk_bls_env_key", "env key of bls key");
-    my_sk_ed_env_key = ins->getConfig()->get_string("my_sk_ed_env_key", "sk_ed_env_key", "env key of ed key");
+    std::string bls_sk_hex = iInstance->getConfig()->get_string("my_sk_bls", "", "BLS secret (hex, inline)");
+    std::string ed_sk_hex  = iInstance->getConfig()->get_string("my_sk_ed",  "", "Ed secret (hex, inline)");
+    if (!bls_sk_hex.empty()) my_sk_bls.deserializebase16Str(bls_sk_hex);
+    else                     my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
+    if (!ed_sk_hex.empty())  my_sk_ed = base16::decode(ed_sk_hex);
+    else                     my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
+
     this_node_name.container = ins->getConfig()->get_string("this_node_name", "n0", "registered name of node");
+
+// std::string bls_sk_hex = iInstance->getConfig()->get_string("my_sk_bls", "", "BLS secret (hex, inline)");
+// std::string ed_sk_hex  = iInstance->getConfig()->get_string("my_sk_ed",  "", "Ed secret (hex, inline)");
 
     db_name=ins->getConfig()->get_string2("db_name", "grain", "db name");
     node_start_timestamp=iUtils->getNow();
@@ -769,6 +774,7 @@ void Node::Service::do_request_for_transactions( block_leader& li, const REF_get
 THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
 {
     MUTEX_INSPECTOR;
+    // logNode("[execute_block] sender %s",b.)
     // ▼▼▼ INSERT: bc_state block_height++ (NULL — не rollback)
     {
         auto st = b.db->getStateOrCreate(NULL);
@@ -786,19 +792,39 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         std::optional<std::string> t_err;
         auto tt=b.validateBlockREQ->transaction_bodies[ti];
         auto tx_hash=tt->getHash();
-        auto &pk_bin=tt->pk_ed_bin;
-        ADDRESS_id senderAddress;
-        senderAddress.addr=blake2b_hash(pk_bin).container;
+        // auto &pk_bin=tt->pk_ed_bin;
+        // ADDRESS_id senderAddress;
+        // senderAddress.addr=blake2b_hash(pk_bin).container;
         auto &tj = tt->tx_body;
-        if (!tt->verify())
-        {
-            t_err = "verify failed @12";
-            logNode("verify failed @12");
+        yyjson_val *jroot2 = yyjson_doc_get_root(tt->doc);
+        std::string sender_hex;
+        yyjson_val *sv2 = jroot2 ? yyjson_obj_get(jroot2, "sender") : nullptr;
+        if (sv2 && yyjson_is_str(sv2)) sender_hex = yyjson_get_str(sv2);
+
+        int64_t key_id = -1;
+        yyjson_val *ki2 = jroot2 ? yyjson_obj_get(jroot2, "key_id") : nullptr;
+        if (ki2 && yyjson_is_num(ki2)) key_id = yyjson_get_sint(ki2);
+
+        ADDRESS_id senderAddress;
+        if (!sender_hex.empty()) {
+            senderAddress.addr = base16::decode(sender_hex);
+            auto uu = b.db->getAddressStateNoCreate(senderAddress);
+            if (!uu.valid()) { t_err = "sender address not found"; }
+            else if (key_id < 0) { t_err = "key_id required"; }
+            else {
+                auto k = uu->getKey((uint64_t)key_id);
+                if (!k) { t_err = "key_id not found"; }
+                else if (!verify(*k, tt->sig_ed_bin, tt->getHash().container)) { t_err = "verify failed"; }
+            }
+        } else {
+            t_err= "sender address not specified";
+            // senderAddress.addr = blake2b_hash(pk_bin).container;
+            // if (!tt->verify()) { t_err = "verify failed (legacy ed25519)"; }
         }
         if (!t_err)
         {
             MUTEX_INSPECTOR;
-            auto u = b.db->getAddressStateOrCreate(senderAddress,NULL);
+            auto u = b.db->getAddressStateNoCreate(senderAddress);
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -840,7 +866,6 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
 
     auto rh=proceed_merkle_on_transaction_pool_hashers(db_state->root);
     calc_fee_rewards_nodes(b, lc);
-
     rh=proceed_merkle_on_transaction_pool_hashers(db_state->root);
     return rh;
 }
@@ -872,8 +897,10 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
             auto portion=n->get_full_stake()*b.node_rewards/total_staked;
             auto u = db_state->getAddressStateNoCreate(n->get_owner());
             if (u.valid()) {
-                M_LOCK(u->parent->mx);
-                u->balance += portion;
+                {
+                    M_LOCK(u->parent->mx);
+                    u->balance += portion;
+                }
                 u->setDirty(NULL);
             } else {
                 // owner не найден — аномалия (node_create owner должен быть)
@@ -888,6 +915,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
 
 
     b.emit_block("total_fee",R"({"fee":"%s"})",std::to_string(b.node_rewards).c_str());
+
 }
 
 THASH_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &r)
@@ -1116,18 +1144,21 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
             {
                 std::optional<std::string> err;
                 auto meth=method_str;
-                if (meth == "mint") err = TR::execute_mint(params, b, t, index);
-                else if (meth == "transfer") err = TR::execute_transfer(params, b,t, index);
-                else if (meth == "node_create") err = TR::execute_node_create(params,b, t, index);
-                else if (meth == "node_update") err = TR::execute_node_update(params, b,t, index);
-                else if (meth == "node_stake") err = TR::execute_node_stake(params, b,t, index);
-                else if (meth == "node_unstake") err = TR::execute_unstake_node(params, b,t, index);
-                else if (meth == "node_enable") err = TR::execute_node_enable(params, b,t, index);
-                else if (meth == "node_disable") err = TR::execute_node_disable(params, b,t, index);
-                else if (meth == "contract_deploy") err = TR::execute_contract_deploy(params,b, t, index);
-                else if (meth == "contract_update") err = TR::execute_contract_update(params, b,t, index);
-                else if (meth == "vote") err = TR::execute_vote(params, b,t, index);
-                else if (meth == "gc") err = TR::execute_gc(params, b,t, index, db_to_save_Z);
+                if (meth == "mint") err = execute_mint(params, b, t, index);
+                else if (meth == "transfer") err = execute_transfer(params, b,t, index);
+                else if (meth == "node_create") err = execute_node_create(params,b, t, index);
+                else if (meth == "node_update") err = execute_node_update(params, b,t, index);
+                else if (meth == "node_stake") err = execute_node_stake(params, b,t, index);
+                else if (meth == "node_unstake") err = execute_unstake_node(params, b,t, index);
+                else if (meth == "node_enable") err = execute_node_enable(params, b,t, index);
+                else if (meth == "node_disable") err = execute_node_disable(params, b,t, index);
+                else if (meth == "contract_deploy") err = execute_contract_deploy(params,b, t, index);
+                else if (meth == "contract_update") err = execute_contract_update(params, b,t, index);
+                else if (meth == "vote") err = execute_vote(params, b,t, index);
+                else if (meth == "gc") err = execute_gc(params, b,t, index, db_to_save_Z);
+                else if (meth == "create_address")      err = execute_create_address(params, b, t, index);
+                else if (meth == "add_address_key")     err = execute_add_address_key(params, b, t, index);
+                else if (meth == "remove_address_key")  err = execute_remove_address_key(params, b, t, index);                
                 else return "unhandled method '"+method_str+"' for root contract";
                 if(err) logNode("err: %s",err->c_str());
                 if (err) return err;
@@ -1338,6 +1369,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
             return e;
         int64_t bal1 = 0;
         { M_LOCK(uu->parent->mx); bal1 = uu->balance; }
+        // #ifdef KALLLOG
         logNode("[t] tx=%s value=%lld gasLimitTokens=%lld priority=%lld gasLimit_gas=%lld gpt=%lld "
                 "gasUsed=%lld rollback=%d total=%lld spentTokens=%lld value_spent=0 bal %lld->%lld status=err msg=\"%s\"",
                 base16::encode(tx_id.container).c_str(),
@@ -1347,6 +1379,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
                 (long long)t.gasUsed, (int)t.roll->size(), (long long)t.gasUsed,
                 (long long)spent,
                 (long long)bal0, (long long)bal1, msg.c_str());
+        // #endif
         return msg;
     };
     // std::set<REF_getter<data_base>> deteled_granules;
@@ -1384,7 +1417,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
     db_state->root->calc_tree_hash(db_dump);
     db_to_save_Z.add(db_dump);
-
+// #ifdef KALLLOG
     logNode("[t] tx=%s value=%lld gasLimitTokens=%lld priority=%lld gasLimit_gas=%lld gpt=%lld "
             "gasUsed=%lld db_dump=%d total=%lld spentTokens=%lld value_spent=%lld bal %lld->%lld status=ok",
             base16::encode(tx_id.container).c_str(),
@@ -1394,7 +1427,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
             (long long)(t.gasUsed - db_dump.size()), (int)db_dump.size(), (long long)t.gasUsed,
             (long long)spent, (long long)(value - t.value),
             (long long)bal0, (long long)bal1);
-
+// #endif
     return std::nullopt;
 }
 

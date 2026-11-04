@@ -58,7 +58,7 @@ inline THASH_id blake2b_hash(const std::string& data) {
                           (uint8_t*)data.data(), data.size(),
                           NULL, 0))
     {
-        throw CommonError("blake2b_hash %d",data.size());
+        throw std::runtime_error("blake2b_hash error");
     }
     return out;
 }

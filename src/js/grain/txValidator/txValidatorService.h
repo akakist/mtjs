@@ -58,6 +58,7 @@ namespace TxValidator
         // bool is_working=false;
         // REF_getter<root_data> root=NULL;
         // REF_getter<IDatabase> db;
+        REF_getter<IDatabase> db;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
 

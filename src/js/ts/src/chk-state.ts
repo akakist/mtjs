@@ -1,4 +1,5 @@
 #!/usr/local/bin/mtjs
+import * as std from "std";
 const node = "127.0.0.1:2301";
 function check(c: boolean, m: string) {
     console.log((c ? "  ✅ " : "  ❌ ") + m);
@@ -22,6 +23,7 @@ function check(c: boolean, m: string) {
         check(s.chain_id === 1, "chain_id == 1");
         check(s.genesis_time > 0, "genesis_time > 0");
         console.log("DONE");
+	std.exit(0);
     } catch (e: any) {
         console.log("ERR:", e && e.errstr ? e.errstr : String(e));
     }

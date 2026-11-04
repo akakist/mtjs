@@ -13,7 +13,7 @@ mtjs.tx_subscribe(node, (b) => {
     console.log("  finalized:", b.finalized);
 });
 async function main() {
-    const addr = mtjs.addr_from_pk(pk);
+    const addr = mtjs.addr_from_name("root");
     const ui = await mtjs.get_user_nonce(node, addr, 2);
     const nonce = BigInt(ui.nonce);
     const tx = [{ contract: "root", method: "mint", params: { amount: "1" } }];

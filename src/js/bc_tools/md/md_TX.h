@@ -4,6 +4,7 @@
 // #include "bigint.h"
 #include "yyjson.h"
 #include <optional>
+#include "ADDRESS_id.h"
 namespace MsgData
 {
     struct TX: public Base
@@ -26,6 +27,10 @@ namespace MsgData
         std::string tx_body;
         std::string pk_ed_bin;
         std::string sig_ed_bin;
+    // локально (TxValidator → execute_block), НЕ pack/unpack
+        ADDRESS_id sender_addr;
+        uint64_t   sender_key_id = 0;
+        bool       sender_resolved = false;        
         yyjson_doc *doc=nullptr;
         void pack(outBuffer& b) const final
         {

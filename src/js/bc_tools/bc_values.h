@@ -7,31 +7,32 @@ struct bc_values: public data_base
 
     bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         /// gas
-        fees["gas_per_token"]    = 1000;
-        fees["gas_per_byte"]     = 1;
-        fees["gas_per_jsi_step"] = 10;      // = interrupt_counter
-        fees["gas_per_hostcall"] = 500;
-        fees["gas_per_call"]     = 1000;
-        fees["min_tx_fee"]       = 1;
-        fees["gas_node_create"]  = 10000;
-        fees["gas_node_enable"]  = 5000;
-        fees["gas_node_stake"]   = 2000;
-        fees["gas_node_update"]  = 1000;
-        fees["gas_node_disable"] = 5000;
+        values["gas_per_token"]    = 1000;
+        values["gas_per_byte"]     = 1;
+        values["gas_per_jsi_step"] = 10;      // = interrupt_counter
+        values["gas_per_hostcall"] = 500;
+        values["gas_per_call"]     = 1000;
+        values["min_tx_fee"]       = 1;
+        values["gas_node_create"]  = 10000;
+        values["gas_node_enable"]  = 5000;
+        values["gas_node_stake"]   = 2000;
+        values["gas_node_update"]  = 1000;
+        values["gas_node_disable"] = 5000;
 
-        fees["gas_contract_deploy"]  = 10000;
-        fees["gas_create_base"]      = 100;
-        fees["ttl_seconds_per_gas"]  = 86400;        
-        fees["gas_create_address"]   = 1000;
+        values["gas_contract_deploy"]  = 10000;
+        values["gas_create_base"]      = 100;
+        values["ttl_seconds_per_gas"]  = 86400;        
+        values["gas_create_address"]   = 1000;
 
         /// another params
-        fees["validator_count_percent"] = 50;
-        fees["validator_min_stake"] = 50;
-        fees["missed_rounds_max"] = 100 ;
+        values["validator_count_percent"] = 50;
+        values["validator_min_stake"] = 50;
+        values["missed_rounds_max"] = 100 ;
+        values["ttl_cache"] = 20 ; /// time to live contract cache and state cache in height
         
 
     }
-    std::map<std::string,int64_t> fees;
+    std::map<std::string,int64_t> values;
     std::set<ADDRESS_id> emitters_bin;
 
     size_t size() const
@@ -39,7 +40,7 @@ struct bc_values: public data_base
         M_LOCK(parent->mx);
 
         size_t sz=size_();
-        for(auto &z: fees)
+        for(auto &z: values)
         {
             sz+=z.first.size();
             sz+=sizeof(int64_t);
@@ -53,8 +54,8 @@ struct bc_values: public data_base
 
     int64_t getGas(const std::string &fee_type) const
     {
-        auto it=fees.find(fee_type);
-        if(it!=fees.end())
+        auto it=values.find(fee_type);
+        if(it!=values.end())
             return it->second;
         throw CommonError("fee '%s' not found", fee_type.c_str());
         return 0;
@@ -63,14 +64,14 @@ struct bc_values: public data_base
     {
         data_base::pack(o);
         o<<1;
-        o<<fees<<emitters_bin;
+        o<<values<<emitters_bin;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>fees>>emitters_bin;
+        o>>values>>emitters_bin;
     }
 
 };

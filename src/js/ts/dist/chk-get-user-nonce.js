@@ -1,10 +1,18 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 const node = "127.0.0.1:2301";
-const rootSk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk");
-const rootPk = std.getenv("k_root_ed_pk");
-if (!rootSk || !rootPk)
-    throw new Error("no root sk/pk");
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
+let rootSk = "";
+let rootPk = "";
+async function loadKeys() {
+    const raw = await mtjs.fs.readFile(KEYS_PATH);
+    const keys = JSON.parse(raw);
+    const r = keys.users?.root?.keys?.[0];
+    if (!r?.sk || !r?.pk)
+        throw new Error("keys_test.json: no users.root.keys[0].sk/pk");
+    rootSk = r.sk;
+    rootPk = r.pk;
+}
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
@@ -23,8 +31,7 @@ function errStr(e) {
     return (e && typeof e === "object" && ("errcode" in e || "errstr" in e))
         ? "errcode=" + e.errcode + " errstr=" + e.errstr : String(e);
 }
-const rootAddr = mtjs.addr_from_pk(rootPk);
-// генерация случайного hex-адреса (32 байта)
+const rootAddr = mtjs.addr_from_name("root");
 function randomAddrHex() {
     const s = "0123456789abcdef";
     let out = "";
@@ -33,35 +40,41 @@ function randomAddrHex() {
     return out;
 }
 async function main() {
-    console.log("=== GET_USER_NONCE (NoCreate, no spam) ===");
-    const rb = BigInt((await mtjs.get_user_nonce(node, rootAddr, 3)).balance);
-    if (rb < 50000000n) {
-        if (rb < 200000n) {
-            check(false, "root low — clean db");
-            return;
-        }
-        // mint root — TBD (submit) — или check false
-        check(false, "root low — clean db / mint root (TBD)");
-        return;
-    }
+    await loadKeys();
+    console.log("=== GET_USER_NONCE (NoCreate, reject unknown) ===");
     const s0 = await mtjs.get_state(node, 3);
     console.log("  state0:", JSON.stringify(s0));
     const acc0 = s0.account_count;
-    // t1: get_user_nonce неизвестный адрес — balance 0, nonce 0 (не создан)
+    // t1: root — found: true (genesis)
     {
-        console.log("\n[t1] get_user_nonce неизвестный адрес — balance 0, nonce 0");
-        const unknown = randomAddrHex();
-        const ui = await mtjs.get_user_nonce(node, unknown, 3);
+        console.log("\n[t1] root (genesis) — found: true");
+        const ui = await mtjs.get_user_nonce(node, rootAddr, 3);
         console.log("  ui:", JSON.stringify(ui));
-        check(ui.nonce === "0", "nonce == 0 (got " + ui.nonce + ")");
-        check(ui.balance === "0", "balance == 0 (got " + ui.balance + ")");
+        check(ui.found === true, "root found: true");
+        check(ui.nonce !== undefined && ui.balance !== undefined, "root nonce/balance present");
     }
-    // t2: account_count не растёт (не создан)
+    // t2: неизвестный адрес — reject (address not found)
     {
-        console.log("\n[t2] account_count не растёт (адрес не создан)");
-        // ещё несколько неизвестных
+        console.log("\n[t2] unknown — reject");
+        const unknown = randomAddrHex();
+        try {
+            const ui = await mtjs.get_user_nonce(node, unknown, 3);
+            check(false, "unknown: expected reject, got " + JSON.stringify(ui));
+        }
+        catch (e) {
+            const es = errStr(e);
+            console.log("  rejected:", es);
+            check(es.indexOf("address not found") >= 0, "rejected: address not found");
+        }
+    }
+    // t3: несколько неизвестных — account_count не растёт
+    {
+        console.log("\n[t3] account_count не растёт (NoCreate)");
         for (let i = 0; i < 5; i++) {
-            await mtjs.get_user_nonce(node, randomAddrHex(), 3);
+            try {
+                await mtjs.get_user_nonce(node, randomAddrHex(), 3);
+            }
+            catch (_) { }
         }
         const s1 = await mtjs.get_state(node, 3);
         console.log("  account_count:", acc0, "->", s1.account_count);
@@ -72,6 +85,7 @@ async function main() {
         console.log(GREEN + "DONE" + RESET);
     else
         console.log(RED + "FAIL" + RESET);
+    std.exit(fail);
 }
 main().catch((e) => console.log(RED + "ERR: " + errStr(e) + RESET));
 setInterval(() => { }, 1000000);

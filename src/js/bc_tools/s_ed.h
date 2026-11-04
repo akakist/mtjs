@@ -1,6 +1,7 @@
 #pragma once
 #include <sodium.h>
 #include "mutexInspector.h"
+#include "THASH_id.h"
 inline bool verify_ed_pk(const std::string& pk, const std::string & signature, const std::string & msg)
 {
     MUTEX_INSPECTOR;

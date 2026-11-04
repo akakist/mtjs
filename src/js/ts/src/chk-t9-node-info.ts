@@ -25,6 +25,7 @@ function errStr(e: any): string {
         check(notFound.found === false, "unknown node → found: false");
     } catch (e: any) { check(false, "get_node_info: " + errStr(e)); }
     console.log("DONE");
+    std.exit(0);
 })().catch((e: any) => console.log("ERR:", errStr(e)));
 setInterval(() => {}, 1000000);
 export {};

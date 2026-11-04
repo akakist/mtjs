@@ -12,7 +12,7 @@ struct ADDRESS_id
     ADDRESS_id() {}
     std::string str() const
     {
-        return base16::encode(addr).substr(0,4);
+        return base16::encode(addr);
     }
 
 };

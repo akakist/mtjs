@@ -1,11 +1,7 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
-// ============================================================
-// b_test-node-load-pause.ts
-// 20 юзеров, каждый: пачка TX -> ждём блок -> иногда пауза -> снова.
-// Ловит залипание консенсуса после паузы (TIMER_RESTART_BLOCK и т.п.).
-// ============================================================
 const node = "127.0.0.1:2301";
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 function envInt(name, def) {
     const v = std.getenv(name);
     if (!v)
@@ -49,19 +45,23 @@ function errStr(e) {
 }
 function sleep(ms) { return new Promise((r) => setTimeout(() => r(), ms)); }
 const users = [];
-for (let i = 0; i < USERS; i++) {
-    const sk = std.getenv("k_u" + i + "_ed_sk");
-    const pk = std.getenv("k_u" + i + "_ed_pk");
-    if (!sk || !pk) {
-        console.log("skip u" + i + ": no keys");
-        continue;
+async function loadKeys() {
+    const raw = await mtjs.fs.readFile(KEYS_PATH);
+    const keys = JSON.parse(raw);
+    for (let i = 0; i < USERS; i++) {
+        const name = "u" + i;
+        const u = keys.users?.[name]?.keys?.[0];
+        if (!u?.sk || !u?.pk) {
+            console.log("skip " + name + ": no keys");
+            continue;
+        }
+        users.push({ name, sk: u.sk, pk: u.pk, addr: mtjs.addr_from_name(name) });
     }
-    users.push({ name: "u" + i, sk, pk, addr: mtjs.addr_from_pk(pk) });
+    if (users.length === 0) {
+        console.log(RED + "no users" + RESET);
+        std.exit(1);
+    }
 }
-if (users.length === 0) {
-    console.log(RED + "no users" + RESET);
-}
-// ---------- pending tx -> block ----------
 const pending = {};
 let lastBlockTs = 0;
 let lastTxSubmitTs = 0;
@@ -109,20 +109,36 @@ async function waitNonceGt(addr, lastNonce, timeoutSec) {
     }
     throw new Error("waitNonceGt timeout last=" + lastNonce.toString());
 }
-// пачка TX: submit -> waitTx -> waitNonceGt
-async function submitBatch(u, tx) {
-    const nonce = await getNonce(u.addr);
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: Number(GAS_LIMIT), priority: Number(PRIORITY) };
-    const now = Date.now();
-    lastTxSubmitTs = now;
-    if (!firstTxTs)
-        firstTxTs = now;
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), u.sk, nonce.toString(), () => { });
-    if (rsp.err)
-        throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, WAIT_TX_SEC);
-    await waitNonceGt(u.addr, nonce, WAIT_NONCE_SEC);
-    return { rsp, block: b, nonce };
+async function submitBatch(u, tx, retries = 3) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(u.addr);
+        const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: Number(GAS_LIMIT), priority: Number(PRIORITY), sender: u.addr, key_id: 0 };
+        const now = Date.now();
+        lastTxSubmitTs = now;
+        if (!firstTxTs)
+            firstTxTs = now;
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), u.sk, nonce.toString(), () => { });
+        if (rsp.err) {
+            if (attempt + 1 < retries) {
+                await sleep(200);
+                continue;
+            }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        const b = await waitTx(rsp.tx_hash, WAIT_TX_SEC);
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) {
+                await sleep(200);
+                continue;
+            }
+            throw new Error("invalid nonce: " + es);
+        }
+        await waitNonceGt(u.addr, nonce, WAIT_NONCE_SEC);
+        return { rsp, block: b, nonce };
+    }
+    throw new Error("submit: retries exhausted");
 }
 function childEmits(b, txHash) {
     const ch = b.children(txHash);
@@ -139,7 +155,6 @@ function hasEmit(em, name) {
                 return e[1];
     return null;
 }
-// ---------- сторож ----------
 let watchdogFailed = false;
 const watchdog = setInterval(() => {
     const now = Date.now();
@@ -155,7 +170,6 @@ const watchdog = setInterval(() => {
         fail++;
     }
 }, 1000);
-// ---------- цикл одного юзера ----------
 async function userLoop(u, ui) {
     const other = users[(ui + 1) % users.length];
     const other2 = users[(ui + 2) % users.length];
@@ -198,15 +212,11 @@ async function userLoop(u, ui) {
         }
     }
 }
-// ---------- main ----------
 (async () => {
     console.log("=== B_TEST-NODE-LOAD-PAUSE ===");
+    await loadKeys();
     console.log("users=" + users.length + " iters=" + ITERS + " pauseEvery=" + PAUSE_EVERY + " pauseSec=" + PAUSE_SEC +
         " priority=" + PRIORITY + " gasLimit=" + GAS_LIMIT + " throttle=" + THROTTLE_MS + "ms");
-    if (users.length === 0) {
-        console.log(RED + "no users" + RESET);
-        return;
-    }
     await sleep(500);
     const t0 = Date.now();
     await Promise.all(users.map((u, i) => userLoop(u, i).catch((e) => check(false, "[u" + i + "] EXC: " + errStr(e)))));
@@ -215,9 +225,15 @@ async function userLoop(u, ui) {
     console.log("\n--- summary ---");
     console.log("  duration=" + dt + "ms blocks=" + blocks + " maxGapMs=" + maxGapMs);
     console.log("\n=== RESULT: " + pass + " passed, " + fail + " failed ===");
-    if (fail === 0 && !watchdogFailed)
+    if (fail === 0 && !watchdogFailed) {
         console.log(GREEN + "DONE" + RESET);
-    else
+        std.exit(0);
+    }
+    else {
         console.log(RED + "FAIL" + RESET);
-})().catch((e) => console.log(RED + "ERR: " + errStr(e) + RESET));
-setInterval(() => { }, 1000000);
+        std.exit(1);
+    }
+})().catch((e) => {
+    console.log(RED + "ERR: " + errStr(e) + RESET);
+    std.exit(2);
+});

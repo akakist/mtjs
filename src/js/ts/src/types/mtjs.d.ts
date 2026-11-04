@@ -1,7 +1,16 @@
 import { StreamModule } from "./stream";
 
-    declare global {
-        interface StateInfo {
+declare global {
+    interface AddressKey { id: number; type: number; keybuffer: string; }
+
+    interface AddressInfo {
+        found: boolean;
+        balance: string;
+        nonce: string;
+        keys: AddressKey[];
+    }
+
+    interface StateInfo {
         found: boolean;
         total_supply: string;
         total_stake: string;
@@ -23,6 +32,7 @@ import { StreamModule } from "./stream";
     interface userInfo {
         nonce: string;
         balance: string;
+        found: bool;
     }
 
     interface mintRequest {
@@ -76,9 +86,14 @@ import { StreamModule } from "./stream";
         found: boolean;
         contract: string;
         key: string;
-        value: string;   // JSON-строка, JSON.parse() в тестах
+        value: string;
     }
     interface mtjsModule {
+        // address
+        addr_from_name(nick: string): string;
+        get_address_info(nodeaddr: string, addr_hex: string, timeout: number): Promise<AddressInfo>;
+
+        // mtjs core
         telnet: telnetModule;
         http: httpModule;
         async asyncExecute(command: string): Promise<void>;
@@ -93,19 +108,17 @@ import { StreamModule } from "./stream";
             nonce: string,
             callback: (params: object) => void
         ): Promise<AddTxRsp>;
+
         tx_subscribe(nodeaddr: string, callback: (block: Block) => void): void;
         tx_wait_block(nodeaddr: string, tx_hash_hex: string, timeout: number): Promise<Block>;
         get_block(nodeaddr: string, timeout: number): Promise<Block>;
         get_node_info(nodeaddr: string, name: string, timeout: number): Promise<NodeInfo>;
         get_values(nodeaddr: string, timeout: number): Promise<ValuesInfo>;
         get_contract_data(nodeaddr: string, contract: string, key: string, timeout: number): Promise<ContractData>;
-    	get_contract(nodeaddr: string, contract: string, timeout: number): Promise<ContractInfo>;
-
+        get_contract(nodeaddr: string, contract: string, timeout: number): Promise<ContractInfo>;
         get_state(nodeaddr: string, timeout: number): Promise<StateInfo>;
 
         tx_unsubscribe(nodeaddr: string, tx_hash_hex?: string): void;
-        tx_subscribe(nodeaddr: string, callback: (block: Block) => void): void;
-        addr_from_pk(pk: string): string;
         pipe: Pipe;
         STDIN: STDIN;
         rpc: rpcModule;
@@ -117,4 +130,4 @@ import { StreamModule } from "./stream";
     const mtjs: mtjsModule;
 }
 
-export {};export {  };
+export {};

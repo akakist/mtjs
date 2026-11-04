@@ -119,6 +119,20 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     pass_NodeMsgRSP(bdvrs.get(),route);
     return true;
 }
+static void dump_mem(const char* label, JSIRuntime* rt) {
+    JSI_RunGC(rt);   // форсируем GC, чтобы мусор не считался
+    JSIMemoryUsage s;
+    JSI_ComputeMemoryUsage(rt, &s);
+    printf("\n[%s]\n", label);
+    printf("  malloc_size      = %lld\n", (long long)s.malloc_size);
+    printf("  memory_used_size = %lld\n", (long long)s.memory_used_size);
+    printf("  obj_count        = %lld\n", (long long)s.obj_count);
+    printf("  str_count        = %lld\n", (long long)s.str_count);
+    printf("  atom_count       = %lld\n", (long long)s.atom_count);
+    printf("  c_func_count     = %lld\n", (long long)s.c_func_count);
+    printf("  array_count      = %lld\n", (long long)s.array_count);
+    printf("  shape_count      = %lld\n", (long long)s.shape_count);
+}
 bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
@@ -256,6 +270,17 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
             logNode("removed tx %s", base16::encode(z.container).c_str());
         }
         XPASS;
+    }
+    auto v=db_state->getValuesNoCreateConst();
+    auto ttl_cache=v->getGas("ttl_cache");
+    if(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->new_epoch % ttl_cache == 0)
+    {
+        for(auto& z: contractHost->contract_cache)
+        {
+            dump_mem("ccc",z.second->rt);
+        }
+        contractHost->contract_cache.clear();
+        db_state->root=getRoot(db_state.get(),prev_block);
     }
     cli_leader_info.clear();
 
@@ -436,7 +461,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             .gas_create_address   = v->getGas("gas_create_address"),
         };
         auto new_root_hash = execute_block(t, r->heart_beat);
-
+                
         std::map<std::string, std::string> diffs;
         for(auto& z:db_to_save_Z.cells)
         {
@@ -485,7 +510,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
         rsp->node_validator = this_node_name;
         rsp->sign(my_sk_bls);
-
 
         pass_NodeMsgRSP(rsp.get(), route);
     }

@@ -6,7 +6,7 @@ const pk = std.getenv("k_root_ed_pk");
 if (!sk || !pk)
     throw new Error("no sk/pk");
 async function main() {
-    const addr = mtjs.addr_from_pk(pk);
+    const addr = mtjs.addr_from_name("root");
     const ui = await mtjs.get_user_nonce(node, addr, 2);
     const bad = (BigInt(ui.nonce) + 100000n).toString();
     console.log("bad nonce:", bad, "(real:", ui.nonce, ")");
@@ -23,4 +23,4 @@ async function main() {
     console.log("errstr:", block.errstr(rsp.tx_hash));
     console.log("emits:", JSON.stringify(block.emits(rsp.tx_hash)));
 }
-main().then(() => console.log("OK")).catch((e) => console.log("ERR:", JSON.stringify(e)));
+main().then(() => { console.log("OK"); std.exit(0); }).catch((e) => { console.log("ERR:", JSON.stringify(e)); std.exit(1); });

@@ -1,90 +1,80 @@
 #!/usr/local/bin/mtjs
-
 import * as std from "std";
 import { sleep } from "os";
-const node="127.0.0.1:2301";
-let sk=std.getenv('k_root_ed_sk');
-let root_pk=std.getenv('k_root_ed_pk');
-// let u0 = std.getenv('k_u0_ed_pk');
-// let u1 = std.getenv('k_u1_ed_pk');
-// let u2 = std.getenv('k_u2_ed_pk');
-// let u3 = std.getenv('k_u3_ed_pk');
-// let u4 = std.getenv('k_u4_ed_pk');
-// let users=[u0!,u1!,u2!,u3!,u4!];
-let users: string[] = [];
-for (let i = 0; i < 10; i++) {
-    let pk = std.getenv(`k_u${i}_ed_pk`);
-    if (pk) users.push(mtjs.addr_from_pk(pk));
-}
-let nodes: string[] = [];
-for (let i = 0; i < 10; i++) {
-    nodes.push(`n${i}`);
-}
-async function exec() {
-    let i=0;
-        while(true)
-        {
-            mtjs.tx_subscribe(node, (params)=>{
-                // console.log("tx report from js:", JSON.stringify(params));
-            });
-            const ui=await mtjs.get_user_nonce(node,mtjs.addr_from_pk(root_pk!),1.5)
-            const nonce=ui.nonce;
+
+const node = "127.0.0.1:2301";
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
+
+(async () => {
+    console.log(std.getenv("PATH"));
+
+    let keysRaw = "";
+    try { keysRaw = await mtjs.fs.readFile(KEYS_PATH); }
+    catch (e: any) { console.log("readFile " + KEYS_PATH + " err:", String(e)); process.exit(1); }
+    const keys = JSON.parse(keysRaw);
+
+    const root = keys.users && keys.users.root && keys.users.root.keys && keys.users.root.keys[0];
+    if (!root || !root.sk || !root.pk) { console.log("keys_test.json: no users.root.keys[0] sk/pk"); process.exit(1); }
+    const sk = root.sk;
+
+    const users: string[] = [];
+    for (let i = 0; i < 10; i++) {
+        users.push(mtjs.addr_from_name("u" + i));
+    }
+    const nodes: string[] = [];
+    for (let i = 0; i < 10; i++) nodes.push(`n${i}`);
+
+    const rootAddr = mtjs.addr_from_name("root");
+
+    mtjs.tx_subscribe(node, (b: Block) => {
+    });
+
+    async function exec() {
+        while (true) {
+            const ui = await mtjs.get_user_nonce(node, rootAddr, 1.5);
+            const nonce = ui.nonce;
             console.log(ui);
-            let tx=
-                [
-                    {
-                        contract:"root",
-                        method:"mint",
-                        params: { amount:"100000"}
-                    }
-                ];
 
-            for (let i = 0; i < users.length; i++)
-            {
-                tx.push({
-                    contract:"root",
-                    method:"transfer",
-                    params:{to:users[i], amount: `${100+i}`}
-                } as any);
+            let tx: any[] = [
+                { contract: "root", method: "mint", params: { amount: "100000" } },
+            ];
+            for (let i = 0; i < users.length; i++) {
+                tx.push({ contract: "root", method: "transfer",
+                          params: { to: users[i], amount: `${100 + i}` } });
             }
-            for(let i=0;i<nodes.length;i++)
-            {
-                tx.push({
-                    contract:"root",
-                    method:"node_stake",
-                    params:{node:nodes[i], amount:`${i+10}`!}
-                } as any);
+            for (let i = 0; i < nodes.length; i++) {
+                tx.push({ contract: "root", method: "node_stake",
+                          params: { node: nodes[i], amount: `${i + 10}` } });
             }
-            for(let i=1;i<nodes.length;i++)
-            {
-                tx.push({
-                    contract:"root",
-                    method:"node_unstake",
-                    params:{node:nodes[i], amount:`${i+5}`!}
-                } as any);
+            for (let i = 1; i < nodes.length; i++) {
+                tx.push({ contract: "root", method: "node_unstake",
+                          params: { node: nodes[i], amount: `${i + 5}` } });
             }
 
-            // const m=mtjs.tx_sign(tx, sk!);
-            // console.log("signed tx:", m);
-            i++;
-            let req={tx:tx, nonce: nonce, value: 1000000, gasLimit: 100000, priority: 0};
-            const rsp=await mtjs.tx_submit(node,1, JSON.stringify(req), sk!, nonce,
-            (obj)=>{
-                console.log("TX REPORT "+JSON.stringify(obj));
+            const req = {
+                tx: tx,
+                nonce: nonce,
+                value: 100000,
+                gasLimit: 20000,
+                priority: 0,
+                sender: rootAddr,
+                key_id: 0,
+            };
+            const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce, (obj) => {
+                console.log("TX REPORT " + JSON.stringify(obj));
             });
             console.log(rsp);
             sleep(200);
         }
-}
+    }
 
-console.log(std.getenv("PATH"));
-try{
-    const nums=[0,1,2,3,4,5,6,7,8,9
-        // ,10,11,12,13,14,15,16,17,18,19
-    ];
-    for(let i of nums)
-    {
-        mtjs.addInstance(`MTJS${i}`,`
+    const nums = [0,1,2,3,4,5,6,7,8,9];
+    for (let i of nums) {
+        const name = `n${i}`;
+        const k = keys.nodes && keys.nodes[name];
+        if (!k) { console.log("keys_test.json: no node " + name); process.exit(1); }
+
+        mtjs.addInstance(`MTJS${i}`, `
             Start=Node
                 Node_rpc_addr=127.0.0.1:${2300+i}
                 Node_web_addr=0.0.0.0:${7700+i}
@@ -102,36 +92,27 @@ try{
                 HTTP_doc_urls=/pics,/html,/css
                 HTTP_document_root=./www
                 GrainWriter_snapshot_modulus=1000
-                Node_my_sk_bls_env_key=k_node${i}_bls_sk
-                Node_my_sk_ed_env_key=k_node${i}_ed_sk
-                Node_this_node_name=n${i}
+                Node_my_sk_bls=${k.bls_sk}
+                Node_my_sk_ed=${k.ed_sk}
+                Node_this_node_name=${name}
                 Node_sqlite_pn=db/s${i}
-#                db_user=root
- #               db_password=gaga123
-  #              db_socket=/run/mysqld/mysqld.sock
                 db_name=db${i}
                 mysql_max_connections=20
-                 mysql_host=NULL
-                 mysql_user=root
-                 mysql_passwd=gaga123
-                 mysql_database=md
-                 mysql_port=0
-                 mysql_sock=/run/mysqld/mysqld.sock
-
+                mysql_host=NULL
+                mysql_user=root
+                mysql_passwd=gaga123
+                mysql_database=md
+                mysql_port=0
+                mysql_sock=/run/mysqld/mysqld.sock
         `);
     }
-     sleep(200);
+    sleep(200);
     console.log("Start");
-    try{
-        const sk=std.getenv('u_root_ed_sk');
-        setInterval(()=>{
-
-        },5000);
+    try {
+        setInterval(() => {}, 5000);
         await exec();
+    } catch (e) {
+        console.log("catched: ", e);
     }
-    catch(e)
-    {
-        console.log("catched: ",e);
-    }
+})();
 
-} catch(e){console.log(e);}

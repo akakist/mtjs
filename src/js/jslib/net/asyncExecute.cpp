@@ -92,6 +92,7 @@ void execute_task::finalize(JSContext* ctx)
     if(rv==0)
     {
         auto ret=JS_Call(ctx, g_resolve.get(), JS_UNDEFINED, 0, nullptr);
+// logErr2("rv==0");
         scope.addValue(ret);
     } else {
         JSValue str=JS_NewString(ctx, error_str.c_str());

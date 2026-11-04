@@ -17,11 +17,11 @@ function _isAdmin(m: JsiMsg): boolean {
     return String(a.addr) === String(m.sender);
 }
 
+
 registerMethod("init", function (p: { admin: string }, m: JsiMsg) {
     if (getGranule("admin")) throw new Error("already init");
-    createGranule("admin", { addr: String(p.admin) }, 0);
+    createGranule("admin", { addr: String(p.admin) }, 315360000);
 });
-
 registerMethod("issuePass", function (p: { visits: number; user?: string }, m: JsiMsg) {
     if (!_isAdmin(m)) throw new Error("admin only");
     var user = p.user ? String(p.user) : String(m.sender);

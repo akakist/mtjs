@@ -3,22 +3,29 @@
 #include <yyjson.h>
 #include <string>
 #include "commonError.h"
-#include "tr_exec.h"
+#include "nodeService.h"
 #include "ADDRESS_id.h"
 #include "PK_id.h"
 #include "yyjson_to_quickjs.h"
 #include "QUORUM.h"
+#include "normalizeNick.h"
+#include "s_key.h"
 
-std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_params &t,
+std::optional<std::string> Node::Service::execute_mint(yyjson_val *params, b_params &b, t_params &t,
         int seqId)
 {
     MUTEX_INSPECTOR;
 
     auto v = b.db->getValuesNoCreateConst();
+    logNode("t.senderAddrss %s",base16::encode(t.senderAddress.addr).c_str());
     auto it = v->emitters_bin.find(t.senderAddress);
     if (it == v->emitters_bin.end())
     {
-        logErr2("insufficient_privileges");
+        for(auto& z: v->emitters_bin)
+        {
+            logNode("emitter: %s",base16::encode(z.addr).c_str());
+        }
+        logErr2("insufficient_privileges emitter not found");
         return "insufficient_privileges";
     }
     int64_t amount=0;
@@ -51,69 +58,47 @@ std::optional<std::string> TR::execute_mint(yyjson_val *params, b_params &b, t_p
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_transfer(yyjson_val *params, b_params &b, t_params &t,
-        int seqId)
+std::optional<std::string> Node::Service::execute_transfer(yyjson_val *params, b_params &b, t_params &t, int seqId)
 {
     MUTEX_INSPECTOR;
-    auto v = b.db->getValuesNoCreateConst();
 
-    int64_t amount=0;
-    auto err=yy_get_int64_t(params,"amount",amount);
-    if(err) return err;
+    int64_t amount = 0;
+    if (auto err = yy_get_int64_t(params, "amount", amount)) return err;
 
-    std::string to_;
-    err=yy_get_string(params,"to",to_);
-    if(err) return err;
+    std::string to_hex;
+    if (auto err = yy_get_string(params, "to", to_hex)) return err;
 
     ADDRESS_id to_addr;
-    to_addr.addr=base16::decode(to_);
-    if(to_addr.addr.size()!=t.senderAddress.addr.size())
+    to_addr.addr = base16::decode(to_hex);
+    if (to_addr.addr.size() != t.senderAddress.addr.size())
         return "param to has invalid size";
 
     auto u = b.db->getAddressStateNoCreateConst(t.senderAddress);
-    if (!u.valid())
-    {
-        return "sender userstate invalid";
-    }
-    if (to_addr == t.senderAddress)
-    {
-        return "cannot transfer to self";
-    }
-    if (to_addr.addr.size() != t.senderAddress.addr.size())
-    {
-        return "invalid destination address";
-    }
-    
-    // ▼▼▼ create_address — если новый (sender платит, разово)
-    bool to_exists = b.db->getAddressStateNoCreateConst(to_addr).valid();
-    auto to = b.db->getAddressStateOrCreate(to_addr, t.roll);
-    if (!to.valid()) return "destination user not found";
-    if (!to_exists) {
-        t.gasUsed += b.fees.gas_create_address;
-    }
-    // ▲▲▲
-    if(amount>t.value)
-        return "amount>t.value";
+    if (!u.valid()) return "sender userstate invalid";
+    if (to_addr == t.senderAddress) return "cannot transfer to self";
 
-    t.value-=amount;
+    auto to = b.db->getAddressStateNoCreate(to_addr);
+    if (!to.valid()) return "execute_transfer: to address not found "+to_addr.str();
+
+    if (amount > t.value) return "amount>t.value";
+
+    t.value -= amount;
     {
         M_LOCK(to->parent->mx);
-        to->balance+=amount;
+        to->balance += amount;
     }
     t.markDirty(to.get());
 
-
-
-
-    b.emit_command(t.tx_id, seqId, "transfer", R"({"from":"%s","to":"%s","amount":"%s"})",
-                   base16::encode(t.senderAddress.addr).c_str(),
-                   base16::encode(to_addr.addr).c_str(),
-                   std::to_string(amount).c_str()
-                  );
-
+    b.emit_command(t.tx_id, seqId, "transfer",
+        R"({"from":"%s","to":"%s","amount":"%s"})",
+        base16::encode(t.senderAddress.addr).c_str(),
+        base16::encode(to_addr.addr).c_str(),
+        std::to_string(amount).c_str());
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params &b, t_params &t,
+
+
+std::optional<std::string> Node::Service::execute_node_update(yyjson_val *params, b_params &b, t_params &t,
         int seqId)
 {
     MUTEX_INSPECTOR;
@@ -154,7 +139,7 @@ std::optional<std::string> TR::execute_node_update(yyjson_val *params, b_params 
     return std::nullopt;
 }
 
-std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params &b, t_params &t,
+std::optional<std::string> Node::Service::execute_node_create(yyjson_val *params, b_params &b, t_params &t,
         int seqId)
 {
     MUTEX_INSPECTOR;
@@ -212,7 +197,7 @@ std::optional<std::string> TR::execute_node_create(yyjson_val *params, b_params 
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params & b,t_params &t,
+std::optional<std::string> Node::Service::execute_node_stake(yyjson_val *params, b_params & b,t_params &t,
         int seqId)
 {
     MUTEX_INSPECTOR;
@@ -263,7 +248,7 @@ std::optional<std::string> TR::execute_node_stake(yyjson_val *params, b_params &
 
     return std::nullopt;
 }
-std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params & b,t_params &t,
+std::optional<std::string> Node::Service::execute_unstake_node(yyjson_val *params, b_params & b,t_params &t,
         int seqId)
 {
     MUTEX_INSPECTOR;
@@ -314,7 +299,7 @@ std::optional<std::string> TR::execute_unstake_node(yyjson_val *params, b_params
     return std::nullopt;
 }
 
-std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params & b,t_params &t,
+std::optional<std::string> Node::Service::execute_node_enable(yyjson_val *params, b_params & b,t_params &t,
         int seqId)
 {
     MUTEX_INSPECTOR;
@@ -346,7 +331,7 @@ std::optional<std::string> TR::execute_node_enable(yyjson_val *params, b_params 
     return std::nullopt;
 }
 
-std::optional<std::string> TR::execute_node_disable(yyjson_val *params, b_params & b,t_params &t,
+std::optional<std::string> Node::Service::execute_node_disable(yyjson_val *params, b_params & b,t_params &t,
         int seqId)
 {
     MUTEX_INSPECTOR;
@@ -381,7 +366,7 @@ std::optional<std::string> TR::execute_node_disable(yyjson_val *params, b_params
 
 
 
-std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_params &b, t_params &t,
+std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *params, b_params &b, t_params &t,
         int seqId)
 {
     MUTEX_INSPECTOR;
@@ -435,7 +420,7 @@ std::optional<std::string> TR::execute_contract_deploy(yyjson_val *params, b_par
 }
 
 
-std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_params &b, t_params &t,
+std::optional<std::string> Node::Service::execute_contract_update(yyjson_val *params, b_params &b, t_params &t,
         int seqId)
 {
     MUTEX_INSPECTOR;
@@ -469,11 +454,12 @@ std::optional<std::string> TR::execute_contract_update(yyjson_val *params, b_par
 
     b.emit_command(t.tx_id, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",cn.container.c_str(),base16::encode(t.senderAddress.addr).c_str());
 
+    contractHost->contract_cache.erase(cn);
     return std::nullopt;
 }
 
 
-std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_params &t,
+std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_params &b, t_params &t,
         int seqId)
 {
     MUTEX_INSPECTOR;
@@ -568,9 +554,9 @@ std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_p
             auto vv = b.db->getValuesNoCreate();
             {
                 M_LOCK(vv->parent->mx);
-                vv->fees[param] = std::stoull(value);
+                vv->values[param] = std::stoull(value);
                 if (param == "validator_min_stake")
-                    vv->fees["validator_min_stake_activated"] = 1;   // активация sybil (getMetaFull — TBD)
+                    vv->values["validator_min_stake_activated"] = 1;   // активация sybil (getMetaFull — TBD)
             }
             votes->votes.erase(vhash);
             t.markDirty(votes.get());
@@ -595,11 +581,11 @@ std::optional<std::string> TR::execute_vote(yyjson_val *params, b_params &b, t_p
 // total_supply — не меняется (delete — TTL сгорел)
 // emit gc { count }
 
-std::optional<std::string> TR::execute_gc(yyjson_val* params, b_params& b, t_params& t, int seqId, _db_to_save& dbd) 
+std::optional<std::string> Node::Service::execute_gc(yyjson_val* params, b_params& b, t_params& t, int seqId, _db_to_save& dbd) 
 {
     auto v = b.db->getValuesNoCreateConst();
     if (v->emitters_bin.find(t.senderAddress) == v->emitters_bin.end())
-        return "insufficient_privileges";
+        return "insufficient_privileges gc";
 
     yyjson_val* arr = yyjson_obj_get(params, "dbids");
     if (!arr || !yyjson_is_arr(arr)) return "param 'dbids' must be array";
@@ -619,5 +605,108 @@ std::optional<std::string> TR::execute_gc(yyjson_val* params, b_params& b, t_par
         n++;
     }
     b.emit_command(t.tx_id, seqId, "gc", R"({"count":"%d"})", n);
+    return std::nullopt;
+}
+
+std::optional<std::string> Node::Service::execute_create_address(yyjson_val* params, b_params& b, t_params& t, int seqId)
+{
+    std::string addr_hex;
+    if (auto e = yy_get_string(params, "addr", addr_hex)) return e;
+
+    auto addr_bin = base16::decode(addr_hex);
+    if (addr_bin.size() != 32) return "addr: must be 32 bytes hex";
+
+    ADDRESS_id addr; addr.addr = addr_bin;
+
+    auto existing = b.db->getAddressStateNoCreate(addr);
+    if (existing.valid()) return "address already exists";
+
+    yyjson_val* keys_arr = yyjson_obj_get(params, "keys");
+    if (!keys_arr || !yyjson_is_arr(keys_arr)) return "keys: must be array";
+    size_t nkeys = yyjson_arr_size(keys_arr);
+    if (nkeys == 0 || nkeys > MAX_KEYS_PER_ADDRESS) return "keys: 1..5 required";
+
+    struct K { uint8_t type; std::string kb; };
+    std::vector<K> parsed;
+    yyjson_arr_iter it; yyjson_arr_iter_init(keys_arr, &it);
+    yyjson_val* item;
+    while ((item = yyjson_arr_iter_next(&it))) {
+        int64_t type = 0; std::string kb_hex;
+        if (auto e = yy_get_int64_t(item, "type", type)) return e;
+        if (auto e = yy_get_string(item, "keybuffer", kb_hex)) return e;
+        auto kb = base16::decode(kb_hex);
+        if (type == KEY_ED25519 && kb.size() != 32) return "key: bad ed25519 size";
+        if ((type == KEY_SECP256K1 || type == KEY_P256) && kb.size() != 33 && kb.size() != 65)
+            return "key: bad ecdsa size (33/65)";
+        parsed.push_back({(uint8_t)type, kb});
+    }
+
+    auto u = b.db->getAddressStateOrCreate(addr, t.roll);
+    if (!u.valid()) return "create failed";
+    for (auto& k : parsed) {
+        auto id = u->addKey(k.type, k.kb);
+        if (!id) return "addKey failed";
+    }
+    t.markDirty(u.get());
+    t.gasUsed += b.fees.gas_create_address;
+    b.emit_command(t.tx_id, seqId, "create_address",
+        R"({"addr":"%s","keys":%d})", addr_hex.c_str(), (int)parsed.size());
+    return std::nullopt;
+}
+
+std::optional<std::string> Node::Service::execute_add_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId)
+{
+    std::string addr_hex; int64_t type = 0; std::string kb_hex, sig_hex;
+    if (auto e = yy_get_string(params, "addr", addr_hex)) return e;
+    if (auto e = yy_get_int64_t(params, "type", type)) return e;
+    if (auto e = yy_get_string(params, "keybuffer", kb_hex)) return e;
+    if (auto e = yy_get_string(params, "sig", sig_hex)) return e;
+
+    ADDRESS_id addr; addr.addr = base16::decode(addr_hex);
+    auto u = b.db->getAddressStateNoCreate(addr);
+    if (!u.valid()) return "execute_add_address_key: address not found";
+
+    bool is_owner = false;
+    for (auto& [id, k] : u->keys) if (k.keybuffer == t.tx->pk_ed_bin) { is_owner = true; break; }
+    if (!is_owner) return "sender is not an owner";
+
+    auto kb = base16::decode(kb_hex);
+    if (type == KEY_ED25519 && kb.size() != 32) return "key: bad ed25519 size";
+    if ((type == KEY_SECP256K1 || type == KEY_P256) && kb.size() != 33 && kb.size() != 65)
+        return "key: bad ecdsa size (33/65)";
+
+    std::string msg = "add_address_key:" + addr_hex + ":" + kb_hex;
+    if (!verify(Key{0, (uint8_t)type, kb}, base16::decode(sig_hex), msg))
+        return "sig: invalid";
+
+    auto id = u->addKey((uint8_t)type, kb);
+    if (!id) return "too many keys (max 5)";
+    t.markDirty(u.get());
+    b.emit_command(t.tx_id, seqId, "add_address_key",
+        R"({"addr":"%s","key_id":%llu})", addr_hex.c_str(), (unsigned long long)*id);
+    return std::nullopt;
+}
+
+std::optional<std::string> Node::Service::execute_remove_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId)
+{
+    std::string addr_hex; int64_t key_id = 0;
+    if (auto e = yy_get_string(params, "addr", addr_hex)) return e;
+    if (auto e = yy_get_int64_t(params, "key_id", key_id)) return e;
+
+    ADDRESS_id addr; addr.addr = base16::decode(addr_hex);
+    auto u = b.db->getAddressStateNoCreate(addr);
+    if (!u.valid()) return (std::string)"execute_remove_address_key: address not found "+addr.str();
+
+    bool is_owner = false;
+    for (auto& [id, k] : u->keys) if (k.keybuffer == t.tx->pk_ed_bin) { is_owner = true; break; }
+    if (!is_owner) return "sender is not an owner";
+
+    if (!u->hasKeyId((uint64_t)key_id)) return "key_id not found";
+    if (u->sizeKeys() <= 1) return "cannot remove last key";
+
+    u->removeKey((uint64_t)key_id);
+    t.markDirty(u.get());
+    b.emit_command(t.tx_id, seqId, "remove_address_key",
+        R"({"addr":"%s","key_id":%lld})", addr_hex.c_str(), (long long)key_id);
     return std::nullopt;
 }

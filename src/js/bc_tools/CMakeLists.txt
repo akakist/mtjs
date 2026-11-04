@@ -14,7 +14,6 @@ add_library(bctools STATIC
     tree.cpp
     base16.cpp
     normalizeNick.cpp
-tr_exec.cpp
 cellable.cpp
 msg.cpp
 msgFactory.cpp
@@ -48,6 +47,8 @@ yyjson_to_quickjs.h
 getValidators.cpp
 IDatabase.cpp
 blockMeta.h
+s_key.cpp
+s_key.h
 )
 
 

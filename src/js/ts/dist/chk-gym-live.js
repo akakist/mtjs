@@ -1,19 +1,20 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
-// chk-gym-live.ts — gym на живой ноде:
-//   ensureRootFunded (mint 100M, если root < 50M)
-//   → get_contract(gym): found → contract_update; иначе → contract_deploy
-//   → init (admin = hex root, если admin нет)
-//   → issuePass → createEntry (если нет активного) → markUsed (на активный id)
-//   → get_contract_data.
-// node :2301 (n1). root — admin/sender (hex). get_contract_data: key = "abonement<hex>"/"entry<hex>".
 const node = "127.0.0.1:2301";
 const GYM_SRC_PATH = "/home/bsr/mtjs/src/js/tsi/dist/contracts/gym.js";
 const GAS_LIMIT = 100000;
-const rootSk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk");
-const rootPk = std.getenv("k_root_ed_pk");
-if (!rootSk || !rootPk)
-    throw new Error("no root sk/pk");
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
+let rootSk = "";
+let rootPk = "";
+async function loadKeys() {
+    const raw = await mtjs.fs.readFile(KEYS_PATH);
+    const keys = JSON.parse(raw);
+    const r = keys.users?.root?.keys?.[0];
+    if (!r?.sk || !r?.pk)
+        throw new Error("keys_test.json: no users.root.keys[0].sk/pk");
+    rootSk = r.sk;
+    rootPk = r.pk;
+}
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
@@ -56,34 +57,40 @@ function waitTx(h, to) {
 }
 async function getNonce(addr) {
     const ui = await mtjs.get_user_nonce(node, addr, 3);
+    console.log("getNonce: " + ui.nonce);
     return BigInt(ui.nonce);
 }
 async function getBalance(addr) {
     const ui = await mtjs.get_user_nonce(node, addr, 3);
     return BigInt(ui.balance);
 }
-async function waitNonceGt(addr, lastNonce, timeoutSec = 10) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeoutSec * 1000) {
-        const n = await getNonce(addr);
-        if (n > lastNonce)
-            return n;
-        await new Promise((r) => setTimeout(() => r(), 200));
+async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        if (rsp.err) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        const b = await waitTx(rsp.tx_hash, 10);
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
     }
-    throw new Error("waitNonceGt timeout: lastNonce=" + lastNonce.toString());
+    throw new Error("submitAndWait: retries exhausted");
 }
-async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT) {
-    const ui = await mtjs.get_user_nonce(node, addr, 3);
-    const req = { tx, nonce: ui.nonce, value, gasLimit, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, ui.nonce, () => { });
-    if (rsp.err)
-        throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, 10);
-    await waitNonceGt(addr, BigInt(ui.nonce), 10);
-    return { rsp, block: b };
-}
-const rootAddr = mtjs.addr_from_pk(rootPk);
-// ensure root funded: если balance < min — mint 100M (root → root, value=0, gasLimit=20000).
+const rootAddr = mtjs.addr_from_name("root");
 async function ensureRootFunded(minBalance) {
     const bal = await getBalance(rootAddr);
     console.log("  root balance:", bal.toString(), "min:", minBalance.toString());
@@ -103,7 +110,6 @@ async function ensureRootFunded(minBalance) {
     console.log("  root balance after mint:", bal2.toString());
     check(bal2 >= minBalance, "root funded after mint >= " + minBalance.toString());
 }
-// get_contract: found → update; иначе → deploy. Идемпотентно.
 async function ensureGym(src) {
     const c = await mtjs.get_contract(node, "gym", 3);
     if (c.found) {
@@ -120,7 +126,6 @@ async function ensureGym(src) {
         check(block.status(rsp.tx_hash) === "ok", "contract_deploy gym ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
     }
 }
-// init: если admin нет — init(admin=hex root). Идемпотентно.
 async function ensureInit() {
     const r = await mtjs.get_contract_data(node, "gym", "admin", 3);
     if (r.found) {
@@ -132,7 +137,6 @@ async function ensureInit() {
     ]);
     check(block.status(rsp.tx_hash) === "ok", "gym.init ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
 }
-// активный entry: !disabled && used<M && expires_at > now. Возвращает id или -1.
 function findActiveId(passes, now) {
     for (const pp of passes) {
         if (!pp.disabled && Number(pp.used) < Number(pp.M) && Number(pp.expires_at) > now)
@@ -141,6 +145,7 @@ function findActiveId(passes, now) {
     return -1;
 }
 async function main() {
+    await loadKeys();
     console.log("=== GYM LIVE (node " + node + ") ===");
     await ensureRootFunded(50000000n);
     let src = "";
@@ -154,7 +159,6 @@ async function main() {
     check(src.length > 0, "gym src read (" + src.length + " bytes)");
     await ensureGym(src);
     await ensureInit();
-    // issuePass — только если abonement нет
     {
         const r = await mtjs.get_contract_data(node, "gym", "abonement" + rootAddr, 3);
         if (r.found) {
@@ -183,7 +187,6 @@ async function main() {
                 check(Number(v.visits) >= 0, "abonement.visits >= 0 (got " + (v && v.visits) + ")");
         }
     }
-    // createEntry — только если нет активного (иначе «entry active»)
     {
         const now = Math.floor(Date.now() / 1000);
         const r = await mtjs.get_contract_data(node, "gym", "entry" + rootAddr, 3);
@@ -210,7 +213,6 @@ async function main() {
         console.log("  entry:", JSON.stringify(r));
         check(r.found === true, "entry found");
     }
-    // markUsed — на активный id
     {
         const now = Math.floor(Date.now() / 1000);
         const r = await mtjs.get_contract_data(node, "gym", "entry" + rootAddr, 3);
@@ -251,6 +253,7 @@ async function main() {
         console.log(GREEN + "DONE" + RESET);
     else
         console.log(RED + "FAIL" + RESET);
+    std.exit(fail);
 }
 main().catch((e) => console.log(RED + "ERR: " + errStr(e) + RESET));
 setInterval(() => { }, 1000000);

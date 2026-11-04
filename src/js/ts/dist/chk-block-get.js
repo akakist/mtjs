@@ -20,12 +20,10 @@ function errStr(e) {
 }
 async function main() {
     console.log("[t5] get_block (next block)");
-    const addr = mtjs.addr_from_pk(pk);
+    const addr = mtjs.addr_from_name("root");
     const ui = await mtjs.get_user_nonce(node, addr, 3);
     const nonce = BigInt(ui.nonce);
-    // 1. подписаться ДО сборки блока
     const p = mtjs.get_block(node, 10);
-    // 2. отправить TX, чтобы блок собрался
     const tx = [{ contract: "root", method: "mint", params: { amount: "1" } }];
     const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0 };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
@@ -34,7 +32,6 @@ async function main() {
         check(false, "submit failed");
         return;
     }
-    // 3. дождаться блока
     const t0 = Date.now();
     const b = await p;
     const dt = Date.now() - t0;
@@ -45,6 +42,6 @@ async function main() {
     check(dt < 10500, "resolved < 10.5s");
 }
 main()
-    .then(() => console.log("OK"))
-    .catch((e) => console.log("ERR:", errStr(e)));
+    .then(() => { console.log("OK"); std.exit(0); })
+    .catch((e) => { console.log("ERR:", errStr(e)); std.exit(1); });
 setInterval(() => { }, 1000000);

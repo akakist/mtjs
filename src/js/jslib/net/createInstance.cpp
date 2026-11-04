@@ -33,6 +33,8 @@
 #include "md/md_GetContractREQ.h"
 #include "js_tools.h"
 #include "md/md_GetStateREQ.h"
+#include "md/md_GetAddressInfoREQ.h"
+#include "md/md_GetAddressInfoRSP.h"
 // #include ""
 
 static std::string js_obj_to_kv(JSContext *ctx,
@@ -95,9 +97,9 @@ JSValue js_get_contract(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     rq->contract.container = contract;
     auto hash = rq->getHash();
     op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
-        new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
-        new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
 
     auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
@@ -219,11 +221,11 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     // JSValueGuard g_func(ctx,JS_DupValue(ctx,argv[5]));
     int64_t nonce=0;
     try
-    {        nonce=std::atoll(nonce_str.c_str());
-    }    
+    {   nonce=std::atoll(nonce_str.c_str());
+    }
     catch (std::exception &e)
     {
-                return JS_ThrowInternalError(ctx, "error parsing nonce: %s", e.what());
+        return JS_ThrowInternalError(ctx, "error parsing nonce: %s", e.what());
     }
 
 
@@ -237,13 +239,14 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     if (JS_IsFunction(ctx, argv[5])) {
         op->node_tx_cb.emplace(hash.container, JSValueGuard(ctx, JS_DupValue(ctx, argv[5])));
         // подписка на блок с этой TX (BlockStreamer шлёт RSP только если tx_hash в блоке)
-        THASH_id h; h.container = hash.container;
+        THASH_id h;
+        h.container = hash.container;
         op->broadcaster->sendEvent(node_addr, ServiceEnum::BlockStreamer,
-            new bcEvent::ClientTxWaitREQ(h, (time_t)timeout, op->listener_->serviceId));
+                                   new bcEvent::ClientTxWaitREQ(h, (time_t)timeout, op->listener_->serviceId));
         // таймер на блок (TIMER_TX_WAIT_BLOCK)
         op->broadcaster->sendEvent(ServiceEnum::Timer,
-            new timerEvent::SetAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(hash.container), NULL, timeout, op->listener_));
-    }    
+                                   new timerEvent::SetAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(hash.container), NULL, timeout, op->listener_));
+    }
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, timeout, op->listener_));
 
@@ -265,22 +268,56 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     return g_prom.release();
 }
-JSValue js_addr_from_pk(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
-{
-    MUTEX_INSPECTOR;
-    JSScope<10, 10> scope(ctx);
-    // mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    if (argc != 1)
-        return JS_ThrowInternalError(ctx, "number of argument must be 1");
-    if (!JS_IsString(argv[0]))
-        return JS_ThrowInternalError(ctx, "pk not specified, must be string");
-    auto pk = base16::decode(scope.toStdString(argv[0]));
-    auto addr = blake2b_hash(pk);
-    auto addr_str = base16::encode(addr.container);
-    // logErr2("addr from pk: %s", addr_str.c_str());
-    return JS_NewString(ctx, addr_str.c_str());
-}
 /////////////////
+
+JSValue js_get_address_info(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv)
+{
+    JSScope<10,10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque*)JS_GetContextOpaque(ctx);
+    if (!op) return JS_ThrowInternalError(ctx, "get_address_info: !op");
+    if (argc != 3) return JS_ThrowInternalError(ctx, "get_address_info(node, addr, timeout)");
+    if (!JS_IsString(argv[0]) || !JS_IsString(argv[1]) || !JS_IsNumber(argv[2]))
+        return JS_ThrowInternalError(ctx, "get_address_info: bad args");
+    std::string node_addr = scope.toStdString(argv[0]);
+    std::string addr = scope.toStdString(argv[1]);
+    double to = 0;
+    if (JS_ToFloat64(ctx, &to, argv[2])) return JS_ThrowInternalError(ctx, "timeout parse error");
+
+    REF_getter<MsgData::GetAddressInfoREQ> rq = new MsgData::GetAddressInfoREQ();
+    rq->addr.addr = base16::decode(addr);
+    auto hash = rq->getHash();
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+    op->broadcaster->sendEvent(ServiceEnum::Timer,
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+
+    auto &pd = op->node_req_promises[hash.container];
+    pd.ctx = ctx;
+    JSValue prom[2];
+    JSValue promise = JS_NewPromiseCapability(ctx, prom);
+    JSValueGuard g_resolve(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[1]);
+    JSValueGuard g_prom(ctx, promise);
+    if (JS_IsException(promise)) return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
+    pd.resolve = g_resolve;
+    pd.reject = g_reject;
+    return g_prom.release();
+}
+#include "normalizeNick.h"
+
+JSValue js_addr_from_name(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    JSScope<10,10> scope(ctx);
+    if (argc != 1 || !JS_IsString(argv[0]))
+        return JS_ThrowTypeError(ctx, "addr_from_name(nick)");
+    std::string nick = scope.toStdString(argv[0]);
+    std::string norm = normalizeNick(nick);
+    if (norm.empty())
+        return JS_ThrowTypeError(ctx, "addr_from_name: bad nick (only ASCII a-zA-Z0-9_@.)");
+    ADDRESS_id addr;
+    addr.addr = blake2b_hash(norm).container;
+    auto hex = base16::encode(addr.addr);
+    return JS_NewStringLen(ctx, hex.data(), hex.size());
+}
 JSValue js_get_user_nonce(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     MUTEX_INSPECTOR;
@@ -376,9 +413,9 @@ JSValue js_tx_wait_block(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     pd.reject = g_reject;
     // logErr2("js_tx_wait_block: node=%s tx=%s timeout=%lf", node_addr.c_str(), tx_hash_hex.c_str(), timeout);
     op->broadcaster->sendEvent(node_addr, ServiceEnum::BlockStreamer,
-        new bcEvent::ClientTxSubscribeREQ(op->listener_->serviceId));
+                               new bcEvent::ClientTxSubscribeREQ(op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
-        new timerEvent::SetAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(tx_hash_hex), NULL, timeout, op->listener_));
+                               new timerEvent::SetAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(tx_hash_hex), NULL, timeout, op->listener_));
 
     return g_prom.release();
 }
@@ -421,9 +458,9 @@ JSValue js_get_block(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     pd.reject = g_reject;
 
     op->broadcaster->sendEvent(node_addr, ServiceEnum::BlockStreamer,
-        new bcEvent::ClientTxSubscribeREQ(op->listener_->serviceId));
+                               new bcEvent::ClientTxSubscribeREQ(op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
-        new timerEvent::SetAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(next_key), NULL, timeout, op->listener_));
+                               new timerEvent::SetAlarm(Timers::TIMER_TX_WAIT_BLOCK, toRef(next_key), NULL, timeout, op->listener_));
 
     return g_prom.release();
 }
@@ -447,9 +484,9 @@ JSValue js_get_node_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     rq->node_name.container = name;
     auto hash = rq->getHash();
     op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
-        new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
-        new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
 
     auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
@@ -480,9 +517,9 @@ JSValue js_get_values(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
     REF_getter<MsgData::GetValuesREQ> rq = new MsgData::GetValuesREQ();
     auto hash = rq->getHash();
     op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
-        new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
-        new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
 
     auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
@@ -517,9 +554,9 @@ JSValue js_get_contract_data(JSContext *ctx, JSValueConst this_val, int argc, JS
     rq->key.container = key;
     auto hash = rq->getHash();
     op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
-        new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
-        new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
 
     auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
@@ -551,9 +588,9 @@ JSValue js_get_state(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     REF_getter<MsgData::GetStateREQ> rq = new MsgData::GetStateREQ();
     auto hash = rq->getHash();
     op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
-        new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
-        new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
 
     auto &pd = op->node_req_promises[hash.container];
     pd.ctx = ctx;
@@ -584,7 +621,7 @@ JSValue js_tx_unsubscribe(JSContext *ctx, JSValueConst this_val, int argc, JSVal
         h.container = base16::decode(hex);
     }
     op->broadcaster->sendEvent(node_addr, ServiceEnum::BlockStreamer,
-        new bcEvent::ClientTxUnsubscribeREQ(h, op->listener_->serviceId));
+                               new bcEvent::ClientTxUnsubscribeREQ(h, op->listener_->serviceId));
     if (h.container.empty()) op->tx_subscription_cb.reset();
     return JS_UNDEFINED;
 }
@@ -593,11 +630,10 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     MUTEX_INSPECTOR;
     // logErr2("js_register_add_instance");
     JS_SetPropertyStr(ctx, mtjs_obj, "addInstance",       JS_NewCFunction(ctx, js_add_instance,       "addInstance", 2));
-     JS_SetPropertyStr(ctx, mtjs_obj, "killInstance",     JS_NewCFunction(ctx, js_kill_instance,     "killInstance", 1));
+    JS_SetPropertyStr(ctx, mtjs_obj, "killInstance",     JS_NewCFunction(ctx, js_kill_instance,     "killInstance", 1));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_submit",         JS_NewCFunction(ctx, js_tx_submit,          "tx_submit", 6));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_subscribe",      JS_NewCFunction(ctx, js_tx_subscribe,       "tx_subscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_user_nonce",    JS_NewCFunction(ctx, js_get_user_nonce,     "get_user_nonce", 3));
-    JS_SetPropertyStr(ctx, mtjs_obj, "addr_from_pk",      JS_NewCFunction(ctx, js_addr_from_pk,       "addr_from_pk", 1));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_wait_block",     JS_NewCFunction(ctx, js_tx_wait_block,      "tx_wait_block", 3));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_block",         JS_NewCFunction(ctx, js_get_block,          "get_block", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_node_info",     JS_NewCFunction(ctx, js_get_node_info,      "get_node_info", 3));
@@ -606,4 +642,8 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     JS_SetPropertyStr(ctx, mtjs_obj, "get_contract_data", JS_NewCFunction(ctx, js_get_contract_data,  "get_contract_data", 4));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_contract", JS_NewCFunction(ctx, js_get_contract, "get_contract", 3));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_state", JS_NewCFunction(ctx, js_get_state, "get_state", 2));
+// в js_register_add_instance:
+    JS_SetPropertyStr(ctx, mtjs_obj, "get_address_info", JS_NewCFunction(ctx, js_get_address_info, "get_address_info", 3));
+    JS_SetPropertyStr(ctx, mtjs_obj, "addr_from_name", JS_NewCFunction(ctx, js_addr_from_name, "addr_from_name", 1));
+
 }

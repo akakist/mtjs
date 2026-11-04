@@ -11,10 +11,12 @@ namespace MsgData
         }
         int64_t balance;
         int64_t nonce;
+        bool found=false;
         void update(Blake2bHasher& h) const
         {
             h.update(std::to_string(balance));
             h.update(std::to_string(nonce));
+            h.update(std::to_string(found));
         }
 
         void pack(outBuffer& b) const final
@@ -23,16 +25,18 @@ namespace MsgData
 
             Base::pack(b);
             b
-            <<balance
-            <<nonce;
+            << balance
+            << nonce
+            << found;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b
-            >>balance
-            >>nonce;
+            >> balance
+            >> nonce
+            >> found;
         }
 
         static Base* construct()

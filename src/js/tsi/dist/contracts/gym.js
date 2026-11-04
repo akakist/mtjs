@@ -19,7 +19,7 @@ function _isAdmin(m) {
 registerMethod("init", function (p, m) {
     if (getGranule("admin"))
         throw new Error("already init");
-    createGranule("admin", { addr: String(p.admin) }, 0);
+    createGranule("admin", { addr: String(p.admin) }, 315360000);
 });
 registerMethod("issuePass", function (p, m) {
     if (!_isAdmin(m))

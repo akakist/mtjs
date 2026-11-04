@@ -2,7 +2,7 @@
 registerMethod("createX", function (p, m) {
     if (getGranule("x"))
         throw new Error("x exists");
-    createGranule("x", { v: 1 }, 0);
+    createGranule("x", { v: 1 }, 100000);
 });
 registerMethod("deleteX", function (p, m) {
     if (!getGranule("x"))

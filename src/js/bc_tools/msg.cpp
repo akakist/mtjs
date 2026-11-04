@@ -61,7 +61,8 @@ const char *msgName(int id)
     case msgid::GetStateRSP: return "GetStateRSP";
     case msgid::LeaderCert:
         return "LeaderCert";
-
+    case msgid::GetAddressInfoREQ: return "GetAddressInfoREQ";
+    case msgid::GetAddressInfoRSP: return "GetAddressInfoRSP";
 
     default:
         return "unknown";

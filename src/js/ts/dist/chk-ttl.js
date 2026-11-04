@@ -2,10 +2,18 @@
 import * as std from "std";
 const node = "127.0.0.1:2301";
 const SRC = "/home/bsr/mtjs/src/js/tsi/dist/contracts/ttl_test.js";
-const rootSk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk");
-const rootPk = std.getenv("k_root_ed_pk");
-if (!rootSk || !rootPk)
-    throw new Error("no root sk/pk");
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
+let rootSk = "";
+let rootPk = "";
+async function loadKeys() {
+    const raw = await mtjs.fs.readFile(KEYS_PATH);
+    const keys = JSON.parse(raw);
+    const r = keys.users?.root?.keys?.[0];
+    if (!r?.sk || !r?.pk)
+        throw new Error("keys_test.json: no users.root.keys[0].sk/pk");
+    rootSk = r.sk;
+    rootPk = r.pk;
+}
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
@@ -42,43 +50,76 @@ function waitTx(h, to) {
     });
 }
 async function getNonce(addr) {
-    return BigInt((await mtjs.get_user_nonce(node, addr, 3)).nonce);
+    const ui = await mtjs.get_user_nonce(node, addr, 3);
+    console.log("getNonce: " + ui.nonce);
+    return BigInt(ui.nonce);
 }
-async function waitNonceGt(addr, last, to = 10) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < to * 1000) {
-        const n = await getNonce(addr);
-        if (n > last)
-            return n;
-        await new Promise(r => setTimeout(() => r(), 200));
+async function submitAndWait(sk, addr, tx, value = 0, gasLimit = 100000, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        if (rsp.err) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        const b = await waitTx(rsp.tx_hash, 10);
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
     }
-    throw new Error("waitNonceGt timeout");
+    throw new Error("submitAndWait: retries exhausted");
 }
-async function submitAndWait(sk, addr, tx, value = 0, gasLimit = 100000) {
-    const ui = await mtjs.get_user_nonce(node, addr, 3);
-    const req = { tx, nonce: ui.nonce, value, gasLimit, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, ui.nonce, () => { });
-    if (rsp.err)
-        throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, 10);
-    await waitNonceGt(addr, BigInt(ui.nonce), 10);
-    return { rsp, block: b };
+async function submitAndWaitErr(sk, addr, tx, value = 0, gasLimit = 100000, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        if (rsp.err) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        let b;
+        try {
+            b = await waitTx(rsp.tx_hash, 30);
+        }
+        catch (e) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw e;
+        }
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
+    }
+    throw new Error("submitAndWaitErr: retries exhausted");
 }
-async function submitAndWaitErr(sk, addr, tx, value = 0, gasLimit = 100000) {
-    const ui = await mtjs.get_user_nonce(node, addr, 3);
-    const req = { tx, nonce: ui.nonce, value, gasLimit, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, ui.nonce, () => { });
-    if (rsp.err)
-        throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, 10);
-    await waitNonceGt(addr, BigInt(ui.nonce), 10);
-    return { rsp, block: b };
-}
-const rootAddr = mtjs.addr_from_pk(rootPk);
+const rootAddr = mtjs.addr_from_name("root");
 function txErr(b, h) {
     return b.errstr(h) || "";
 }
-// cleanup: удалить гранулу, если есть (от прошлого прогона)
 async function cleanupGranule(method, key) {
     const g = await mtjs.get_contract_data(node, "ttl_test", key, 3);
     if (g.found) {
@@ -89,6 +130,7 @@ async function cleanupGranule(method, key) {
     }
 }
 async function main() {
+    await loadKeys();
     console.log("=== TTL TEST (node " + node + ") ===");
     const rb = BigInt((await mtjs.get_user_nonce(node, rootAddr, 3)).balance);
     if (rb < 50000000n) {
@@ -124,9 +166,7 @@ async function main() {
         ]);
         check(block.status(rsp.tx_hash) === "ok", "contract_deploy (errstr=" + txErr(block, rsp.tx_hash) + ")");
     }
-    // cleanup x (от прошлого прогона)
     await cleanupGranule("deleteX", "x");
-    // t1: createGranule с ttl=86400 (1 день) — ok
     {
         console.log("\n[t1] createGranule ttl=86400 (1 день) — ok");
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
@@ -136,7 +176,6 @@ async function main() {
         const g = await mtjs.get_contract_data(node, "ttl_test", "x", 3);
         check(g.found === true, "x found");
     }
-    // t2: createGranule ttl=0 — err (ttl > 0)
     {
         console.log("\n[t2] createGranule ttl=0 — err (ttl > 0)");
         const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
@@ -146,7 +185,6 @@ async function main() {
         const es = txErr(block, rsp.tx_hash);
         check(es.indexOf("ttl must be > 0") >= 0, "errstr: ttl must be > 0 (got: " + es + ")");
     }
-    // t3: createGranule ttl > MAX_GRANULE_TTL (10 лет = 315360000) — err
     {
         console.log("\n[t3] createGranule ttl > MAX (10 лет) — err");
         const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
@@ -156,7 +194,6 @@ async function main() {
         const es = txErr(block, rsp.tx_hash);
         check(es.indexOf("MAX_TTL") >= 0, "errstr: MAX_TTL (got: " + es + ")");
     }
-    // t4: setGranule x (автопродление, старый ttl=86400) — ok
     {
         console.log("\n[t4] setGranule x (автопродление, ttl=86400) — ok");
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
@@ -170,7 +207,6 @@ async function main() {
             check(v.v === 2, "x.v == 2 (got " + v.v + ")");
         }
     }
-    // t5: deleteGranule x — ok
     {
         console.log("\n[t5] deleteGranule x — ok");
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
@@ -180,24 +216,22 @@ async function main() {
         const g = await mtjs.get_contract_data(node, "ttl_test", "x", 3);
         check(g.found === false, "x deleted (found=false)");
     }
-    // t6: createGranule без ttl (undefined) — err
     {
         console.log("\n[t6] createGranule без ttl (undefined) — err");
         const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
-            { contract: "ttl_test", method: "createY", params: {} }, // ttl отсутствует
+            { contract: "ttl_test", method: "createY", params: {} },
         ]);
         check(block.status(rsp.tx_hash) === "err", "createY без ttl err");
         const es = txErr(block, rsp.tx_hash);
         console.log("  errstr:", es);
         check(es.indexOf("ttl") >= 0, "errstr mentions ttl (got: " + es + ")");
     }
-    // cleanup y/z (если созданы — не должны)
-    // (t2/t3/t6 — err, y/z не созданы; cleanup не нужен)
     console.log("\n=== RESULT: " + pass + " passed, " + fail + " failed ===");
     if (fail === 0)
         console.log(GREEN + "DONE" + RESET);
     else
         console.log(RED + "FAIL" + RESET);
+    std.exit(fail);
 }
 main().catch((e) => console.log(RED + "ERR: " + errStr(e) + RESET));
 setInterval(() => { }, 1000000);

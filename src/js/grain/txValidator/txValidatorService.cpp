@@ -104,39 +104,60 @@ TxValidator::Service::Service(const SERVICE_id &id, const std::string &nm, IInst
 {
 }
 
+#include "s_key.h"
+#include "bc_address_state.h"
+#include <yyjson.h>
+
 bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
     MUTEX_INSPECTOR;
     conf = e;
-    // db=e->db;
-    // dbroot=e->root;
+    db = e->db;
     return true;
 }
+
 bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
 {
     MUTEX_INSPECTOR;
-// logErr2("TxValidator AddTxREQ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-
     std::optional<std::string> err;
     auto hash = e->tx->getHash();
-    if (!err)
-    {
-        if (!e->tx->verify())
-        {
-            err = "verify failed";
-            logErr2("verify failed");
+
+    yyjson_doc* doc = yyjson_read(e->tx->tx_body.data(), e->tx->tx_body.size(), 0);
+    if (!doc) { err = "tx_body: invalid json"; }
+    else {
+        yyjson_val *root = yyjson_doc_get_root(doc);
+        yyjson_val *sv = root ? yyjson_obj_get(root, "sender") : nullptr;
+        yyjson_val *ki = root ? yyjson_obj_get(root, "key_id") : nullptr;
+        std::string sender_hex;
+        if (sv && yyjson_is_str(sv)) sender_hex = yyjson_get_str(sv);
+        int64_t key_id = -1;
+        if (ki && yyjson_is_num(ki)) key_id = yyjson_get_sint(ki);
+
+        if (!sender_hex.empty()) {
+            ADDRESS_id senderAddress;
+            senderAddress.addr = base16::decode(sender_hex);
+            auto u = db->getAddressStateNoCreate(senderAddress);
+            if (!u.valid()) { err = "sender address not found"; }
+            else if (key_id < 0) { err = "key_id required"; }
+            else {
+                auto k = u->getKey((uint64_t)key_id);
+                if (!k) { err = "key_id not found"; }
+                else if (!verify(*k, e->tx->sig_ed_bin, hash.container)) { err = "verify failed"; }
+                else {
+                    e->tx->sender_addr = senderAddress;
+                    e->tx->sender_key_id = (uint64_t)key_id;
+                    e->tx->sender_resolved = true;
+                }
+            }
+        } else {
+            if (!e->tx->verify()) err = "verify failed (legacy ed25519)";
         }
+        yyjson_doc_free(doc);
     }
 
-    if (!err)
-    {
-        logErr2("sendEvent(ServiceEnum::Node, new bcEvent::PutTransactionREQ(e->tx, this));");
-        sendEvent(ServiceEnum::Node, new bcEvent::PutTransactionREQ(e->tx, this));
-
-    }
-
-    passEvent(
-        new bcEvent::AddTxRSP(hash, err.has_value(), err ? *err : "transaction added to pool", poppedFrontRoute(e->route)));
+    if (!err) sendEvent(ServiceEnum::Node, new bcEvent::PutTransactionREQ(e->tx, this));
+    passEvent(new bcEvent::AddTxRSP(hash, err.has_value(), err ? *err : "transaction added to pool",
+                                    poppedFrontRoute(e->route)));
     return true;
 }
 

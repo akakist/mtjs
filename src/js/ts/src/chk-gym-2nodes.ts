@@ -10,10 +10,16 @@ const node1 = "127.0.0.1:2301";
 const node2 = "127.0.0.1:2302";
 const GYM_SRC_PATH = "/home/bsr/mtjs/src/js/tsi/dist/contracts/gym.js";
 const GAS_LIMIT = 100000;
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 
-const rootSk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk");
-const rootPk = std.getenv("k_root_ed_pk");
-if (!rootSk || !rootPk) throw new Error("no root sk/pk");
+let rootSk = ""; let rootPk = "";
+async function loadKeys() {
+    const raw = await mtjs.fs.readFile(KEYS_PATH);
+    const keys = JSON.parse(raw);
+    const r = keys.users?.root?.keys?.[0];
+    if (!r?.sk || !r?.pk) throw new Error("keys_test.json: no users.root.keys[0].sk/pk");
+    rootSk = r.sk; rootPk = r.pk;
+}
 
 const GREEN = "\x1b[32m"; const RED = "\x1b[31m"; const RESET = "\x1b[0m";
 let pass = 0; let fail = 0;
@@ -27,7 +33,6 @@ function errStr(e: any): string {
     return String(e);
 }
 
-// pending tx → block (по :2301)
 const pending: { [h: string]: { resolve: (b: Block) => void; reject: (e: any) => void; timer: any } } = {};
 mtjs.tx_subscribe(node1, (b: Block) => {
     for (const h of b.tx_hashes) {
@@ -46,42 +51,58 @@ function waitTx(h: string, to: number): Promise<Block> {
 }
 async function getNonce(addr: string): Promise<bigint> {
     const ui = await mtjs.get_user_nonce(node1, addr, 3);
+    console.log("getNonce: " + ui.nonce);
     return BigInt(ui.nonce);
 }
-async function waitNonceGt(addr: string, lastNonce: bigint, timeoutSec = 10): Promise<bigint> {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeoutSec * 1000) {
-        const n = await getNonce(addr);
-        if (n > lastNonce) return n;
-        await new Promise<void>((r) => setTimeout(() => r(), 200));
-    }
-    throw new Error("waitNonceGt timeout: lastNonce=" + lastNonce.toString());
-}
-async function submitAndWait(sk: string, addr: string, tx: any[], value = 0, gasLimit = GAS_LIMIT) {
-    const ui = await mtjs.get_user_nonce(node1, addr, 3);
-    const req = { tx, nonce: ui.nonce, value, gasLimit, priority: 0 };
-    const rsp = await mtjs.tx_submit(node1, 1, JSON.stringify(req), sk, ui.nonce, () => {});
-    if (rsp.err) throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, 10);
-    await waitNonceGt(addr, BigInt(ui.nonce), 10);
-    return { rsp, block: b };
-}
-async function submitAndWaitErr(sk: string, addr: string, tx: any[], value = 0, gasLimit = GAS_LIMIT) {
-    const ui = await mtjs.get_user_nonce(node1, addr, 3);
-    const req = { tx, nonce: ui.nonce, value, gasLimit, priority: 0 };
-    const rsp = await mtjs.tx_submit(node1, 1, JSON.stringify(req), sk, ui.nonce, () => {});
-    if (rsp.err) throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, 10);
-    await waitNonceGt(addr, BigInt(ui.nonce), 10);
-    return { rsp, block: b };
-}
-
-const rootAddr = mtjs.addr_from_pk(rootPk!);
-
 async function getBalance(addr: string): Promise<bigint> {
     const ui = await mtjs.get_user_nonce(node1, addr, 3);
     return BigInt(ui.balance);
 }
+
+async function submitAndWait(sk: string, addr: string, tx: any[], value = 0, gasLimit = GAS_LIMIT, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node1, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+        if (rsp.err) {
+            if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        const b = await waitTx(rsp.tx_hash, 10);
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
+    }
+    throw new Error("submitAndWait: retries exhausted");
+}
+
+async function submitAndWaitErr(sk: string, addr: string, tx: any[], value = 0, gasLimit = GAS_LIMIT, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node1, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+        if (rsp.err) {
+            if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        const b = await waitTx(rsp.tx_hash, 10);
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
+    }
+    throw new Error("submitAndWaitErr: retries exhausted");
+}
+
+const rootAddr = mtjs.addr_from_name("root");
+
 async function ensureRootFunded(minBalance: bigint) {
     const bal = await getBalance(rootAddr);
     console.log("  root balance:", bal.toString(), "min:", minBalance.toString());
@@ -90,7 +111,7 @@ async function ensureRootFunded(minBalance: bigint) {
         check(false, "root balance too low for mint (" + bal.toString() + " < 200000) — clean db");
         return;
     }
-    const { rsp, block } = await submitAndWait(rootSk!, rootAddr, [
+    const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
         { contract: "root", method: "mint", params: { amount: "100000000" } },
     ], 0, 20000);
     check(block.status(rsp.tx_hash) === "ok", "mint root 100M ok");
@@ -98,12 +119,12 @@ async function ensureRootFunded(minBalance: bigint) {
 async function ensureGym(src: string) {
     const c = await mtjs.get_contract(node1, "gym", 3);
     if (c.found) {
-        const { rsp, block } = await submitAndWait(rootSk!, rootAddr, [
+        const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
             { contract: "root", method: "contract_update", params: { name: "gym", src } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "contract_update gym ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
     } else {
-        const { rsp, block } = await submitAndWait(rootSk!, rootAddr, [
+        const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
             { contract: "root", method: "contract_deploy", params: { name: "gym", src } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "contract_deploy gym ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
@@ -112,7 +133,7 @@ async function ensureGym(src: string) {
 async function ensureInit() {
     const r = await mtjs.get_contract_data(node1, "gym", "admin", 3);
     if (r.found) { check(true, "gym already init (admin found)"); return; }
-    const { rsp, block } = await submitAndWait(rootSk!, rootAddr, [
+    const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
         { contract: "gym", method: "init", params: { admin: rootAddr } },
     ]);
     check(block.status(rsp.tx_hash) === "ok", "gym.init ok");
@@ -124,12 +145,12 @@ async function getAbonement(): Promise<number> {
     return Number(v.visits);
 }
 
-// подписаться на :node2 (next block) ДО submit; вернуть promise block (или null при таймауте)
 function getNextBlock(nodeaddr: string, to: number): Promise<Block> {
     return mtjs.get_block(nodeaddr, to);
 }
 
 async function main() {
+    await loadKeys();
     console.log("=== GYM 2NODES (n1 " + node1 + ", n2 " + node2 + ") ===");
 
     await ensureRootFunded(50_000_000n);
@@ -142,16 +163,15 @@ async function main() {
     await ensureGym(src);
     await ensureInit();
 
-    // подготовка: visits >= 10
     {
         const v = await getAbonement();
         if (v < 0) {
-            const { rsp, block } = await submitAndWait(rootSk!, rootAddr, [
+            const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
                 { contract: "gym", method: "issuePass", params: { visits: 10 } },
             ]);
             check(block.status(rsp.tx_hash) === "ok", "issuePass 10 ok");
         } else if (v < 10) {
-            const { rsp, block } = await submitAndWait(rootSk!, rootAddr, [
+            const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
                 { contract: "gym", method: "issuePass", params: { visits: 10 - v } },
             ]);
             check(block.status(rsp.tx_hash) === "ok", "issuePass top-up ok");
@@ -160,12 +180,10 @@ async function main() {
         }
     }
 
-    // t1: ok TX (issuePass 1) — block_hash same на :2301/:2302
     {
         console.log("\n[t1] ok TX (issuePass 1): block_hash same on :2301/:2302");
-        // подписка на :2302 (next block) ДО submit
         const p2 = getNextBlock(node2, 10);
-        const { rsp, block } = await submitAndWait(rootSk!, rootAddr, [
+        const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
             { contract: "gym", method: "issuePass", params: { visits: 1 } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "issuePass 1 ok on :2301");
@@ -180,14 +198,12 @@ async function main() {
         }
     }
 
-    // t2: err TX (createEntry no visits) — block_hash same на :2301/:2302 (root hash сошёлся)
     {
         console.log("\n[t2] err TX (createEntry no visits): block_hash same on :2301/:2302");
         const visits0 = await getAbonement();
         const M = visits0 + 1;
-        // подписка на :2302 (next block) ДО submit
         const p2 = getNextBlock(node2, 10);
-        const { rsp, block } = await submitAndWaitErr(rootSk!, rootAddr, [
+        const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
             { contract: "gym", method: "createEntry", params: { M: M, ttl: 300 } },
         ]);
         check(block.status(rsp.tx_hash) === "err", "createEntry M>visits err on :2301");
@@ -205,6 +221,7 @@ async function main() {
     console.log("\n=== RESULT: " + pass + " passed, " + fail + " failed ===");
     if (fail === 0) console.log(GREEN + "DONE" + RESET);
     else            console.log(RED   + "FAIL" + RESET);
+    std.exit(fail);
 }
 
 main().catch((e: any) => console.log(RED + "ERR: " + errStr(e) + RESET));

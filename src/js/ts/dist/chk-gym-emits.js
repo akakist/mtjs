@@ -1,21 +1,20 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
-// chk-gym-emits.ts — эмиты gym на живой ноде:
-//   issuePass → PassIssued
-//   createEntry → EntryCreated
-//   markUsed (used<M) → EntryUsed
-//   markUsed (used==M) → EntryClosed (pass splice)
-//   cancelEntry → EntryCancelled
-//   disableEntry → EntryDisabled
-// эмиты в block.children(tx_hash)[seqId].emits (не root-level).
-// node :2301 (n1). root — admin/sender (hex).
 const node = "127.0.0.1:2301";
 const GYM_SRC_PATH = "/home/bsr/mtjs/src/js/tsi/dist/contracts/gym.js";
 const GAS_LIMIT = 100000;
-const rootSk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk");
-const rootPk = std.getenv("k_root_ed_pk");
-if (!rootSk || !rootPk)
-    throw new Error("no root sk/pk");
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
+let rootSk = "";
+let rootPk = "";
+async function loadKeys() {
+    const raw = await mtjs.fs.readFile(KEYS_PATH);
+    const keys = JSON.parse(raw);
+    const r = keys.users?.root?.keys?.[0];
+    if (!r?.sk || !r?.pk)
+        throw new Error("keys_test.json: no users.root.keys[0].sk/pk");
+    rootSk = r.sk;
+    rootPk = r.pk;
+}
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
@@ -58,33 +57,40 @@ function waitTx(h, to) {
 }
 async function getNonce(addr) {
     const ui = await mtjs.get_user_nonce(node, addr, 3);
+    console.log("getNonce: " + ui.nonce);
     return BigInt(ui.nonce);
 }
 async function getBalance(addr) {
     const ui = await mtjs.get_user_nonce(node, addr, 3);
     return BigInt(ui.balance);
 }
-async function waitNonceGt(addr, lastNonce, timeoutSec = 10) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeoutSec * 1000) {
-        const n = await getNonce(addr);
-        if (n > lastNonce)
-            return n;
-        await new Promise((r) => setTimeout(() => r(), 200));
+async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        if (rsp.err) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        const b = await waitTx(rsp.tx_hash, 10);
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
     }
-    throw new Error("waitNonceGt timeout: lastNonce=" + lastNonce.toString());
+    throw new Error("submitAndWait: retries exhausted");
 }
-async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT) {
-    const ui = await mtjs.get_user_nonce(node, addr, 3);
-    const req = { tx, nonce: ui.nonce, value, gasLimit, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, ui.nonce, () => { });
-    if (rsp.err)
-        throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, 10);
-    await waitNonceGt(addr, BigInt(ui.nonce), 10);
-    return { rsp, block: b };
-}
-const rootAddr = mtjs.addr_from_pk(rootPk);
+const rootAddr = mtjs.addr_from_name("root");
 async function ensureRootFunded(minBalance) {
     const bal = await getBalance(rootAddr);
     console.log("  root balance:", bal.toString(), "min:", minBalance.toString());
@@ -139,7 +145,6 @@ async function getPasses() {
         return [];
     return JSON.parse(r.value).passes || [];
 }
-// ищем emits команды index в block.children(tx_hash)[seqId].emits → [{name, value}]
 function childEmits(block, txHash, seqId) {
     const ch = block.children(txHash);
     if (!ch)
@@ -167,6 +172,7 @@ function findEmit(list, name) {
     return null;
 }
 async function main() {
+    await loadKeys();
     console.log("=== GYM EMITS (node " + node + ") ===");
     await ensureRootFunded(50000000n);
     let src = "";
@@ -180,7 +186,6 @@ async function main() {
     check(src.length > 0, "gym src read (" + src.length + " bytes)");
     await ensureGym(src);
     await ensureInit();
-    // visits >= 10
     {
         const v = await getAbonement();
         if (v < 10) {
@@ -192,7 +197,6 @@ async function main() {
         else
             check(true, "abonement.visits >= 10 (skip issuePass)");
     }
-    // 1) issuePass → PassIssued (в block.children, seqId=0)
     {
         console.log("\n[1] issuePass → PassIssued");
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
@@ -207,14 +211,11 @@ async function main() {
             check(String(pi.user) === rootAddr, "PassIssued.user == root");
             check(Number(pi.visits) === 3, "PassIssued.visits == 3 (got " + pi.visits + ")");
         }
-        // root-level emits — только result
         const rootEm = block.emits(rsp.tx_hash) || [];
         check(rootEm.length >= 1, "root-level emits (result) present");
     }
-    // 2) createEntry → EntryCreated
     {
         console.log("\n[2] createEntry → EntryCreated");
-        // если есть активный — сначала cancel/disable старых (или создаём новый — политика)
         const passes = await getPasses();
         const now = Math.floor(Date.now() / 1000);
         let active = null;
@@ -224,7 +225,6 @@ async function main() {
                 break;
             }
         if (active) {
-            // disable активный, чтобы createEntry прошёл
             await submitAndWait(rootSk, rootAddr, [
                 { contract: "gym", method: "disableEntry", params: { user: rootAddr, entry_id: Number(active.id) } },
             ]);
@@ -242,7 +242,6 @@ async function main() {
             check(Number(ec.M) === 2, "EntryCreated.M == 2 (got " + ec.M + ")");
         }
     }
-    // 3) markUsed (used<M) → EntryUsed
     let activeId = -1;
     {
         console.log("\n[3] markUsed (count=1, used<M) → EntryUsed");
@@ -270,7 +269,6 @@ async function main() {
             }
         }
     }
-    // 4) markUsed (count=M-used → used==M) → EntryClosed
     if (activeId >= 0) {
         console.log("\n[4] markUsed (count = M-used → used==M) → EntryClosed");
         const passes = await getPasses();
@@ -295,10 +293,8 @@ async function main() {
                 check(Number(eclosed.id) === activeId, "EntryClosed.id == " + activeId);
         }
     }
-    // 5) cancelEntry → EntryCancelled
     {
         console.log("\n[5] createEntry + cancelEntry → EntryCancelled");
-        // создаём новый entry, отменяем
         const { rsp: rspC, block: blockC } = await submitAndWait(rootSk, rootAddr, [
             { contract: "gym", method: "createEntry", params: { M: 1, ttl: 300 } },
         ]);
@@ -322,7 +318,6 @@ async function main() {
             }
         }
     }
-    // 6) disableEntry → EntryDisabled
     {
         console.log("\n[6] createEntry + disableEntry → EntryDisabled");
         const { rsp: rspC, block: blockC } = await submitAndWait(rootSk, rootAddr, [
@@ -351,6 +346,7 @@ async function main() {
         console.log(GREEN + "DONE" + RESET);
     else
         console.log(RED + "FAIL" + RESET);
+    std.exit(fail);
 }
 main().catch((e) => console.log(RED + "ERR: " + errStr(e) + RESET));
 setInterval(() => { }, 1000000);

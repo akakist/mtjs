@@ -51,8 +51,6 @@ namespace Node
 {
     enum timers
     {
-        // TIMER_START_HEART_BEAT,
-        // TIMER_RESTART_BLOCK,
         TIMER_PERIODIC_CLOCK,
         TIMER_GetTransactionRSP,
         TIMER_SYNC_TIMEDOUT,
@@ -60,16 +58,6 @@ namespace Node
         TIMER_BROADCAST_ACK_TIMEDOUT,
         TIMER_BlockDiffValidateREQ,
         TIMER_BlockDBStore,
-    };
-    struct heart_beat_node_info
-    {
-        // int64_t confirm_leader_sent=0;
-        // REF_getter< MsgData::HeartBeatREQ> leader_cert_2=nullptr;
-        // std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > HeartBeatRSP_m;
-
-    };
-    struct heart_beat_info
-    {
     };
     class Service:
         public UnknownBase,
@@ -290,6 +278,25 @@ namespace Node
 
 
         REF_getter<ContractHost> contractHost=nullptr;
+
+
+        std::optional<std::string> execute_mint(yyjson_val *params, b_params & b,t_params &t,   int seqId);
+        std::optional<std::string> execute_transfer(yyjson_val *params, b_params &,t_params &t,  int seqId);
+        std::optional<std::string> execute_node_create(yyjson_val *params, b_params &,t_params &t,   int seqId);
+        std::optional<std::string> execute_node_update(yyjson_val *params, b_params &,t_params &t,   int seqId);
+        std::optional<std::string> execute_node_stake(yyjson_val *params, b_params &,t_params &t,  int seqId);
+        std::optional<std::string> execute_unstake_node(yyjson_val *params, b_params &,t_params &t, int seqId);
+        std::optional<std::string> execute_node_enable(yyjson_val *params, b_params &,t_params &t,  int seqId);
+        std::optional<std::string> execute_node_disable(yyjson_val *params, b_params &,t_params &t,  int seqId);
+        std::optional<std::string> execute_contract_deploy(yyjson_val *params, b_params &,t_params &t,  int seqId);
+        std::optional<std::string> execute_contract_update(yyjson_val *params, b_params &,t_params &t,  int seqId);
+        std::optional<std::string> execute_vote(yyjson_val *params, b_params &,t_params &t,  int seqId);
+        std::optional<std::string> execute_gc(yyjson_val* params, b_params& b, t_params& t, int seqId, _db_to_save& dbd);
+        std::optional<std::string> execute_create_address(yyjson_val* params, b_params& b, t_params& t, int seqId);
+        std::optional<std::string> execute_add_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId);
+        std::optional<std::string> execute_remove_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId);
+
+
 
     };
 

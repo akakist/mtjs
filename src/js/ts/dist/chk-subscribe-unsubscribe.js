@@ -1,16 +1,25 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
-// chk-subscribe-unsubscribe.ts — tx_subscribe / tx_unsubscribe
-// node :2301.
 const node = "127.0.0.1:2301";
-const rootSk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk");
-const rootPk = std.getenv("k_root_ed_pk");
-if (!rootSk || !rootPk)
-    throw new Error("no root sk/pk");
-const u1sk = std.getenv("k_u1_ed_sk");
-const u1pk = std.getenv("k_u1_ed_pk");
-if (!u1sk || !u1pk)
-    throw new Error("no k_u1_* keys");
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
+let rootSk = "";
+let rootPk = "";
+let u1Sk = "";
+let u1Pk = "";
+async function loadKeys() {
+    const raw = await mtjs.fs.readFile(KEYS_PATH);
+    const keys = JSON.parse(raw);
+    const r = keys.users?.root?.keys?.[0];
+    if (!r?.sk || !r?.pk)
+        throw new Error("keys_test.json: no users.root.keys[0].sk/pk");
+    rootSk = r.sk;
+    rootPk = r.pk;
+    const u = keys.users?.u1?.keys?.[0];
+    if (!u?.sk || !u?.pk)
+        throw new Error("keys_test.json: no users.u1.keys[0].sk/pk");
+    u1Sk = u.sk;
+    u1Pk = u.pk;
+}
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
@@ -31,7 +40,6 @@ function errStr(e) {
         return "errcode=" + e.errcode + " errstr=" + e.errstr;
     return String(e);
 }
-// pending (tx_wait через tx_subscribe callback)
 const pending = {};
 let subBlocks = 0;
 mtjs.tx_subscribe(node, (b) => {
@@ -56,6 +64,7 @@ function waitTx(h, to) {
 }
 async function getNonce(addr) {
     const ui = await mtjs.get_user_nonce(node, addr, 3);
+    console.log("getNonce: " + ui.nonce);
     return BigInt(ui.nonce);
 }
 async function waitNonceGt(addr, lastNonce, timeoutSec = 10) {
@@ -68,81 +77,73 @@ async function waitNonceGt(addr, lastNonce, timeoutSec = 10) {
     }
     throw new Error("waitNonceGt timeout: lastNonce=" + lastNonce.toString());
 }
-const rootAddr = mtjs.addr_from_pk(rootPk);
-const u1Addr = mtjs.addr_from_pk(u1pk);
-// ============================================================
-// setup: root mint (value=0), u1 +1000
-// ============================================================
+async function submitAndWait(sk, addr, tx, value = 0, gasLimit = 20000, retries = 5) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        const nonce = await getNonce(addr);
+        const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
+        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        if (rsp.err) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("submit: " + rsp.err_str);
+        }
+        const b = await waitTx(rsp.tx_hash, 10);
+        const st = b.status(rsp.tx_hash);
+        const es = b.errstr(rsp.tx_hash) || "";
+        if (st === "err" && es.indexOf("invalid nonce") >= 0) {
+            if (attempt + 1 < retries) {
+                await new Promise(r => setTimeout(r, 300));
+                continue;
+            }
+            throw new Error("invalid nonce: " + es);
+        }
+        return { rsp, block: b, nonce };
+    }
+    throw new Error("submitAndWait: retries exhausted");
+}
+const rootAddr = mtjs.addr_from_name("root");
+const u1Addr = mtjs.addr_from_name("u1");
 async function setup() {
     console.log("\n[setup] fill u1 with 1000");
     {
-        const ui = await mtjs.get_user_nonce(node, rootAddr, 3);
-        const req = { tx: [{ contract: "root", method: "mint", params: { amount: "5000000" } }],
-            nonce: ui.nonce, value: 0, gasLimit: 20000, priority: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, ui.nonce, () => { });
-        if (rsp.err)
-            throw new Error("setup mint: " + rsp.err_str);
-        const b = await waitTx(rsp.tx_hash, 10);
-        await waitNonceGt(rootAddr, BigInt(ui.nonce), 10);
-        console.log("  mint status:", b.status(rsp.tx_hash));
+        const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
+            { contract: "root", method: "mint", params: { amount: "5000000" } },
+        ], 0, 20000);
+        console.log("  mint status:", block.status(rsp.tx_hash));
     }
     {
-        const ui = await mtjs.get_user_nonce(node, rootAddr, 3);
-        const req = { tx: [{ contract: "root", method: "transfer", params: { to: u1Addr, amount: "1000" } }],
-            nonce: ui.nonce, value: 100000, gasLimit: 20000, priority: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, ui.nonce, () => { });
-        if (rsp.err)
-            throw new Error("setup transfer: " + rsp.err_str);
-        const b = await waitTx(rsp.tx_hash, 10);
-        await waitNonceGt(rootAddr, BigInt(ui.nonce), 10);
-        console.log("  transfer status:", b.status(rsp.tx_hash));
+        const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
+            { contract: "root", method: "transfer", params: { to: u1Addr, amount: "1000" } },
+        ], 100000, 20000);
+        console.log("  transfer status:", block.status(rsp.tx_hash));
     }
     const ui = await mtjs.get_user_nonce(node, u1Addr, 3);
     check(BigInt(ui.balance) >= 1000n, "u1 funded >= 1000 (balance=" + ui.balance + ")");
 }
-// ok TX (transfer 100 от u1), value=1000000
 async function submitTransfer(sk, addr, to, amount) {
-    const ui = await mtjs.get_user_nonce(node, addr, 3);
-    const tx = [{ contract: "root", method: "transfer", params: { to, amount } }];
-    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, ui.nonce, () => { });
-    if (rsp.err)
-        throw new Error("submit: " + rsp.err_str);
-    const b = await waitTx(rsp.tx_hash, 10);
-    await waitNonceGt(addr, BigInt(ui.nonce), 10);
-    return { rsp, block: b };
+    return await submitAndWait(sk, addr, [
+        { contract: "root", method: "transfer", params: { to, amount } },
+    ], 1000000, 100000);
 }
-// ============================================================
-// t1: tx_subscribe работает (блоки приходят)
-// ============================================================
 async function t1_subscribe() {
     console.log("\n[t1] tx_subscribe → блоки приходят");
     const before = subBlocks;
-    await submitTransfer(u1sk, u1Addr, rootAddr, "100");
+    await submitTransfer(u1Sk, u1Addr, rootAddr, "100");
     await new Promise((r) => setTimeout(r, 300));
     check(subBlocks > before, "tx_subscribe callback fired (before=" + before + " after=" + subBlocks + ")");
 }
-// ============================================================
-// t2: tx_unsubscribe → блоки не приходят
-// ============================================================
 async function t2_unsubscribe() {
     console.log("\n[t2] tx_unsubscribe → блоки не приходят");
     mtjs.tx_unsubscribe(node);
     await new Promise((r) => setTimeout(r, 300));
     const before = subBlocks;
-    // прямой tx_submit, без waitTx (tx_subscribe отписан → pending не резолвится)
-    const ui = await mtjs.get_user_nonce(node, u1Addr, 3);
-    const tx = [{ contract: "root", method: "transfer", params: { to: rootAddr, amount: "100" } }];
-    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), u1sk, ui.nonce, () => { });
-    if (rsp.err) {
-        check(false, "submit: " + rsp.err_str);
-        return;
-    }
-    await waitNonceGt(u1Addr, BigInt(ui.nonce), 10); // nonce inc — блок собран, но subBlocks не растёт
+    await submitAndWait(u1Sk, u1Addr, [
+        { contract: "root", method: "transfer", params: { to: rootAddr, amount: "100" } },
+    ], 1000000, 100000);
     await new Promise((r) => setTimeout(r, 500));
     check(subBlocks === before, "tx_subscribe callback NOT fired after unsubscribe (before=" + before + " after=" + subBlocks + ")");
-    // снова подписаться (для t3/t4)
     mtjs.tx_subscribe(node, (b) => {
         subBlocks++;
         for (const h of b.tx_hashes) {
@@ -156,17 +157,14 @@ async function t2_unsubscribe() {
     });
     await new Promise((r) => setTimeout(r, 300));
 }
-// ============================================================
-// t3: tx_subscribe + tx_submit(cb) — оба работают
-// ============================================================
 async function t3_both() {
     console.log("\n[t3] tx_subscribe + tx_submit(cb) — оба работают");
     const beforeSub = subBlocks;
     const ui = await mtjs.get_user_nonce(node, u1Addr, 3);
     const cbs = [];
     const tx = [{ contract: "root", method: "transfer", params: { to: rootAddr, amount: "100" } }];
-    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1sk, ui.nonce, (st) => {
+    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0, sender: u1Addr, key_id: 0 };
+    const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1Sk, ui.nonce, (st) => {
         cbs.push(st);
         console.log("  cb:", JSON.stringify(st));
     });
@@ -183,9 +181,6 @@ async function t3_both() {
     check(!!submitted, "cb submitted present");
     check(!!finalized, "cb finalized present");
 }
-// ============================================================
-// t4: tx_unsubscribe не убивает tx_submit(cb)
-// ============================================================
 async function t4_unsub_not_kill_cb() {
     console.log("\n[t4] tx_unsubscribe не убивает tx_submit(cb)");
     mtjs.tx_unsubscribe(node);
@@ -193,8 +188,8 @@ async function t4_unsub_not_kill_cb() {
     const ui = await mtjs.get_user_nonce(node, u1Addr, 3);
     const cbs = [];
     const tx = [{ contract: "root", method: "transfer", params: { to: rootAddr, amount: "100" } }];
-    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1sk, ui.nonce, (st) => {
+    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0, sender: u1Addr, key_id: 0 };
+    const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1Sk, ui.nonce, (st) => {
         cbs.push(st);
         console.log("  cb:", JSON.stringify(st));
     });
@@ -202,7 +197,6 @@ async function t4_unsub_not_kill_cb() {
         check(false, "submit: " + rsp.err_str);
         return;
     }
-    // tx_subscribe отписан, pending не резолвится → ждём finalized через cb (poll)
     const t0 = Date.now();
     while (Date.now() - t0 < 10000) {
         if (cbs.find(c => c.status === "finalized"))
@@ -215,10 +209,8 @@ async function t4_unsub_not_kill_cb() {
     check(!!submitted, "cb submitted present (tx_subscribe отписан, cb работает)");
     check(!!finalized, "cb finalized present (tx_subscribe отписан, cb работает)");
 }
-// ============================================================
-// main
-// ============================================================
 (async () => {
+    await loadKeys();
     console.log("=== SUBSCRIBE/UNSUBSCRIBE TESTS ===");
     await setup();
     await t1_subscribe();
@@ -230,5 +222,6 @@ async function t4_unsub_not_kill_cb() {
         console.log(GREEN + "DONE" + RESET);
     else
         console.log(RED + "FAIL" + RESET);
+    std.exit(fail);
 })().catch((e) => console.log(RED + "ERR: " + errStr(e) + RESET));
 setInterval(() => { }, 1000000);

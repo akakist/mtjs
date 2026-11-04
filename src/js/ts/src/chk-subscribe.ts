@@ -15,7 +15,7 @@ mtjs.tx_subscribe(node, (b: Block) => {
 });
 
 async function main() {
-    const addr = mtjs.addr_from_pk(pk!);
+    const addr = mtjs.addr_from_name("root");
     const ui = await mtjs.get_user_nonce(node, addr, 2);
     const nonce = BigInt(ui.nonce);
     const tx = [{ contract: "root", method: "mint", params: { amount: "1" } }];
@@ -28,5 +28,6 @@ async function main() {
     }
     console.log("got:", got);
 }
-main().then(() => console.log("OK")).catch((e: any) => console.log("ERR:", JSON.stringify(e)));
+main().then(() => {console.log("OK"); std.exit(0);}).catch((e: any) =>{ console.log("ERR:", JSON.stringify(e)); std.exit(1);});
 setInterval(() => {}, 1000000);
+
