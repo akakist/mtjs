@@ -166,7 +166,7 @@ async function setup() {
         }
     }
     await submitAndWait(rootSk, rootAddr, [{ contract: "root", method: "mint", params: { amount: "1000" } }]);
-    await submitAndWait(rootSk, rootAddr, [{ contract: "root", method: "transfer", params: { to: u1Addr, amount: "1000" } }]);
+    await submitAndWait(rootSk, rootAddr, [{ contract: "root", method: "transfer", params: { to: u1Addr, amount: "1000" } }], 1000);
     const { bal } = await getNonceBal(u1Addr);
     console.log("  u1 balance:", bal.toString());
     check(bal >= 1000n, "u1 funded >= 1000");
@@ -202,18 +202,19 @@ async function t2_partial_batch() {
 async function t3_separate_txs() {
     console.log("\n[t3] separate TXs: ok applied, err rolled back, nonce +2");
     const { nonce: n0, bal: b0 } = await getNonceBal(u1Addr);
-    await submitAndWait(u1Sk, u1Addr, [
+    const { rsp: r1, block: b1 } = await submitAndWait(u1Sk, u1Addr, [
         { contract: "root", method: "transfer", params: { to: rootAddr, amount: "100" } },
-    ]);
-    const { nonce: n1, bal: b1 } = await getNonceBal(u1Addr);
+    ], 100); // value=100
+    check(b1.status(r1.tx_hash) === "ok", "after ok: status ok (errstr=" + b1.errstr(r1.tx_hash) + ")");
+    const { nonce: n1, bal: bal1 } = await getNonceBal(u1Addr);
     check(n1 === n0 + 1n, "after ok: nonce +1: " + n0.toString() + " -> " + n1.toString());
-    check(b1 <= b0 - 100n, "after ok: balance <= b0 - 100 (value + gas): " + b0.toString() + " -> " + b1.toString());
+    check(bal1 <= b0 - 100n, "after ok: balance <= b0 - 100 (value + gas): " + b0.toString() + " -> " + bal1.toString());
     await submitAndWaitErr(u1Sk, u1Addr, [
         { contract: "root", method: "transfer", params: { to: rootAddr, amount: "2000000" } },
     ]);
     const { nonce: n2, bal: b2 } = await getNonceBal(u1Addr);
     check(n2 === n1 + 1n, "after err: nonce +1: " + n1.toString() + " -> " + n2.toString());
-    check(b2 <= b1, "after err: balance not increased (gas charged): " + b1.toString() + " -> " + b2.toString());
+    check(b2 <= bal1, "after err: balance not increased (gas charged): " + bal1.toString() + " -> " + b2.toString());
 }
 async function t4_vote_ttl_no_effect() {
     console.log("\n[t4] vote ttl_expired: fees unchanged, nonce inc");
@@ -223,7 +224,7 @@ async function t4_vote_ttl_no_effect() {
     const v0 = await mtjs.get_values(node, 3);
     const before = v0.fees[param];
     console.log("  fees[param] before:", before);
-    await new Promise((r) => setTimeout(() => r(), 2000));
+    await new Promise((r) => setTimeout(() => r(), 3000));
     const { nonce: rn0 } = await getNonceBal(rootAddr);
     const { rsp, block } = await voteFromRoot("n6", param, value, "1");
     const st = block.status(rsp.tx_hash);

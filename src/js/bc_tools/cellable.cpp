@@ -102,6 +102,19 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
                 MUTEX_INSPECTOR;
                 db_dump.add(c->getDbId(), child_buf);
                 children_hashes_mx[cid] = ch;
+                {
+                    //DEBUG KALL
+                    if (c->payload_ctor_idx == hsh::bc_contract_balance) {
+                        inBuffer in(child_buf);
+                        Cellable chk(nullptr, c->getDbId());
+                        chk.unpack_mx(in);
+                        if (chk.data.valid()) {
+                            auto* b = dynamic_cast<bc_contract_balance*>(chk.data.get());
+                            logErr2("calc_tree_hash: contract_balance dbid=%s amount=%lld",
+                                    base16::encode(c->getDbId()).substr(0,16).c_str(), (long long)(b ? b->getAmount() : -1));
+                        }
+                    }                    
+                }
             }
         }
     }

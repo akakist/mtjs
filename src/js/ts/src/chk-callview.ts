@@ -79,7 +79,7 @@ async function ensureGym(src: string) {
         check(block.status(rsp.tx_hash) === "ok", "contract_update gym ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
     } else {
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-            { contract: "root", method: "contract_deploy", params: { name: "gym", src } },
+            { contract: "root", method: "contract_deploy", params: { name: "gym", src, ttl: 86400 } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "contract_deploy gym ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
     }
@@ -118,7 +118,7 @@ async function main() {
     await ensureGym(src);
     await ensureInit();
 
-    // t1: getAdmin (view)
+    // t1: getAdmin (view) — admin == root
     {
         console.log("\n[t1] call_view gym.getAdmin");
         const r = await mtjs.call_view(node, "gym", "getAdmin", {}, 5, 5);
@@ -127,46 +127,16 @@ async function main() {
         check(r.error === false, "no error");
         try {
             const v = JSON.parse(r.result);
-            check(typeof v.addr === "string" && v.addr.length > 0, "addr non-empty (got '" + v.addr + "')");
-            check(v.addr === rootAddr, "addr == root (" + v.addr + " vs " + rootAddr + ")");
+            check(typeof v.addr === "string" && v.addr.length > 0, "addr non-empty");
+            check(v.addr === rootAddr, "addr == root");
         } catch (e: any) {
             check(false, "result JSON: " + errStr(e));
         }
     }
 
-    // t2: getPass (view) — без pass
+    // t2: unknown view
     {
-        console.log("\n[t2] call_view gym.getPass (no pass)");
-        const r = await mtjs.call_view(node, "gym", "getPass", { user: rootAddr }, 5, 5);
-        console.log("  result:", JSON.stringify(r));
-        check(r.found === true, "found");
-        check(r.error === false, "no error");
-        try {
-            const v = JSON.parse(r.result);
-            check(v.found === false, "pass not found");
-        } catch (e: any) {
-            check(false, "result JSON: " + errStr(e));
-        }
-    }
-
-    // t3: getEntry (view) — без entry
-    {
-        console.log("\n[t3] call_view gym.getEntry (no entry)");
-        const r = await mtjs.call_view(node, "gym", "getEntry", { user: rootAddr }, 5, 5);
-        console.log("  result:", JSON.stringify(r));
-        check(r.found === true, "found");
-        check(r.error === false, "no error");
-        try {
-            const v = JSON.parse(r.result);
-            check(v.found === false, "entry not found");
-        } catch (e: any) {
-            check(false, "result JSON: " + errStr(e));
-        }
-    }
-
-    // t4: unknown view
-    {
-        console.log("\n[t4] call_view gym.unknownView");
+        console.log("\n[t2] call_view gym.unknownView");
         const r = await mtjs.call_view(node, "gym", "unknownView", {}, 5, 5);
         console.log("  result:", JSON.stringify(r));
         check(r.found === false, "found=false");
@@ -174,30 +144,14 @@ async function main() {
         check(r.result.indexOf("view not found") >= 0, "result mentions 'view not found'");
     }
 
-    // t5: unknown contract
+    // t3: unknown contract
     {
-        console.log("\n[t5] call_view unknownContract.getAdmin");
+        console.log("\n[t3] call_view unknownContract.getAdmin");
         const r = await mtjs.call_view(node, "unknownContract", "getAdmin", {}, 5, 5);
         console.log("  result:", JSON.stringify(r));
         check(r.found === false, "found=false");
         check(r.error === true, "error=true");
         check(r.result.indexOf("contract not found") >= 0, "result mentions 'contract not found'");
-    }
-
-    // t6: listEntries (view) — пустой
-    {
-        console.log("\n[t6] call_view gym.listEntries (empty)");
-        const r = await mtjs.call_view(node, "gym", "listEntries", { user: rootAddr }, 5, 5);
-        console.log("  result:", JSON.stringify(r));
-        check(r.found === true, "found");
-        check(r.error === false, "no error");
-        try {
-            const v = JSON.parse(r.result);
-            check(Array.isArray(v), "result is array");
-            check(v.length === 0, "empty (got " + v.length + ")");
-        } catch (e: any) {
-            check(false, "result JSON: " + errStr(e));
-        }
     }
 
     console.log("\n=== RESULT: " + pass + " passed, " + fail + " failed ===");

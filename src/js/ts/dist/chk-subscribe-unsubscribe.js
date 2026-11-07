@@ -139,11 +139,19 @@ async function t2_unsubscribe() {
     mtjs.tx_unsubscribe(node);
     await new Promise((r) => setTimeout(r, 300));
     const before = subBlocks;
-    await submitAndWait(u1Sk, u1Addr, [
-        { contract: "root", method: "transfer", params: { to: rootAddr, amount: "100" } },
-    ], 1000000, 100000);
-    await new Promise((r) => setTimeout(r, 500));
+    // submit без wait (tx_subscribe отписан, pending не resolve)
+    const ui = await mtjs.get_user_nonce(node, u1Addr, 3);
+    const tx = [{ contract: "root", method: "transfer", params: { to: rootAddr, amount: "100" } }];
+    const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0, sender: u1Addr, key_id: 0 };
+    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), u1Sk, ui.nonce, () => { });
+    if (rsp.err) {
+        check(false, "submit: " + rsp.err_str);
+        return;
+    }
+    // ждём 1s (блок должен пройти, но tx_subscribe отписан → subBlocks не растёт)
+    await new Promise((r) => setTimeout(r, 1000));
     check(subBlocks === before, "tx_subscribe callback NOT fired after unsubscribe (before=" + before + " after=" + subBlocks + ")");
+    // re-subscribe
     mtjs.tx_subscribe(node, (b) => {
         subBlocks++;
         for (const h of b.tx_hashes) {

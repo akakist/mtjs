@@ -137,7 +137,11 @@ async function t2_mint_all_users() {
         return;
     }
 
+    // UIG дубли (normalizeNick схлопывает 6→G, 9→G) — пропускаем
+    const skip = new Set([6, 9, 16, 19]);
+
     for (let i = 0; i < 20; i++) {
+        if (skip.has(i)) { console.log("  u" + i + ": UIG duplicate, skip"); continue; }
         const uSk = std.getenv("k_u" + i + "_ed_sk");
         const uPk = std.getenv("k_u" + i + "_ed_pk");
         if (!uSk || !uPk) { console.log("  u" + i + ": no keys, skip"); continue; }

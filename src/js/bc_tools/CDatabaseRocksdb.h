@@ -66,6 +66,22 @@ struct CDatabaseRocksdb: public IDatabase
     int write_granules_batch(const _db_to_save &v)
     {
         rocksdb::WriteBatch batch;
+        {
+                //DEBUG KALL
+                for (const auto& [key, data] : v.cells) {
+                    if (key.size() == 32) {
+                        inBuffer in(data);
+                        Cellable c(nullptr, key);
+                        c.unpack_mx(in);
+                        if (c.payload_ctor_idx == hsh::bc_contract_balance) {
+                            auto* b = dynamic_cast<bc_contract_balance*>(c.data.get());
+                            logErr2("write_granules_batch: bc_contract_balance dbid=%s amount=%lld", base16::encode(key).substr(0,16).c_str(), (long long)(b ? b->getAmount() : -1));
+                        }
+                    }
+                    // batch.Put(key, data);
+                }
+
+        }
 
         for (const auto& key : v.deleted) batch.Delete(key);
         for (const auto& [key, data] : v.cells) {

@@ -138,7 +138,7 @@ async function ensureGym(src: string) {
         check(block.status(rsp.tx_hash) === "ok", "contract_update gym ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
     } else {
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-            { contract: "root", method: "contract_deploy", params: { name: "gym", src } },
+            { contract: "root", method: "contract_deploy", params: { name: "gym", src, ttl: 86400 } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "contract_deploy gym ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
     }
@@ -224,7 +224,8 @@ async function main() {
         const visits0 = await getAbonement();
         const passes0 = await getPasses();
         const { nonce: n0, bal: b0 } = await getNonceBal(rootAddr);
-        const M = visits0 + 1;
+        // issuePass(100) → visits+100, M > visits+100 → createEntry err
+        const M = visits0 + 100 + 1;
         const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
             { contract: "gym", method: "issuePass", params: { visits: 100 } },
             { contract: "gym", method: "createEntry", params: { M: M, ttl: 300 } },

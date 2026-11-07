@@ -320,6 +320,11 @@ JSIValue jsi_consumeValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueCons
         call->msg_source->consume_value(amount);
         if (auto err = call->host->granules->addContractBalance(call->root, call->contract->name, amount, call->roll))
             return JSI_ThrowTypeError(ctx, "consumeValue: %s", err->c_str());
+        {
+            int64_t newbal = 0;
+            call->host->granules->getContractBalance(call->root, call->contract->name, newbal);
+            logErr2("consumeValue: contract=%s amount=%lld balance=%lld", call->contract->name.container.c_str(), (long long)amount, (long long)newbal);
+        }
         return JSI_UNDEFINED;
     } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
     catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "consumeValue: %s", e.what()); }
@@ -341,6 +346,11 @@ JSIValue jsi_refundValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst
         int64_t amount = 0;
         if (JSI_ToInt64(ctx, &amount, argv[0]) != 0) return JSI_ThrowTypeError(ctx, "refundValue: amount must be int64");
         if (amount < 0) return JSI_ThrowTypeError(ctx, "refundValue: amount < 0");
+        {
+            int64_t cur = 0;
+            call->host->granules->getContractBalance(call->root, call->contract->name, cur);
+            logErr2("refundValue: contract=%s amount=%lld balance=%lld", call->contract->name.container.c_str(), (long long)amount, (long long)cur);            
+        }
         int64_t cur = 0;
         if (!call->host->granules->getContractBalance(call->root, call->contract->name, cur) || cur < amount)
             return JSI_ThrowTypeError(ctx, "refundValue: insufficient contract balance (amount=%lld balance=%lld)",

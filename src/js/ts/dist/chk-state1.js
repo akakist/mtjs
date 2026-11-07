@@ -133,7 +133,7 @@ async function main() {
         const s1 = await getState();
         const src = "registerMethod('noop', function(p, m) {});";
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-            { contract: "root", method: "contract_deploy", params: { name: "state_test_" + Date.now(), src } },
+            { contract: "root", method: "contract_deploy", params: { name: "state_test_" + Date.now(), src, ttl: 100000 } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "deploy ok (errstr=" + (block.errstr(rsp.tx_hash) || "") + ")");
         const s2 = await getState();

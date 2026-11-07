@@ -130,7 +130,7 @@ async function main() {
         check(block.status(rsp.tx_hash) === "ok", "contract_update (errstr=" + block.errstr(rsp.tx_hash) + ")");
     } else {
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-            { contract: "root", method: "contract_deploy", params: { name: "del_test", src } },
+            { contract: "root", method: "contract_deploy", params: { name: "del_test", src, ttl:100000 } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "contract_deploy (errstr=" + block.errstr(rsp.tx_hash) + ")");
     }

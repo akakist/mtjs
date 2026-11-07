@@ -126,7 +126,7 @@ async function ensureInterrupt(src: string) {
         check(block.status(rsp.tx_hash) === "ok", "contract_update interrupt ok");
     } else {
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-            { contract: "root", method: "contract_deploy", params: { name: "interrupt", src } },
+            { contract: "root", method: "contract_deploy", params: { name: "interrupt", src, ttl:100000 } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "contract_deploy interrupt ok");
     }
