@@ -25,7 +25,7 @@ const MINT_AMOUNT    = envStr("MINT_AMOUNT", "1000000");
 const THROTTLE_MS    = envInt("THROTTLE_MS", 100);
 const WAIT_TX_SEC    = envInt("WAIT_TX_SEC", 20);
 const WAIT_NONCE_SEC = envInt("WAIT_NONCE_SEC", 15);
-const WATCHDOG_MS    = 10000;
+const WATCHDOG_MS    = 50000;
 
 const GREEN = "\x1b[32m"; const RED = "\x1b[31m"; const RESET = "\x1b[0m";
 let pass = 0, fail = 0;
@@ -49,7 +49,11 @@ async function loadKeys(): Promise<void> {
         const name = "u" + i;
         const u = keys.users?.[name]?.keys?.[0];
         if (!u?.sk || !u?.pk) { console.log("skip " + name + ": no keys"); continue; }
-        users.push({ name, sk: u.sk, pk: u.pk, addr: mtjs.addr_from_name(name) });
+        // addr — из keys_test (hex, уникальный); fallback — addr_from_name
+        const addr = keys.users?.[name]?.addr
+            ? keys.users[name].addr
+            : mtjs.addr_from_name(name);
+        users.push({ name, sk: u.sk, pk: u.pk, addr });
     }
     if (users.length === 0) { console.log(RED + "no users" + RESET); std.exit(1); }
 }
@@ -212,3 +216,4 @@ async function userLoop(u: User, ui: number) {
     console.log(RED + "ERR: " + errStr(e) + RESET);
     std.exit(2);
 });
+

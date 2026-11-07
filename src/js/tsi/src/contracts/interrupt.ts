@@ -7,3 +7,16 @@ registerMethod("loopN", function (p: { n: number }, m: JsiMsg) {
     for (var i = 0; i < n; i++) { x += i; }
     return x;
 });
+
+// view: бесконечный цикл — прерывается view_interrupt_handler по timeout_sec
+registerView("loopView", function (p: {}) {
+    while (true) { }
+});
+
+// view: ограниченный цикл — должен вернуть результат (без прерывания)
+registerView("loopViewN", function (p: { n: number }) {
+    var n = Number(p.n);
+    var x = 0;
+    for (var i = 0; i < n; i++) { x += i; }
+    return x;
+});

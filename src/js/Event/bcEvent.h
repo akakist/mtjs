@@ -13,13 +13,15 @@
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
-    const SERVICE_id BlockValidator(ghash("@g_BlockValidator"));
+//    const SERVICE_id BlockValidator(ghash("@g_BlockValidator"));
     const SERVICE_id TxValidator(ghash("@g_TxValidator"));
     const SERVICE_id BroadcasterTree(ghash("@g_BroadcasterTree"));
     const SERVICE_id GrainReader(ghash("@g_GrainReader"));
+    const SERVICE_id GrainReaderLite(ghash("@g_GrainReaderLite"));
     const SERVICE_id BlockStreamer(ghash("@g_BlockStreamer"));
-    const SERVICE_id GrainWriter(ghash("@g_GrainWriter"));
+//    const SERVICE_id GrainWriter(ghash("@g_GrainWriter"));
     // const SERVICE_id LeaderElection(ghash("@g_LeaderElection"));
+    const SERVICE_id Scan(ghash("@g_Scan"));
 
 }
 namespace bcEventEnum
@@ -35,7 +37,7 @@ namespace bcEventEnum
     const EVENT_id ClientTxUnsubscribeREQ(ghash("@g_ClientTxUnsubscribeREQ"));
     const EVENT_id ClientTxSubscribeRSP(ghash("@g_ClientTxSubscribeRSP"));
     const EVENT_id ServiceInit(ghash("@g_ServiceInit"));
-    // const EVENT_id InvalidateRoot(ghash("@g_InvalidateRoot"));
+    const EVENT_id InvalidateRoot(ghash("@g_InvalidateRoot"));
     const EVENT_id BroadcastMessage(ghash("@g_BroadcastMessage"));
     const EVENT_id SendToChild(ghash("@g_SendToChild"));
     const EVENT_id SendToChildAck(ghash("@g_SendToChildAck"));
@@ -48,13 +50,21 @@ namespace bcEventEnum
     const EVENT_id WriteBlock(ghash("@g_WriteBlock"));
     const EVENT_id GetGranulesREQ(ghash("@g_GetGranulesREQ"));
     const EVENT_id GetGranulesRSP(ghash("@g_GetGranulesRSP"));
+    const EVENT_id StaleGranules(ghash("@g_StaleGranules"));
+    const EVENT_id LiteSetUplinkREQ(ghash("@g_LiteSetUplinkREQ")); /// выставить для iDatabase адрес ноды откуда брать гранулы
     
 
 }
 
 namespace bcEvent
 {
-
+    class LiteSetUplinkREQ : public Event::NoPacked {
+    public:
+        static Base* construct(const route_t &r) { return nullptr; }
+        LiteSetUplinkREQ(const std::string& _addr, const route_t &r)
+            : NoPacked(bcEventEnum::LiteSetUplinkREQ, r), addr(_addr) {}
+        std::string addr;   // "127.0.0.1:4500"
+    };
     class NodeMsgREQ : public Event::Base
     {
 
@@ -303,18 +313,17 @@ namespace bcEvent
         // REF_getter<root_data> root;
     };
 
-    // class InvalidateRoot : public Event::NoPacked
-    // {
-    // public:
-    //     static Base *construct(const route_t &r)
-    //     {
-    //         return NULL;
-    //     }
-    //     InvalidateRoot(const REF_getter<root_data>& _root, const route_t &r)
-    //         : NoPacked(bcEventEnum::InvalidateRoot, r), root(_root) {}
+    class InvalidateRoot : public Event::NoPacked
+    {
+    public:
+        static Base *construct(const route_t &r)
+        {
+            return NULL;
+        }
+        InvalidateRoot(const route_t &r)
+            : NoPacked(bcEventEnum::InvalidateRoot, r) {}
         
-    //     REF_getter<root_data> root;
-    // };
+    };
 
     class BroadcastMessage : public Event::NoPacked
     {
@@ -616,6 +625,14 @@ namespace bcEvent
             o<<v;
         }
     };
+    class StaleGranules : public Event::NoPacked
+    {
+    public:
+        static Base* construct(const route_t &r) { return nullptr; }
+        StaleGranules(const std::vector<std::pair<std::string,std::string>>& _v, const route_t &r)
+            : NoPacked(bcEventEnum::StaleGranules, r), v(_v) {}
+        std::vector<std::pair<std::string,std::string>> v;   // {hash (32 bin), body}
+    };    
 
  
 }

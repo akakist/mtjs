@@ -86,7 +86,10 @@ namespace msgid
         GetContractDataREQ=26, GetContractDataRSP=27,
         GetContractREQ=28, GetContractRSP=29,
         GetStateREQ=30, GetStateRSP=31,
-	GetAddressInfoREQ=32, GetAddressInfoRSP=33,
+        GetAddressInfoREQ=32, GetAddressInfoRSP=33,
+        CallViewREQ=34, CallViewRSP=35,
+        GetGranuleREQ=36, GetGranuleRSP=37,
+        ScanREQ=38, ScanRSP=39,    
     };
 
 }

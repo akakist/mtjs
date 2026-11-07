@@ -31,6 +31,12 @@
 #include "md/md_GetStateRSP.h"
 #include "md/md_GetAddressInfoREQ.h"
 #include "md/md_GetAddressInfoRSP.h"
+#include "md/md_CallViewREQ.h"
+#include "md/md_CallViewRSP.h"
+#include "md/md_GetGranuleREQ.h"
+#include "md/md_GetGranuleRSP.h"
+#include "md/md_ScanREQ.h"
+#include "md/md_ScanRSP.h"
 // #include <yyjson.h>
 #include <nlohmann/json.hpp>
 #include "js_tools.h"
@@ -609,6 +615,61 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
     {
 
 // в ClientMsgReply switch(p):
+    case msgid::ScanRSP:
+    {
+        auto *rs = (MsgData::ScanRSP*)b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20,20> scope(ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JSValue dbids_arr = JS_NewArray(ctx);
+        uint32_t i = 0;
+        for (auto& d : rs->dbids) {
+            JS_SetPropertyUint32(ctx, dbids_arr, i++, JS_NewString(ctx, base16::encode(d.container).c_str()));
+        }
+        JS_SetPropertyStr(ctx, obj, "dbids", dbids_arr);
+        JS_SetPropertyStr(ctx, obj, "next_from", JS_NewString(ctx, rs->next_from.container.empty() ? "" : base16::encode(rs->next_from.container).c_str()));
+        JS_SetPropertyStr(ctx, obj, "done", JS_NewBool(ctx, rs->done));
+        JS_SetPropertyStr(ctx, obj, "scanned", JS_NewInt64(ctx, rs->scanned));
+        JSValue ret = JS_Call(ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
+    }
+
+    case msgid::GetGranuleRSP:
+    {
+        auto *rs = (MsgData::GetGranuleRSP*)b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20,20> scope(ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "stale", JS_NewBool(ctx, rs->stale));
+        JS_SetPropertyStr(ctx, obj, "body", JS_NewString(ctx, base16::encode(rs->body).c_str()));
+        JSValue ret = JS_Call(ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
+    }
+    case msgid::CallViewRSP:
+    {
+        auto *rs = (MsgData::CallViewRSP*)b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20,20> scope(ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "error", JS_NewBool(ctx, rs->error));
+        JS_SetPropertyStr(ctx, obj, "result", JS_NewString(ctx, rs->result_json.c_str()));
+        JSValue ret = JS_Call(ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
+    }
     case msgid::GetAddressInfoRSP: {
         auto *rs = (MsgData::GetAddressInfoRSP*)b.get();
         auto *ctx = it->second.ctx;
@@ -673,6 +734,8 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         }
         JS_SetPropertyStr(ctx, obj, "owners", owners_arr);
         JS_SetPropertyStr(ctx, obj, "src", JS_NewStringLen(ctx, rs->src.data(), rs->src.size()));
+        JS_SetPropertyStr(ctx, obj, "ttl", JS_NewInt64(ctx, rs->ttl));
+        JS_SetPropertyStr(ctx, obj, "update_time", JS_NewInt64(ctx, rs->update_time));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
         scope.addValue(ret);
         opaque.node_req_promises.erase(e->hash_of_request.container);
@@ -723,6 +786,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JS_SetPropertyStr(ctx, obj, "ip", JS_NewString(ctx, rs->ip.c_str()));
         JS_SetPropertyStr(ctx, obj, "enabled", JS_NewBool(ctx, rs->enabled));
         JS_SetPropertyStr(ctx, obj, "missed_rounds", JS_NewInt64(ctx, rs->missed_rounds));
+        JS_SetPropertyStr(ctx, obj, "answered_rounds", JS_NewInt64(ctx, rs->answered_rounds));
         JS_SetPropertyStr(ctx, obj, "full_stake", JS_NewString(ctx, std::to_string(rs->full_stake).c_str()));
         JSValue stakes_obj = JS_NewObject(ctx);
         // scope.addValue(stakes_obj);

@@ -33,6 +33,12 @@
 #include "md/md_GetStateRSP.h"
 #include "md/md_GetAddressInfoREQ.h"
 #include "md/md_GetAddressInfoRSP.h"
+#include "md/md_CallViewREQ.h"
+#include "md/md_CallViewRSP.h"
+#include "md/md_GetGranuleREQ.h"
+#include "md/md_GetGranuleRSP.h"
+#include "md/md_ScanREQ.h"
+#include "md/md_ScanRSP.h"
 
 
 MsgFactory::MsgFactory()
@@ -70,4 +76,10 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetStateRSP, MsgData::GetStateRSP::construct);
     registerMsg(msgid::GetAddressInfoREQ, MsgData::GetAddressInfoREQ::construct);
     registerMsg(msgid::GetAddressInfoRSP, MsgData::GetAddressInfoRSP::construct);
+    registerMsg(msgid::CallViewREQ, MsgData::CallViewREQ::construct);
+    registerMsg(msgid::CallViewRSP, MsgData::CallViewRSP::construct);
+    registerMsg(msgid::GetGranuleREQ, MsgData::GetGranuleREQ::construct);
+    registerMsg(msgid::GetGranuleRSP, MsgData::GetGranuleRSP::construct);    
+    registerMsg(msgid::ScanREQ, MsgData::ScanREQ::construct);
+    registerMsg(msgid::ScanRSP, MsgData::ScanRSP::construct);
 }

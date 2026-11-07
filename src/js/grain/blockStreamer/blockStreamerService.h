@@ -77,7 +77,6 @@ namespace BlockStreamer
         }
 
 
-        // std::map<route_t,clientTxSubscription> clientTxSubscriptions;
 
     };
 

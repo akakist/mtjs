@@ -7,7 +7,7 @@ struct bc_values: public data_base
 
     bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
         /// gas
-        values["gas_per_token"]    = 1000;
+        values["gas_per_token"]    = 1;
         values["gas_per_byte"]     = 1;
         values["gas_per_jsi_step"] = 10;      // = interrupt_counter
         values["gas_per_hostcall"] = 500;
@@ -28,6 +28,7 @@ struct bc_values: public data_base
         values["validator_count_percent"] = 50;
         values["validator_min_stake"] = 50;
         values["missed_rounds_max"] = 100 ;
+        values["answered_committee_min"] = 10 ; 
         values["ttl_cache"] = 20 ; /// time to live contract cache and state cache in height
         
 
@@ -37,7 +38,7 @@ struct bc_values: public data_base
 
     size_t size() const
     {
-        M_LOCK(parent->mx);
+        
 
         size_t sz=size_();
         for(auto &z: values)
@@ -52,7 +53,7 @@ struct bc_values: public data_base
         return sz;
     }
 
-    int64_t getGas(const std::string &fee_type) const
+    int64_t getValue(const std::string &fee_type) const
     {
         auto it=values.find(fee_type);
         if(it!=values.end())

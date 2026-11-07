@@ -1,0 +1,1 @@
+../../../mt/tools/ifacegen2/ifacegen2.debug.exe scanService *.cpp *.h 

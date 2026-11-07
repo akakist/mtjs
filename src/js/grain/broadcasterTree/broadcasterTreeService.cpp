@@ -24,7 +24,7 @@
 #include "tree.h"
 #include "events_broadcasterTreeService.hpp"
 #include "unknown.h"
-#include "init_root.h"
+// #include "init_root.h"
 #include "CDatabaseRocksdb.h"
 bool BroadcasterTree::Service::on_startService(const systemEvent::startService *)
 {
@@ -153,10 +153,7 @@ BroadcasterTree::Service::Service(const SERVICE_id &id, const std::string &nm, I
 
 bool BroadcasterTree::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
-    conf = e;
-    // root=e->root;
-    // db_state_4=new CDatabase(getDB(),conf->db_name2);
-    return true;
+    return false;
 }
 bool BroadcasterTree::Service::BroadcastMessage(const bcEvent::BroadcastMessage *e)
 {
@@ -191,19 +188,19 @@ bool BroadcasterTree::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *e)
         throw CommonError("if(e->route.size())");
     return true;
 }
-void BroadcasterTree::Service::logNode(const char *fmt, ...)
-{
+// void BroadcasterTree::Service::logNode(const char *fmt, ...)
+// {
 
-    {
-        va_list ap;
-        va_start(ap, fmt);
-        fprintf(stdout, "%ld [BroadcasterTree] [%s] ", time(NULL),
-                conf->this_node_name.container.c_str());
-        vfprintf(stdout, fmt, ap);
-        fprintf(stdout, "\n");
-        va_end(ap);
-    }
-}
+//     {
+//         va_list ap;
+//         va_start(ap, fmt);
+//         fprintf(stdout, "%ld [BroadcasterTree] [%s] ", time(NULL),
+//                 conf->this_node_name.container.c_str());
+//         vfprintf(stdout, fmt, ap);
+//         fprintf(stdout, "\n");
+//         va_end(ap);
+//     }
+// }
 
 void registerBroadcasterTreeService(const char *pn)
 {

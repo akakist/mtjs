@@ -10,17 +10,17 @@ struct bc_contract_balance: public data_base
     }
     int64_t getAmount() const
     {
-        M_LOCK(parent->mx);
+        
         return amount;
     }
     void addAmount(int64_t a)
     {
-        M_LOCK(parent->mx);
+        
         amount += a;
     }
     void subAmount(int64_t a)
     {
-        M_LOCK(parent->mx);
+        
         amount -= a;
     }
     void pack(outBuffer& o) const final

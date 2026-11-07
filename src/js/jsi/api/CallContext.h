@@ -28,5 +28,6 @@ struct CallContext {
 
     FeesSnapshot *fees = nullptr;
     std::set<REF_getter<data_base>> * deleted_granules = nullptr;
+    Cellable* root = nullptr;
 };
 

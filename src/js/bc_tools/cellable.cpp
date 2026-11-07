@@ -12,7 +12,7 @@
 #include "bc_vote.h"
 #include "bc_contract_balance.h"
 #include "bc_state.h"
-
+#include "bc_contract_activity.h"
 
 std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
@@ -39,6 +39,7 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base * { return new bc_contract_balance(p); }, 
 
     +[](Cellable *p) -> data_base * { return new bc_state(p); }, 
+    +[](Cellable *p) -> data_base * { return new bc_contract_activity(p); }, 
 };
 
 
@@ -55,14 +56,10 @@ void Cellable::get_dirty_leaves(_db_to_save &db_dump)
 {
     if (!is_dirty)
         return;
-    MutexLockerDeferred lk(mx);
     bool has_children=false;
-    lk.lock();
-    auto cptr_copy = children_ptrs_mx;
     has_children=children_ptrs_mx.size()>0;
-    lk.unlock();
 
-    for (auto &zz : cptr_copy)
+    for (auto &zz : children_ptrs_mx)
     {
         MUTEX_INSPECTOR;
         auto cid = zz.first;
@@ -75,10 +72,8 @@ void Cellable::get_dirty_leaves(_db_to_save &db_dump)
     }
     if(!has_children)
     {
-        lk.lock();
         auto child_buf = getBuffer_mx();
         db_dump.add(getDbId(), child_buf);
-        lk.unlock();
 
 
     }
@@ -90,12 +85,8 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     MUTEX_INSPECTOR;
     if (!is_dirty)
         return;
-    MutexLockerDeferred lk(mx);
-    lk.lock();
-    auto cptr_copy = children_ptrs_mx;
-    lk.unlock();
 
-    for (auto &zz : cptr_copy)
+    for (auto &zz : children_ptrs_mx)
     {
         MUTEX_INSPECTOR;
         auto cid = zz.first;
@@ -104,7 +95,6 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
         {
             MUTEX_INSPECTOR;
             c->calc_tree_hash(db_dump);
-            lk.lock();
             auto child_buf = c->getBuffer_mx();
             auto ch = blake2b_hash(child_buf);
             if (ch != children_hashes_mx[cid])
@@ -113,7 +103,6 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
                 db_dump.add(c->getDbId(), child_buf);
                 children_hashes_mx[cid] = ch;
             }
-            lk.unlock();
         }
     }
     is_dirty = false;
@@ -133,20 +122,15 @@ void deleteGranule(data_base* g, Rollback* roll,_db_to_save &db_dump)
     cell->setDirty__(roll);
     while(cell)
     {
-        MutexLockerDeferred l(cell->mx);
-        l.lock();
         if(cell->children_hashes_mx.size())
         {
-            l.unlock();
             return;
         }
         auto pred=cell->parent;
         if(!pred) return;
         db_dump.del(cell->getDbId());
         auto id=cell->m_id;
-        l.unlock();
         {
-            M_LOCK(pred->mx);
             pred->children_hashes_mx.erase(id);
             pred->children_ptrs_mx.erase(id);
 

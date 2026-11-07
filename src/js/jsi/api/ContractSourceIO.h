@@ -5,5 +5,5 @@
 struct ContractSourceIO : public Refcountable {
     ContractSourceIO() : Refcountable("ContractSourceIO") {}
     virtual ~ContractSourceIO() = default;
-    virtual bool load(const CONTRACT_id& name, std::string& src) = 0;
+    virtual bool load(Cellable*, const CONTRACT_id& name, std::string& src) = 0;
 };

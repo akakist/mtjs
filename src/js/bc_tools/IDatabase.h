@@ -28,7 +28,7 @@ struct IDatabase: public Refcountable
     virtual int deleteGranule(const std::string& k) = 0;
     std::atomic<bool> clear_root=false;
 
-    REF_getter<Cellable> root;
+    // REF_getter<Cellable> root;
 
 
     IDatabase():Refcountable("Idatabse") {}
@@ -101,81 +101,13 @@ struct IDatabase: public Refcountable
 
 
 private:
-    Mutex mx;
     std::map<int, std::set<std::string> > sync_out;
     std::string sync_ip;
-    // REF_getter<root_data> _root;
 
 public:
-    static std::vector<std::string> getPath(const std::string& name);
-    static std::vector<std::string> getPathFromHash(const THASH_id& h);
+    Mutex mx;
 
-    REF_getter<data_base> replaceLeaf(const THASH_id &name, Rollback* roll, const std::string & buffer);
-
-    static std::vector<std::string> getContractPath(const CONTRACT_id &name);
-    std::vector<std::string> getContractDataPath(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId);
-    static std::vector<std::string> getNodePath(const NODE_id &name);
-
-
-    // static std::vector<std::string> getUserPath(const ADDRESS_id &addr);
-    static std::vector<std::string> getAddressStatePath(const ADDRESS_id &addr);
-
-    REF_getter<bc_contract> getContractNoCreate(const CONTRACT_id &name);
-    REF_getter<const bc_contract> getContractNoCreateConst(const CONTRACT_id &name);
-    REF_getter<bc_contract> getContractOrCreate(const CONTRACT_id &name,Rollback* roll);
-
-    REF_getter<bc_contract_data> getContractDataNoCreate(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId);
-    REF_getter<const bc_contract_data> getContractDataNoCreateConst(const CONTRACT_id& contract, const CONTRACT_DATA_id &dataId);
-    REF_getter<bc_contract_data> getContractDataOrCreate(const CONTRACT_id& con, const CONTRACT_DATA_id &name, Rollback* roll, int ttl, time_t create_time);
-
-    std::vector<std::string> getContractBalancePath(const CONTRACT_id& contract);
-    REF_getter<bc_contract_balance> getContractBalanceOrCreate(const CONTRACT_id& contract, Rollback* roll);
-    REF_getter<bc_contract_balance> getContractBalanceNoCreate(const CONTRACT_id& contract);
-    REF_getter<const bc_contract_balance> getContractBalanceNoCreateConst(const CONTRACT_id& contract);
-
-    REF_getter<bc_values> getValuesOrCreate(Rollback*);
-    REF_getter<bc_values> getValuesNoCreate();
-    REF_getter<const bc_values> getValuesNoCreateConst();
-
-    REF_getter<bc_votes> getVotesOrCreate(Rollback*);
-    REF_getter<bc_votes> getVotesNoCreate();
-    REF_getter<const bc_votes> getVotesNoCreateConst();
-
-
-    REF_getter<bc_address_state> getAddressStateOrCreate(const ADDRESS_id &pk,Rollback*);
-    REF_getter<bc_address_state> getAddressStateNoCreate(const ADDRESS_id &pk);
-    REF_getter<const bc_address_state> getAddressStateNoCreateConst(const ADDRESS_id &pk);
-
-
-    // std::vector<NODE_id> getNodesNames();
-    std::vector<REF_getter<bc_node>> getAllNodes();
-
-
-    REF_getter<bc_node> getNodeNoCreate(const NODE_id &name);
-    REF_getter<const bc_node> getNodeNoCreateConst(const NODE_id &name);
-    REF_getter<bc_node> addNode(const NODE_id &name, Rollback*);
-    REF_getter<bc_nodelist> getNodeListOrCreate(Rollback* roll);
-    REF_getter<bc_nodelist> getNodeListNoCreate();
-    REF_getter<const bc_nodelist> getNodeListNoCreateConst();
-
-
-    // ---- STATE (bc_state) ----
-    static std::vector<std::string> getStatePath();          // getPath("STATE")
-    REF_getter<bc_state> getStateOrCreate(Rollback* roll);
-    REF_getter<bc_state> getStateNoCreate();
-    REF_getter<const bc_state> getStateNoCreateConst();
-
-    REF_getter<Cellable> replaceLeafNoCreate(const REF_getter<Cellable>&cur, const std::string& id, MutexLockerDeferred &l);
-    REF_getter<Cellable> replaceLeafOrCreate(const REF_getter<Cellable>&cur, const std::string &id, MutexLockerDeferred &l, Rollback *roll);
-
-
-    REF_getter<Cellable> getByPathOrCreate(const REF_getter<Cellable>&cur, const std::vector<std::string>& v, Rollback* roll);
-    REF_getter<Cellable> getByPathOrCreate(const REF_getter<Cellable>&cur, const std::deque<std::string> &v, Rollback*);
-
-    REF_getter<Cellable> getByPathNoCreate(const REF_getter<Cellable>&cur, const std::vector<std::string>& v);
-    REF_getter<Cellable> getByDbIdNoCreate(const THASH_id& h);   // root + getPathFromHash + getByPathNoCreate
-// IDatabase.h
-
+    
 };
 
 REF_getter<Cellable>  getRoot(IDatabase *db, const REF_getter<MsgData::BlockAccepted2REQ>& pb);

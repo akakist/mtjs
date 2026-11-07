@@ -1,6 +1,18 @@
 import { StreamModule } from "./stream";
 
 declare global {
+
+    interface ScanResult { dbids: string[]; next_from: string; done: boolean; scanned: number; }
+    interface Granule {
+        found: boolean;
+        stale: boolean;     // этап 2; сейчас всегда false
+        body: string;       // тело гранулы hex (JS не умеет бинарные строки)
+    }
+    interface CallViewResult {
+        found: boolean;
+        error: boolean;
+        result: string;   // JSON-строка
+    }
     interface AddressKey { id: number; type: number; keybuffer: string; }
 
     interface AddressInfo {
@@ -28,6 +40,8 @@ declare global {
         contract: string;
         owners: string[];
         src: string;
+        ttl: number;
+        update_time: number;
     }
     interface userInfo {
         nonce: string;
@@ -75,6 +89,7 @@ declare global {
         ip: string;
         enabled: boolean;
         missed_rounds: number;
+        answered_rounds: number;
         full_stake: string;
         stakes: { [addr: string]: string };
     }
@@ -92,6 +107,9 @@ declare global {
         // address
         addr_from_name(nick: string): string;
         get_address_info(nodeaddr: string, addr_hex: string, timeout: number): Promise<AddressInfo>;
+        get_granule(nodeaddr: string, addr_hex: string, hash_hex: string, timeout: number): Promise<Granule>;
+        get_granule_lite(addr_hex: string, hash_hex: string, timeout: number): Promise<Granule>;
+	scan_expired(nodeaddr: string, from_hex: string, max_sec: number): Promise<ScanResult>;
 
         // mtjs core
         telnet: telnetModule;
@@ -117,8 +135,11 @@ declare global {
         get_contract_data(nodeaddr: string, contract: string, key: string, timeout: number): Promise<ContractData>;
         get_contract(nodeaddr: string, contract: string, timeout: number): Promise<ContractInfo>;
         get_state(nodeaddr: string, timeout: number): Promise<StateInfo>;
-
+        call_view(nodeaddr: string, contract: string, view: string, params: object, timeout_sec: number, timeout: number): Promise<CallViewResult>;
         tx_unsubscribe(nodeaddr: string, tx_hash_hex?: string): void;
+	    lite_set_uplink(addr: string): void;
+        blake2b_hex(str: string): string;
+        sign_ed(sk_hex: string, msg: string): string;
         pipe: Pipe;
         STDIN: STDIN;
         rpc: rpcModule;

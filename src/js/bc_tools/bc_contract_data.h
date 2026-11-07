@@ -8,7 +8,7 @@ struct bc_contract_data:  public data_base
     std::string container;
     size_t size() const
     {
-        M_LOCK(parent->mx);
+        
 
         return  size_()+container.size();
     }

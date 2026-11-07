@@ -1,10 +1,10 @@
-#include "init_root.h"
 #include "getenv2.h"
 #include "IDatabase.h"
 #include "normalizeNick.h"
 #include "Key.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include "cells.h"
 
 // addr (hex, 64) / nick → ADDRESS_id
 static ADDRESS_id resolve_addr(const std::string& s) {
@@ -34,12 +34,17 @@ static std::string user_label(const nlohmann::json& u) {
     if (u.contains("nick") && u["nick"].is_string()) return u["nick"].get<std::string>();
     return "<unknown>";
 }
+THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &r, _db_to_save &db_to_save_Z);
 
-void init_root(IDatabase* db) {
+void init_genesis(Cellable* root, IDatabase* db) 
+{
     MUTEX_INSPECTOR;
-
-    auto st = db->getStateNoCreate();
+    if(!root)
+        throw CommonError("[init_genesis] if(!root)");
+    auto st = cells::getStateNoCreate(root, db);
     if (st.valid()) return;
+
+    logErr2("RUN GENESIS");
 
     const char* env_path = getenv("MTJS_GENESIS_PATH");
     std::string path = env_path ? env_path : "genesis.json";
@@ -49,7 +54,12 @@ void init_root(IDatabase* db) {
     try { f >> j; }
     catch (const std::exception& e) { throw CommonError("genesis: parse %s: %s", path.c_str(), e.what()); }
 
-    auto st2 = db->getStateOrCreate(NULL);
+    auto nl=cells::getNodeListOrCreate(root,db,NULL);
+    nl->setDirty(NULL);
+    auto votes=cells::getVotesOrCreate(root,db,NULL);
+    votes->setDirty(NULL);
+
+    auto st2 = cells::getStateOrCreate(root,db,NULL);
     st2->chain_id      = j.value("chain_id", (int64_t)1);
     st2->genesis_time  = j.value("genesis_time", (int64_t)time(NULL));
     st2->total_supply  = i128(0);
@@ -61,7 +71,7 @@ void init_root(IDatabase* db) {
     st2->block_height  = 0;
     st2->setDirty(NULL);
 
-    auto v = db->getValuesOrCreate(NULL);
+    auto v = cells::getValuesOrCreate(root, db, NULL);
     if (j.contains("params") && j["params"].is_object()) {
         for (auto& [k, val] : j["params"].items()) {
             if (!val.is_number_integer())
@@ -87,11 +97,11 @@ void init_root(IDatabase* db) {
             std::string label = user_label(u);
             ADDRESS_id addr = resolve_user(u);
 
-            auto ua = db->getAddressStateOrCreate(addr, NULL);
+            auto ua = cells::getAddressStateOrCreate(root, db,addr, NULL);
             int64_t bal = 0;
             if (u.contains("balance") && u["balance"].is_string())
                 bal = std::stoll(u["balance"].get<std::string>());
-            { M_LOCK(ua->parent->mx); ua->balance = bal; }
+            {  ua->balance = bal; }
 
             if (u.contains("keys") && u["keys"].is_array()) {
                 auto& keys = u["keys"];
@@ -121,14 +131,14 @@ void init_root(IDatabase* db) {
             if (!n.contains("name") || !n["name"].is_string())
                 throw CommonError("genesis: node.name required");
             NODE_id name; name.container = n["name"].get<std::string>();
-            if (db->getNodeNoCreate(name).valid())
+            if (cells::getNodeNoCreate(root,db, name).valid())
                 throw CommonError("genesis: duplicate node %s", name.container.c_str());
 
             if (!n.contains("owner") || !n["owner"].is_string())
                 throw CommonError("genesis: node.%s owner required", name.container.c_str());
             ADDRESS_id owner = resolve_addr(n["owner"].get<std::string>());
 
-            auto nn = db->addNode(name, NULL);
+            auto nn = cells::addNode(root,db,name, NULL);
 
             blst_cpp::PublicKey bls_pk;
             if (!n.contains("bls_pk") || !n["bls_pk"].is_string())
@@ -154,4 +164,13 @@ void init_root(IDatabase* db) {
         }
     }
     st2->setDirty(NULL);
+    _db_to_save dbz;
+    proceed_merkle_on_transaction_pool_hashers(root,dbz);
+    db->write_granules_batch(dbz);
+    logErr2("write_granules_batch %d granules",dbz.cells.size());
+    // db_to_save_Z.clear();
+
+    // invalidate_services();
+
+    
 }

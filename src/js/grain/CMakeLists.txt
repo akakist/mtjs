@@ -3,12 +3,13 @@
 #add_subdirectory(bc_tools)
 #add_subdirectory(test)
 
+add_subdirectory(scan)
 
 add_subdirectory(node)
 add_subdirectory(blockStreamer)
 #add_subdirectory(leaderElection)
 add_subdirectory(grainReader)
-add_subdirectory(grainWriter)
-add_subdirectory(blockValidator)
+#add_subdirectory(grainWriter)
+#add_subdirectory(blockValidator)
 add_subdirectory(txValidator)
 add_subdirectory(broadcasterTree)

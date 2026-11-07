@@ -50,7 +50,7 @@ namespace BroadcasterTree
         bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
         bool SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork);
 
-        void logNode(const char* fmt, ...);
+        // void logNode(const char* fmt, ...);
 
 
 
@@ -74,7 +74,6 @@ namespace BroadcasterTree
             XPASS;
         }
 
-        REF_getter<bcEvent::ServiceInit> conf=nullptr;
 
     };
 

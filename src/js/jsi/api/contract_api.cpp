@@ -107,7 +107,17 @@ JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& /*m*/)
     return obj;
 
 }
-
+JSIValue js_blake2b_hex(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv)
+{
+    MUTEX_INSPECTOR;
+    JSIScope<10,10> scope(ctx);
+    if (argc != 1 || !JSI_IsString(argv[0]))
+        return JSI_ThrowTypeError(ctx, "blake2b_hex(str)");
+    std::string s = scope.toStdString(argv[0]);
+    auto h = blake2b_hash(s);
+    auto hex = base16::encode(h.container);
+    return JSI_NewStringLen(ctx, hex.data(), hex.size());
+}
 JSIValue jsi_registerMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     try {
         if (argc < 2 || !JSI_IsString(argv[0]) || !JSI_IsFunction(ctx, argv[1]))
@@ -174,7 +184,7 @@ JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueCon
                         + (ttl + call->fees->ttl_seconds_per_gas - 1) / call->fees->ttl_seconds_per_gas;
 
         CONTRACT_DATA_id cid; cid.container = key;
-        if (io->existsGranule(cc->name, cid))
+        if (io->existsGranule(cc->root, cc->name, cid))
             return JSI_ThrowTypeError(ctx, "createGranule: already exists: %s%s",
                                       cc->name.container.c_str(), key.c_str());
         std::string s = serialize_value(ctx, argv[1]);
@@ -185,7 +195,7 @@ JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueCon
             return JSI_ThrowTypeError(ctx, "createGranule(%s%s): value too large",
                                       cc->name.container.c_str(), key.c_str());
         int64_t now = call->msg_source->get_blockTimestamp();
-        if (auto err = io->createGranule(cc->name, cid, s, now, ttl, call->roll))
+        if (auto err = io->createGranule(cc->root, cc->name, cid, s, now, ttl, call->roll))
             return JSI_ThrowTypeError(ctx, "createGranule(%s%s): %s",
                                       cc->name.container.c_str(), key.c_str(), err->c_str());
 
@@ -226,11 +236,11 @@ JSIValue jsi_setGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
             return JSI_EXCEPTION;
 
         CONTRACT_DATA_id cid; cid.container = key;
-        if (!io->existsGranule(cc->name, cid))
+        if (!io->existsGranule(cc->root, cc->name, cid))
             return JSI_ThrowTypeError(ctx, "setGranule: not found: %s%s",
                                       cc->name.container.c_str(), key.c_str());
 
-        int64_t ttl = io->getGranuleTTL(cc->name, cid);   // ← старый TTL
+        int64_t ttl = io->getGranuleTTL(cc->root, cc->name, cid);   // ← старый TTL
         if (ttl <= 0)
             return JSI_ThrowTypeError(ctx, "setGranule: no ttl (granule without ttl)");
         int64_t ttl_gas = (ttl + call->fees->ttl_seconds_per_gas - 1) / call->fees->ttl_seconds_per_gas;   // без base
@@ -243,7 +253,7 @@ JSIValue jsi_setGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
             return JSI_ThrowTypeError(ctx, "setGranule(%s%s): value too large",
                                       cc->name.container.c_str(), key.c_str());
         int64_t now = call->msg_source->get_blockTimestamp();
-        if (auto err = io->setGranule(cc->name, cid, s, now, ttl, call->roll))
+        if (auto err = io->setGranule(cc->root, cc->name, cid, s, now, call->roll))
             return JSI_ThrowTypeError(ctx, "setGranule(%s%s): %s",
                                       cc->name.container.c_str(), key.c_str(), err->c_str());
 
@@ -277,7 +287,7 @@ JSIValue jsi_getGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
         }
         CONTRACT_DATA_id cid; cid.container=key;
         std::string value;
-        if (!io->getGranule(cc->name,cid, value)){
+        if (!io->getGranule(cc->root, cc->name,cid, value)){
             return JSI_UNDEFINED;
         } 
         json j = json::parse(value);
@@ -294,18 +304,12 @@ JSIValue jsi_consumeValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueCons
         if (argc < 1 || !JSI_IsNumber(argv[0])) return JSI_ThrowTypeError(ctx, "consumeValue(amount)");
         CallContext* call = (CallContext*)JSI_GetContextOpaque(ctx);
         if (!call) return JSI_ThrowTypeError(ctx, "no call context");
-        // ▼▼▼
-        if (!call->in_view && call->msg_source)
-            call->msg_source->consume_gas(call->fees->gas_per_call + call->fees->gas_per_hostcall);
-        // ▲▲▲        
         if (call->in_view) return JSI_ThrowTypeError(ctx, "consumeValue is not allowed in view");
-        // ▼▼▼
-        if (call->msg_source)
-            call->msg_source->consume_gas(call->fees->gas_per_call + call->fees->gas_per_hostcall);
-        // ▲▲▲        
         if (!call->msg_source) return JSI_ThrowTypeError(ctx, "consumeValue: no value context");
         if (!call->host.valid() || !call->host->granules.valid() || !call->contract.valid())
             return JSI_ThrowTypeError(ctx, "consumeValue: no contract/granules context");
+        // газ — один раз
+        call->msg_source->consume_gas(call->fees->gas_per_call + call->fees->gas_per_hostcall);
         int64_t amount = 0;
         if (JSI_ToInt64(ctx, &amount, argv[0]) != 0) return JSI_ThrowTypeError(ctx, "consumeValue: amount must be int64");
         if (amount < 0) return JSI_ThrowTypeError(ctx, "consumeValue: amount < 0");
@@ -313,9 +317,8 @@ JSIValue jsi_consumeValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueCons
         if (amount > remaining)
             return JSI_ThrowTypeError(ctx, "consumeValue: insufficient value (amount=%lld remaining=%lld)",
                                       (long long)amount, (long long)remaining);
-        // value: sender -> contract
         call->msg_source->consume_value(amount);
-        if (auto err = call->host->granules->addContractBalance(call->contract->name, amount, call->roll))
+        if (auto err = call->host->granules->addContractBalance(call->root, call->contract->name, amount, call->roll))
             return JSI_ThrowTypeError(ctx, "consumeValue: %s", err->c_str());
         return JSI_UNDEFINED;
     } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
@@ -339,11 +342,11 @@ JSIValue jsi_refundValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst
         if (JSI_ToInt64(ctx, &amount, argv[0]) != 0) return JSI_ThrowTypeError(ctx, "refundValue: amount must be int64");
         if (amount < 0) return JSI_ThrowTypeError(ctx, "refundValue: amount < 0");
         int64_t cur = 0;
-        if (!call->host->granules->getContractBalance(call->contract->name, cur) || cur < amount)
+        if (!call->host->granules->getContractBalance(call->root, call->contract->name, cur) || cur < amount)
             return JSI_ThrowTypeError(ctx, "refundValue: insufficient contract balance (amount=%lld balance=%lld)",
                                       (long long)amount, (long long)cur);
         // contract -> sender
-        if (auto err = call->host->granules->addContractBalance(call->contract->name, -amount, call->roll))
+        if (auto err = call->host->granules->addContractBalance(call->root, call->contract->name, -amount, call->roll))
             return JSI_ThrowTypeError(ctx, "refundValue: %s", err->c_str());
         call->msg_source->refund_value(amount);
         return JSI_UNDEFINED;
@@ -369,51 +372,6 @@ int interrupt_handler(JSIRuntime* rt, void* opaque) {
     if (gasUsed > gasLimit) return 1;   // прервать (exception)
     return 0;
 }
-#ifdef KALL
-JSIValue jsi_consumeValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    try {
-        if (argc < 1 || !JSI_IsNumber(argv[0])) return JSI_ThrowTypeError(ctx, "consumeValue(amount)");
-        CallContext* call = (CallContext*)JSI_GetContextOpaque(ctx);
-        if (!call) return JSI_ThrowTypeError(ctx, "no call context");
-        if (call->in_view) return JSI_ThrowTypeError(ctx, "consumeValue is not allowed in view");
-        if (!call->value_ptr) return JSI_ThrowTypeError(ctx, "consumeValue: no value context");
-        int64_t amount = 0;
-        if (JSI_ToInt64(ctx, &amount, argv[0]) != 0) return JSI_ThrowTypeError(ctx, "consumeValue: amount must be int64");
-        if (amount < 0) return JSI_ThrowTypeError(ctx, "consumeValue: amount < 0");
-        if (amount > *call->value_ptr)
-            return JSI_ThrowTypeError(ctx, "consumeValue: insufficient value (amount=%lld remaining=%lld)",
-                                      (long long)amount, (long long)*call->value_ptr);
-        *call->value_ptr -= amount;
-        return JSI_UNDEFINED;
-    } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
-    catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "consumeValue: %s", e.what()); }
-    catch (...) { return JSI_ThrowInternalError(ctx, "consumeValue: unknown C++ exception"); }
-}
-
-JSIValue jsi_refundValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    try {
-        if (argc < 1 || !JSI_IsNumber(argv[0])) return JSI_ThrowTypeError(ctx, "refundValue(amount)");
-        CallContext* call = (CallContext*)JSI_GetContextOpaque(ctx);
-        if (!call) return JSI_ThrowTypeError(ctx, "no call context");
-        if (call->in_view) return JSI_ThrowTypeError(ctx, "refundValue is not allowed in view");
-        if (!call->value_ptr) return JSI_ThrowTypeError(ctx, "refundValue: no value context");
-        int64_t amount = 0;
-        if (JSI_ToInt64(ctx, &amount, argv[0]) != 0) return JSI_ThrowTypeError(ctx, "refundValue: amount must be int64");
-        if (amount < 0) return JSI_ThrowTypeError(ctx, "refundValue: amount < 0");
-        *call->value_ptr += amount;
-        return JSI_UNDEFINED;
-    } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
-    catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "refundValue: %s", e.what()); }
-    catch (...) { return JSI_ThrowInternalError(ctx, "refundValue: unknown C++ exception"); }
-}
-
-JSIValue jsi_remainingValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*) {
-    CallContext* call = (CallContext*)JSI_GetContextOpaque(ctx);
-    if (!call) return JSI_ThrowTypeError(ctx, "no call context");
-    if (!call->value_ptr) return JSI_NewInt64(ctx, 0);
-    return JSI_NewInt64(ctx, *call->value_ptr);
-}
-#endif
 JSIValue jsi_emit(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     try {
         if (argc < 2 || !JSI_IsString(argv[0])) return JSI_ThrowTypeError(ctx, "emit(name, value)");
@@ -445,22 +403,21 @@ JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
         if (!self || !self->call_stack.valid() || !self->host.valid())
             return JSI_ThrowTypeError(ctx, "callMethod outside of a call");
         // ▼▼▼
-        if (!self->in_view && self->msg_source)
+        if (self->in_view)
+            return JSI_ThrowTypeError(ctx, "callMethod is not allowed in view");
+        if (self->msg_source)
             self->msg_source->consume_gas(self->fees->gas_per_call + self->fees->gas_per_hostcall);
-        // ▲▲▲            
-        if (self->in_view)                                                         // ← guard
-            return JSI_ThrowTypeError(ctx, "callMethod is not allowed in view");   // ← guard
         JSIScope<20,20> scope(ctx);
         CONTRACT_id contract_name; contract_name.container = scope.toStdString(argv[0]);
         auto method_name = scope.toStdString(argv[1]);
         if (contract_name.container.empty() || method_name.empty()) return JSI_EXCEPTION;
         if (self->contract->name == contract_name) return JSI_ThrowTypeError(ctx, "callMethod to self not allowed");
-        auto cc = self->host->get_contract(contract_name);
+        auto cc = self->host->get_contract(self->root,contract_name);
         if (!cc.valid()) return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.container.c_str());
         json params = json_from_jsi(ctx, argv[2]);
         void* prev = JSI_GetContextOpaque(cc->ctx);      // ContractContext* (или nullptr)
         JSI_SetContextOpaque(cc->ctx, self);             // CallContext* caller
-        JSIValue r = cc->call_contract_method(method_name, params, self->msg_source, false,
+        JSIValue r = cc->call_contract_method(method_name, params, self->msg_source, 
                                                self->call_stack, self->host, self->roll, self->contract->name,self->fees,self->deleted_granules);
         JSI_SetContextOpaque(cc->ctx, prev);             // восстановить
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
@@ -473,28 +430,30 @@ JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
 }
 JSIValue jsi_callView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     try {
-        if (argc < 3 || !JSI_IsString(argv[0]) || !JSI_IsString(argv[1]))
-            return JSI_ThrowTypeError(ctx, "callView(contract, view, params)");
+        if (argc < 4 || !JSI_IsString(argv[0]) || !JSI_IsString(argv[1]))
+            return JSI_ThrowTypeError(ctx, "callView(contract, view, params, timeout_sec)");
         CallContext* self = (CallContext*)JSI_GetContextOpaque(ctx);
         if (!self || !self->call_stack.valid() || !self->host.valid())
             return JSI_ThrowTypeError(ctx, "callView outside of a call");
-        // ▼▼▼
-        if (!self->in_view && self->msg_source)
-            self->msg_source->consume_gas(self->fees->gas_per_call + self->fees->gas_per_hostcall);
-        // ▲▲▲            
+        if (self->in_view)
+            return JSI_ThrowTypeError(ctx, "callView is not allowed in view");
         JSIScope<20,20> scope(ctx);
         CONTRACT_id contract_name; contract_name.container = scope.toStdString(argv[0]);
         auto view_name = scope.toStdString(argv[1]);
         if (contract_name.container.empty() || view_name.empty()) return JSI_EXCEPTION;
         if (self->contract->name == contract_name) return JSI_ThrowTypeError(ctx, "callView to self not allowed");
-        auto cc = self->host->get_contract(contract_name);
+        int64_t timeout_sec = 5;
+        if (!JSI_IsUndefined(argv[3])) {
+            if (JSI_ToInt64(ctx, &timeout_sec, argv[3]) != 0)
+                return JSI_ThrowTypeError(ctx, "callView: timeout_sec must be int64");
+        }
+        auto cc = self->host->get_contract(self->root, contract_name);
         if (!cc.valid()) return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.container.c_str());
         json params = json_from_jsi(ctx, argv[2]);
-        void* prev = JSI_GetContextOpaque(cc->ctx);      // ContractContext* (или nullptr)
-        JSI_SetContextOpaque(cc->ctx, self);             // CallContext* caller
-        JSIValue r = cc->call_contract_method(view_name, params, self->msg_source, true,
-                                               self->call_stack, self->host, self->roll, self->contract->name,self->fees,self->deleted_granules);
-        JSI_SetContextOpaque(cc->ctx, prev);             // восстановить
+        void* prev = JSI_GetContextOpaque(cc->ctx);
+        JSI_SetContextOpaque(cc->ctx, self);
+        JSIValue r = cc->call_contract_view(view_name, params, self->call_stack, self->host, timeout_sec);
+        JSI_SetContextOpaque(cc->ctx, prev);
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
         JSIValue r_caller = convert_value(cc->ctx, ctx, r);
         JSI_FreeValue(cc->ctx, r);
@@ -503,6 +462,7 @@ JSIValue jsi_callView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* a
     catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "callView: %s", e.what()); }
     catch (...) { return JSI_ThrowInternalError(ctx, "callView: unknown C++ exception"); }
 }
+
 JSIValue jsi_deleteGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     try {
         if (argc < 1 || !JSI_IsString(argv[0]))
@@ -521,9 +481,9 @@ JSIValue jsi_deleteGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueCon
         if (key.empty()) return JSI_EXCEPTION;
         CONTRACT_DATA_id cid; cid.container = key;
         std::string value;
-        if (!io->getGranule(cc->name, cid, value))
+        if (!io->getGranule(cc->root, cc->name, cid, value))
             return JSI_ThrowTypeError(ctx, "deleteGranule: not found: %s", key.c_str());
-        if (auto err = io->deleteGranule(cc->name, cid, call->roll, call->deleted_granules))
+        if (auto err = io->deleteGranule(cc->root, cc->name, cid, call->roll, call->deleted_granules))
             return JSI_ThrowTypeError(ctx, "deleteGranule: %s", err->c_str());
         return JSI_UNDEFINED;
     } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
@@ -539,11 +499,11 @@ void register_api(JSIContext* ctx) {
     JSI_SetPropertyStr(ctx, global, "getGranule",     JSI_NewCFunction(ctx, jsi_getGranule,     "getGranule", 1));
     JSI_SetPropertyStr(ctx, global, "emit",           JSI_NewCFunction(ctx, jsi_emit,           "emit", 2));
     JSI_SetPropertyStr(ctx, global, "callMethod",     JSI_NewCFunction(ctx, jsi_callMethod,     "callMethod", 3));
-    JSI_SetPropertyStr(ctx, global, "callView",       JSI_NewCFunction(ctx, jsi_callView,       "callView", 3));
     JSI_SetPropertyStr(ctx, global, "consumeValue",   JSI_NewCFunction(ctx, jsi_consumeValue,   "consumeValue", 1));
     JSI_SetPropertyStr(ctx, global, "refundValue",    JSI_NewCFunction(ctx, jsi_refundValue,    "refundValue", 1));
     JSI_SetPropertyStr(ctx, global, "remainingValue", JSI_NewCFunction(ctx, jsi_remainingValue, "remainingValue", 0));
     JSI_SetPropertyStr(ctx, global, "deleteGranule",  JSI_NewCFunction(ctx, jsi_deleteGranule, "deleteGranule", 1));
+    JSI_SetPropertyStr(ctx, global, "callView",       JSI_NewCFunction(ctx, jsi_callView,       "callView", 4));
     JSI_FreeValue(ctx, global);
 }
 

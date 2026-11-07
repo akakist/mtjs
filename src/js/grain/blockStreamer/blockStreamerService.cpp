@@ -140,7 +140,7 @@ BlockStreamer::Service::Service(const SERVICE_id &id, const std::string &nm, IIn
 }
 bool BlockStreamer::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
-    return true;
+    return false;
 }
 
 void registerBlockStreamerService(const char *pn)

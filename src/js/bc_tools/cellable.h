@@ -14,12 +14,17 @@ struct data_base : public Refcountable
     int type;
     Cellable *parent;
 
-    time_t create_time=0;
+    time_t __update_time=0;
     int ttl=-1;
+    void update_time(time_t t)
+    {
+        if(t>__update_time)
+            __update_time=t;
+    }
 
 
     data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
-        type(t), parent(_parent), create_time(_create_time),ttl(_ttl) {
+        type(t), parent(_parent), __update_time(_create_time),ttl(_ttl) {
     }
     ~data_base()
     {
@@ -28,20 +33,20 @@ struct data_base : public Refcountable
     ;
     size_t size_() const
     {
-        return sizeof(type)+sizeof(create_time)+sizeof(ttl);
+        return sizeof(type)+sizeof(__update_time)+sizeof(ttl);
     }
     virtual size_t size() const=0;
     virtual void pack(outBuffer& o) const
     {
         o<<1;
         o<<type;
-        o<<create_time<<ttl;
+        o<<__update_time<<ttl;
     }
     virtual void unpack(inBuffer& in)
     {
         int ver=in.get_PN();
         in>>type;
-        in>>create_time>>ttl;
+        in>>__update_time>>ttl;
     }
     std::string getBuffer()
     {
@@ -74,7 +79,6 @@ struct Cellable: public Refcountable
     ~Cellable()
     {
     }
-    Mutex mx;
     /// @brief  не изменяется, выставляется только в конструкторе
     Cellable * parent=nullptr;
 
@@ -99,7 +103,6 @@ public:
     size_t size()
     {
         size_t sz=0;
-        M_LOCK(mx);
         sz+=m_id.size();
         for(auto& z:children_hashes_mx)
         {
@@ -111,7 +114,6 @@ public:
     void setDirty__(Rollback* r)
     {
         {
-            M_LOCK(mx);
             if(r)
             {
                 if(!r->data.count(this))

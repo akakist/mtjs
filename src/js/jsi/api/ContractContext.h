@@ -26,6 +26,7 @@ struct ContractContext : public Refcountable {
     ContractContext() : Refcountable("ContractContext") {}
     ContractContext(const ContractContext&) = delete;
     ContractContext& operator=(const ContractContext&) = delete;
+    Cellable * root;
 
     ~ContractContext() {
         methods.clear(); views.clear();
@@ -44,12 +45,22 @@ struct ContractContext : public Refcountable {
         return true;
     }
 
+    // method: msg есть, газ есть, roll есть
     JSIValue call_contract_method(const std::string& method_name,
                              const nlohmann::json& params,
-                             IMsgSource* msg_source, bool is_view,
+                             IMsgSource* msg_source,
                              const REF_getter<CallStack>& call_stack,
-                             const REF_getter<ContractHost>& host, Rollback* roll, const CONTRACT_id& caller, FeesSnapshot* fees, std::set<REF_getter<data_base>> * deleted_granules);
-};
+                             const REF_getter<ContractHost>& host, Rollback* roll,
+                             const CONTRACT_id& caller, FeesSnapshot* fees,
+                             std::set<REF_getter<data_base>> * deleted_granules);
 
+    // view: msg НЕТ, газа НЕТ, roll НЕТ (read-only)
+    // view: msg НЕТ, газа НЕТ, roll НЕТ (read-only). timeout_sec — лимит времени.
+    JSIValue call_contract_view(const std::string& view_name,
+                             const nlohmann::json& params,
+                             const REF_getter<CallStack>& call_stack,
+                             const REF_getter<ContractHost>& host,
+                             int64_t timeout_sec = 5);
+};
 
 

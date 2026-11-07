@@ -72,7 +72,7 @@ bool Node::Service::handle_send_to_child(const NODE_id &node_signer, int64_t nod
         return true;
     }
     s.insert(seqId);
-    auto n = db_state->getNodeNoCreate(node_signer);
+    auto n = cells::getNodeNoCreate(root.get(),db_state.get(),node_signer);
     if(!n.valid())
         return true;
     if (!verify_ed_pk(n->get_ed_pk(), signature, blake2b_hash(msg)))

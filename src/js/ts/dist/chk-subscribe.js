@@ -26,5 +26,5 @@ async function main() {
     }
     console.log("got:", got);
 }
-main().then(() => console.log("OK")).catch((e) => console.log("ERR:", JSON.stringify(e)));
+main().then(() => { console.log("OK"); std.exit(0); }).catch((e) => { console.log("ERR:", JSON.stringify(e)); std.exit(1); });
 setInterval(() => { }, 1000000);

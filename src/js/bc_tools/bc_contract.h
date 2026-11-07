@@ -9,14 +9,14 @@ struct bc_contract:  public data_base
     std::string src;
     size_t size() const
     {
-        M_LOCK(parent->mx);
+        
         size_t sz = size_() + name_.size() + src.size();
         for (auto& o : owners) sz += o.addr.size();
         return sz;
     }
     bool isOwner(const ADDRESS_id& a) const
     {
-        M_LOCK(parent->mx);
+        
         return owners.count(a) != 0;
     }
     void pack(outBuffer&b) const final

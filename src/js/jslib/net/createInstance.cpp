@@ -31,10 +31,16 @@
 #include "md/md_GetNodeInfoREQ.h"
 #include "md/md_GetValuesREQ.h"
 #include "md/md_GetContractREQ.h"
+#include "md/md_CallViewREQ.h"
+#include "md/md_CallViewRSP.h"
 #include "js_tools.h"
 #include "md/md_GetStateREQ.h"
 #include "md/md_GetAddressInfoREQ.h"
 #include "md/md_GetAddressInfoRSP.h"
+#include "md/md_GetGranuleREQ.h"
+#include "md/md_GetGranuleRSP.h"
+#include "md/md_ScanREQ.h"
+#include "md/md_ScanRSP.h"
 // #include ""
 
 static std::string js_obj_to_kv(JSContext *ctx,
@@ -77,6 +83,38 @@ static std::string js_obj_to_kv(JSContext *ctx,
     js_free(ctx, props);
 
     return result;
+}
+JSValue js_blake2b_hex(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv)
+{
+    MUTEX_INSPECTOR;
+    JSScope<10,10> scope(ctx);
+    if (argc != 1 || !JS_IsString(argv[0]))
+        return JS_ThrowTypeError(ctx, "blake2b_hex(str)");
+    std::string s = scope.toStdString(argv[0]);
+    auto h = blake2b_hash(s);
+    auto hex = base16::encode(h.container);
+    return JS_NewStringLen(ctx, hex.data(), hex.size());
+}
+
+JSValue js_sign_ed(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv)
+{
+    MUTEX_INSPECTOR;
+    JSScope<10,10> scope(ctx);
+    if (argc != 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1]))
+        return JS_ThrowTypeError(ctx, "sign_ed(sk_hex, msg)");
+    std::string sk_hex = scope.toStdString(argv[0]);
+    std::string msg    = scope.toStdString(argv[1]);
+    std::string sk;
+    try { sk = base16::decode(sk_hex); }
+    catch (const std::exception& e) {
+        return JS_ThrowTypeError(ctx, "sign_ed: bad sk hex: %s", e.what());
+    }
+    if (sk.size() != crypto_sign_SECRETKEYBYTES)
+        return JS_ThrowTypeError(ctx, "sign_ed: sk must be %d bytes (got %zu)",
+                                 crypto_sign_SECRETKEYBYTES, sk.size());
+    auto sig = sign_ed(sk, msg);
+    auto hex = base16::encode(sig);
+    return JS_NewStringLen(ctx, hex.data(), hex.size());
 }
 JSValue js_get_contract(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
@@ -571,6 +609,51 @@ JSValue js_get_contract_data(JSContext *ctx, JSValueConst this_val, int argc, JS
     return g_prom.release();
 }
 
+JSValue js_call_view(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    MUTEX_INSPECTOR;
+    JSScope<10,10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque*)JS_GetContextOpaque(ctx);
+    if (!op) return JS_ThrowInternalError(ctx, "call_view: !op");
+    if (argc != 6) return JS_ThrowInternalError(ctx, "call_view(node, contract, view, params, timeout_sec, timeout)");
+    if (!JS_IsString(argv[0]) || !JS_IsString(argv[1]) || !JS_IsString(argv[2]) ||
+        !JS_IsObject(argv[3]) || !JS_IsNumber(argv[4]) || !JS_IsNumber(argv[5]))
+        return JS_ThrowInternalError(ctx, "call_view: bad args");
+
+    std::string node_addr = scope.toStdString(argv[0]);
+    std::string contract  = scope.toStdString(argv[1]);
+    std::string view      = scope.toStdString(argv[2]);
+    std::string params_json;
+    qjs::convert_js_value_to_json(ctx, argv[3], params_json);
+    int64_t timeout_sec = 5;
+    if (JS_ToInt64(ctx, &timeout_sec, argv[4])) return JS_ThrowInternalError(ctx, "call_view: timeout_sec parse error");
+    double to = 0;
+    if (JS_ToFloat64(ctx, &to, argv[5])) return JS_ThrowInternalError(ctx, "call_view: timeout parse error");
+
+    REF_getter<MsgData::CallViewREQ> rq = new MsgData::CallViewREQ();
+    rq->contract.container = contract;
+    rq->view = view;
+    rq->params_json = params_json;
+    rq->timeout_sec = timeout_sec;
+    auto hash = rq->getHash();
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+    op->broadcaster->sendEvent(ServiceEnum::Timer,
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+
+    auto &pd = op->node_req_promises[hash.container];
+    pd.ctx = ctx;
+    JSValue prom[2];
+    JSValue promise = JS_NewPromiseCapability(ctx, prom);
+    JSValueGuard g_resolve(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[1]);
+    JSValueGuard g_prom(ctx, promise);
+    if (JS_IsException(promise)) return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
+    pd.resolve = g_resolve;
+    pd.reject = g_reject;
+    return g_prom.release();
+}
+
 
 JSValue js_get_state(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
@@ -625,6 +708,131 @@ JSValue js_tx_unsubscribe(JSContext *ctx, JSValueConst this_val, int argc, JSVal
     if (h.container.empty()) op->tx_subscription_cb.reset();
     return JS_UNDEFINED;
 }
+JSValue js_get_granule(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    MUTEX_INSPECTOR;
+    JSScope<10,10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque*)JS_GetContextOpaque(ctx);
+    if (!op) return JS_ThrowInternalError(ctx, "get_granule: !op");
+    if (argc != 4) return JS_ThrowInternalError(ctx, "get_granule(node, addr_hex, hash_hex, timeout)");
+    if (!JS_IsString(argv[0]) || !JS_IsString(argv[1]) || !JS_IsString(argv[2]) || !JS_IsNumber(argv[3]))
+        return JS_ThrowInternalError(ctx, "get_granule: bad args");
+
+    std::string node_addr = scope.toStdString(argv[0]);
+    std::string addr_hex  = scope.toStdString(argv[1]);
+    std::string hash_hex  = scope.toStdString(argv[2]);
+    double to = 0;
+    if (JS_ToFloat64(ctx, &to, argv[3])) return JS_ThrowInternalError(ctx, "get_granule: timeout parse error");
+
+    REF_getter<MsgData::GetGranuleREQ> rq = new MsgData::GetGranuleREQ();
+    rq->addr = base16::decode(addr_hex);
+    rq->hash = hash_hex.empty() ? "" : base16::decode(hash_hex);
+    auto hash = rq->getHash();
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+    op->broadcaster->sendEvent(ServiceEnum::Timer,
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+
+    auto &pd = op->node_req_promises[hash.container];
+    pd.ctx = ctx;
+    JSValue prom[2];
+    JSValue promise = JS_NewPromiseCapability(ctx, prom);
+    JSValueGuard g_resolve(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[1]);
+    JSValueGuard g_prom(ctx, promise);
+    if (JS_IsException(promise)) return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
+    pd.resolve = g_resolve;
+    pd.reject = g_reject;
+    return g_prom.release();
+}
+JSValue js_get_granule_lite(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    MUTEX_INSPECTOR;
+    JSScope<10,10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque*)JS_GetContextOpaque(ctx);
+    if (!op) return JS_ThrowInternalError(ctx, "get_granule_lite: !op");
+    if (argc != 3) return JS_ThrowInternalError(ctx, "get_granule_lite(addr_hex, hash_hex, timeout)");
+    if (!JS_IsString(argv[0]) || !JS_IsString(argv[1]) || !JS_IsNumber(argv[2]))
+        return JS_ThrowInternalError(ctx, "get_granule_lite: bad args");
+
+    // std::string node_addr = scope.toStdString(argv[0]);
+    std::string addr_hex  = scope.toStdString(argv[0]);
+    std::string hash_hex  = scope.toStdString(argv[1]);
+    double to = 0;
+    if (JS_ToFloat64(ctx, &to, argv[2])) return JS_ThrowInternalError(ctx, "get_granule: timeout parse error");
+
+    REF_getter<MsgData::GetGranuleREQ> rq = new MsgData::GetGranuleREQ();
+    rq->addr = base16::decode(addr_hex);
+    rq->hash = hash_hex.empty() ? "" : base16::decode(hash_hex);
+    auto hash = rq->getHash();
+    op->broadcaster->sendEvent(ServiceEnum::GrainReaderLite,
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+    op->broadcaster->sendEvent(ServiceEnum::Timer,
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+
+    auto &pd = op->node_req_promises[hash.container];
+    pd.ctx = ctx;
+    JSValue prom[2];
+    JSValue promise = JS_NewPromiseCapability(ctx, prom);
+    JSValueGuard g_resolve(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[1]);
+    JSValueGuard g_prom(ctx, promise);
+    if (JS_IsException(promise)) return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
+    pd.resolve = g_resolve;
+    pd.reject = g_reject;
+    return g_prom.release();
+}
+JSValue js_lite_set_uplink(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv)
+{
+    MUTEX_INSPECTOR;
+    JSScope<10,10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque*)JS_GetContextOpaque(ctx);
+    if (!op) return JS_ThrowInternalError(ctx, "lite_set_uplink: !op");
+    if (argc != 1 || !JS_IsString(argv[0]))
+        return JS_ThrowInternalError(ctx, "lite_set_uplink(addr)");
+    std::string addr = scope.toStdString(argv[0]);
+    if (addr.empty())
+        return JS_ThrowInternalError(ctx, "lite_set_uplink: addr empty");
+    op->broadcaster->sendEvent(ServiceEnum::GrainReaderLite,
+                               new bcEvent::LiteSetUplinkREQ(addr, op->listener_->serviceId));
+    return JS_UNDEFINED;
+}
+JSValue js_scan_expired(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv)
+{
+    JSScope<10,10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque*)JS_GetContextOpaque(ctx);
+    if (!op) return JS_ThrowInternalError(ctx, "scan_expired: !op");
+    if (argc != 3) return JS_ThrowInternalError(ctx, "scan_expired(node, from_hex, max_sec)");
+    if (!JS_IsString(argv[0]) || !JS_IsString(argv[1]) || !JS_IsNumber(argv[2]))
+        return JS_ThrowInternalError(ctx, "scan_expired: bad args");
+    std::string node_addr = scope.toStdString(argv[0]);
+    std::string from_hex  = scope.toStdString(argv[1]);
+    int64_t max_sec = 0;
+    if (JS_ToInt64(ctx, &max_sec, argv[2])) return JS_ThrowInternalError(ctx, "scan_expired: max_sec parse error");
+
+    REF_getter<MsgData::ScanREQ> rq = new MsgData::ScanREQ();
+    rq->from.container = from_hex.empty() ? "" : base16::decode(from_hex);
+    rq->max_sec = max_sec;
+    rq->now = 0;
+    auto hash = rq->getHash();
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Scan,
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+    op->broadcaster->sendEvent(ServiceEnum::Timer,
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, 30.0, op->listener_));
+
+    auto &pd = op->node_req_promises[hash.container];
+    pd.ctx = ctx;
+    JSValue prom[2];
+    JSValue promise = JS_NewPromiseCapability(ctx, prom);
+    JSValueGuard g_resolve(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[1]);
+    JSValueGuard g_prom(ctx, promise);
+    if (JS_IsException(promise)) return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
+    pd.resolve = g_resolve;
+    pd.reject = g_reject;
+    return g_prom.release();
+}
+
 void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
 {
     MUTEX_INSPECTOR;
@@ -645,5 +853,11 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
 // в js_register_add_instance:
     JS_SetPropertyStr(ctx, mtjs_obj, "get_address_info", JS_NewCFunction(ctx, js_get_address_info, "get_address_info", 3));
     JS_SetPropertyStr(ctx, mtjs_obj, "addr_from_name", JS_NewCFunction(ctx, js_addr_from_name, "addr_from_name", 1));
-
+    JS_SetPropertyStr(ctx, mtjs_obj, "call_view", JS_NewCFunction(ctx, js_call_view, "call_view", 6));
+    JS_SetPropertyStr(ctx, mtjs_obj, "get_granule", JS_NewCFunction(ctx, js_get_granule, "get_granule", 4));
+    JS_SetPropertyStr(ctx, mtjs_obj, "get_granule_lite", JS_NewCFunction(ctx, js_get_granule_lite, "get_granule_lite", 3));
+    JS_SetPropertyStr(ctx, mtjs_obj, "lite_set_uplink", JS_NewCFunction(ctx, js_lite_set_uplink, "lite_set_uplink", 1));
+    JS_SetPropertyStr(ctx, mtjs_obj, "blake2b_hex", JS_NewCFunction(ctx, js_blake2b_hex, "blake2b_hex", 1));
+    JS_SetPropertyStr(ctx, mtjs_obj, "sign_ed",     JS_NewCFunction(ctx, js_sign_ed,     "sign_ed",     2));
+    JS_SetPropertyStr(ctx, mtjs_obj, "scan_expired", JS_NewCFunction(ctx, js_scan_expired, "scan_expired", 3));
 }

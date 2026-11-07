@@ -5,17 +5,18 @@
 #include "convert.h"
 #include "contract_api.h"
 
-REF_getter<ContractContext> ContractHost::load_contract(const CONTRACT_id& name) {
+REF_getter<ContractContext> ContractHost::load_contract(Cellable* root, const CONTRACT_id& name) {
     auto it = contract_cache.find(name);
     if (it != contract_cache.end()) return it->second;
 
     std::string src;
-    if (!source->load(name, src)) {
+    if (!source->load(root, name, src)) {
         return nullptr;
     }
 
     REF_getter<ContractContext> cc = new ContractContext();
     cc->name = name;
+    cc->root = root;
 
     if (!cc->create__()) {
         std::cerr << "cannot create context for " << name.container << std::endl;
@@ -48,10 +49,10 @@ REF_getter<ContractContext> ContractHost::load_contract(const CONTRACT_id& name)
     return cc;
 }
 
-REF_getter<ContractContext> ContractHost::get_contract(const CONTRACT_id& name) {
+REF_getter<ContractContext> ContractHost::get_contract(Cellable* root, const CONTRACT_id& name) {
     auto it = contract_cache.find(name);
     if (it != contract_cache.end()) return it->second;
-    return load_contract(name);
+    return load_contract(root, name);
 }
 
 

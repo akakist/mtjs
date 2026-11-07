@@ -308,7 +308,7 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
         for (auto& cmd : tx.commands) {
             CONTRACT_id cid;
             cid.container = cmd.contract;
-            auto cc = host->get_contract(cid);
+            auto cc = host->get_contract(nullptr, cid);
             if (!cc.valid()) { std::cerr << "contract not loaded: " << cmd.contract << std::endl; return false; }
 
             auto mit = cc->methods.find(cmd.method);
@@ -338,10 +338,17 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             FeesSnapshot fees;
             TestMsgSource msg_src(tx.msg);
             CONTRACT_id caller;
-            JSIValue result = cc->call_contract_method(cmd.method, cmd.params, &msg_src, is_view,
-                                                       call_ctx.call_stack, host, NULL,caller,&fees,& deleted_granules);
+            JSIValue result;
+            if (is_view) {
+                result = cc->call_contract_view(cmd.method, cmd.params,
+                                                call_ctx.call_stack, host, 5);
+            } else {
+                result = cc->call_contract_method(cmd.method, cmd.params, &msg_src,
+                                                  call_ctx.call_stack, host, NULL,
+                                                  caller, &fees, &deleted_granules);
+            }
             JSI_SetContextOpaque(cc->ctx, saved_opaque);
-
+            
             std::vector<jsiEvent> cmd_emits = call_ctx.emits;
             call_ctx.emits.clear();
 

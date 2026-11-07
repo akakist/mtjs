@@ -69,7 +69,7 @@ struct t_params
     {
         for(auto &z: roll->data) {
             inBuffer in(z.second);
-            { M_LOCK(z.first->mx); z.first->unpack_mx(in); }
+            {  z.first->unpack_mx(in); }
         }
     }
 };

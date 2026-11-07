@@ -6,7 +6,7 @@
 #include "ioBuffer.h"
 #include "tools_mt.h"
 #include "events_txValidatorService.hpp"
-#include "init_root.h"
+#include "cells.h"
 
 bool TxValidator::Service::on_startService(const systemEvent::startService *)
 {
@@ -42,6 +42,8 @@ bool TxValidator::Service::handleEvent(const REF_getter<Event::Base> &e)
             return ClientMsg((const bcEvent::ClientMsg *)e.get());
         case bcEventEnum::ServiceInit:
             return ServiceInit((const bcEvent::ServiceInit *)e.get());
+        case bcEventEnum::InvalidateRoot:
+            return InvalidateRoot((const bcEvent::InvalidateRoot *)e.get());
         case timerEventEnum::TickTimer:
             return on_timer((const timerEvent::TickTimer *)e.get());
         case timerEventEnum::TickAlarm:
@@ -110,9 +112,20 @@ TxValidator::Service::Service(const SERVICE_id &id, const std::string &nm, IInst
 
 bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
 {
+    logErr2("TxValidator::Service::ServiceInit");
     MUTEX_INSPECTOR;
     conf = e;
     db = e->db;
+    auto prev=load_last_block(db.get());
+    xroot=getRoot(db.get(),prev);
+    return true;
+}
+bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
+{
+    // logErr2("TxValidator::Service::InvalidateRoot");
+    MUTEX_INSPECTOR;
+    auto prev=load_last_block(db.get());
+    xroot=getRoot(db.get(),prev);
     return true;
 }
 
@@ -136,7 +149,7 @@ bool TxValidator::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
         if (!sender_hex.empty()) {
             ADDRESS_id senderAddress;
             senderAddress.addr = base16::decode(sender_hex);
-            auto u = db->getAddressStateNoCreate(senderAddress);
+            auto u = cells::getAddressStateNoCreate(xroot.get(),db.get(), senderAddress);
             if (!u.valid()) { err = "sender address not found"; }
             else if (key_id < 0) { err = "key_id required"; }
             else {

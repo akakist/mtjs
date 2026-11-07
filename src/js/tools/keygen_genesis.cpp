@@ -1,14 +1,19 @@
 // tools/keygen_genesis.cpp
 // Генерит:
 //   genesis.json   — публичный (users{nick|addr, balance, keys}, emitters, nodes, params)
-//   keys_test.json — приватный (sk, bls_sk, ed_sk) — НЕ в git (мимо репы)
+//   keys_test.json — приватный (addr, sk, bls_sk, ed_sk) — НЕ в git (мимо репы)
 //
 // users:
 //   root               — nick, 1 ed25519
 //   alice..(n_users-2) — nick, 1..4 keys (alice 4: 2 ed, secp, p256)
-//   u0..u19            — legacy hash(pk), addr = blake2b(pk) hex, 1 ed25519
+//   u0..u19            — addr = blake2b(normalizeNick("u<i>")) hex, 1 ed25519
+//                        (исключая u16/u19 — normalizeNick схлопывает 6→G, 9→G → UIG дубль)
 //
 // emitters = все users (первый ключ каждого) — mint разрешён всем
+//
+// keys_test.json users[name] = { addr (hex), keys: [{type, sk, pk}] }
+//   addr нужен тестам (b_test-node-pause) — чтобы использовать hex, не addr_from_name
+//   (u16/u19 через addr_from_name дают один hex → verify failed)
 
 #define OPENSSL_SUPPRESS_DEPRECATED
 
@@ -26,6 +31,7 @@
 #include <ctime>
 #include <cstring>
 #include <cstdlib>
+#include <set>
 #include "normalizeNick.h"
 #include "blake2bHasher.h"
 
@@ -101,6 +107,14 @@ static std::string user_name(int i) {
     return "user" + std::to_string(i);
 }
 
+// blake2b(normalizeNick(nick)) — hex
+static std::string addr_from_nick(const std::string& nick) {
+    std::string norm = normalizeNick(nick);
+    if (norm.empty())
+        throw std::runtime_error("bad nick: " + nick);
+    return hex(blake2b_hash(norm).container);
+}
+
 int main(int argc, char** argv) {
     if (sodium_init() < 0) { std::cerr << "sodium_init failed\n"; return 1; }
 
@@ -135,15 +149,25 @@ int main(int argc, char** argv) {
     nlohmann::json g_users = nlohmann::json::array();
     nlohmann::json k_users = nlohmann::json::object();
 
+    std::set<std::string> addr_set;   // уникальность addr
+
+    auto push_user = [&](const nlohmann::json& u, const std::string& addr_hex, const std::string &name) {
+        if (!addr_set.insert(addr_hex).second)
+            throw std::runtime_error("duplicate addr: " + addr_hex +" "+name);
+        g_users.push_back(u);
+    };
+
     // 1) root (nick, ed25519, 1 key)
     {
         auto ed = gen_ed25519();
+        std::string addr = addr_from_nick("root");
         nlohmann::json u;
         u["nick"] = "root";
         u["balance"] = "100000000";
         u["keys"] = nlohmann::json::array({ { {"type",0}, {"keybuffer", hex(ed.pk_bin)} } });
-        g_users.push_back(u);
+        push_user(u, addr,"root");
 
+        k_users["root"]["addr"] = addr;
         k_users["root"]["keys"] = nlohmann::json::array({
             { {"type",0}, {"sk", hex(ed.sk_bin)}, {"pk", hex(ed.pk_bin)} }
         });
@@ -152,6 +176,7 @@ int main(int argc, char** argv) {
     // 2) alice.. — nick; alice 4 keys (2 ed, secp, p256); остальные 1 ed
     for (int i = 0; i < n_users - 1; ++i) {
         std::string name = user_name(i);
+        std::string addr = addr_from_nick(name);
         nlohmann::json u;
         u["nick"] = name;
         u["balance"] = "10000000";
@@ -178,34 +203,43 @@ int main(int argc, char** argv) {
             kkeys.push_back({ {"type",0}, {"sk", hex(ed.sk_bin)}, {"pk", hex(ed.pk_bin)} });
         }
         u["keys"] = gkeys;
-        g_users.push_back(u);
+        push_user(u, addr, name);
+        k_users[name]["addr"] = addr;
         k_users[name]["keys"] = kkeys;
     }
 
-    // 3) u0..u19 — legacy hash(pk); addr = blake2b(pk) hex; 1 ed25519
-    for (int i = 0; i < 20; ++i) {
-        auto ed = gen_ed25519();
-        std::string name = "u" + std::to_string(i);
-        auto norm=normalizeNick(name);
+    // 3) u0..u19 — addr = blake2b(normalizeNick("u<i>")) hex; 1 ed25519
+    //    ВАЖНО: u16/u19 normalizeNick схлопывает (6→G, 9→G → UIG) — пропускаем u16/u19,
+    //    добавляем u20/u21 вместо них (U20/U21 — уникальны).
+    {
+        std::vector<int> u_idx;
+        for (int i = 0; i < 20; ++i) {
+            if (i == 16 || i == 19 || i == 6 || i == 9) continue;   // UIG дубль
+            u_idx.push_back(i);
+        }
+        u_idx.push_back(20);
+        u_idx.push_back(21);
+        u_idx.push_back(22);
+        u_idx.push_back(23);
 
-        unsigned char addr_bin[32];
-        crypto_generichash(addr_bin, 32,
-                           (const unsigned char*)norm.data(), norm.size(),
-                           nullptr, 0);
-        std::string addr_hex = hex(addr_bin, 32);
-        
+        for (int i : u_idx) {
+            auto ed = gen_ed25519();
+            std::string name = "u" + std::to_string(i);
+            std::string addr = addr_from_nick(name);
 
-        nlohmann::json u;
-        u["addr"] = addr_hex;                        // hex (legacy)
-        u["balance"] = "10000000";
-        u["keys"] = nlohmann::json::array({
-            { {"type",0}, {"keybuffer", hex(ed.pk_bin)} }
-        });
-        g_users.push_back(u);
+            nlohmann::json u;
+            u["addr"] = addr;
+            u["balance"] = "10000000";
+            u["keys"] = nlohmann::json::array({
+                { {"type",0}, {"keybuffer", hex(ed.pk_bin)} }
+            });
+            push_user(u, addr, name);
 
-        k_users[name]["keys"] = nlohmann::json::array({
-            { {"type",0}, {"sk", hex(ed.sk_bin)}, {"pk", hex(ed.pk_bin)} }
-        });
+            k_users[name]["addr"] = addr;
+            k_users[name]["keys"] = nlohmann::json::array({
+                { {"type",0}, {"sk", hex(ed.sk_bin)}, {"pk", hex(ed.pk_bin)} }
+            });
+        }
     }
 
     // ============================================================
@@ -254,31 +288,27 @@ int main(int argc, char** argv) {
         {"validator_count_percent", 50},
         {"validator_min_stake", 50},
         {"missed_rounds_max", 100},
+        {"answered_committee_min", 10},
         {"ttl_cache", 20},
     };
 
-    // emitters — ВСЕ users (первый ключ каждого — pk)
-// emitters — addr (hex, blake2b(normalizeNick(nick)) / blake2b(pk) для addr)
-{
-    nlohmann::json emitters = nlohmann::json::array();
-    for (auto& u : g_users) {
-        if (u.contains("nick") && u["nick"].is_string()) {
-            std::string norm = normalizeNick(u["nick"].get<std::string>());
-            if (norm.empty())
-                throw std::runtime_error("bad nick: " + u["nick"].get<std::string>());
-            auto addr = blake2b_hash(norm).container;
-            emitters.push_back(hex(addr));
-        } else if (u.contains("addr") && u["addr"].is_string()) {
-            emitters.push_back(u["addr"].get<std::string>());
+    // emitters = addr (hex) всех users
+    {
+        nlohmann::json emitters = nlohmann::json::array();
+        for (auto& u : g_users) {
+            if (u.contains("nick") && u["nick"].is_string()) {
+                emitters.push_back(addr_from_nick(u["nick"].get<std::string>()));
+            } else if (u.contains("addr") && u["addr"].is_string()) {
+                emitters.push_back(u["addr"].get<std::string>());
+            }
         }
+        genesis["emitters"] = emitters;
     }
-    genesis["emitters"] = emitters;
-}
     genesis["users"] = g_users;
     genesis["nodes"] = g_nodes;
 
     // ============================================================
-    // keys_test.json (PRIVATE)
+    // keys_test.json (PRIVATE) — users[name] = { addr, keys: [{type, sk, pk}] }
     // ============================================================
     nlohmann::json keys;
     keys["users"] = k_users;
@@ -300,6 +330,8 @@ int main(int argc, char** argv) {
 
     std::cerr << "wrote " << out_genesis
               << " (users{nick|addr,balance,keys}, emitters=all users, nodes)\n";
-    std::cerr << "wrote " << out_keys << " (PRIVATE — keep out of git!)\n";
+    std::cerr << "wrote " << out_keys
+              << " (PRIVATE — keep out of git! users[name]={addr,keys:[{type,sk,pk}]})\n";
     return 0;
 }
+

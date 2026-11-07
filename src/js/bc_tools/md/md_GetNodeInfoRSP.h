@@ -16,6 +16,7 @@ namespace MsgData
         std::string ip;
         bool enabled = false;
         int64_t missed_rounds = 0;
+        int64_t answered_rounds = 0;
         int64_t full_stake = 0;
         std::map<ADDRESS_id, int64_t> stakes;
         void update(Blake2bHasher& h) const
@@ -26,18 +27,19 @@ namespace MsgData
             h.update(ed_pk); h.update(bls_pk); h.update(ip);
             h.update(enabled ? "1" : "0");
             h.update(std::to_string(missed_rounds));
+            h.update(std::to_string(answered_rounds));
             h.update(std::to_string(full_stake));
             for(auto& z: stakes) { h.update(z.first.addr); h.update(std::to_string(z.second)); }
         }
         void pack(outBuffer& b) const final
         {
             Base::pack(b);
-            b<<found<<name<<owner<<ed_pk<<bls_pk<<ip<<enabled<<missed_rounds<<full_stake<<stakes;
+            b<<found<<name<<owner<<ed_pk<<bls_pk<<ip<<enabled<<missed_rounds<<answered_rounds<<full_stake<<stakes;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
-            b>>found>>name>>owner>>ed_pk>>bls_pk>>ip>>enabled>>missed_rounds>>full_stake>>stakes;
+            b>>found>>name>>owner>>ed_pk>>bls_pk>>ip>>enabled>>missed_rounds>>answered_rounds>>full_stake>>stakes;
         }
         static Base* construct() { return new GetNodeInfoRSP(); }
     };

@@ -9,7 +9,6 @@
 #include "nodeService.h"
 #include <cstdlib>
 #include <cstddef>
-#include "init_root.h"
 #include "tools_mt.h"
 std::pair<std::string,std::string> splice(const std::string& id)
 {
@@ -129,7 +128,7 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
     std::vector<std::string> pathes=db_state->getPathes();
     if(pathes.size())
     {
-        auto n=db_state->getNodeNoCreate(m->responder);
+        auto n=cells::getNodeNoCreate(root.get(),db_state.get(),m->responder);
         if (!n.valid()) {
             logNode("GetGranulesRSP: responder %s not found locally, ignore (sync)", m->responder.container.c_str());
             return true;   // не throw — responder ещё не досинкан
@@ -158,7 +157,7 @@ void Node::Service::do_sync(const NODE_id &src_node, const THASH_id& prev_root_h
 
     db_state->add_sync_out("");
 
-    auto n=db_state->getNodeNoCreate(src_node);
+    auto n=cells::getNodeNoCreate(root.get(),db_state.get(),src_node);
     if(!n.valid())
         throw CommonError("if(!n.valid()) eer@##");
     // root=NULL;

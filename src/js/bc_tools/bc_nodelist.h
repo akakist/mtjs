@@ -10,7 +10,7 @@ private:
 public:
     size_t size() const
     {
-        M_LOCK(parent->mx);
+        
         size_t sz=size_();
         for(auto &z: list)
             sz+=z.container.size();
@@ -18,19 +18,22 @@ public:
     }
     std::set<NODE_id> getList() const
     {
-        M_LOCK(parent->mx);
+        
         return list;
     }
     int count(const NODE_id& n)
     {
-        M_LOCK(parent->mx);
+        
         return list.count(n);
     }
     void insert(const NODE_id& n)
     {
-        M_LOCK(parent->mx);
+        
         list.insert(n);
     }
+    
+    void remove(const NODE_id& n) { list.erase(n); }
+
     void pack(outBuffer&b) const final
     {
         data_base::pack(b);

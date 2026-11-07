@@ -59,11 +59,13 @@ const char *msgName(int id)
     case msgid::GetContractRSP: return "GetContractRSP";
     case msgid::GetStateREQ: return "GetStateREQ";
     case msgid::GetStateRSP: return "GetStateRSP";
-    case msgid::LeaderCert:
-        return "LeaderCert";
+    case msgid::LeaderCert: return "LeaderCert";
     case msgid::GetAddressInfoREQ: return "GetAddressInfoREQ";
     case msgid::GetAddressInfoRSP: return "GetAddressInfoRSP";
-
+    case msgid::CallViewREQ: return "CallViewREQ";
+    case msgid::CallViewRSP: return "CallViewRSP";
+    case msgid::GetGranuleREQ: return "GetGranuleREQ";
+    case msgid::GetGranuleRSP: return "GetGranuleRSP";    
     default:
         return "unknown";
     }

@@ -40,6 +40,7 @@
 #include "t_params.h"
 #include "contract_rt.h"
 #include "ContractHost.h"
+#include "cells.h"
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 std::set<NODE_id> getValidators(int64_t block_timestamp, IDatabase* db);
 
@@ -151,21 +152,21 @@ namespace Node
         {
             REF_getter< MsgData::HeartBeatREQ> leader_cert_2=nullptr;
             std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > >HeartBeatRSP_m;
-            bool is_HeartBeatRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf);
+            bool is_HeartBeatRSP_m_quorum(const THASH_id& h, BlockMetaFull* mf);
 
             std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m; /// сбрасывается после посылки гетТХ
             std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m_copy; /// для подсчета ответивших нод
 
             std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTransactionRSP> > >GetTransactionRSP_m; /// для подсчета ответивших нод
-            bool is_GetTransactionRSP_m_quorum(const THASH_id& h,  IDatabase* mf);
+            bool is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* mf);
 
             std::map<THASH_id /*hb hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
 
             std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
-            bool is_ValidateBlockRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf);
+            bool is_ValidateBlockRSP_m_quorum(const THASH_id& h, BlockMetaFull* mf);
 
             std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
-            bool is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, IDatabase* db);
+            bool is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db);
 
             REF_getter<MsgData::BlockDiffValidateREQ> blockDiffValidateREQ=nullptr;
 
@@ -236,9 +237,6 @@ namespace Node
 
         void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::HeartBeatREQ> &lc);
 
-        THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &r);
-
-        // bool verify_block_committee(const REF_getter<MsgData::BlockAcceptedREQ>& lc);
         bool verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ>& lc);
 
         std::optional<std::string> execute_transaction(const THASH_id &tx_id, b_params &b, const ADDRESS_id &senderAddress,
@@ -278,6 +276,7 @@ namespace Node
 
 
         REF_getter<ContractHost> contractHost=nullptr;
+        REF_getter<Cellable> root = nullptr;
 
 
         std::optional<std::string> execute_mint(yyjson_val *params, b_params & b,t_params &t,   int seqId);
@@ -296,6 +295,13 @@ namespace Node
         std::optional<std::string> execute_add_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId);
         std::optional<std::string> execute_remove_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId);
 
+        // std::optional<std::string> execute_gc(yyjson_val* params, b_params& b, t_params& t, int seqId, _db_to_save& dbd);
+        std::optional<std::string> gc_granule_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
+        std::optional<std::string> gc_contract_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
+        std::optional<std::string> gc_node_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
+        std::optional<std::string> gc_address_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);        
+
+        void invalidate_services();
 
 
     };

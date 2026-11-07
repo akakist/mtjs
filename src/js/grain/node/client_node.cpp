@@ -17,7 +17,8 @@
 #include "t_params.h"
 #include "tools_mt.h"
 #include "QUORUM.h"
-
+#include "cells.h"
+#include "proceed_merkle_on_transaction_pool_hashers.h"
 #include <vector>
 bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route)
 {
@@ -43,7 +44,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     for (auto &z : r->blockAcceptedREQ->node_validators)
     {
         XTRY;
-        auto n=db_state->getNodeNoCreateConst(z);
+        auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(), z);
         if(!n.valid())
             throw CommonError("if(!n.valid()) @09");
 
@@ -91,7 +92,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         if(z.size()!=32) throw CommonError("if(z.first.size()!=32)");
             THASH_id h;
             h.container=z;
-            auto cc = db_state->getByDbIdNoCreate(h);
+            auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h);
             if (!cc.valid()) { logNode("deleted: cell not found %s", base16::encode(z).c_str()); continue; }
             if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }
             deleteGranule(cc->data.get(),&roll,db_to_save_Z);
@@ -102,11 +103,11 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
         THASH_id h;
         h.container=z.first;
-        auto leaf=db_state->replaceLeaf(h, &roll,z.second);
+        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second);
     }
 
 
-    auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(db_state->root);
+    auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
     if(r->blockAcceptedREQ->blockInfo->new_root_hash1!=new_root_hash)
     {
         logNode("@@ BlockDiffValidateREQ not matched root hash remote %s local %s",r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str(),new_root_hash.str().c_str());
@@ -177,7 +178,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     for (auto &z : r->blockAccepted2REQ->blockAcceptedREQ->node_validators)
     {
         XTRY;
-        auto n=db_state->getNodeNoCreateConst(z);
+        auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(),z);
         if(!n.valid())
             throw CommonError("if(!n.valid()) @86");
 
@@ -210,14 +211,14 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     std::vector<blst_cpp::PublicKey> agg_pk_n;
     for(auto & z: r->blockAccepted2REQ->node_diff_validators)
     {
-        auto n=db_state->getNodeNoCreateConst(z);
+        auto n=cells::getNodeNoCreateConst(root.get(), db_state.get(),z);
         if(!n.valid())
             throw CommonError("if(!n.valid()) ##88");
         stake_n+=n->get_full_stake();
         agg_pk_n.push_back(n->get_bls_pk());
     }
     int64_t full_stake=0;
-    auto ls=db_state->getAllNodes();
+    auto ls=cells::getAllNodes(root.get(), db_state.get());
     for(auto &z: ls)
     {
         if(!z->isEnabled()) continue;
@@ -246,11 +247,30 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         }
         logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
     }
+
     db_to_save_Z.add("...last_block...",r->blockAccepted2REQ->getBuffer());
+
+
+    // stale: читаем старые гранулы ПЕРЕД записью → евент в GrainReader
+    std::vector<std::pair<std::string,std::string>> stale;
+    for (auto& z : db_to_save_Z.cells) {
+        std::string old_body;
+        if (db_state->getGranule(z.first, &old_body) == 0 && !old_body.empty() && old_body != z.second)
+            stale.push_back({blake2b_hash(old_body).container, old_body});
+    }
+    for (auto& z : db_to_save_Z.deleted) {
+        std::string old_body;
+        if (db_state->getGranule(z, &old_body) == 0 && !old_body.empty())
+            stale.push_back({blake2b_hash(old_body).container, old_body});
+    }
+
     db_state->write_granules_batch(db_to_save_Z);
 
-    db_to_save_Z.clear();
+    if (!stale.empty())
+        sendEvent(ServiceEnum::GrainReader, new bcEvent::StaleGranules(stale, this));
 
+    db_to_save_Z.clear();
+    invalidate_services();
 
     sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
 
@@ -271,16 +291,16 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         }
         XPASS;
     }
-    auto v=db_state->getValuesNoCreateConst();
-    auto ttl_cache=v->getGas("ttl_cache");
-    if(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->new_epoch % ttl_cache == 0)
+    auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
+    auto ttl_cache=v->getValue("ttl_cache");
+    // if(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->new_epoch % ttl_cache == 0)
     {
         for(auto& z: contractHost->contract_cache)
         {
             dump_mem("ccc",z.second->rt);
         }
         contractHost->contract_cache.clear();
-        db_state->root=getRoot(db_state.get(),prev_block);
+        root=getRoot(db_state.get(),prev_block);
     }
     cli_leader_info.clear();
 
@@ -339,10 +359,9 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
 }
 void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators)
 {
-    // return;
-    auto ls=db_state->getAllNodes();
-    auto v=db_state->getValuesNoCreateConst();
-    auto round_limit=v->getGas("missed_rounds_max");
+    auto ls=cells::getAllNodes(root.get(), db_state.get());
+    auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
+    auto round_limit=v->getValue("missed_rounds_max");
     for(auto &z: ls)
     {
         if(!z->isEnabled())
@@ -351,8 +370,9 @@ void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators)
         {
             int missed=0;
             {
-                M_LOCK(z->parent->mx);
+                
                 z->missed_rounds++;
+                z->answered_rounds = 0;
                 missed=z->missed_rounds;
                 logNode("missed ++");
             }
@@ -365,18 +385,13 @@ void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators)
         }
         else
         {
-            MutexLockerDeferred lk(z->parent->mx);
-            lk.lock();
-            if(z->missed_rounds)
-            {
-                z->missed_rounds=0;
-                lk.unlock();
-                z->setDirty(NULL);
-            }
+            z->missed_rounds=0;
+            z->answered_rounds++;
+            z->setDirty(NULL);
         }
     }
-
 }
+
 int get_global_refcount();
 
 bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
@@ -442,23 +457,23 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         MUTEX_INSPECTOR;
         // auto new_root_hash =
         t.validateBlockREQ = r;
-        auto v = db_state->getValuesNoCreateConst();
+        auto v = cells::getValuesNoCreateConst(root.get(),db_state.get());
         t.fees = FeesSnapshot{
-            .gas_per_token        = v->getGas("gas_per_token"),
-            .gas_per_byte         = v->getGas("gas_per_byte"),
-            .gas_per_jsi_step     = v->getGas("gas_per_jsi_step"),
-            .gas_per_hostcall     = v->getGas("gas_per_hostcall"),
-            .gas_per_call         = v->getGas("gas_per_call"),
-            .min_tx_fee           = v->getGas("min_tx_fee"),
-            .gas_node_create      = v->getGas("gas_node_create"),
-            .gas_node_enable      = v->getGas("gas_node_enable"),
-            .gas_node_stake       = v->getGas("gas_node_stake"),
-            .gas_node_update      = v->getGas("gas_node_update"),
-            .gas_node_disable     = v->getGas("gas_node_disable"),
-            .gas_contract_deploy  = v->getGas("gas_contract_deploy"),
-            .gas_create_base      = v->getGas("gas_create_base"),
-            .ttl_seconds_per_gas  = v->getGas("ttl_seconds_per_gas"),
-            .gas_create_address   = v->getGas("gas_create_address"),
+            .gas_per_token        = v->getValue("gas_per_token"),
+            .gas_per_byte         = v->getValue("gas_per_byte"),
+            .gas_per_jsi_step     = v->getValue("gas_per_jsi_step"),
+            .gas_per_hostcall     = v->getValue("gas_per_hostcall"),
+            .gas_per_call         = v->getValue("gas_per_call"),
+            .min_tx_fee           = v->getValue("min_tx_fee"),
+            .gas_node_create      = v->getValue("gas_node_create"),
+            .gas_node_enable      = v->getValue("gas_node_enable"),
+            .gas_node_stake       = v->getValue("gas_node_stake"),
+            .gas_node_update      = v->getValue("gas_node_update"),
+            .gas_node_disable     = v->getValue("gas_node_disable"),
+            .gas_contract_deploy  = v->getValue("gas_contract_deploy"),
+            .gas_create_base      = v->getValue("gas_create_base"),
+            .ttl_seconds_per_gas  = v->getValue("ttl_seconds_per_gas"),
+            .gas_create_address   = v->getValue("gas_create_address"),
         };
         auto new_root_hash = execute_block(t, r->heart_beat);
                 

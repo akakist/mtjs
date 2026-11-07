@@ -36,7 +36,7 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     auto mf=getMetaFull(bt.leader_cert_2->block_timestamp);
 
 
-    if (bt.is_GetTransactionRSP_m_quorum(r->hb_hash,db_state.get()))
+    if (bt.is_GetTransactionRSP_m_quorum(r->hb_hash,root.get(), db_state.get()))
     {
         sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTransactionRSP, toRef(r->hb_hash.container), NULL,0.05, this));
     }
@@ -64,7 +64,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
         return true;
     }
-    auto nnn=db_state->getNodeNoCreateConst(r->node_validator);
+    auto nnn=cells::getNodeNoCreateConst(root.get(),db_state.get(),r->node_validator);
     if(!nnn.valid())
         throw CommonError("if(!nnn.valid()) @44");
     if (!r->sig.verify(nnn->get_bls_pk(),bt.blockDiffValidateREQ->blockAcceptedREQ->getHash().container))
@@ -77,7 +77,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     bt.BlockDiffValidateRSP_m[r->blockInfoHash].push_back(r);
 
 
-    if(bt.is_BlockDiffValidateRSP_m_quorum(r->blockInfoHash,db_state.get()))
+    if(bt.is_BlockDiffValidateRSP_m_quorum(r->blockInfoHash,root.get(),db_state.get()))
     {
         MUTEX_INSPECTOR;
         XTRY;
@@ -88,7 +88,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         std::set<std::string> nnn;
         for (auto &z : bt.BlockDiffValidateRSP_m[r->blockInfoHash])
         {
-            auto n = db_state->getNodeNoCreateConst(z->node_validator);
+            auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(),z->node_validator);
             if(!n.valid())
                 throw CommonError("if(!n.valid()) @#1");
             agg_pk.push_back(n->get_bls_pk());
@@ -144,7 +144,7 @@ bool Node::Service::verifyLeaderCert(const MsgData::LeaderCert* lc, const BlockM
     int64_t stake_lc=0;
     for(auto &z: lc->node_validators)
     {
-        auto n=db_state->getNodeNoCreateConst(z);
+        auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(), z);
         if(!n.valid())
             throw CommonError("if(!n.valid()) @@$8");
         agg_pk_lc.push_back(n->get_bls_pk());
@@ -174,7 +174,7 @@ REF_getter<MsgData::LeaderCert> Node::Service::makeLeaderCert(const MsgData::Hea
     int64_t stake_lc=0;
     for(auto& z:bt.ConfirmLeaderRSP_m_copy[hb_hash])
     {
-        auto n=db_state->getNodeNoCreateConst(z.second->node_signer);
+        auto n=cells::getNodeNoCreateConst(root.get(), db_state.get(),z.second->node_signer);
         if(!n.valid())
             throw CommonError("if(!n.valid()) ##124");
         agg_pk_lc.push_back(n->get_bls_pk());
@@ -208,7 +208,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
         return true;
     }
-    auto nnn=db_state->getNodeNoCreate(r->node_validator);
+    auto nnn=cells::getNodeNoCreate(root.get(), db_state.get(),r->node_validator);
     if(!nnn.valid())
         throw CommonError("if(!nnn.valid())");
     if (!r->verify(nnn->get_bls_pk()))
@@ -240,7 +240,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         for (auto &z : bt.ValidateBlockRSP_m[h])
         {
             nv_+=z->node_validator.container+" ";
-            auto n = db_state->getNodeNoCreateConst(z->node_validator);
+            auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(),z->node_validator);
             if(!n.valid())
                 throw CommonError("if(!n.valid()) ^14");
             auto st=mf->getPrevStake(z->node_validator);

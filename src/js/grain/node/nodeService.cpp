@@ -40,13 +40,13 @@
 #include "listenerBuffered1Thread.h"
 #include "t_params.h"
 #include "__crc32.h"
-#include "init_root.h"
 #include "nodeService.h"
 #include "CDatabaseRocksdb.h"
 #include "NodeMsgSource.h"
+#include "genesis.h"
+#include "proceed_merkle_on_transaction_pool_hashers.h"
 
 
-#include "tr_exec.h"
 #include "yyjson_to_quickjs.h"
 #include "js_tools.h"
 #include "jsi/api/ContractHost.h"
@@ -59,6 +59,9 @@
 #include <rocksdb/snapshot.h>
 #include <rocksdb/utilities/checkpoint.h>
 #include "s_key.h"
+#include "cells.h"
+
+
 
 static REF_getter<ContractHost> make_node_contract_host(const REF_getter<IDatabase>& db) {
     REF_getter<ContractHost> h = new ContractHost();
@@ -228,7 +231,7 @@ void Node::Service::dump(nlohmann::json& j)
 
     // nodes
     if (db_state.valid()) {
-        auto an = db_state->getAllNodes();
+        auto an = cells::getAllNodes(root.get(), db_state.get());
         for (auto& n : an) {
             if (!n.valid()) continue;
             j["nodes"].push_back({
@@ -271,13 +274,19 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     contractHost=make_node_contract_host(db_state);
 
     prev_block=load_last_block(db_state.get());
-    db_state->root=getRoot(db_state.get(),prev_block);
+    root=getRoot(db_state.get(),prev_block);
     db_state->on_sync_finished = [this]() {
             // prev_block = load_last_block(db_state.get());
-            db_state->root = getRoot(db_state.get(), prev_block);
+            root = getRoot(db_state.get(), prev_block);
             block_meta_full.clear();
     };
-    init_root(db_state.get());
+    sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    sendEvent(ServiceEnum::Scan, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+
+    init_genesis(root.get(), db_state.get());
+    invalidate_services();
 
     if(prev_block.valid())
     {
@@ -288,11 +297,8 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     // my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
 
     // my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
-    logNode("ServiceInit nodename %s", this_node_name.container.c_str());
-    sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
-    sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
-    sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
-    sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    // logNode("ServiceInit nodename %s", this_node_name.container.c_str());
+    // sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
     for (auto &z : rpc_addr)
     {
         SECURE sec;
@@ -427,7 +433,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         auto &bt = l_blocks[prev_root_hash_Z()];
         THASH_id hb_hash;
         hb_hash.container=e->data->container;
-        if(bt.is_GetTransactionRSP_m_quorum(hb_hash,db_state.get()))
+        if(bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
         {
             do_start_block();
             logNode("do_start_block();");
@@ -442,7 +448,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
             throw CommonError("!r BlockDBStore");
         auto & bt= l_blocks[prev_root_hash_Z()];
         auto h=r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->getHash();
-        if(bt.is_BlockDiffValidateRSP_m_quorum(h,db_state.get()))
+        if(bt.is_BlockDiffValidateRSP_m_quorum(h,root.get(), db_state.get()))
         {
             auto mf=getMetaFull(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
             broadcast_MsgEvent_via_broadcaster(r,mf->tree_all_nodes);
@@ -777,10 +783,10 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
     // logNode("[execute_block] sender %s",b.)
     // ▼▼▼ INSERT: bc_state block_height++ (NULL — не rollback)
     {
-        auto st = b.db->getStateOrCreate(NULL);
+        auto st = cells::getStateNoCreate(root.get(), db_state.get());
         auto bh=lc->new_epoch;
         if (st.valid()) {
-            M_LOCK(st->parent->mx);
+            
             st->block_height=bh;
         }
         st->setDirty(NULL);
@@ -808,7 +814,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         ADDRESS_id senderAddress;
         if (!sender_hex.empty()) {
             senderAddress.addr = base16::decode(sender_hex);
-            auto uu = b.db->getAddressStateNoCreate(senderAddress);
+            auto uu = cells::getAddressStateNoCreate(root.get(), db_state.get(),senderAddress);
             if (!uu.valid()) { t_err = "sender address not found"; }
             else if (key_id < 0) { t_err = "key_id required"; }
             else {
@@ -824,7 +830,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         if (!t_err)
         {
             MUTEX_INSPECTOR;
-            auto u = b.db->getAddressStateNoCreate(senderAddress);
+            auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),senderAddress);
             if (!u.valid())
             {
                 t_err = "sender invalid";
@@ -864,9 +870,9 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
             b.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());
     }
 
-    auto rh=proceed_merkle_on_transaction_pool_hashers(db_state->root);
+    auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
     calc_fee_rewards_nodes(b, lc);
-    rh=proceed_merkle_on_transaction_pool_hashers(db_state->root);
+    rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
     return rh;
 }
 void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData::HeartBeatREQ> &lc)
@@ -874,7 +880,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
     MUTEX_INSPECTOR;
 
     double total_staked=0;
-    auto nn=db_state->getAllNodes();
+    auto nn=cells::getAllNodes(root.get(), db_state.get());
     auto local_prev_block=prev_block;
     std::set<NODE_id> ns;
     if(local_prev_block.valid())
@@ -882,7 +888,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
         for(auto& z:local_prev_block->blockAcceptedREQ->node_validators)
         {
             ns.insert(z);
-            auto n=db_state->getNodeNoCreate(z);
+            auto n=cells::getNodeNoCreate(root.get(), db_state.get(),z);
             if(!n.valid())
                 throw CommonError("if(!n.valid()) --@34");
 
@@ -890,15 +896,15 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
         }
         for(auto& z:local_prev_block->blockAcceptedREQ->node_validators)
         {
-            auto n=db_state->getNodeNoCreate(z);
+            auto n=cells::getNodeNoCreate(root.get(), db_state.get(),z);
             if(!n.valid())
                 throw CommonError("if(!n.valid())00@@");
 
             auto portion=n->get_full_stake()*b.node_rewards/total_staked;
-            auto u = db_state->getAddressStateNoCreate(n->get_owner());
+            auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),n->get_owner());
             if (u.valid()) {
                 {
-                    M_LOCK(u->parent->mx);
+                    
                     u->balance += portion;
                 }
                 u->setDirty(NULL);
@@ -918,24 +924,6 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
 
 }
 
-THASH_id Node::Service::proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &r)
-{
-    MUTEX_INSPECTOR;
-    r->calc_tree_hash(db_to_save_Z);
-    // r->calcers_Z.clear();
-
-    std::string root_buf;
-    {
-        M_LOCK(r->mx);
-        root_buf = r->getBuffer_mx();
-    }
-    auto root_hash = blake2b_hash(root_buf);
-    db_to_save_Z.add("", root_buf);
-    // db_to_save_Z.add("#root_hash#", root_hash.container);
-    THASH_id ret;
-    ret.container = root_hash.container;
-    return ret;
-}
 #include <stdlib.h>
 bool Node::Service::isNodeGreater(const NODE_id &nodeLeft, const NODE_id &nodeRight, const REF_getter<BlockMetaFull>& m)
 {
@@ -960,14 +948,14 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
         int64_t stake=0;
         for (auto &z : lc->node_diff_validators)
         {
-            auto n = db_state->getNodeNoCreateConst(z);
+            auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(),z);
             if(!n.valid())
                 throw CommonError("if(!n.valid()) #00");
             agg_pk.push_back(n->get_bls_pk());
             stake += n->get_full_stake();
         }
         int64_t full_stake=0;
-        auto ls=db_state->getAllNodes();
+        auto ls=cells::getAllNodes(root.get(), db_state.get());
         for(auto& z:ls )
         {
             if(z->isEnabled())
@@ -995,7 +983,6 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
 bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 {
     MUTEX_INSPECTOR;
-    logNode("@@ %s",__FUNCTION__);
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
     if(iUtils->getNow()-stage_is_working> STAGE_IS_WORKING_TIMEOUT* _1sec)
@@ -1023,7 +1010,7 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
         return true;
     }
     s.insert(m->seqId2);
-    auto n = db_state->getNodeNoCreate(m->node_signer);
+    auto n = cells::getNodeNoCreate(root.get(), db_state.get(),m->node_signer);
     if(!n.valid())
         return true;
     if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
@@ -1071,7 +1058,7 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
         return true;
     }
 
-    auto n = db_state->getNodeNoCreate(m->node_signer);
+    auto n = cells::getNodeNoCreate(root.get(), db_state.get(),m->node_signer);
     if(!n.valid())
     { 
         logNode("NodeMsgRSP from unknown node %s, ignore", m->node_signer.container.c_str()); 
@@ -1142,6 +1129,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 
             if (contract_str == "root")
             {
+                logNode("execute_tx_commands: contract=root method=%s", method_str.c_str());
                 std::optional<std::string> err;
                 auto meth=method_str;
                 if (meth == "mint") err = execute_mint(params, b, t, index);
@@ -1167,7 +1155,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
             {
                 // JSI-контракт (gym.js и т.п.)
                 CONTRACT_id c; c.container = contract_str;
-                auto cc = contractHost->get_contract(c);
+                auto cc = contractHost->get_contract(root.get(), c);
                 if (!cc.valid()) return "contract not found: " + contract_str;
 
                 // params yyjson -> json
@@ -1192,7 +1180,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 
                 NodeMsgSource src(&t);
                 CONTRACT_id caller;
-                JSIValue result = cc->call_contract_method(method_str, params_json, &src, false,
+                JSIValue result = cc->call_contract_method(method_str, params_json, &src, 
                                                            call_stack, contractHost, t.roll, caller, & b.fees, deleted_granules);
 
                 JSI_SetContextOpaque(cc->ctx, prev_ctx);
@@ -1274,11 +1262,10 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     std::set<REF_getter<data_base>> deleted_granules;
     // ▼▼▼ INSERT: bc_state tx_count++ (TX попала в блок; NULL — не rollback)
     {
-        auto st = b.db->getStateOrCreate(NULL);
-        if (st.valid()) {
-            M_LOCK(st->parent->mx);
-            st->tx_count++;
-        }
+        auto st = cells::getStateNoCreate(root.get(), db_state.get());
+        if (!st.valid()) 
+            throw CommonError("if (!st.valid()) ");
+        st->tx_count++;
         st->setDirty(NULL);
     }
     // ▲▲▲    
@@ -1296,7 +1283,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         return err;
     }
 
-    auto v = db_state->getValuesNoCreateConst();
+    auto v = cells::getValuesNoCreateConst(root.get(),db_state.get());
     int64_t gas_per_token_base = b.fees.gas_per_token;
 
     int64_t gasLimit_gas = 0;
@@ -1331,13 +1318,13 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     }
     t.tx_index = 0; // TBD
 
-    auto uu = db_state->getAddressStateNoCreate(senderAddress);
+    auto uu = cells::getAddressStateNoCreate(root.get(), db_state.get(),senderAddress);
     if (!uu.valid())
         throw CommonError("if(!uu.valid())");
 
     int64_t bal0 = 0;
     {
-        M_LOCK(uu->parent->mx);
+        
         bal0 = uu->balance;
         if (uu->balance < gasLimitTokens + value)
         {
@@ -1347,13 +1334,13 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         }
     }
 
-    db_state->root->calc_tree_hash(db_to_save_Z);
+    root->calc_tree_hash(db_to_save_Z);
 
     // helper: списать газ (в токенах) с баланса и вернуть ошибку (если priority/gas невалидны)
     auto charge_gas = [&](int64_t gas_charged, int64_t& spent) -> std::optional<std::string> {
         if (auto e = gas_2_token(gas_charged, priority, gas_per_token_base, spent))
             return e;
-        M_LOCK(uu->parent->mx);
+        
         uu->balance -= spent;
         b.node_rewards += spent;
         return std::nullopt;
@@ -1368,7 +1355,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         if (auto e = charge_gas(gas_charged, spent))
             return e;
         int64_t bal1 = 0;
-        { M_LOCK(uu->parent->mx); bal1 = uu->balance; }
+        {  bal1 = uu->balance; }
         // #ifdef KALLLOG
         logNode("[t] tx=%s value=%lld gasLimitTokens=%lld priority=%lld gasLimit_gas=%lld gpt=%lld "
                 "gasUsed=%lld rollback=%d total=%lld spentTokens=%lld value_spent=0 bal %lld->%lld status=err msg=\"%s\"",
@@ -1398,7 +1385,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {
         deleteGranule(z.get(),&roll,db_dump);
     }
-    db_state->root->calc_tree_hash(db_dump);
+    root->calc_tree_hash(db_dump);
     // t.gasUsed += db_dump.size();
     t.gasUsed += db_dump.size_leaves() * b.fees.gas_per_byte;
     if (t.gasUsed > gasLimit_gas)
@@ -1409,13 +1396,13 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         return e;
 
     {
-        M_LOCK(uu->parent->mx);
+        
         uu->balance -= value - t.value;
     }
     int64_t bal1 = 0;
-    { M_LOCK(uu->parent->mx); bal1 = uu->balance; }
+    {  bal1 = uu->balance; }
 
-    db_state->root->calc_tree_hash(db_dump);
+    root->calc_tree_hash(db_dump);
     db_to_save_Z.add(db_dump);
 // #ifdef KALLLOG
     logNode("[t] tx=%s value=%lld gasLimitTokens=%lld priority=%lld gasLimit_gas=%lld gpt=%lld "
@@ -1456,12 +1443,11 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
         {
             if(ii->second.valid())
                 return ii->second;
-
         }
     }
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
     block_meta_full[b][t_win]=m;
-    auto an=db_state->getAllNodes();
+    auto an=cells::getAllNodes(root.get(),db_state.get());
     int live_nodes=0;
     for(auto& z: an)
     {
@@ -1471,10 +1457,9 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
         }
     }
 
+    auto v=cells::getValuesNoCreateConst(root.get(),db_state.get());
 
-    auto v=db_state->getValuesNoCreateConst();
-
-    auto validators_percent=v->getGas("validator_count_percent");
+    auto validators_percent=v->getValue("validator_count_percent");
 
     size_t validator_count=(live_nodes * validators_percent)/100;
 
@@ -1515,17 +1500,46 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
         throw CommonError("if(validator_count>=vne.size())");
     std::vector<NodeElement> vne_committe;
 
-    auto minstake=v->getGas("validator_min_stake");
-    for(size_t i=0; vne_committe.size()< validator_count &&   i< vne.size(); i++)
+    auto minstake=v->getValue("validator_min_stake");
+    auto answered_min=v->getValue("answered_committee_min");
+
+    // Попытка 1: строгий фильтр (answered > answered_min && stake >= minstake)
+    for(size_t i=0; vne_committe.size()< validator_count && i< vne.size(); i++)
     {
+        auto n = cells::getNodeNoCreate(root.get(), db_state.get(),vne[i].name);
+        if (!n.valid())
+            continue;
+        if (n->answered_rounds <= answered_min)
+            continue;
         if(vne[i].stake_A>=minstake)
         {
             auto n=vne[i].name;
             vne_committe.push_back(vne[i]);
             m->committe_members.insert(n);
-
         }
     }
+
+    // Попытка 2: без answered (только stake) — если строгий не набрался
+    if (vne_committe.size() < validator_count)
+    {
+        logNode("getMetaFull: strict filter gave %zu < %zu, relax answered",
+                vne_committe.size(), (size_t)validator_count);
+        for(size_t i=0; vne_committe.size()< validator_count && i< vne.size(); i++)
+        {
+            if (m->committe_members.count(vne[i].name))
+                continue;   // уже в комитете
+            if(vne[i].stake_A>=minstake)
+            {
+                auto n=vne[i].name;
+                vne_committe.push_back(vne[i]);
+                m->committe_members.insert(n);
+            }
+        }
+    }
+
+    if (vne_committe.empty())
+        throw CommonError("getMetaFull: no committee (even relaxed)");
+
     m->tree_committe=buildTree(vne_committe);
 
     return m;
@@ -1568,10 +1582,10 @@ bool Node::Service::block_leader::is_ValidateBlockRSP_m_quorum(const THASH_id& h
     return false;
 
 }
-bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& h, IDatabase* db)
+bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable*r, IDatabase* db)
 {
     int64_t fullstakeVal = 0;
-    auto ls=db->getAllNodes();
+    auto ls=cells::getAllNodes(r, db);
     for (auto &z : ls)
     {
         if(z->isEnabled())
@@ -1581,7 +1595,7 @@ bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& 
     auto &mm=GetTransactionRSP_m[h];
     for (auto &z : mm)
     {
-        auto n=db->getNodeNoCreateConst(z.first);
+        auto n=cells::getNodeNoCreateConst(r, db,z.first);
         if(!n.valid())
             throw CommonError("if(!n.valid()) $555");
         stakeVal += n->get_full_stake();
@@ -1590,10 +1604,10 @@ bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& 
         return true;
     return false;
 }
-bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, IDatabase* db)
+bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable*r, IDatabase* db)
 {
     int64_t fullstakeVal = 0;
-    auto ls=db->getAllNodes();
+    auto ls=cells::getAllNodes(r, db);
     for (auto &z : ls)
     {
         if(z->isEnabled())
@@ -1602,7 +1616,7 @@ bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_i
     int64_t stakeVal = 0;
     for (auto &z : BlockDiffValidateRSP_m[h])
     {
-        auto n=db->getNodeNoCreateConst(z->node_validator);
+        auto n=cells::getNodeNoCreateConst(r, db,z->node_validator);
         if(!n.valid())
             throw CommonError("if(!n.valid()) $555");
         stakeVal += n->get_full_stake();
@@ -1610,6 +1624,11 @@ bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_i
     if ((stakeVal * 100) / fullstakeVal > QUORUM )
         return true;
     return false;
+}
+void Node::Service::invalidate_services()
+{
+    sendEvent(ServiceEnum::GrainReader,new bcEvent::InvalidateRoot(this));
+    sendEvent(ServiceEnum::TxValidator,new bcEvent::InvalidateRoot(this));
 }
 
 void Node::Service::logNode(const char *fmt, ...)

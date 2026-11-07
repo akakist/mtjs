@@ -30,6 +30,7 @@ namespace TxValidator
         bool handleEvent(const REF_getter<Event::Base>& e);
 
         bool ServiceInit(const bcEvent::ServiceInit *e);
+        bool InvalidateRoot(const bcEvent::InvalidateRoot *e);
         bool ClientMsg(const bcEvent::ClientMsg*e);
         bool AddTxREQ(const bcEvent::AddTxREQ*e);
 
@@ -61,6 +62,7 @@ namespace TxValidator
         REF_getter<IDatabase> db;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;
+        REF_getter<Cellable> xroot = nullptr;
 
 
 

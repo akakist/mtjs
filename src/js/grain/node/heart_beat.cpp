@@ -39,7 +39,7 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         }
     }
 
-    auto n = db_state->getNodeNoCreate(m->node_signer);
+    auto n = cells::getNodeNoCreate(root.get(),db_state.get(), m->node_signer);
     if (!n.valid())
     {
         logNode("if(!n.valid())");
@@ -149,7 +149,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
         REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
         d->lc=local_prev_block;
         auto buffer = d->getBuffer();
-        auto n=db_state->getNodeNoCreate(src_node);
+        auto n=cells::getNodeNoCreate(root.get(),db_state.get(),src_node);
         if(!n.valid())
             throw CommonError("if(!n.valid()) #45555");
         sendEvent(n->get_ip(), ServiceEnum::Node,
@@ -240,7 +240,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
             REF_getter<MsgData::DelayNotificationREQ> d=new MsgData::DelayNotificationREQ;
             d->lc=local_prev_block;
             auto buffer = d->getBuffer();
-            auto n=db_state->getNodeNoCreate(src_node);
+            auto n=cells::getNodeNoCreate(root.get(),db_state.get(),src_node);
             if(!n.valid())
                 throw CommonError("if(!n.valid()) @3455");
 

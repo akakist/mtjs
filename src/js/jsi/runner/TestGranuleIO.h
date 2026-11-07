@@ -9,18 +9,18 @@ struct TestGranuleIO : GranuleIO {
 
     std::map<std::string, int64_t> balances;   // contract -> amount
 
-    bool getContractBalance(const CONTRACT_id& c, int64_t& out) override {
+    bool getContractBalance(Cellable*, const CONTRACT_id& c, int64_t& out) override {
         auto it = balances.find(c.container);
         if (it == balances.end()) return false;
         out = it->second;
         return true;
     }
-    std::optional<std::string> addContractBalance(const CONTRACT_id& c, int64_t delta, Rollback* roll) override {
+    std::optional<std::string> addContractBalance(Cellable*,const CONTRACT_id& c, int64_t delta, Rollback* roll) override {
         balances[c.container] += delta;
         return std::nullopt;
     }
 
-    bool getGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d, std::string& out) override {
+    bool getGranule(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d, std::string& out) override {
         printf("get: %s %s\n",c.container.c_str(),d.container.c_str());
         auto it = data.find(c.container+d.container);
         if (it == data.end())
@@ -32,17 +32,17 @@ struct TestGranuleIO : GranuleIO {
         out = it->second.value;
         return true;
     }
-    std::optional<std::string> deleteGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d,
+    std::optional<std::string> deleteGranule(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d,
                                             Rollback* roll, std::set<REF_getter<data_base>> * deleted_granules)  override {
         auto it = data.find(c.container + d.container);
         if (it == data.end()) return std::string("not found");
         data.erase(it);   // сразу (rollback — saved/restore)
         return std::nullopt;
     }    
-    bool existsGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
+    bool existsGranule(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
         return data.find(c.container+d.container) != data.end();
     }
-    std::optional<std::string> createGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d, const std::string& value,
+    std::optional<std::string> createGranule(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d, const std::string& value,
                 int64_t create_time, int64_t ttl, Rollback* roll) override {
         if (data.find(c.container+d.container) != data.end())
         {
@@ -53,18 +53,17 @@ struct TestGranuleIO : GranuleIO {
         data[c.container+d.container] = Granule{ value, create_time, ttl };
         return std::nullopt;
     }
-    std::optional<std::string> setGranule(const CONTRACT_id& c, const CONTRACT_DATA_id& d,
+    std::optional<std::string> setGranule(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d,
                                         const std::string& value,
-                                        int64_t now, int64_t ttl,
+                                        int64_t now, 
                                         Rollback* roll) override {
         auto it = data.find(c.container + d.container);
         if (it == data.end()) return std::string("not found");
         it->second.value = value;
         it->second.create_time = now;
-        it->second.ttl = ttl;
         return std::nullopt;
     }
-    int64_t getGranuleTTL(const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
+    int64_t getGranuleTTL(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
         auto it = data.find(c.container + d.container);
         if (it == data.end()) return 0;
         return it->second.ttl;
@@ -76,7 +75,7 @@ struct TestGranuleIO : GranuleIO {
 struct TestContractSourceIO : ContractSourceIO {
     TestContractSourceIO() : ContractSourceIO() {}
 
-    bool load(const CONTRACT_id& name, std::string& src) override {
+    bool load(Cellable*, const CONTRACT_id& name, std::string& src) override {
         std::string path = "contracts/" + name.container + ".js";
         FILE* f = fopen(path.c_str(), "rb");
         if (!f) return false;

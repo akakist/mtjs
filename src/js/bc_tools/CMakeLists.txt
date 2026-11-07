@@ -17,7 +17,7 @@ add_library(bctools STATIC
 cellable.cpp
 msg.cpp
 msgFactory.cpp
-init_root.cpp
+#init_root.cpp
 base16.h
 blake2bHasher.h
 THASH_id.h
@@ -27,7 +27,7 @@ db_to_save.h
 getenv2.h
 hsh.h
 IDatabase.h
-init_root.h
+#init_root.h
 msg.h
 msgFactory.h
 NODE_id.h
@@ -49,6 +49,12 @@ IDatabase.cpp
 blockMeta.h
 s_key.cpp
 s_key.h
+cells.cpp
+cells.h
+genesis.cpp
+genesis.h
+proceed_merkle_on_transaction_pool_hashers.cpp
+proceed_merkle_on_transaction_pool_hashers.h
 )
 
 

@@ -16,8 +16,8 @@ struct ContractHost : public Refcountable {
     virtual ~ContractHost() = default;
 
     // ---- загрузка/получение контрактов (методы) ----
-    REF_getter<ContractContext> load_contract(const CONTRACT_id& name);
-    REF_getter<ContractContext> get_contract(const CONTRACT_id& name);
+    REF_getter<ContractContext> load_contract(Cellable* root, const CONTRACT_id& name);
+    REF_getter<ContractContext> get_contract(Cellable* root,const CONTRACT_id& name);
 
     // ---- фабрики ----
 };

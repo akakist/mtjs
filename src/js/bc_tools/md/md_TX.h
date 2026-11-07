@@ -77,7 +77,7 @@ namespace MsgData
             else return "yyjson: nonce must be string or num";
             return std::nullopt;
         }
-        std::optional<std::string> getGasLimit(int64_t & gasLimit)
+        std::optional<std::string> getValueLimit(int64_t & gasLimit)
         {
             if(!doc)
                 return "yyjson: !doc";

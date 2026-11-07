@@ -31,13 +31,41 @@ int main(int argc, char** argv) {
         auto val = it->value().ToString();
         Cellable c(nullptr, key);
         inBuffer in(val);
-        c.unpack_mx(in);                              // children_hashes_mx + data
-        if (c.data.valid() && c.data->ttl > 0
-            && c.data->create_time + c.data->ttl < now) {
-            out << base16::encode(key) << "\n";
-            expired++;
+        c.unpack_mx(in);
+
+        if (!c.data.valid()) continue;
+
+        if (c.payload_ctor_idx == hsh::bc_contract_activity) {
+            // activity: update_time + contract.ttl < now
+            auto* act = dynamic_cast<bc_contract_activity*>(c.data.get());
+            if (!act || act->name_.empty()) continue;
+            CONTRACT_id cn; cn.container = act->name_;
+            auto cc = cells::getContractNoCreateConst(nullptr, nullptr, cn);  // ← нельзя: root=null
+            // Проще: прочитать contract-гранулу напрямую по dbid
+            auto cpath = cells::getContractPath(cn);
+            std::string cdbid;
+            for (auto& p : cpath) cdbid += p;
+            std::string cval;
+            if (db->Get(rocksdb::ReadOptions(), cdbid, &cval).ok()) {
+                Cellable cc2(nullptr, cdbid);
+                inBuffer cin(cval);
+                cc2.unpack_mx(cin);
+                if (cc2.data.valid()) {
+                    int64_t cttl = cc2.data->ttl;
+                    if (cttl > 0 && act->update_time + cttl < now) {
+                        out << base16::encode(key) << "\n";     // activity
+                        out << base16::encode(cdbid) << "\n";   // contract
+                        expired += 2;
+                    }
+                }
+            }
+        } else if (c.payload_ctor_idx == hsh::bc_contract_data) {
+            // гранула данных: update_time + ttl < now
+            if (c.data->ttl > 0 && c.data->update_time + c.data->ttl < now) {
+                out << base16::encode(key) << "\n";
+                expired++;
+            }
         }
-        // c — scope (refcount 0 — delete)
     }
     out.close();
     delete db;
