@@ -1,3 +1,5 @@
+/// cells.h
+
 #pragma once
 #include <string>
 #include <vector>
@@ -14,14 +16,14 @@
 #include "db_to_save.h"
 #include "bc_address_state.h"
 #include "bc_contract.h"
-#include "bc_contract_data.h"
+#include "bc_granule.h"
 #include "bc_contract_balance.h"
 #include "bc_node.h"
 #include "bc_nodelist.h"
 #include "bc_values.h"
 #include "bc_vote.h"
 #include "bc_state.h"
-#include "bc_contract_activity.h"
+#include "bc_activity.h"
 
 struct IDatabase;
 
@@ -33,9 +35,22 @@ namespace cells {
     std::vector<std::string> getPath(const std::string& name);
     std::vector<std::string> getPathFromHash(const THASH_id& h);
 
+    std::string getAddressStateKey(const ADDRESS_id& addr);
+    std::string getContractKey(const CONTRACT_id& name);
+    std::string getContractDataKey(const CONTRACT_id& contract, const CONTRACT_DATA_id& dataId);
+    std::string getContractBalanceKey(const CONTRACT_id& contract);
+
+    std::string getNodeKey(const NODE_id& name);
+
+    std::string getStateKey();
+
+
+
     std::vector<std::string> getAddressStatePath(const ADDRESS_id& addr);
     std::vector<std::string> getContractPath(const CONTRACT_id& name);
     std::vector<std::string> getContractDataPath(const CONTRACT_id& contract, const CONTRACT_DATA_id& dataId);
+    std::string getContractDataKey(const CONTRACT_id& contract, const CONTRACT_DATA_id& dataId);
+
     std::vector<std::string> getNodePath(const NODE_id& name);
     std::vector<std::string> getContractBalancePath(const CONTRACT_id& contract);
     std::vector<std::string> getStatePath();
@@ -67,9 +82,9 @@ namespace cells {
     REF_getter<bc_contract> getContractNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name);
     REF_getter<const bc_contract> getContractNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& name);
 
-    REF_getter<bc_contract_data> getContractDataOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key, Rollback* roll, int ttl, time_t create_time);
-    REF_getter<bc_contract_data> getContractDataNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key);
-    REF_getter<const bc_contract_data> getContractDataNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key);
+    REF_getter<bc_granule> getContractDataOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key, Rollback* roll, int ttl, time_t create_time);
+    REF_getter<bc_granule> getContractDataNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key);
+    REF_getter<const bc_granule> getContractDataNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key);
 
     REF_getter<bc_contract_balance> getContractBalanceOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& contract, Rollback* roll);
     REF_getter<bc_contract_balance> getContractBalanceNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& contract);
@@ -103,8 +118,17 @@ namespace cells {
     REF_getter<bc_state> getStateNoCreate(Cellable* root, IDatabase* db);
     REF_getter<const bc_state> getStateNoCreateConst(Cellable* root, IDatabase* db);
 
-    std::vector<std::string> getContractActivityPath(const CONTRACT_id& name);
-    REF_getter<bc_contract_activity> getContractActivityOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll);
-    REF_getter<bc_contract_activity> getContractActivityNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name);
-    REF_getter<const bc_contract_activity> getContractActivityNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& name);
+
+    // activity
+    std::vector<std::string> getActivityPath(const THASH_id& granule_dbid);
+
+    REF_getter<bc_activity> getActivityNoCreate(Cellable* root, IDatabase* db, const std::string& granule_dbid);
+
+    REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
+                                        const std::string& granule_dbid, const std::set<std::string> &additional,
+                                        int ttl, time_t now, Rollback* roll);
+
+    void touchActivity(Cellable* root, IDatabase* db,
+                    const std::string& granule_dbid,
+                    Rollback* roll, time_t now);
 } // namespace cells

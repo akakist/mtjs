@@ -431,11 +431,11 @@ bool GrainReader::Service::ClientMsg(const bcEvent::ClientMsg *e)
             rsp->found = true;
             rsp->owners = c->owners;
             rsp->src = c->src;
-            auto act = cells::getContractActivityNoCreateConst(root.get(), db_state_3.get(), pp->contract);
+            auto act = cells::getActivityNoCreate(root.get(), db_state_3.get(), c->getDbId());
             if(!act.valid())
                 throw CommonError("if(!act.valid())");
             rsp->ttl = act->ttl;   // ← activity.ttl (маркер), не bc_contract.ttl (0)
-            rsp->update_time = act->__update_time;
+            rsp->update_time = act->_update_time;
         }
         passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
         break;

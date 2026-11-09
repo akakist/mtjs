@@ -42,6 +42,7 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
                              const CONTRACT_id& caller, FeesSnapshot* fees,
                              std::set<REF_getter<data_base>> * deleted_granules)
 {
+    MUTEX_INSPECTOR;
     if (call_stack->call_stack.size() >= (size_t)MAX_CALL_DEPTH)
         return JSI_ThrowTypeError(ctx, "call stack too deep (%zu >= %d)", call_stack->call_stack.size(), MAX_CALL_DEPTH);
 
@@ -91,6 +92,7 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
 
     JSIValue r;
     try {
+        MUTEX_INSPECTOR;
         r = JSI_Call(ctx, fn, JSI_UNDEFINED, nargs, argv);
     } catch (...) {
         JSI_SetInterruptHandler(rt, nullptr, nullptr);
@@ -108,6 +110,7 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
     call_stack->call_stack.pop_back();
 
     if (saved) {
+        MUTEX_INSPECTOR;
         auto* parent = (CallContext*)saved;
         parent->emits.insert(parent->emits.end(), call_ctx.emits.begin(), call_ctx.emits.end());
     }
@@ -124,6 +127,7 @@ JSIValue ContractContext::call_contract_view(const std::string& view_name,
                              const REF_getter<ContractHost>& host,
                              int64_t timeout_sec)
 {
+    MUTEX_INSPECTOR;
     if (call_stack->call_stack.size() >= (size_t)MAX_CALL_DEPTH)
         return JSI_ThrowTypeError(ctx, "call stack too deep (%zu >= %d)",
                                   call_stack->call_stack.size(), MAX_CALL_DEPTH);

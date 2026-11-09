@@ -48,10 +48,8 @@ inline std::string sign_ed(const std::string& sk, const std::string& msg)
 
     }
 
-    // auto hs=get_hash();
     std::string signature;
     signature.resize(crypto_sign_BYTES);
-    // std::vector<unsigned char> sig(crypto_sign_BYTES);
 
     auto err=crypto_sign_detached((unsigned char*)signature.data(),
                                   nullptr,

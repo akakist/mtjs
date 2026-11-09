@@ -296,10 +296,14 @@ namespace Node
         std::optional<std::string> execute_remove_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId);
 
         // std::optional<std::string> execute_gc(yyjson_val* params, b_params& b, t_params& t, int seqId, _db_to_save& dbd);
-        std::optional<std::string> gc_granule_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
-        std::optional<std::string> gc_contract_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
-        std::optional<std::string> gc_node_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
-        std::optional<std::string> gc_address_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);        
+        // std::optional<std::string> gc_granule_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
+        // std::optional<std::string> gc_contract_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
+        // std::optional<std::string> gc_node_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
+        // std::optional<std::string> gc_address_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);        
+        std::optional<std::string> gc_activity_apply(
+                const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd,
+                int& applied_granule, int& applied_contract, int& applied_node, int& applied_address);
+
 
         void invalidate_services();
 

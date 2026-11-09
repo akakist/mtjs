@@ -10,11 +10,11 @@ namespace hsh
         bc_nodelist,
         bc_values,
         // bc_epoch,
-        bc_contract_data,
+        bc_granule,
         bc_votes,
         bc_contract_balance,
         bc_state,
-        bc_contract_activity,
+        bc_activity,
         HSH_END
     };
 }

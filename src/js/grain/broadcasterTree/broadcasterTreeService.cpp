@@ -188,19 +188,6 @@ bool BroadcasterTree::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *e)
         throw CommonError("if(e->route.size())");
     return true;
 }
-// void BroadcasterTree::Service::logNode(const char *fmt, ...)
-// {
-
-//     {
-//         va_list ap;
-//         va_start(ap, fmt);
-//         fprintf(stdout, "%ld [BroadcasterTree] [%s] ", time(NULL),
-//                 conf->this_node_name.container.c_str());
-//         vfprintf(stdout, fmt, ap);
-//         fprintf(stdout, "\n");
-//         va_end(ap);
-//     }
-// }
 
 void registerBroadcasterTreeService(const char *pn)
 {

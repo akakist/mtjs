@@ -54,6 +54,10 @@ void init_genesis(Cellable* root, IDatabase* db)
     try { f >> j; }
     catch (const std::exception& e) { throw CommonError("genesis: parse %s: %s", path.c_str(), e.what()); }
 
+    // ▼▼▼ INSERT: genesis_time (для activity)
+    int64_t genesis_time = j.value("genesis_time", (int64_t)time(NULL));
+    // ▲▲▲
+
     auto nl=cells::getNodeListOrCreate(root,db,NULL);
     nl->setDirty(NULL);
     auto votes=cells::getVotesOrCreate(root,db,NULL);
@@ -84,7 +88,6 @@ void init_genesis(Cellable* root, IDatabase* db)
             if (!addr_hex.is_string()) continue;
             ADDRESS_id addr;
             addr.addr = base16::decode(addr_hex.get<std::string>());
-            // ADDRESS_id addr; addr.addr = blake2b_hash(pk).container;
             if (addr.addr.size() != 32)
                 throw CommonError("genesis: emitters addr must be 32 bytes hex (got %zu)", addr.addr.size());
             v->emitters_bin.insert(addr);
@@ -121,6 +124,11 @@ void init_genesis(Cellable* root, IDatabase* db)
                 }
             }
             ua->setDirty(NULL);
+
+            // ▼▼▼ INSERT: activity для адреса (ttl = 0, вечный)
+            cells::getActivityOrCreate(root, db, ua->getDbId(), {}, 0, genesis_time, NULL);
+            // ▲▲▲
+
             st2->total_supply += i128(bal);
         }
     }
@@ -160,6 +168,10 @@ void init_genesis(Cellable* root, IDatabase* db)
             nn->add_stake(owner, stake);
             nn->setDirty(NULL);
 
+            // ▼▼▼ INSERT: activity для ноды (ttl = 0, вечный)
+            cells::getActivityOrCreate(root, db, nn->getDbId(), {}, 0, genesis_time, NULL);
+            // ▲▲▲
+
             st2->total_stake += i128(stake);
         }
     }
@@ -168,9 +180,5 @@ void init_genesis(Cellable* root, IDatabase* db)
     proceed_merkle_on_transaction_pool_hashers(root,dbz);
     db->write_granules_batch(dbz);
     logErr2("write_granules_batch %d granules",dbz.cells.size());
-    // db_to_save_Z.clear();
-
-    // invalidate_services();
-
-    
 }
+

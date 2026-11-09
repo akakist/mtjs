@@ -39,12 +39,9 @@ static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueC
     for (int i = 2; i < argc; i++)
     {
         JSValueGuard arg(ctx, JS_DupValue(ctx, argv[i]));
-        // scope.addValue(arg);
         fargs.push_back(arg);
-        // scope.detach(arg); // Передаём владение аргументом в fargs
     }
 
-    // uint64_t timerId = idGen++;
     REF_getter<TimerTask> t = new TimerTask;
     t->timerId = idGen++;
     t->ctx = ctx;
@@ -52,18 +49,10 @@ static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueC
     t->fargs = std::move(fargs);
     t->timeout = double(to) / 1000.;
     t->cb = cb;
-    // for (auto &z : t->fargs)
-    // {
-    //     JS_DupValue(ctx, z);
-    // }
-    // JS_DupValue(ctx, t->cb);
-
-    // scope.detach(cb); // Передаём владение cb в t->cb
     op->rcf->timers.timers_refed.insert({t->timerId, t});
 
     JSValue jsTimeout = JS_NewObjectClass(ctx, js_timeout_class_id);
 
-    // scope.addValue(jsTimeout);
     Timeout *timeout = new Timeout(t, op->rcf);
 
     JS_SetOpaque(jsTimeout, timeout);
@@ -71,13 +60,11 @@ static JSValue js_setCommon(JSContext *ctx, JSValueConst val, int argc, JSValueC
 
     if (isInterval)
     {
-        // logErr2("setTimer %lld %lf", t->timerId, t->timeout);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(
                                        Timers::TIMER_INTERVAL, toRef(std::to_string(t->timerId)), t.get(), t->timeout, op->listener_));
     }
     else
     {
-        // logErr2("SetAlarm %lld %lf", t->timerId, t->timeout);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(
                                        Timers::TIMER_TIMER, toRef(std::to_string(t->timerId)), t.get(), t->timeout, op->listener_));
     }
@@ -106,13 +93,11 @@ static JSValue js_clearCommon(JSContext *ctx, JSValueConst val, int argc, JSValu
 
     if (isInterval)
     {
-        // logErr2("StopTimer %lld", timerId);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::StopTimer(
                                        Timers::TIMER_INTERVAL, toRef(std::to_string(timerId)), op->listener_));
     }
     else
     {
-        // logErr2("StopAlarm %lld", timerId);
         op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(
                                        Timers::TIMER_TIMER, toRef(std::to_string(timerId)), op->listener_));
     }

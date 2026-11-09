@@ -8,6 +8,17 @@
 #include "db_to_save.h"
 #include "cellable.h"
 
+struct CNode: public Refcountable
+{
+    CNode(): Refcountable("CNode"){}
+    virtual void set(const std::string &s) =0;
+    virtual std::string get() =0;
+    virtual void touch(time_t t)=0;
+    virtual int ttl()=0;
+    virtual void update_time(time_t t, Rollback* r)=0;
+    virtual void setDirty(Rollback* r)=0;
+    virtual ~CNode() = default;
+};
 struct GranuleIO : public Refcountable {
     GranuleIO() : Refcountable("GranuleIO") {}
     virtual ~GranuleIO() = default;
@@ -23,6 +34,12 @@ struct GranuleIO : public Refcountable {
                                                   const std::string& value,
                                                   int64_t now,
                                                   Rollback* roll) = 0;
+
+    virtual REF_getter<CNode> createCNode(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd,
+                                                     int64_t create_time, int64_t ttl,
+                                                     Rollback* r) = 0;
+    virtual REF_getter<CNode> getCNode(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd) = 0;
+                                                         
 
     virtual bool getContractBalance(Cellable*,const CONTRACT_id& c, int64_t& out) = 0;
     virtual std::optional<std::string> addContractBalance(Cellable*,const CONTRACT_id& c, int64_t delta, Rollback* roll) = 0;

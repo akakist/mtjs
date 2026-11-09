@@ -2,7 +2,7 @@
 #include "cellable.h"
 struct bc_contract_balance: public data_base
 {
-    bc_contract_balance(Cellable *p):data_base(hsh::bc_contract_balance,p,0,-1) { amount=0; }
+    bc_contract_balance(Cellable *p):data_base(hsh::bc_contract_balance,p,0,0) { amount=0; }
     int64_t amount;
     size_t size() const
     {

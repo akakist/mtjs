@@ -7,7 +7,6 @@ THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &
 {
     MUTEX_INSPECTOR;
     r->calc_tree_hash(db_to_save_Z);
-    // r->calcers_Z.clear();
 
     std::string root_buf;
     {
@@ -16,7 +15,6 @@ THASH_id proceed_merkle_on_transaction_pool_hashers(const REF_getter<Cellable> &
     }
     auto root_hash = blake2b_hash(root_buf);
     db_to_save_Z.add("", root_buf);
-    // db_to_save_Z.add("#root_hash#", root_hash.container);
     THASH_id ret;
     ret.container = root_hash.container;
     return ret;

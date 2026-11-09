@@ -1,10 +1,10 @@
 #pragma once
 #include "cellable.h"
 // #include
-struct bc_contract_data:  public data_base
+struct bc_granule:  public data_base
 {
 
-    bc_contract_data(Cellable *p):data_base(hsh::bc_contract_data,p, 0,-1) {}
+    bc_granule(Cellable *p):data_base(hsh::bc_granule,p, 0,0) {}
     std::string container;
     size_t size() const
     {

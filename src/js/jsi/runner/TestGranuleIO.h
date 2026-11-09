@@ -68,6 +68,17 @@ struct TestGranuleIO : GranuleIO {
         if (it == data.end()) return 0;
         return it->second.ttl;
     }
+    REF_getter<CNode> createCNode(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd,
+                                                     int64_t create_time, int64_t ttl,
+                                                     Rollback* r)
+    {
+        return nullptr;
+    }
+    REF_getter<CNode> getCNode(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd)
+    {
+        return nullptr;
+    }
+
 };
 
 

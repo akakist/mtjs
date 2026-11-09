@@ -33,13 +33,21 @@ function errStr(e: any): string {
 }
 
 const pending: { [h: string]: { resolve: (b: Block) => void; reject: (e: any) => void; timer: any } } = {};
+let lastBlock: Block | null = null;  // кэш последнего блока
+
 mtjs.tx_subscribe(node, (b: Block) => {
+    lastBlock = b;  // сохраняем последний блок
     for (const h of b.tx_hashes) {
         const p = pending[h];
         if (p) { delete pending[h]; clearTimeout(p.timer); p.resolve(b); }
     }
 });
+
 function waitTx(h: string, to: number): Promise<Block> {
+    // если блок уже пришёл (lastBlock) и содержит tx — resolve сразу
+    if (lastBlock && lastBlock.tx_hashes.indexOf(h) >= 0) {
+        return Promise.resolve(lastBlock);
+    }
     return new Promise<Block>((res, rej) => {
         const timer = setTimeout(() => {
             delete pending[h];

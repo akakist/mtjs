@@ -891,8 +891,8 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 {
     MUTEX_INSPECTOR;
     XTRY;
-    // logErr2("[mtjs] ClientTxSubscribeRSP ENTER: tx_hashes=%d tx_wait_promises=%d node_tx_cb=%d",
-    // (int)e->tx_hashes.size(), (int)opaque.tx_wait_promises.size(), (int)opaque.node_tx_cb.size());
+    logErr2("[mtjs] ClientTxSubscribeRSP ENTER: tx_hashes=%d tx_wait_promises=%d node_tx_cb=%d",
+    (int)e->tx_hashes.size(), (int)opaque.tx_wait_promises.size(), (int)opaque.node_tx_cb.size());
     for (auto& kv : opaque.tx_wait_promises) logErr2("  %s", kv.first.c_str());
     if (!e->att_data.valid()) {
         logErr2("ClientTxSubscribeRSP: att_data invalid");

@@ -1,3 +1,5 @@
+/// cells.cpp
+
 #include "cells.h"
 #include "IDatabase.h"
 #include "normalizeNick.h"
@@ -26,39 +28,61 @@ namespace cells {
         auto h = blake2b_hash(name);
         return getPathFromHash(h);
     }
-
+    std::string getAddressStateKey(const ADDRESS_id& addr)
+    {
+        return "USER_STATE_" + addr.addr;
+    }
     std::vector<std::string> getAddressStatePath(const ADDRESS_id& addr)
     {
         MUTEX_INSPECTOR;
         if (addr.addr.empty())
             throw CommonError("getAddressStatePath: empty addr");
-        return getPath("USER_STATE_" + addr.addr);
+        return getPath(getAddressStateKey(addr));
     }
 
+    std::string getContractKey(const CONTRACT_id& name)
+    {
+        return "USER_STATE_" + name.container;
+    }
     std::vector<std::string> getContractPath(const CONTRACT_id& name)
     {
-        return getPath("CONTRACT_" + name.container);
+        return getPath(getContractKey(name));
+    }
+    std::string getContractDataKey(const CONTRACT_id& contract, const CONTRACT_DATA_id& dataId)
+    {
+        return "CONTRACT_DATA_" + contract.container + "_" + dataId.container;
     }
 
     std::vector<std::string> getContractDataPath(const CONTRACT_id& contract, const CONTRACT_DATA_id& dataId)
     {
-        std::string key = "CONTRACT_DATA_" + contract.container + "_" + dataId.container;
-        return getPath(key);
+        
+        return getPath(getContractDataKey(contract,dataId));
     }
 
+    std::string getNodeKey(const NODE_id& name)
+    {
+        return "NODE_" + name.container;
+    }
     std::vector<std::string> getNodePath(const NODE_id& name)
     {
-        return getPath("NODE_" + name.container);
+        return getPath(getNodeKey(name));
     }
 
+    std::string getContractBalanceKey(const CONTRACT_id& contract)
+    {
+        return "CONTRACT_BALANCE_" + contract.container;
+    }
     std::vector<std::string> getContractBalancePath(const CONTRACT_id& contract)
     {
-        return getPath("CONTRACT_BALANCE_" + contract.container);
+        return getPath(getContractBalanceKey(contract));
     }
-
+    std::string getStateKey()
+    {
+        return "STATE";
+    }
     std::vector<std::string> getStatePath()
     {
-        return getPath("STATE");
+        return getPath(getStateKey());
     }
 
 // ============================================================
@@ -282,7 +306,7 @@ namespace cells {
         return dynamic_cast<const bc_contract*>(cc->data.get());
     }
 
-    REF_getter<bc_contract_data> getContractDataOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& name, Rollback* roll, int ttl, time_t create_time)
+    REF_getter<bc_granule> getContractDataOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& name, Rollback* roll, int ttl, time_t create_time)
     {
         MUTEX_INSPECTOR;
         auto cc = getByPathOrCreate(root, db, getContractDataPath(con, name), roll);
@@ -290,16 +314,20 @@ namespace cells {
             throw CommonError("if(!cc.valid())");
         if (cc->data.valid())
             throw CommonError("if(cc->data.valid())");
-        REF_getter<bc_contract_data> bc = new bc_contract_data(cc.get());
-        bc->ttl = ttl;
-        bc->update_time(create_time);
+        REF_getter<bc_granule> bc = new bc_granule(cc.get());
+        auto dbid=blake2b_hash(getContractDataKey(con,name));
+
+        auto act=cells::getActivityOrCreate(root,db,bc->getDbId(),{},ttl,create_time,roll);
+        act->update_time(create_time, roll);
+        // bc->ttl = ttl;
+        // bc->update_time(create_time);
         cc->data = bc.get();
-        cc->payload_ctor_idx = hsh::bc_contract_data;
+        cc->payload_ctor_idx = hsh::bc_granule;
         cc->data->setDirty(roll);
         return bc;
     }
 
-    REF_getter<bc_contract_data> getContractDataNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key)
+    REF_getter<bc_granule> getContractDataNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key)
     {
         MUTEX_INSPECTOR;
         auto cc = getByPathNoCreate(root, db, getContractDataPath(con, key));
@@ -307,10 +335,10 @@ namespace cells {
             return NULL;
         if (!cc->data.valid())
             return NULL;
-        return dynamic_cast<bc_contract_data*>(cc->data.get());
+        return dynamic_cast<bc_granule*>(cc->data.get());
     }
 
-    REF_getter<const bc_contract_data> getContractDataNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key)
+    REF_getter<const bc_granule> getContractDataNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key)
     {
         MUTEX_INSPECTOR;
         auto cc = getByPathNoCreate(root, db, getContractDataPath(con, key));
@@ -318,7 +346,7 @@ namespace cells {
             return NULL;
         if (!cc->data.valid())
             return NULL;
-        return dynamic_cast<const bc_contract_data*>(cc->data.get());
+        return dynamic_cast<const bc_granule*>(cc->data.get());
     }
 
     REF_getter<bc_contract_balance> getContractBalanceOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& contract, Rollback* roll)
@@ -574,31 +602,81 @@ namespace cells {
         return getPath("CONTRACT_ACTIVITY_" + name.container);
     }
 
-    REF_getter<bc_contract_activity> getContractActivityOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll)
+    REF_getter<bc_activity> getContractActivityOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll)
     {
         auto cc = getByPathOrCreate(root, db, getContractActivityPath(name), roll);
         if (!cc.valid()) throw CommonError("if(!cc.valid())");
-        if (cc->data.valid()) return dynamic_cast<bc_contract_activity*>(cc->data.get());
-        REF_getter<bc_contract_activity> bc = new bc_contract_activity(cc.get());
+        if (cc->data.valid()) return dynamic_cast<bc_activity*>(cc->data.get());
+        REF_getter<bc_activity> bc = new bc_activity(cc.get());
         bc->name_ = name.container;
         cc->data = bc.get();
-        cc->payload_ctor_idx = hsh::bc_contract_activity;
+        cc->payload_ctor_idx = hsh::bc_activity;
         cc->data->setDirty(roll);
         return bc;
     }
 
-    REF_getter<bc_contract_activity> getContractActivityNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name)
+    REF_getter<bc_activity> getContractActivityNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name)
     {
         auto cc = getByPathNoCreate(root, db, getContractActivityPath(name));
         if (!cc.valid()) return NULL;
         if (!cc->data.valid()) return NULL;
-        return dynamic_cast<bc_contract_activity*>(cc->data.get());
+        return dynamic_cast<bc_activity*>(cc->data.get());
     }
 
-    REF_getter<const bc_contract_activity> getContractActivityNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& name)
+    REF_getter<const bc_activity> getContractActivityNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& name)
     {
         auto v = getContractActivityNoCreate(root, db, name);
         if (!v.valid()) return NULL;
-        return dynamic_cast<const bc_contract_activity*>(v.get());
+        return dynamic_cast<const bc_activity*>(v.get());
     }
+
+std::vector<std::string> getActivityPath(const std::string& granule_dbid) {
+    outBuffer o;
+    o << granule_dbid << std::string("activity");
+    return getPathFromHash(blake2b_hash(o.asString()->container));
+}
+
+
+REF_getter<bc_activity> getActivityNoCreate(Cellable* root, IDatabase* db, const std::string& granule_dbid) {
+    auto cc = getByPathNoCreate(root, db, getActivityPath(granule_dbid));
+    if (!cc.valid() || !cc->data.valid()) 
+        throw CommonError("if (!cc.valid() || !cc->data.valid()) ");
+    auto *p=dynamic_cast<bc_activity*>(cc->data.get());
+    if(!p)
+        throw CommonError("if(!p)");
+    return p;
+}
+
+REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
+                                      const std::string& granule_dbid, const std::set<std::string> & additional,
+                                      int ttl, time_t now, Rollback* roll) {
+    auto cc = getByPathOrCreate(root, db, getActivityPath(granule_dbid), roll);
+    if (!cc.valid()) throw CommonError("if(!cc.valid())");
+    if (cc->data.valid()) {
+        auto act = dynamic_cast<bc_activity*>(cc->data.get());
+        act->_update_time = now;
+        act->ttl = ttl;
+        act->setDirty(roll);
+        return act;
+    }
+    REF_getter<bc_activity> act = new bc_activity(cc.get());
+    act->dbid=additional;
+    act->dbid.insert(granule_dbid);
+    act->_update_time = now;
+    act->ttl = ttl;
+    cc->data = act.get();
+    cc->payload_ctor_idx = hsh::bc_activity;
+    cc->data->setDirty(roll);
+    return act;
+}
+
+void touchActivity(Cellable* root, IDatabase* db,
+                   const std::string& granule_dbid,
+                   Rollback* roll, int64_t now) {
+    auto act = getActivityNoCreate(root, db, granule_dbid);
+    if (!act.valid()) return;
+    act->update_time(now, roll);
+    // act->setDirty(roll);
+}
+
 } // namespace cells

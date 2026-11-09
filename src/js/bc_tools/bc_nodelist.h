@@ -4,7 +4,7 @@
 struct bc_nodelist:  public data_base
 {
 
-    bc_nodelist(Cellable *p):data_base(hsh::bc_nodelist,p, 0,-1) {}
+    bc_nodelist(Cellable *p):data_base(hsh::bc_nodelist,p, 0,0) {}
 private:
     std::set<NODE_id> list;
 public:

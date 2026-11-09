@@ -4,7 +4,7 @@
 #include <sstream>
 #include "bc_address_state.h"
 #include "bc_contract.h"
-#include "bc_contract_data.h"
+#include "bc_granule.h"
 #include "bc_node.h"
 #include "bc_node.h"
 #include "bc_nodelist.h"
@@ -12,7 +12,7 @@
 #include "bc_vote.h"
 #include "bc_contract_balance.h"
 #include "bc_state.h"
-#include "bc_contract_activity.h"
+#include "bc_activity.h"
 
 std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base *
@@ -31,7 +31,7 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     { return new bc_values(p); },
 
     +[](Cellable *p) -> data_base *
-    { return new bc_contract_data(p); },
+    { return new bc_granule(p); },
 
     +[](Cellable *p) -> data_base *
     { return new bc_votes(p); },
@@ -39,7 +39,7 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     +[](Cellable *p) -> data_base * { return new bc_contract_balance(p); }, 
 
     +[](Cellable *p) -> data_base * { return new bc_state(p); }, 
-    +[](Cellable *p) -> data_base * { return new bc_contract_activity(p); }, 
+    +[](Cellable *p) -> data_base * { return new bc_activity(p); }, 
 };
 
 
@@ -49,6 +49,10 @@ std::string Cellable::getDbId() const
         return parent->getDbId()  + m_id;
 
     return parent ? m_id : "";
+}
+std::string data_base::getDbId() const
+{
+    return parent->getDbId();
 }
 
 
@@ -126,6 +130,8 @@ void data_base::setDirty(Rollback* roll)
 
     parent->setDirty__(roll);
 }
+#include "cells.h"
+
 
 void deleteGranule(data_base* g, Rollback* roll,_db_to_save &db_dump)
 {

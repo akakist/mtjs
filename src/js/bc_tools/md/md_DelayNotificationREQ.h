@@ -18,21 +18,18 @@ namespace MsgData
         REF_getter<BlockAccepted2REQ> lc;
         void update(Blake2bHasher& h) const
         {
-            // h.update(epoch.toString());
             lc->update(h);
         }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            // b<<epoch;
             b<<lc;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            // b>>epoch;
             b>>lc;
         }
     };

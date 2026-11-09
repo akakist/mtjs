@@ -14,17 +14,12 @@ struct data_base : public Refcountable
     int type;
     Cellable *parent;
 
-    time_t __update_time=0;
-    int ttl=-1;
-    void update_time(time_t t)
-    {
-        if(t>__update_time)
-            __update_time=t;
-    }
+    std::string getDbId() const;
+
 
 
     data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
-        type(t), parent(_parent), __update_time(_create_time),ttl(_ttl) {
+        type(t), parent(_parent) {
     }
     ~data_base()
     {
@@ -33,20 +28,18 @@ struct data_base : public Refcountable
     ;
     size_t size_() const
     {
-        return sizeof(type)+sizeof(__update_time)+sizeof(ttl);
+        return sizeof(type);
     }
     virtual size_t size() const=0;
     virtual void pack(outBuffer& o) const
     {
         o<<1;
         o<<type;
-        o<<__update_time<<ttl;
     }
     virtual void unpack(inBuffer& in)
     {
         int ver=in.get_PN();
         in>>type;
-        in>>__update_time>>ttl;
     }
     std::string getBuffer()
     {

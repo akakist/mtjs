@@ -122,7 +122,6 @@ bool TxValidator::Service::ServiceInit(const bcEvent::ServiceInit *e)
 }
 bool TxValidator::Service::InvalidateRoot(const bcEvent::InvalidateRoot *e)
 {
-    // logErr2("TxValidator::Service::InvalidateRoot");
     MUTEX_INSPECTOR;
     auto prev=load_last_block(db.get());
     xroot=getRoot(db.get(),prev);

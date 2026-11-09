@@ -5,7 +5,7 @@
 #include "base16.h"
 #include "commonError.h"
 #include "Events/Tools/telnetEvent.h"
-// #include "bigint.h"
+
 #include "blake2bHasher.h"
 #include "REF.h"
 #include "Events/Tools/webHandlerEvent.h"
@@ -144,16 +144,6 @@ void Node::Service::dump(nlohmann::json& j)
         auto& li = bt;
 
         lb["leader_cert"] = dump_hb(li.leader_cert_2);
-        // lb["TIMER_VALIDATE_BLOCK_DELAY_set"] = li.TIMER_VALIDATE_BLOCK_DELAY_set;
-
-        // heart_beat rsp
-        // for (auto& [signer, rsp] : li.HeartBeatRSP_m) {
-        //     if (!rsp.valid()) continue;
-        //     lb["hb_rsp"].push_back({
-        //         {"signer", signer.container},
-        //         {"hb",     dump_hb(rsp->payload_heart_beat)}
-        //     });
-        // }
 
         // confirm_leader rsp (по hb_hash)
         for (auto& [hb_hash, m] : bt.ConfirmLeaderRSP_m) {
@@ -377,14 +367,7 @@ void Node::Service::do_start_block()
         return;
     }
 
-    // 3) пустой пул — не собираем пустой блок, ждём TX (по политике "нет TX — нет блока")
-    // if (transaction_pool_of_leader.empty()) {
-    //     logNode("do_start_block: tx pool empty");
-    //     sendEvent(ServiceEnum::Timer,
-    //               new timerEvent::SetAlarm(timers::TIMER_RESTART_BLOCK, NULL, NULL, 0.5, this));
-    //     return;
-    // }
-
+    
     auto mf = getMetaFull(li.leader_cert_2->block_timestamp);
     if (!mf.valid()) {
         logNode("do_start_block: meta invalid");
@@ -493,29 +476,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     case timers::TIMER_SYNC_TIMEDOUT:
         logNode("FAILED SYNC, NODE STOPPED---------------------------------------------------------------");
         break;
-    // case timers::TIMER_RESTART_BLOCK:
-    // {
-    //     if(!db_state->sync_empty)
-    //     {
-    //         logNode("TIMER_RESTART_BLOCK if(!db_state->sync_empty)");
-    //         return true;
-    //     }
-    //     auto &li = l_blocks[prev_root_hash_Z()];
-    //     if (!li.leader_cert_2.valid()) {
-    //         // нет лидера — попробовать стартовать (do_heart_beat сам проверит cli)
-    //         do_heart_beat(time(NULL));
-    //         return true;
-    //     }
-    //     // лидер есть — не перебиваем; если это я, запрашиваем TX
-    //     auto& cli = cli_leader_info[prev_root_hash_Z()];
-    //     if (cli.node_leader.valid() && cli.node_leader->node_leader != this_node_name) {
-    //         return true; // не мой раунд
-    //     }
-    //     // li.request_for_transactions_sent = true;
-    //     auto meta=getMetaFull(li.leader_cert_2->block_timestamp);
-    //     do_request_for_transactions(li,meta);
-    //     return true;
-    // }
     }
     return false;
 }
@@ -1129,7 +1089,8 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 
             if (contract_str == "root")
             {
-                logNode("execute_tx_commands: contract=root method=%s", method_str.c_str());
+                MUTEX_INSPECTOR;
+                // logNode("execute_tx_commands: contract=root method=%s", method_str.c_str());
                 std::optional<std::string> err;
                 auto meth=method_str;
                 if (meth == "mint") err = execute_mint(params, b, t, index);
@@ -1153,6 +1114,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
             }
             else
             {
+                MUTEX_INSPECTOR;
                 // JSI-контракт (gym.js и т.п.)
                 CONTRACT_id c; c.container = contract_str;
                 auto cc = contractHost->get_contract(root.get(), c);
@@ -1196,8 +1158,8 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                     JSI_FreeValue(cc->ctx, result);
                     return "contract call failed: " + contract_str + "." + method_str + (emsg.empty() ? "" : ": " + emsg);
                 }
-                logNode("execute_tx_commands: contract=%s method=%s index=%d ext_ctx.emits.size=%d",
-                    contract_str.c_str(), method_str.c_str(), (int)index, (int)ext_ctx.emits.size());
+                // logNode("execute_tx_commands: contract=%s method=%s index=%d ext_ctx.emits.size=%d",
+                    // contract_str.c_str(), method_str.c_str(), (int)index, (int)ext_ctx.emits.size());
                 for (auto& ev : ext_ctx.emits)
                     logNode("  emit: %s = %s", ev.name.c_str(), ev.value.c_str());
 

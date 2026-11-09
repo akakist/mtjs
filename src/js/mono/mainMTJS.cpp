@@ -66,7 +66,6 @@ void onterm(int signum)
 
 int mainMTJS(int argc, char** argv )
 {
-    // curl_global_init(CURL_GLOBAL_DEFAULT);
 
 #ifndef _WIN32
         signal(SIGPIPE,SIG_IGN);
@@ -98,13 +97,11 @@ int mainMTJS(int argc, char** argv )
         registerMTJSModule(NULL);
         registerNodeService(NULL);
         registerTxValidatorService(NULL);
-//        registerBlockValidatorService(NULL);
         registerBroadcasterTreeService(NULL);
         registerGrainReaderService(NULL);
-        // registerGrainWriterService(NULL);
         registerBlockStreamerService(NULL);
-	registerMysqlModule(NULL);
-	registerScanService(NULL);
+        registerMysqlModule(NULL);
+        registerScanService(NULL);
 
 
 #ifdef WEBDUMP

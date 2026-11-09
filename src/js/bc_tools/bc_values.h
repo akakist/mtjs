@@ -5,7 +5,7 @@ struct bc_values: public data_base
 {
 
 
-    bc_values(Cellable *p): data_base(hsh::bc_values,p,0,-1) {
+    bc_values(Cellable *p): data_base(hsh::bc_values,p,0,0) {
         /// gas
         values["gas_per_token"]    = 1;
         values["gas_per_byte"]     = 1;

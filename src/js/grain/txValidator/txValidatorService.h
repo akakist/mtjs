@@ -2,7 +2,6 @@
 
 #include "broadcaster.h"
 
-// #include "signedBuffer.h"
 
 #include "listenerBuffered1Thread.h"
 #include <map>
@@ -56,9 +55,6 @@ namespace TxValidator
 
         std::map<THASH_id, TRANSACTION_body>  transaction_pool_verified;
 
-        // bool is_working=false;
-        // REF_getter<root_data> root=NULL;
-        // REF_getter<IDatabase> db;
         REF_getter<IDatabase> db;
 
         REF_getter<bcEvent::ServiceInit> conf=nullptr;

@@ -65,14 +65,20 @@ bool Scan::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 inBuffer vin(val);
                 try { c.unpack_mx(vin); } catch (...) { it->Next(); continue; }
                 if (c.data.valid()) {
-                    int64_t ttl = c.data->ttl, ut = c.data->__update_time;
                     bool expired = false;
                     switch (c.payload_ctor_idx) {
-                    case hsh::bc_contract_data:     expired = (ttl > 0 && ut + ttl < now); break;
-                    case hsh::bc_contract_activity: expired = (ut < now); break;
-                    case hsh::bc_node:              expired = (ttl > 0 && ut + ttl < now); break;
-                    case hsh::bc_address_state:     expired = (ttl > 0 && ut + ttl < now); break;
-                    default: break;
+                    case hsh::bc_activity: {
+                        auto* act = dynamic_cast<bc_activity*>(c.data.get());
+                        if (act && act->ttl > 0 && act->_update_time + act->ttl < now)
+                            expired = true;
+                        break;
+                    }
+                    case hsh::bc_granule:
+                    case hsh::bc_node:
+                    case hsh::bc_address_state:
+                    default:
+                        // остальные типы удаляются ТОЛЬКО через bc_activity (gc_activity_apply)
+                        break;
                     }
                     if (expired) {
                         THASH_id hh; hh.container = key;

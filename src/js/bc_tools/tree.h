@@ -2,7 +2,7 @@
 #include <string>
 #include <list>
 #include "blake2bHasher.h"
-// #include "bigint.h"
+
 #include "NODE_id.h"
 #include "nodeElement.h"
 #include <nlohmann/json.hpp>

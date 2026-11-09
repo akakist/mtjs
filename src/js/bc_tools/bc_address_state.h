@@ -10,7 +10,7 @@
 static constexpr size_t MAX_KEYS_PER_ADDRESS = 5;
 
 struct bc_address_state: public data_base {
-    bc_address_state(Cellable* p): data_base(hsh::bc_address_state, p, 0, -1) {
+    bc_address_state(Cellable* p): data_base(hsh::bc_address_state, p, 0, 0) {
         nonce = 0; balance = 0;
     }
     int64_t balance = 0;

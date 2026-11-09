@@ -35,9 +35,9 @@ int main(int argc, char** argv) {
 
         if (!c.data.valid()) continue;
 
-        if (c.payload_ctor_idx == hsh::bc_contract_activity) {
+        if (c.payload_ctor_idx == hsh::bc_activity) {
             // activity: update_time + contract.ttl < now
-            auto* act = dynamic_cast<bc_contract_activity*>(c.data.get());
+            auto* act = dynamic_cast<bc_activity*>(c.data.get());
             if (!act || act->name_.empty()) continue;
             CONTRACT_id cn; cn.container = act->name_;
             auto cc = cells::getContractNoCreateConst(nullptr, nullptr, cn);  // ← нельзя: root=null
@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
                     }
                 }
             }
-        } else if (c.payload_ctor_idx == hsh::bc_contract_data) {
+        } else if (c.payload_ctor_idx == hsh::bc_granule) {
             // гранула данных: update_time + ttl < now
             if (c.data->ttl > 0 && c.data->update_time + c.data->ttl < now) {
                 out << base16::encode(key) << "\n";

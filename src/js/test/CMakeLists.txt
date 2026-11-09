@@ -26,7 +26,7 @@ target_link_libraries(test_qjs quickjs)
  add_executable(test_i128
   test_i128.cpp
  )
-target_link_libraries(test_i128 megatron-core)
+target_link_libraries(test_i128 megatron-core megatron-main)
 
 # add_executable(client
   # client.cpp

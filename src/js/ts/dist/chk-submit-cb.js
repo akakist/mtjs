@@ -43,7 +43,9 @@ function errStr(e) {
     return String(e);
 }
 const pending = {};
+let lastBlock = null; // кэш последнего блока
 mtjs.tx_subscribe(node, (b) => {
+    lastBlock = b; // сохраняем последний блок
     for (const h of b.tx_hashes) {
         const p = pending[h];
         if (p) {
@@ -54,6 +56,10 @@ mtjs.tx_subscribe(node, (b) => {
     }
 });
 function waitTx(h, to) {
+    // если блок уже пришёл (lastBlock) и содержит tx — resolve сразу
+    if (lastBlock && lastBlock.tx_hashes.indexOf(h) >= 0) {
+        return Promise.resolve(lastBlock);
+    }
     return new Promise((res, rej) => {
         const timer = setTimeout(() => {
             delete pending[h];

@@ -13,14 +13,11 @@
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
-//    const SERVICE_id BlockValidator(ghash("@g_BlockValidator"));
     const SERVICE_id TxValidator(ghash("@g_TxValidator"));
     const SERVICE_id BroadcasterTree(ghash("@g_BroadcasterTree"));
     const SERVICE_id GrainReader(ghash("@g_GrainReader"));
     const SERVICE_id GrainReaderLite(ghash("@g_GrainReaderLite"));
     const SERVICE_id BlockStreamer(ghash("@g_BlockStreamer"));
-//    const SERVICE_id GrainWriter(ghash("@g_GrainWriter"));
-    // const SERVICE_id LeaderElection(ghash("@g_LeaderElection"));
     const SERVICE_id Scan(ghash("@g_Scan"));
 
 }
@@ -206,12 +203,10 @@ namespace bcEvent
         void unpack(inBuffer &o)
         {
 
-            // o>>msg;
         }
         void pack(outBuffer &o) const
         {
 
-            // o<<msg;
         }
     };
 
@@ -228,7 +223,6 @@ namespace bcEvent
         std::map<std::string,std::string> diffs;
         REF_getter<MsgData::attachment_data> att_data;
         
-        // std::string msg;
 
         ClientTxSubscribeRSP(const REF_getter<MsgData::BlockAccepted2REQ> &_bs, const std::vector<THASH_id> &_tx_hashes,
             const std::map<std::string,std::string> &_diffs, const REF_getter<MsgData::attachment_data> _att,
@@ -301,8 +295,6 @@ namespace bcEvent
                 my_sk_ed(my_sk_ed_), 
                 this_node_name(this_node_name_), 
                 db(db_)
-                // ,
-                // root(_root) 
                 {}
 
         blst_cpp::SecretKey my_sk_bls;
@@ -310,7 +302,6 @@ namespace bcEvent
 
         NODE_id this_node_name;
         REF_getter<IDatabase> db;
-        // REF_getter<root_data> root;
     };
 
     class InvalidateRoot : public Event::NoPacked
@@ -448,11 +439,6 @@ namespace bcEvent
         std::map<std::string,std::string> diffs;
         REF_getter<MsgData::attachment_data> att_data;
     };
-    // struct NetworkBase: public Event::Base
-    // {
-    //     NetworkBase(const EVENT_id& id, const route_t& r):Event::Base(id,r) {}
-    //     virtual void  update(Blake2bHasher &h) const =0;
-    // };
     class PutTransactionREQ : public Event::NoPacked
     {
 

@@ -3,7 +3,7 @@
 #include "ADDRESS_id.h"
 struct bc_contract:  public data_base
 {
-    bc_contract(Cellable *p):data_base(hsh::bc_contract,p, 0,-1) {}
+    bc_contract(Cellable *p):data_base(hsh::bc_contract,p, 0,0) {}
     std::string name_;
     std::set<ADDRESS_id> owners;
     std::string src;

@@ -5,8 +5,6 @@
 #include <stdexcept>
 namespace base16
 {
-    // std::string encode(const std::string& data);
-    // std::string decode(const std::string& str);
 
     std::string encode(const std::string &input) ;
     std::string encode(const std::vector<uint8_t> &input) ;
@@ -26,4 +24,4 @@ namespace base16
                (c >= 'a' && c <= 'f') ||
                (c >= 'A' && c <= 'F');
     }
-} // namespace base16
+}

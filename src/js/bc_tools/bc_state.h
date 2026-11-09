@@ -4,7 +4,7 @@
 #include "i128.h"
 
 struct bc_state: public data_base {
-    bc_state(Cellable *p): data_base(hsh::bc_state,p,0,-1) {}
+    bc_state(Cellable *p): data_base(hsh::bc_state,p,0,0) {}
     i128 total_supply;         // 16
     i128 total_stake;          // 16
     int64_t account_count = 0; // 8

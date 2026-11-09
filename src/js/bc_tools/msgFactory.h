@@ -27,6 +27,5 @@ public:
     }
     MsgFactory();
 
-// private:
     std::map<int, Constructor> registry;
 };

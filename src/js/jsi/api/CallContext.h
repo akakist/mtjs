@@ -8,6 +8,7 @@
 #include "FeesSnapshot.h"
 #include "db_to_save.h"
 #include "cellable.h"
+#include "storage_api.h"
 struct ContractContext;
 struct CallStack;
 struct ContractHost;
@@ -29,5 +30,23 @@ struct CallContext {
     FeesSnapshot *fees = nullptr;
     std::set<REF_getter<data_base>> * deleted_granules = nullptr;
     Cellable* root = nullptr;
+    // REF_getter<JSI_Granule> jsi_granule_root; 
+    std::map<std::string, REF_getter<JSI_Granule>> JSI_Granule_children;
+    void flush(const REF_getter<JSI_Granule>& g)
+    {
+        for(auto& z: JSI_Granule_children)
+        {
+            z.second->flush(roll);
+        }
+        auto max_time=0;
+        for(auto& z: JSI_Granule_children)
+        {
+            if(z.second->__update_time> max_time)
+            {
+                max_time=z.second->__update_time;
+            }
+        }
+        /////////// TODO - update contract actvty
+    }
 };
 

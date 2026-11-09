@@ -1,6 +1,5 @@
 #pragma once
 #include "blake2bHasher.h"
-// #include "bigint.h"
 #include "NODE_id.h"
 struct NodeElement {
     NODE_id name;

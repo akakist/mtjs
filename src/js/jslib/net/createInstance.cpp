@@ -1,3 +1,4 @@
+#define OPENSSL_SUPPRESS_DEPRECATED
 #include <quickjs.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -832,7 +833,59 @@ JSValue js_scan_expired(JSContext *ctx, JSValueConst, int argc, JSValueConst *ar
     pd.reject = g_reject;
     return g_prom.release();
 }
+// jsi/api/contract_api.cpp
 
+// createInstance.cpp
+#include <sodium.h>
+#include <openssl/ec.h>
+#include <openssl/obj_mac.h>
+#include <openssl/bn.h>
+
+JSValue js_generate_keypair(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    int64_t type = 0;
+    if (argc >= 1 && !JS_IsUndefined(argv[0])) {
+        if (JS_ToInt64(ctx, &type, argv[0]) != 0) return JS_ThrowTypeError(ctx, "type must be int");
+    }
+    std::string sk_hex, pk_hex;
+    if (type == 0) {
+        // ed25519
+        unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+        unsigned char sk[crypto_sign_SECRETKEYBYTES];
+        if (crypto_sign_keypair(pk, sk) != 0) return JS_ThrowInternalError(ctx, "ed25519 keypair failed");
+        sk_hex = base16::encode(std::string((char*)sk, sizeof(sk)));
+        pk_hex = base16::encode(std::string((char*)pk, sizeof(pk)));
+    } else if (type == 1 || type == 2) {
+        // secp256k1 / p256
+        int nid = (type == 1) ? NID_secp256k1 : NID_X9_62_prime256v1;
+        EC_KEY* ec = EC_KEY_new_by_curve_name(nid);
+        if (!ec) return JS_ThrowInternalError(ctx, "EC_KEY_new failed");
+        if (!EC_KEY_generate_key(ec)) { EC_KEY_free(ec); return JS_ThrowInternalError(ctx, "EC_KEY_generate_key failed"); }
+
+        const BIGNUM* priv = EC_KEY_get0_private_key(ec);
+        std::string sk_bin(32, '\0');
+        BN_bn2binpad(priv, (unsigned char*)&sk_bin[0], 32);
+        sk_hex = base16::encode(sk_bin);
+
+        const EC_GROUP* group = EC_KEY_get0_group(ec);
+        const EC_POINT* pub = EC_KEY_get0_public_key(ec);
+        size_t pklen = EC_POINT_point2oct(group, pub, POINT_CONVERSION_COMPRESSED, nullptr, 0, nullptr);
+        std::string pk_bin(pklen, '\0');
+        EC_POINT_point2oct(group, pub, POINT_CONVERSION_COMPRESSED, (unsigned char*)&pk_bin[0], pklen, nullptr);
+        pk_hex = base16::encode(pk_bin);
+        EC_KEY_free(ec);
+    } else {
+        return JS_ThrowTypeError(ctx, "unknown key type (0=ed25519, 1=secp256k1, 2=p256)");
+    }
+
+    JSValue obj = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, obj, "type", JS_NewInt64(ctx, type));
+    JS_SetPropertyStr(ctx, obj, "sk",   JS_NewString(ctx, sk_hex.c_str()));
+    JS_SetPropertyStr(ctx, obj, "pk",   JS_NewString(ctx, pk_hex.c_str()));
+    return obj;
+}
+
+// register:
+// в register_api:
 void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
 {
     MUTEX_INSPECTOR;
@@ -860,4 +913,6 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     JS_SetPropertyStr(ctx, mtjs_obj, "blake2b_hex", JS_NewCFunction(ctx, js_blake2b_hex, "blake2b_hex", 1));
     JS_SetPropertyStr(ctx, mtjs_obj, "sign_ed",     JS_NewCFunction(ctx, js_sign_ed,     "sign_ed",     2));
     JS_SetPropertyStr(ctx, mtjs_obj, "scan_expired", JS_NewCFunction(ctx, js_scan_expired, "scan_expired", 3));
+    JS_SetPropertyStr(ctx, mtjs_obj, "generate_keypair", JS_NewCFunction(ctx, js_generate_keypair, "generate_keypair", 1));
+
 }

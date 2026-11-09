@@ -1,7 +1,6 @@
 #pragma once
 #include "md_Base.h"
 
-// #include "md_BlockInfo.h"
 #include "md_BlockAcceptedREQ.h"
 #include "blst_cp.h"
 #include "md_attachment_data.h"

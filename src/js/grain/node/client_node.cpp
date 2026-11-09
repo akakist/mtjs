@@ -293,7 +293,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     }
     auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
     auto ttl_cache=v->getValue("ttl_cache");
-    // if(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->new_epoch % ttl_cache == 0)
     {
         for(auto& z: contractHost->contract_cache)
         {

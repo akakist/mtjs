@@ -113,9 +113,9 @@ async function main() {
     // t2: повторный create_address → err already exists
     {
         console.log("\n[t2] create_address(bob) again → err already exists");
-        const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
+        const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
             { contract: "root", method: "create_address",
-              params: { addr: bobAddr, keys: [{ type: 0, keybuffer: bobPk }] } },
+            params: { addr: bobAddr, keys: [{ type: 0, keybuffer: bobPk }], ttl: 86400 } },
         ]);
         check(block.status(rsp.tx_hash) === "err", "status err");
         const es = block.errstr(rsp.tx_hash) || "";

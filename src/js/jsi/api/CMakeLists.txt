@@ -5,6 +5,8 @@ convert.cpp
 contract_call.cpp
 contract_api.cpp
 contract_host.cpp
+storage_api.cpp
+storage_api.h
 )
 
 

@@ -55,7 +55,6 @@ namespace MsgData
             XTRY;
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            // b>>hb;
             b>>blockAccepted2REQ;
             b>>tx_hashes;
             b>>diffs;

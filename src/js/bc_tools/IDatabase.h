@@ -6,7 +6,7 @@
 #include "THASH_id.h"
 #include "bc_contract.h"
 #include "bc_address_state.h"
-#include "bc_contract_data.h"
+#include "bc_granule.h"
 #include "bc_node.h"
 #include "bc_nodelist.h"
 #include "bc_values.h"
@@ -38,16 +38,7 @@ struct IDatabase: public Refcountable
         M_LOCK(mx);
         sync_out[k.size()].insert(k);
     }
-    // void remove_sync_out(const std::string &k)
-    // {
-    //     M_LOCK(mx);
-    //     auto &s=sync_out[k.size()];
-    //     s.erase(k);
-    //     if(s.empty())
-    //         sync_out.erase(k.size());
-    //     if(sync_out.empty())
-    //         sync_empty=true;
-    // }
+    
     std::function<void()> on_sync_finished;   // вызывается при переходе sync_empty false→true
 
     void remove_sync_out(const std::string &k)
@@ -78,7 +69,6 @@ struct IDatabase: public Refcountable
                 for(auto& x: z.second)
                 {
                     pathes.push_back(x);
-                    // z.second.erase(x);
                     if(pathes.size()>1000)
                         break;
                 }

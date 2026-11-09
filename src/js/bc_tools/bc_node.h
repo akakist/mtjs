@@ -8,7 +8,7 @@ struct bc_node: public data_base
 {
 
 
-    bc_node(Cellable *p):data_base(hsh::bc_node,p,0,-1) {
+    bc_node(Cellable *p):data_base(hsh::bc_node,p,0,0) {
     }
 private:
     NODE_id name_;

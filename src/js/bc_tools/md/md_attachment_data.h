@@ -1,7 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_TX.h"
-// #include "bigint.h"
+
 #include "ADDRESS_id.h"
 #include "NODE_id.h"
 struct EmitNode {
