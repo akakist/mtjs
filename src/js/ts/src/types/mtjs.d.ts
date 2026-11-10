@@ -1,6 +1,11 @@
 import { StreamModule } from "./stream";
 
 declare global {
+interface KeyPair {
+    type: number;   // 0 = ed25519, 1 = secp256k1, 2 = p256, 3 = bls12-381
+    sk: string;     // hex (ed25519: 64, ecdsa: 32, bls: 32)
+    pk: string;     // hex (ed25519: 32, ecdsa: 33 compressed, bls: 48 compressed)
+}
 
     interface ScanResult { dbids: string[]; next_from: string; done: boolean; scanned: number; }
     interface Granule {
@@ -127,6 +132,7 @@ declare global {
             callback: (params: object) => void
         ): Promise<AddTxRsp>;
 
+        generate_keypair(type?: number): KeyPair;
         tx_subscribe(nodeaddr: string, callback: (block: Block) => void): void;
         tx_wait_block(nodeaddr: string, tx_hash_hex: string, timeout: number): Promise<Block>;
         get_block(nodeaddr: string, timeout: number): Promise<Block>;

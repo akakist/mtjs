@@ -219,7 +219,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 
     auto &bt = l_blocks[prev_root_hash_Z()];
     auto h=r->blockInfo->getHash();
-    logNode("blockInfo->getHash() %s from node %s",h.str().c_str(),src_node.container.c_str());
+    // logNode("blockInfo->getHash() %s from node %s",h.str().c_str(),src_node.container.c_str());
     bt.ValidateBlockRSP_m[h].push_back(r);
     auto mf=getMetaFull(r->blockInfo->heart_beat->block_timestamp);
     if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))

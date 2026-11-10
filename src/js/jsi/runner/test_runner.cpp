@@ -31,9 +31,7 @@
 #include "ContractContext.h"
 #include "contract_constants.h"
 #include "Granule.h"
-#include "EventSink.h"
 #include "jsiEvent.h"
-#include "Clock.h"
 #include "ContractSourceIO.h"
 #include "TestGranuleIO.h"
 #include "ContractHost.h"
@@ -297,7 +295,7 @@ static bool json_subset(const json& expected, const json& actual) {
     return expected == actual;
 }
 static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& tc,
-                             const REF_getter<ContractHost>& host)
+                             ContractHost* host)
 {
     auto* test_io = static_cast<TestGranuleIO*>(host->granules.get());
 
@@ -324,7 +322,7 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             std::set<REF_getter<data_base>> deleted_granules;
 
             CallContext call_ctx;
-            call_ctx.contract = cc;
+            call_ctx.contract = cc.get();
             call_ctx.in_view = is_view;
             call_ctx.depth = 0;
             call_ctx.call_stack = new CallStack;
@@ -340,10 +338,10 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             CONTRACT_id caller;
             JSIValue result;
             if (is_view) {
-                result = cc->call_contract_view(cmd.method, cmd.params,
+                result = cc->call_contract_view(NULL,cmd.method, cmd.params,
                                                 call_ctx.call_stack, host, 5);
             } else {
-                result = cc->call_contract_method(cmd.method, cmd.params, &msg_src,
+                result = cc->call_contract_method(NULL, cmd.method, cmd.params, &msg_src,
                                                   call_ctx.call_stack, host, NULL,
                                                   caller, &fees, &deleted_granules);
             }
@@ -550,7 +548,7 @@ int main() {
         REF_getter<ContractHost> host = make_test();
         apply_initial(tc, host);
 
-        if (!run_transactions(rt, ctx, tc, host)) { failures++; continue; }
+        if (!run_transactions(rt, ctx, tc, host.get())) { failures++; continue; }
         if (!compare_emits(tc.actual_emits, tc.expected_emits)) { failures++; continue; }
         if (!compare_expected(ctx, tc, host)) { failures++; continue; }
 

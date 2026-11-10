@@ -134,7 +134,7 @@ namespace Node
 
         bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight, const REF_getter<BlockMetaFull>& meta);
 
-        void fix_missed_rounds(const std::set<NODE_id>& node_validators);
+        void fix_missed_rounds(const std::set<NODE_id>& node_validators, time_t block_timestamp);
 
 
 
@@ -227,7 +227,7 @@ namespace Node
         void do_start_block();
 
 
-        void collectTransactions();
+        std::vector<REF_getter<MsgData::TX>>  collectTransactions();
         THASH_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc);
 
         void do_sync(const NODE_id &src_node, const THASH_id& prev_root_hash_remote);

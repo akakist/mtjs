@@ -32,9 +32,11 @@ bool Node::Service::HeartBeatRSP(const MsgData::HeartBeatRSP *m, const NODE_id &
         if (cli.node_leader.valid() &&
             cli.node_leader->getHash().container != m->payload_heart_beat->getHash().container)
         {
+#ifdef DEBUG            
             logNode("HB RSP for stale leader %s (current %s), ignore",
                     m->payload_heart_beat->node_leader.container.c_str(),
                     cli.node_leader->node_leader.container.c_str());
+#endif                    
             return true;
         }
     }

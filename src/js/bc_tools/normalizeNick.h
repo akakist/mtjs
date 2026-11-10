@@ -23,8 +23,8 @@ inline std::string normalizeNick(const std::string& input)
                 case '2': u = 'Z'; break;
                 case '5': u = 'S'; break;
                 case '8': u = 'B'; break;
-                case '6': u = 'G'; break;
-                case '9': u = 'G'; break;
+                // case '6': u = 'G'; break;
+                // case '9': u = 'G'; break;
                 default: break;
             }
             out.push_back(u);

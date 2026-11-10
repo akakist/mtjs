@@ -844,37 +844,73 @@ JSValue js_scan_expired(JSContext *ctx, JSValueConst, int argc, JSValueConst *ar
 JSValue js_generate_keypair(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     int64_t type = 0;
     if (argc >= 1 && !JS_IsUndefined(argv[0])) {
-        if (JS_ToInt64(ctx, &type, argv[0]) != 0) return JS_ThrowTypeError(ctx, "type must be int");
+        if (JS_ToInt64(ctx, &type, argv[0]) != 0) {
+            return JS_ThrowTypeError(ctx, "generate_keypair: type must be int");
+        }
     }
+    if (type < 0 || type > 3) {
+        return JS_ThrowTypeError(ctx,
+            "generate_keypair: unknown type %lld (0=ed25519, 1=secp256k1, 2=p256, 3=bls12-381)",
+            (long long)type);
+    }
+
     std::string sk_hex, pk_hex;
+
     if (type == 0) {
-        // ed25519
-        unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-        unsigned char sk[crypto_sign_SECRETKEYBYTES];
-        if (crypto_sign_keypair(pk, sk) != 0) return JS_ThrowInternalError(ctx, "ed25519 keypair failed");
+        // ed25519 (libsodium)
+        unsigned char pk[crypto_sign_PUBLICKEYBYTES];   // 32
+        unsigned char sk[crypto_sign_SECRETKEYBYTES];   // 64
+        if (crypto_sign_keypair(pk, sk) != 0) {
+            return JS_ThrowInternalError(ctx, "generate_keypair: crypto_sign_keypair failed");
+        }
         sk_hex = base16::encode(std::string((char*)sk, sizeof(sk)));
         pk_hex = base16::encode(std::string((char*)pk, sizeof(pk)));
     } else if (type == 1 || type == 2) {
-        // secp256k1 / p256
+        // secp256k1 / p256 (OpenSSL)
         int nid = (type == 1) ? NID_secp256k1 : NID_X9_62_prime256v1;
         EC_KEY* ec = EC_KEY_new_by_curve_name(nid);
-        if (!ec) return JS_ThrowInternalError(ctx, "EC_KEY_new failed");
-        if (!EC_KEY_generate_key(ec)) { EC_KEY_free(ec); return JS_ThrowInternalError(ctx, "EC_KEY_generate_key failed"); }
+        if (!ec) {
+            return JS_ThrowInternalError(ctx, "generate_keypair: EC_KEY_new_by_curve_name failed");
+        }
+        if (!EC_KEY_generate_key(ec)) {
+            EC_KEY_free(ec);
+            return JS_ThrowInternalError(ctx, "generate_keypair: EC_KEY_generate_key failed");
+        }
 
+        // sk: 32 байта (BN, big-endian, pad до 32)
         const BIGNUM* priv = EC_KEY_get0_private_key(ec);
         std::string sk_bin(32, '\0');
         BN_bn2binpad(priv, (unsigned char*)&sk_bin[0], 32);
         sk_hex = base16::encode(sk_bin);
 
+        // pk: compressed (33 байта)
         const EC_GROUP* group = EC_KEY_get0_group(ec);
         const EC_POINT* pub = EC_KEY_get0_public_key(ec);
         size_t pklen = EC_POINT_point2oct(group, pub, POINT_CONVERSION_COMPRESSED, nullptr, 0, nullptr);
         std::string pk_bin(pklen, '\0');
         EC_POINT_point2oct(group, pub, POINT_CONVERSION_COMPRESSED, (unsigned char*)&pk_bin[0], pklen, nullptr);
         pk_hex = base16::encode(pk_bin);
+
         EC_KEY_free(ec);
+    } else if (type == 3) {
+        // BLS12-381 (blst) — sk 32 байта, pk 48 байт compressed G1
+        unsigned char ikm[32];
+        randombytes_buf(ikm, sizeof(ikm));
+
+        blst_scalar sk;
+        blst_keygen(&sk, ikm, sizeof(ikm), nullptr, 0);
+
+        blst_p1 pk;
+        blst_sk_to_pk_in_g1(&pk, &sk);
+
+        sk_hex = base16::encode(std::string((char*)sk.b, 32));
+
+        std::string pk_bin(48, '\0');
+        blst_p1_compress((unsigned char*)&pk_bin[0], &pk);
+        pk_hex = base16::encode(pk_bin);
     } else {
-        return JS_ThrowTypeError(ctx, "unknown key type (0=ed25519, 1=secp256k1, 2=p256)");
+        // unreachable (защита)
+        return JS_ThrowInternalError(ctx, "generate_keypair: unreachable type=%lld", (long long)type);
     }
 
     JSValue obj = JS_NewObject(ctx);
@@ -883,7 +919,6 @@ JSValue js_generate_keypair(JSContext* ctx, JSValueConst, int argc, JSValueConst
     JS_SetPropertyStr(ctx, obj, "pk",   JS_NewString(ctx, pk_hex.c_str()));
     return obj;
 }
-
 // register:
 // в register_api:
 void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)

@@ -36,8 +36,8 @@ struct CDatabaseRocksdb: public IDatabase
         options.max_total_wal_size = 32 * 1024 * 1024; // 32 MB (вместо 128 MB)
 
         // 4. Compaction — агрессивнее сбрасываем на диск
-        options.level0_file_num_compaction_trigger = 2; // Начинаем compaction раньше
-        options.target_file_size_base = 32 * 1024 * 1024; // 32 MB файлы (вместо 64 MB)
+        options.level0_file_num_compaction_trigger = 8; // Начинаем compaction раньше
+        options.target_file_size_base = 64 * 1024 * 1024; // 32 MB файлы (вместо 64 MB)
 
         // 5. Дополнительные оптимизации для экономии памяти
         options.optimize_filters_for_hits = true; // Меньше памяти на фильтры
@@ -65,7 +65,9 @@ struct CDatabaseRocksdb: public IDatabase
 
     int write_granules_batch(const _db_to_save &v)
     {
+
         rocksdb::WriteBatch batch;
+#ifdef KALL
         {
                 //DEBUG KALL
                 for (const auto& [key, data] : v.cells) {
@@ -82,6 +84,7 @@ struct CDatabaseRocksdb: public IDatabase
                 }
 
         }
+#endif
 
         for (const auto& key : v.deleted) batch.Delete(key);
         for (const auto& [key, data] : v.cells) {

@@ -16,7 +16,7 @@ REF_getter<ContractContext> ContractHost::load_contract(Cellable* root, const CO
 
     REF_getter<ContractContext> cc = new ContractContext();
     cc->name = name;
-    cc->root = root;
+    // cc->root = root;
 
     if (!cc->create__()) {
         std::cerr << "cannot create context for " << name.container << std::endl;

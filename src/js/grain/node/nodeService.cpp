@@ -308,33 +308,35 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     return true;
 }
 
-void Node::Service::collectTransactions()
+std::vector<REF_getter<MsgData::TX>> Node::Service::collectTransactions()
 {
     MUTEX_INSPECTOR;
-    std::map<std::string /*user addr*/,
-        std::map<int64_t /*nonce*/, std::vector<REF_getter<MsgData::TX> > > > ordered;
-    for (auto &z : transaction_pool_of_leader)
-    {
+    std::map<std::string, std::map<int64_t, std::vector<REF_getter<MsgData::TX>>>> ordered;
+    for (auto &z : transaction_pool_of_leader) {
         std::string &pk = z.second->pk_ed_bin;
-        int64_t nonce;
-        auto err=z.second->getNonce(nonce);
-        if(err)
-            throw CommonError(err->c_str());
+        int64_t nonce = 0;
+        auto err = z.second->getNonce(nonce);
+        if (err) {
+            logNode("collectTransactions: skip tx %s (getNonce: %s)",
+                    base16::encode(z.first.container).c_str(), err->c_str());
+            continue;
+        }
         ordered[pk][nonce].push_back(z.second);
     }
     transaction_pool_of_leader.clear();
-    for (auto &x : ordered)
-    {
-        for (auto &y : x.second)
-        {
-            for (auto &z : y.second)
-            {
+    std::vector<REF_getter<MsgData::TX>> out;
+    for (auto &x : ordered) {
+        for (auto &y : x.second) {
+            for (auto &z : y.second) {
+                out.push_back(z);
                 transaction_pool_of_leader.insert_or_assign(z->getHash(), z);
             }
         }
     }
+    logNode("collectTransactions: collected %zu (from %zu)",
+            out.size(), transaction_pool_of_leader.size());
+    return out;
 }
-
 
 void Node::Service::do_start_block()
 {
@@ -351,7 +353,6 @@ void Node::Service::do_start_block()
 
     const auto prev = prev_root_hash_Z();
 
-    // 1) я не лидер — не стартую блок
     {
         auto &cli = cli_leader_info[prev];
         if (cli.node_leader.valid() && cli.node_leader->node_leader != this_node_name) {
@@ -360,38 +361,36 @@ void Node::Service::do_start_block()
         }
     }
 
-    // 2) лидер-сертификат должен быть валиден
     auto &li = l_blocks[prev];
     if (!li.leader_cert_2.valid()) {
         logNode("do_start_block: leader_cert_2 invalid");
         return;
     }
 
-    
     auto mf = getMetaFull(li.leader_cert_2->block_timestamp);
     if (!mf.valid()) {
         logNode("do_start_block: meta invalid");
         return;
     }
 
-    // 4) собираем ValidateBlockREQ
     REF_getter<MsgData::ValidateBlockREQ> vb = new MsgData::ValidateBlockREQ();
     vb->heart_beat = li.leader_cert_2;
     vb->lc = makeLeaderCert(li.leader_cert_2.get(), mf.get());
 
     auto &bt = l_blocks[prev];
-    collectTransactions();
 
-    for (auto &z : transaction_pool_of_leader)
-        vb->transaction_bodies.push_back(z.second);
-
-    logNode("do_start_block: broadcast ValidateBlockREQ tx_count=%d leader=%s",
-            (int)vb->transaction_bodies.size(),
-            li.leader_cert_2->node_leader.container.c_str());
+    // ▼▼▼ collectTransactions возвращает отсортированный vector
+    auto txs = collectTransactions();
+    for (auto &tx : txs) {
+        vb->transaction_bodies.push_back(tx);
+    }
+    logNode("do_start_block: broadcast ValidateBlockREQ tx_count=%zu (sorted)",
+            vb->transaction_bodies.size());
+    // ▲▲▲
 
     broadcast_MsgEvent_via_broadcaster(vb.get(), mf->tree_committe);
-    
 }
+
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
@@ -751,6 +750,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         }
         st->setDirty(NULL);
     }
+    DBG(logNode("execute_block: tx_count=%zu", (size_t)b.validateBlockREQ->transaction_bodies.size()));
     // ▲▲▲    
     for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
     {
@@ -1128,13 +1128,13 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                     catch (const std::exception& e) { return std::string("params parse error: ") + e.what(); }
                 } else params_json = nlohmann::json::object();
 
-                REF_getter<CallStack> call_stack = new CallStack;
+                CallStack call_stack;
 
                 // внешний CallContext — чтобы call_contract_method докладывал emits в него (parent->emits)
                 CallContext ext_ctx;
-                ext_ctx.contract = cc;
-                ext_ctx.host = contractHost;
-                ext_ctx.call_stack = call_stack;
+                ext_ctx.contract = cc.get();
+                ext_ctx.host = contractHost.get();
+                ext_ctx.call_stack = &call_stack;
                 ext_ctx.value_ptr = &t.value;   // текущий value (нода)
                 ext_ctx.deleted_granules=deleted_granules;
                 void* prev_ctx = JSI_GetContextOpaque(cc->ctx);
@@ -1142,8 +1142,8 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 
                 NodeMsgSource src(&t);
                 CONTRACT_id caller;
-                JSIValue result = cc->call_contract_method(method_str, params_json, &src, 
-                                                           call_stack, contractHost, t.roll, caller, & b.fees, deleted_granules);
+                JSIValue result = cc->call_contract_method(root.get(), method_str, params_json, &src, 
+                                                           &call_stack, contractHost.get(), t.roll, caller, & b.fees, deleted_granules);
 
                 JSI_SetContextOpaque(cc->ctx, prev_ctx);
 
@@ -1161,7 +1161,9 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 // logNode("execute_tx_commands: contract=%s method=%s index=%d ext_ctx.emits.size=%d",
                     // contract_str.c_str(), method_str.c_str(), (int)index, (int)ext_ctx.emits.size());
                 for (auto& ev : ext_ctx.emits)
-                    logNode("  emit: %s = %s", ev.name.c_str(), ev.value.c_str());
+                {
+                    DBG(logNode("  emit: %s = %s", ev.name.c_str(), ev.value.c_str()));
+                }
 
                 JSI_FreeValue(cc->ctx, result);
 
@@ -1318,7 +1320,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
             return e;
         int64_t bal1 = 0;
         {  bal1 = uu->balance; }
-        // #ifdef KALLLOG
+        #ifdef DEBUG
         logNode("[t] tx=%s value=%lld gasLimitTokens=%lld priority=%lld gasLimit_gas=%lld gpt=%lld "
                 "gasUsed=%lld rollback=%d total=%lld spentTokens=%lld value_spent=0 bal %lld->%lld status=err msg=\"%s\"",
                 base16::encode(tx_id.container).c_str(),
@@ -1328,7 +1330,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
                 (long long)t.gasUsed, (int)t.roll->size(), (long long)t.gasUsed,
                 (long long)spent,
                 (long long)bal0, (long long)bal1, msg.c_str());
-        // #endif
+        #endif
         return msg;
     };
     // std::set<REF_getter<data_base>> deteled_granules;
@@ -1366,7 +1368,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
 
     root->calc_tree_hash(db_dump);
     db_to_save_Z.add(db_dump);
-// #ifdef KALLLOG
+#ifdef DEBUG
     logNode("[t] tx=%s value=%lld gasLimitTokens=%lld priority=%lld gasLimit_gas=%lld gpt=%lld "
             "gasUsed=%lld db_dump=%d total=%lld spentTokens=%lld value_spent=%lld bal %lld->%lld status=ok",
             base16::encode(tx_id.container).c_str(),
@@ -1376,7 +1378,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
             (long long)(t.gasUsed - db_dump.size()), (int)db_dump.size(), (long long)t.gasUsed,
             (long long)spent, (long long)(value - t.value),
             (long long)bal0, (long long)bal1);
-// #endif
+#endif
     return std::nullopt;
 }
 

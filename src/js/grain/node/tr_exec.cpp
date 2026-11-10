@@ -400,23 +400,43 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
         n->src = src;
         n->owners.clear();
         n->owners.insert(t.senderAddress);   // создатель — owner
-
-       
     }
     t.markDirty(n.get());
 
-    // activity: update_time = now (момент активности)
-    
-    
-    auto ab=cells::getContractBalanceOrCreate(root.get(),db_state.get(),cn, t.roll);
-    if(!ab.valid())
+    auto ab = cells::getContractBalanceOrCreate(root.get(), db_state.get(), cn, t.roll);
+    if (!ab.valid())
         throw CommonError("if(!ab.valid())");
-
     ab->setDirty(t.roll);
 
-    cells::getActivityOrCreate(root.get(),db_state.get(),n->getDbId(),{ab->getDbId()},ttl,t.block_timestamp,t.roll)->update_time(t.block_timestamp,t.roll);
-    
+    // ▼▼▼ корневая гранула контракта (dataId="")
+    CONTRACT_DATA_id rootKey;
+    rootKey.container = "";
+    auto rootGranule = cells::getContractDataOrCreate(root.get(), db_state.get(), cn, rootKey,
+                                                      t.roll, ttl, t.block_timestamp);
+    if (!rootGranule.valid())
+        return "contract_deploy: root granule create failed";
+    rootGranule->container = "";   // пустой value
+    t.markDirty(rootGranule.get());
 
+    // activity для корневой гранулы (delete_list = root_granule)
+    auto rootAct = cells::getActivityOrCreate(root.get(), db_state.get(), rootGranule->getDbId(),
+                                              {}, ttl, t.block_timestamp, t.roll);
+    if (rootAct.valid()) {
+        rootAct->dbid = { base16::encode(rootGranule->getDbId()) };
+        rootAct->update_time(t.block_timestamp, t.roll);
+    }
+    // ▲▲▲
+
+    // activity контракта (delete_list = contract + balance + root_granule)
+    auto act = cells::getActivityOrCreate(root.get(), db_state.get(), n->getDbId(), {}, ttl, t.block_timestamp, t.roll);
+    if (act.valid()) {
+        act->dbid = {
+            base16::encode(n->getDbId()),           // contract
+            base16::encode(ab->getDbId()),          // balance
+            base16::encode(rootGranule->getDbId()), // root granule
+        };
+        act->update_time(t.block_timestamp, t.roll);
+    }
 
     // газ: gas_contract_deploy + ceil(ttl/ttl_seconds_per_gas)
     int64_t ttl_gas = b.fees.gas_contract_deploy
@@ -433,8 +453,7 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
 
     us->contracts.insert(cn);
     t.markDirty(us.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(t.block_timestamp, t.roll);
-
+    cells::getActivityNoCreate(root.get(), db_state.get(), us->getDbId())->update_time(t.block_timestamp, t.roll);
 
     b.emit_command(t.tx_id, seqId, "contract_deploy",
         R"({"name":"%s","owner":"%s","ttl":"%lld"})",
@@ -595,7 +614,6 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
 std::optional<std::string> Node::Service::execute_gc(
     yyjson_val* params, b_params& b, t_params& t, int seqId, _db_to_save& dbd)
 {
-
     logNode("execute_gc: START items=%d", (int)yyjson_arr_size(yyjson_obj_get(params, "items")));
     auto v = cells::getValuesNoCreateConst(root.get(), db_state.get());
     if (!v.valid()) return "values not found";
@@ -605,7 +623,10 @@ std::optional<std::string> Node::Service::execute_gc(
     yyjson_val* arr = yyjson_obj_get(params, "items");
     if (!arr || !yyjson_is_arr(arr)) return "param 'items' must be array";
 
-    int64_t now = t.block_timestamp;
+    // ← P0: now = max(block_timestamp, time(NULL))
+    // (scan_expired использует time(NULL); gc не должен отставать из-за block_timestamp prev_block)
+    int64_t now = std::max((int64_t)t.block_timestamp, (int64_t)time(NULL));
+
     int applied = 0, skipped = 0;
     int applied_granule = 0, applied_contract = 0, applied_node = 0, applied_address = 0;
 
@@ -620,11 +641,13 @@ std::optional<std::string> Node::Service::execute_gc(
         auto cc = cells::getByDbIdNoCreate(root.get(), db_state.get(), h);
         if (!cc.valid() || !cc->data.valid()) { skipped++; continue; }
 
+        logNode("execute_gc: dbid=%s payload_ctor_idx=%d", hex.c_str(), (int)cc->payload_ctor_idx);
+
         std::optional<std::string> err;
         switch (cc->payload_ctor_idx) {
         case hsh::bc_activity:
             err = gc_activity_apply(cc, now, t, b, dbd, applied_granule, applied_contract, applied_node, applied_address);
-            if (!err) applied_contract++;
+            // ← P0-3: applied_contract++ убран (gc_activity_apply уже считает по payload_ctor_idx)
             break;
         default:
             err = "not_gc_type";
@@ -643,7 +666,6 @@ std::optional<std::string> Node::Service::execute_gc(
     logNode("execute_gc: applied=%d skipped=%d granule=%d", applied, skipped, applied_granule);
     return std::nullopt;
 }
-
 std::optional<std::string> Node::Service::execute_add_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId)
 {
     std::string addr_hex; int64_t type = 0; std::string kb_hex, sig_hex;
@@ -761,8 +783,8 @@ std::optional<std::string> Node::Service::execute_create_address(yyjson_val* par
 // std::optional<std::string> Node::Service::gc_activity_apply(
 //     const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd)
 std::optional<std::string> Node::Service::gc_activity_apply(
-    const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd,
-    int& applied_granule, int& applied_contract, int& applied_node, int& applied_address)
+        const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd,
+        int& applied_granule, int& applied_contract, int& applied_node, int& applied_address)
 {
     if (!cc->data.valid()) return "no data";
     auto* act = dynamic_cast<bc_activity*>(cc->data.get());
@@ -770,28 +792,125 @@ std::optional<std::string> Node::Service::gc_activity_apply(
     if (act->ttl <= 0) return "ttl <= 0";
     if (act->_update_time + act->ttl >= now) return "not expired";
 
-    // 1) удалить гранулу
-    THASH_id granule_dbid;
-    for(auto &granule_dbid : act->dbid)
-    {
-        THASH_id dbid;
-        dbid.container=granule_dbid;
-        auto g = cells::getByDbIdNoCreate(root.get(), db_state.get(), dbid);
-        if (g.valid() && g->data.valid()) {
-            switch (g->payload_ctor_idx) {
-            case hsh::bc_granule:     applied_granule++;  break;
-            case hsh::bc_contract:    applied_contract++; break;
-            case hsh::bc_node:        applied_node++;     break;
-            case hsh::bc_address_state: applied_address++; break;
-            default: break;
+    for (auto& dbid_hex : act->dbid) {
+        THASH_id h; h.container = dbid_hex;
+        auto g = cells::getByDbIdNoCreate(root.get(), db_state.get(), h);
+        if (!g.valid() || !g->data.valid()) {
+            logNode("gc: dbid %s not found (skip)", dbid_hex.c_str());
+            continue;
+        }
+
+        switch (g->payload_ctor_idx) {
+        case hsh::bc_granule:
+            applied_granule++;
+            deleteGranule(g->data.get(), t.roll, dbd);
+            break;
+
+        case hsh::bc_node: {
+            applied_node++;
+            auto* n = dynamic_cast<bc_node*>(g->data.get());
+            if (!n) break;
+               if (n->isEnabled()) {
+                    logNode("gc: node %s enabled (skip)", n->getName().container.c_str());
+                    break;
+                }
+            auto name = n->getName();
+
+            // 1. Вернуть stakes стейкерам
+            auto st = cells::getStateNoCreate(root.get(), db_state.get());
+            if (!st.valid()) break;
+            for (auto& [user_addr, stake] : n->getStakes()) {
+                auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), user_addr);
+                if (u.valid()) {
+                    u->balance += stake;
+                    u->staked_in.erase(name);
+                    t.markDirty(u.get());
+                    cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId())
+                        ->update_time(t.block_timestamp, t.roll);
+                }
+                st->total_stake -= i128(stake);
+            }
+            t.markDirty(st.get());
+
+            // 2. Удалить из bc_nodelist
+            auto nl = cells::getNodeListNoCreate(root.get(), db_state.get());
+            if (nl.valid()) {
+                nl->remove(name);
+                t.markDirty(nl.get());
+            }
+
+            // 3. Удалить bc_node
+            n->setDirty(t.roll);
+            deleteGranule(n, t.roll, dbd);
+
+            b.emit_command(t.tx_id, 0, "gc_node",
+                R"({"name":"%s","stake_returned":true})", name.container.c_str());
+            break;
+        }
+
+        case hsh::bc_address_state: {
+            auto* u = dynamic_cast<bc_address_state*>(g->data.get());
+            if (!u) break;
+            if (!u->contracts.empty()) { logNode("gc: address has contracts (skip)"); break; }
+            if (!u->staked_in.empty()) { logNode("gc: address is staker (skip)"); break; }
+
+            applied_address++;
+            int64_t burned = u->balance;
+            auto st = cells::getStateNoCreate(root.get(), db_state.get());
+            if (st.valid() && burned > 0) {
+                st->total_supply -= i128(burned);
+                t.markDirty(st.get());
+            }
+
+            deleteGranule(u, t.roll, dbd);
+            b.emit_command(t.tx_id, 0, "gc_address_deleted",
+                R"({"addr":"%s","burned":"%lld"})",
+                base16::encode(g->getDbId()).c_str(), (long long)burned);
+            break;
+        }
+
+        case hsh::bc_contract: {
+            applied_contract++;
+            auto* c = dynamic_cast<bc_contract*>(g->data.get());
+            if (!c) break;
+            auto name = c->name_;
+
+            for (auto& owner_addr : c->owners) {
+                auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), owner_addr);
+                if (u.valid()) {
+                    CONTRACT_id cn; cn.container = name;
+                    u->contracts.erase(cn);
+                    t.markDirty(u.get());
+                    cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId())
+                        ->update_time(t.block_timestamp, t.roll);
+                }
+            }
+            c->owners.clear();
+
+            deleteGranule(c, t.roll, dbd);   // ← c, не u
+            b.emit_command(t.tx_id, 0, "gc_contract_deleted",
+                R"({"name":"%s"})", name.c_str());
+            break;
+        }
+
+        case hsh::bc_contract_balance: {
+            auto* bal = dynamic_cast<bc_contract_balance*>(g->data.get());
+            if (bal) {
+                auto st = cells::getStateNoCreate(root.get(), db_state.get());
+                if (st.valid() && bal->getAmount() > 0) {
+                    st->total_supply -= i128(bal->getAmount());
+                    t.markDirty(st.get());
+                }
             }
             deleteGranule(g->data.get(), t.roll, dbd);
-        }    
+            break;
+        }
 
+        default:
+            deleteGranule(g->data.get(), t.roll, dbd);
+            break;
+        }
     }
-    // granule_dbid.container = act->dbid;
-
-    // 2) удалить activity
     deleteGranule(act, t.roll, dbd);
     return std::nullopt;
 }

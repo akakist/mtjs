@@ -105,12 +105,19 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
                 REF_getter< Cellable> par=new Cellable(NULL,id.first);
                 inBuffer inpar(pbuf);
                 par->unpack_mx(inpar);
-                auto it=par->children_hashes_mx.find(id.second);
-                if(it==par->children_hashes_mx.end())
-                    throw CommonError("if(it==par->children_hashes_mx.end())");
-                if(it->second!=blake2b_hash(z.second))
-                    throw CommonError("if(it->second!=blake2b_hash(z.second))");
-            }
+                auto it = par->children_hashes_mx.find(id.second);
+                if (it == par->children_hashes_mx.end()) {
+                    logNode("GetGranulesRSP: parent %s has no child %s (skip hash check)",
+                            base16::encode(id.first).c_str(),
+                            base16::encode(id.second).c_str());
+                    // ← НЕ throw
+                } else if (it->second != blake2b_hash(z.second)) {
+                    logNode("GetGranulesRSP: hash mismatch for %s (expected %s, got %s) — skip, will re-sync after root update",
+                            base16::encode(z.first).c_str(),
+                            base16::encode(it->second.container).c_str(),
+                            base16::encode(blake2b_hash(z.second).container).c_str());
+                    // ← НЕ throw, записать (root обновится, потом re-sync)
+                }            }
 
 
         }

@@ -319,7 +319,11 @@ bool MTJS::Service::TickAlarm(const timerEvent::TickAlarm *e)
         h = e->data.get()->container;
         auto it = opaque.node_req_promises.find(h);
         if (it == opaque.node_req_promises.end())
-            throw CommonError("if(i!=opaque.node_req_promises.end())");
+        {
+            DBG(logErr2("TickAlarm: TIMER_ClientMsg_TIMEDOUT for %s — already resolved (skip)",
+                base16::encode(h).substr(0,8).c_str()));
+            return true; 
+        }
         // it->second.ctx
 
         JSValue global_obj = JS_GetGlobalObject(js_ctx);
@@ -891,8 +895,10 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 {
     MUTEX_INSPECTOR;
     XTRY;
+#ifdef DEBUG    
     logErr2("[mtjs] ClientTxSubscribeRSP ENTER: tx_hashes=%d tx_wait_promises=%d node_tx_cb=%d",
     (int)e->tx_hashes.size(), (int)opaque.tx_wait_promises.size(), (int)opaque.node_tx_cb.size());
+#endif    
     for (auto& kv : opaque.tx_wait_promises) logErr2("  %s", kv.first.c_str());
     if (!e->att_data.valid()) {
         logErr2("ClientTxSubscribeRSP: att_data invalid");
@@ -915,8 +921,10 @@ bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 
         auto hex = base16::encode(e->tx_hashes[ti].container);
         auto &th = e->tx_hashes[ti];
-        // logErr2("[mtjs] ClientTxSubscribeRSP th=%s node_tx_cb.find=%s",
-        //         th.str().c_str(), opaque.node_tx_cb.count(th.container) ? "found" : "not found");
+#ifdef DEBUG        
+        logErr2("[mtjs] ClientTxSubscribeRSP th=%s node_tx_cb.find=%s",
+                th.str().c_str(), opaque.node_tx_cb.count(th.container) ? "found" : "not found");
+#endif
 
         // 1) tx_wait_promises (hex) — tx_wait_block
         auto it = opaque.tx_wait_promises.find(hex);

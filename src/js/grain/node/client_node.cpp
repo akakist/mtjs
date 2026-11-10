@@ -270,7 +270,13 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         sendEvent(ServiceEnum::GrainReader, new bcEvent::StaleGranules(stale, this));
 
     db_to_save_Z.clear();
-    invalidate_services();
+    // grain/node/client_node.cpp, BlockDBStore, после write_granules_batch:
+    {
+        auto root_hex = base16::encode(
+            r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->new_root_hash1.container).substr(0, 16);
+        DBG(logNode("BlockDBStore: after write, root=%s, sending InvalidateRoot", root_hex.c_str()));
+    }
+    invalidate_services();    
 
     sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
 
@@ -287,17 +293,19 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         if (it != transaction_pool_of_leader.end())
         {
             transaction_pool_of_leader.erase(it);
-            logNode("removed tx %s", base16::encode(z.container).c_str());
+            DBG(logNode("removed tx %s", base16::encode(z.container).c_str()));
         }
         XPASS;
     }
     auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
     auto ttl_cache=v->getValue("ttl_cache");
     {
+#ifdef DEBUG
         for(auto& z: contractHost->contract_cache)
         {
             dump_mem("ccc",z.second->rt);
         }
+#endif
         contractHost->contract_cache.clear();
         root=getRoot(db_state.get(),prev_block);
     }
@@ -356,7 +364,7 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
     passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
 }
-void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators)
+void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, time_t block_timestamp)
 {
     auto ls=cells::getAllNodes(root.get(), db_state.get());
     auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
@@ -388,6 +396,10 @@ void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators)
             z->answered_rounds++;
             z->setDirty(NULL);
         }
+        auto act = cells::getActivityNoCreate(root.get(), db_state.get(), z->getDbId());
+        if (act.valid()) {
+            act->update_time(block_timestamp, NULL);
+        }        
     }
 }
 
@@ -449,7 +461,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             err="leader cert verify failed";
     }
     if(!err)
-        fix_missed_rounds(r->lc->node_validators);
+        fix_missed_rounds(r->lc->node_validators, r->lc->hb->block_timestamp);
     if (!err)
     {
 

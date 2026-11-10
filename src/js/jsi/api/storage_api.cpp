@@ -58,6 +58,7 @@ static bool is_writable(JSIContext* ctx, JSIValueConst this_val) {
     return JSI_GetClassID(this_val) == JSI_granule_writable_class_id;
 }
 
+
 // ============================================================
 // new (writable flag)
 // ============================================================
@@ -76,16 +77,16 @@ static JSIValue JSI_granule_new(JSIContext* ctx, const REF_getter<JSI_Granule>& 
 static REF_getter<JSI_Granule> do_get_granule(JSIContext* ctx, JSI_Granule* parent,
                                               const std::string& name, std::string* err)
 {
-    auto* c = call_ctx(ctx);
-    if (!c) throw CommonError("if (!c)");
-    auto* io = dynamic_cast<NodeGranuleIO*>(c->host->granules.get());
+    auto* call = call_ctx(ctx);
+    if (!call) throw CommonError("if (!c)");
+    auto* io = dynamic_cast<NodeGranuleIO*>(call->host->granules.get());
     if (!io) throw CommonError("if(!io)");
 
     auto g = new JSI_Granule(name, parent);
     CONTRACT_DATA_id key;
     key.container = g->path();
 
-    g->cnode = io->getCNode(c->root, c->contract->name, key);
+    g->cnode = io->getCNode(call->root, call->contract->name, key);
     if (!g->cnode.valid()) {
         if (err) *err = "granule not found: " + key.container;
         return nullptr;
@@ -101,10 +102,10 @@ static REF_getter<JSI_Granule> do_get_or_create_granule(JSIContext* ctx, JSI_Gra
                                                         const std::string& name, int64_t ttl,
                                                         std::string* err)
 {
-    auto* c = call_ctx(ctx);
-    if (!c) throw CommonError("if (!c)");
-    if (!c->msg_source) throw CommonError("if (!c->msg_source)");
-    auto* io = dynamic_cast<NodeGranuleIO*>(c->host->granules.get());
+    auto* call = call_ctx(ctx);
+    if (!call) throw CommonError("if (!c)");
+    if (!call->msg_source) throw CommonError("if (!c->msg_source)");
+    auto* io = dynamic_cast<NodeGranuleIO*>(call->host->granules.get());
     if (!io) throw CommonError("if(!io)");
 
     auto g = new JSI_GranuleWritable(name, parent);
@@ -112,22 +113,22 @@ static REF_getter<JSI_Granule> do_get_or_create_granule(JSIContext* ctx, JSI_Gra
     key.container = g->path();
 
     // 1) get
-    auto existing = io->getCNode(c->root, c->contract->name, key);
+    auto existing = io->getCNode(call->root, call->contract->name, key);
     if (existing.valid()) {
         g->cnode = existing;
         g->__ttl = existing->ttl();
         return g;
     }
     // 2) create
-    g->cnode = io->createCNode(c->root, c->contract->name, key,
-                               (time_t)c->msg_source->get_blockTimestamp(),
-                               (int)ttl, c->roll);
+    g->cnode = io->createCNode(call->root, call->contract->name, key,
+                               (time_t)call->msg_source->get_blockTimestamp(),
+                               (int)ttl, call->roll);
     if (!g->cnode.valid()) {
         if (err) *err = "create granule failed: " + key.container;
         return nullptr;
     }
     g->__ttl = ttl;
-    g->do_update_time(c->msg_source->get_blockTimestamp());
+    g->do_update_time(call->msg_source->get_blockTimestamp());
     g->setDirtyD();
     return g;
 }
@@ -181,17 +182,17 @@ static JSIValue jsg_exists(JSIContext* ctx, JSIValueConst this_val, int argc, JS
 // ============================================================
 // jsg_get
 // ============================================================
-static JSIValue jsg_get(JSIContext* ctx, JSIValueConst this_val, int argc, JSIValueConst*) {
-    if (argc != 0) return JSI_ThrowTypeError(ctx, "get()");
-    auto* c = require_readonly_ctx(ctx);
-    if (!c) return JSI_EXCEPTION;
-    auto self = JSI_granule_get(ctx, this_val);
-    if (!self.valid()) return JSI_ThrowTypeError(ctx, "invalid this");
-    if (!self->cnode.valid()) return JSI_NULL;
-    auto s = self->cnode->get();
-    try { json j = json::parse(s); return json_to_jsi(ctx, j); }
-    catch (...) { return JSI_NULL; }
-}
+// static JSIValue jsg_get(JSIContext* ctx, JSIValueConst this_val, int argc, JSIValueConst*) {
+//     if (argc != 0) return JSI_ThrowTypeError(ctx, "get()");
+//     auto* c = require_readonly_ctx(ctx);
+//     if (!c) return JSI_EXCEPTION;
+//     auto self = JSI_granule_get(ctx, this_val);
+//     if (!self.valid()) return JSI_ThrowTypeError(ctx, "invalid this");
+//     if (!self->cnode.valid()) return JSI_NULL;
+//     auto s = self->cnode->get();
+//     try { json j = json::parse(s); return json_to_jsi(ctx, j); }
+//     catch (...) { return JSI_NULL; }
+// }
 
 // ============================================================
 // jsg_set (только writable)
@@ -270,34 +271,115 @@ static JSIValue JSI_global_exists_granule(JSIContext* ctx, JSIValueConst, int ar
     JSIScope<10,10> scope(ctx);
     if (argc != 1 || !JSI_IsString(argv[0]))
         return JSI_ThrowTypeError(ctx, "exists_granule(path)");
-    auto* c = require_readonly_ctx(ctx);
-    if (!c) return JSI_EXCEPTION;
+    auto* call = require_readonly_ctx(ctx);
+    if (!call) return JSI_EXCEPTION;
     auto path = scope.toStdString(argv[0]);
 
-    auto* io = dynamic_cast<NodeGranuleIO*>(c->host->granules.get());
+    auto* io = dynamic_cast<NodeGranuleIO*>(call->host->granules.get());
     if (!io) return JSI_ThrowInternalError(ctx, "exists_granule: no io");
     CONTRACT_DATA_id key;
     key.container = path;
-    auto cn = io->getCNode(c->root, c->contract->name, key);
+    auto cn = io->getCNode(call->root, call->contract->name, key);
     return JSI_NewBool(ctx, cn.valid());
 }
+// ============================================================
+// JSI_global_get — корневая гранула (parent=nullptr)
+//   get(name)      → null если нет
+//   get(name, ttl) → orCreate (throw if error)
+// ============================================================
+static JSIValue JSI_global_get(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
+    JSIScope<10,10> scope(ctx);
+    if (argc < 1 || argc > 2 || !JSI_IsString(argv[0]))
+        return JSI_ThrowTypeError(ctx, "get(name, ttl?)");
+    auto name = scope.toStdString(argv[0]);
+    std::string err;
 
+    if (argc == 2) {
+        auto* c = require_writable_ctx(ctx);
+        if (!c) return JSI_EXCEPTION;
+        int64_t ttl = 0;
+        if (JSI_ToInt64(ctx, &ttl, argv[1]) != 0) return JSI_ThrowTypeError(ctx, "ttl must be int64");
+        if (ttl <= 0) return JSI_ThrowTypeError(ctx, "ttl must be > 0");
+        if (ttl > MAX_GRANULE_TTL) return JSI_ThrowTypeError(ctx, "ttl > MAX_TTL");
+        auto ch = do_get_or_create_granule(ctx, nullptr, name, ttl, &err);
+        if (!ch.valid()) return JSI_ThrowInternalError(ctx, "get: %s", err.c_str());
+        c->JSI_Granule_children.insert({name, ch});
+        return JSI_granule_new(ctx, ch, /*writable=*/true);
+    } else {
+        auto* c = require_readonly_ctx(ctx);
+        if (!c) return JSI_EXCEPTION;
+        auto ch = do_get_granule(ctx, nullptr, name, &err);
+        if (!ch.valid()) return JSI_NULL;   // ← null (не throw)
+        c->JSI_Granule_children.insert({name, ch});
+        return JSI_granule_new(ctx, ch, /*writable=*/false);
+    }
+}
+
+// ============================================================
+// JSI_Granule::get — dispatcher
+//   a.get()          → value (JSON, null если пусто)
+//   a.get(name)      → child (null если нет)
+//   a.get(name, ttl) → child orCreate
+// ============================================================
+static JSIValue jsg_get(JSIContext* ctx, JSIValueConst this_val, int argc, JSIValueConst* argv) {
+    // 0 args → value
+    if (argc == 0) {
+        auto* c = require_readonly_ctx(ctx);
+        if (!c) return JSI_EXCEPTION;
+        auto self = JSI_granule_get(ctx, this_val);
+        if (!self.valid() || !self->cnode.valid()) return JSI_NULL;
+        auto s = self->cnode->get();
+        if (s.empty()) return JSI_NULL;
+        try { json j = json::parse(s); return json_to_jsi(ctx, j); }
+        catch (...) { return JSI_NULL; }
+    }
+    // 1-2 args → child
+    JSIScope<10,10> scope(ctx);
+    if (argc > 2 || !JSI_IsString(argv[0]))
+        return JSI_ThrowTypeError(ctx, "get(name, ttl?)");
+    auto self = JSI_granule_get(ctx, this_val);
+    if (!self.valid()) return JSI_ThrowTypeError(ctx, "invalid this");
+    auto name = scope.toStdString(argv[0]);
+    std::string err;
+
+    if (argc == 2) {
+        auto* c = require_writable_ctx(ctx);
+        if (!c) return JSI_EXCEPTION;
+        int64_t ttl = 0;
+        if (JSI_ToInt64(ctx, &ttl, argv[1]) != 0) return JSI_ThrowTypeError(ctx, "ttl must be int64");
+        if (ttl <= 0) return JSI_ThrowTypeError(ctx, "ttl must be > 0");
+        if (ttl > MAX_GRANULE_TTL) return JSI_ThrowTypeError(ctx, "ttl > MAX_TTL");
+        auto ch = do_get_or_create_granule(ctx, self.get(), name, ttl, &err);
+        if (!ch.valid()) return JSI_ThrowInternalError(ctx, "get: %s", err.c_str());
+        self->children.insert({ch->name, ch});
+        return JSI_granule_new(ctx, ch, /*writable=*/true);
+    } else {
+        auto* c = require_readonly_ctx(ctx);
+        if (!c) return JSI_EXCEPTION;
+        auto ch = do_get_granule(ctx, self.get(), name, &err);
+        if (!ch.valid()) return JSI_NULL;   // ← null (не throw)
+        self->children.insert({ch->name, ch});
+        return JSI_granule_new(ctx, ch, /*writable=*/false);
+    }
+}
 // ============================================================
 // прототипы
 // ============================================================
 static const JSICFunctionListEntry JSI_granule_view_proto[] = {
-    JSI_CFUNC_DEF("get_granule", 2, jsg_get_granule),
-    JSI_CFUNC_DEF("exists",      0, jsg_exists),
-    JSI_CFUNC_DEF("get",         0, jsg_get),
+    JSI_CFUNC_DEF("get", 2, jsg_get),
+    JSI_CFUNC_DEF("get_granule", 2, jsg_get_granule),   // alias
+    JSI_CFUNC_DEF("exists", 0, jsg_exists),
 };
 
+
 static const JSICFunctionListEntry JSI_granule_writable_proto[] = {
+    JSI_CFUNC_DEF("get", 2, jsg_get),
     JSI_CFUNC_DEF("get_granule", 2, jsg_get_granule),
-    JSI_CFUNC_DEF("exists",      0, jsg_exists),
-    JSI_CFUNC_DEF("get",         0, jsg_get),
-    JSI_CFUNC_DEF("set",         1, jsg_set),
-    JSI_CFUNC_DEF("del",         0, jsg_del),
+    JSI_CFUNC_DEF("exists", 0, jsg_exists),
+    JSI_CFUNC_DEF("set", 1, jsg_set),
+    JSI_CFUNC_DEF("del", 0, jsg_del),
 };
+
 
 void register_storage_api(JSIContext* ctx) {
     JSI_NewClassID(&JSI_granule_view_class_id);
@@ -319,6 +401,8 @@ void register_storage_api(JSIContext* ctx) {
     }
 
     JSIValue global = JSI_GetGlobalObject(ctx);
+    JSI_SetPropertyStr(ctx, global, "get",
+        JSI_NewCFunction(ctx, JSI_global_get, "get", 2));
     JSI_SetPropertyStr(ctx, global, "get_granule",
         JSI_NewCFunction(ctx, JSI_global_get_granule, "get_granule", 2));
     JSI_SetPropertyStr(ctx, global, "exists_granule",

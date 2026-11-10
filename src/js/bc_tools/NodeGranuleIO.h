@@ -1,8 +1,6 @@
 #pragma once
 #include "GranuleIO.h"
 #include <string>
-#include "jsi/api/EventSink.h"
-#include "jsi/api/Clock.h"
 #include "jsi/api/ContractSourceIO.h"
 #include "IDatabase.h"
 #include "REF.h"
@@ -103,7 +101,7 @@ struct NodeGranuleIO : GranuleIO {
         if (!b.valid()) return std::string("balance create failed");
         b->addAmount(delta);
         b->setDirty(roll);   // ← ОБЯЗАТЕЛЬНО (diff + calc_tree_hash)
-        logErr2("addContractBalance: contract=%s delta=%lld amount=%lld", c.container.c_str(), (long long)delta, (long long)b->getAmount());
+        DBG(logErr2("addContractBalance: contract=%s delta=%lld amount=%lld", c.container.c_str(), (long long)delta, (long long)b->getAmount()));
         return std::nullopt;
     }
     bool getContractBalance(Cellable* root, const CONTRACT_id& c, int64_t& out) override {
@@ -111,7 +109,7 @@ struct NodeGranuleIO : GranuleIO {
         auto b = cells::getContractBalanceNoCreateConst(root, db.get(), c);
         if (!b.valid()) { logErr2("getContractBalance: %s NOT FOUND", c.container.c_str()); return false; }
         out = b->getAmount();
-        logErr2("getContractBalance: contract=%s amount=%lld", c.container.c_str(), (long long)out);
+        DBG(logErr2("getContractBalance: contract=%s amount=%lld", c.container.c_str(), (long long)out));
         return true;
     }
     std::optional<std::string> deleteGranule(Cellable* root, const CONTRACT_id& contract, const CONTRACT_DATA_id& key,
@@ -163,6 +161,15 @@ struct NodeGranuleIO : GranuleIO {
 
         return ret.get();
     }
+    void update_contract_time(Cellable* root,const CONTRACT_id& c, time_t t, Rollback* r)
+    {
+        auto k=cells::getContractKey(c);
+        auto act=cells::getActivityNoCreate(root,db.get(),blake2b_hash(k).container);
+        if(!act.valid())
+            throw CommonError("if(!act.valid())");
+        act->update_time(t,r);
+    }
+
 
 };
 

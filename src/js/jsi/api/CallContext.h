@@ -9,16 +9,18 @@
 #include "db_to_save.h"
 #include "cellable.h"
 #include "storage_api.h"
+#include "cells.h"
+#include "ContractHost.h"
 struct ContractContext;
 struct CallStack;
 struct ContractHost;
 
 struct CallContext {
-    REF_getter<ContractContext> contract;
+    ContractContext* contract;
     bool in_view = false;
     int depth = 0;
-    REF_getter<CallStack> call_stack;
-    REF_getter<ContractHost> host;
+    CallStack* call_stack;
+    ContractHost* host;
     Rollback * roll = nullptr;
     std::vector<jsiEvent> emits;
 
@@ -30,9 +32,8 @@ struct CallContext {
     FeesSnapshot *fees = nullptr;
     std::set<REF_getter<data_base>> * deleted_granules = nullptr;
     Cellable* root = nullptr;
-    // REF_getter<JSI_Granule> jsi_granule_root; 
     std::map<std::string, REF_getter<JSI_Granule>> JSI_Granule_children;
-    void flush(const REF_getter<JSI_Granule>& g)
+    void flush(Cellable* root, const REF_getter<JSI_Granule>& g)
     {
         for(auto& z: JSI_Granule_children)
         {
@@ -46,6 +47,10 @@ struct CallContext {
                 max_time=z.second->__update_time;
             }
         }
+        host->granules->update_contract_time(root,contract->name,max_time,roll);
+// host->granules->
+        // auto cp=cells::getContractKey(contract->name);
+        // auto ac=cells::getActivityNoCreate(root.get(),host->, blake2b_hash(cp))
         /////////// TODO - update contract actvty
     }
 };

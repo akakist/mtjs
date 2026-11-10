@@ -78,6 +78,10 @@ struct TestGranuleIO : GranuleIO {
     {
         return nullptr;
     }
+    void update_contract_time(Cellable*,const CONTRACT_id& c, time_t t, Rollback* roll)
+    {
+        
+    }
 
 };
 

@@ -214,13 +214,13 @@ int main(int argc, char** argv) {
     {
         std::vector<int> u_idx;
         for (int i = 0; i < 20; ++i) {
-            if (i == 16 || i == 19 || i == 6 || i == 9) continue;   // UIG дубль
+            // if (i == 16 || i == 19 || i == 6 || i == 9) continue;   // UIG дубль
             u_idx.push_back(i);
         }
-        u_idx.push_back(20);
-        u_idx.push_back(21);
-        u_idx.push_back(22);
-        u_idx.push_back(23);
+        // u_idx.push_back(20);
+        // u_idx.push_back(21);
+        // u_idx.push_back(22);
+        // u_idx.push_back(23);
 
         for (int i : u_idx) {
             auto ed = gen_ed25519();

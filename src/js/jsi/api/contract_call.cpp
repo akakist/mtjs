@@ -34,11 +34,11 @@ namespace {
 // ============================================================
 // method: msg есть, газ есть, roll есть
 // ============================================================
-JSIValue ContractContext::call_contract_method(const std::string& method_name,
+JSIValue ContractContext::call_contract_method(Cellable* root,const std::string& method_name,
                              const json& params,
                              IMsgSource* msg_source,
-                             const REF_getter<CallStack>& call_stack,
-                             const REF_getter<ContractHost>& host, Rollback* roll,
+                             CallStack* call_stack,
+                              ContractHost* host, Rollback* roll,
                              const CONTRACT_id& caller, FeesSnapshot* fees,
                              std::set<REF_getter<data_base>> * deleted_granules)
 {
@@ -121,10 +121,10 @@ JSIValue ContractContext::call_contract_method(const std::string& method_name,
 // ============================================================
 // view: msg НЕТ, газа НЕТ, roll НЕТ (read-only)
 // ============================================================
-JSIValue ContractContext::call_contract_view(const std::string& view_name,
+JSIValue ContractContext::call_contract_view(Cellable* root,const std::string& view_name,
                              const json& params,
-                             const REF_getter<CallStack>& call_stack,
-                             const REF_getter<ContractHost>& host,
+                             CallStack* call_stack,
+                             ContractHost* host,
                              int64_t timeout_sec)
 {
     MUTEX_INSPECTOR;

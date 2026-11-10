@@ -21,33 +21,52 @@ type JsiGranule = Record<string, any>;
 // flush дерева в состояние — после выполнения контракта (автоматически).
 // ============================================================
 
-
 interface JsiStorage {
-    // создать дочерний (ошибка, если уже есть)
-    create_granule(name: string, ttl: number): JsiStorage;
-
-    // получить дочерний (ошибка, если нет — try/catch в контракте)
-    get_granule(name: string): JsiStorage;
-
-    // данные (container = serialize(value))
+    get(): any;                                      // value (JSON, null если пусто)
+    get(name: string): JsiStorage | null;            // child (null если нет)
+    get(name: string, ttl: number): JsiStorage;      // child orCreate
     set(value: any): void;
-    get(): any;   // null, если пусто
-
-    // удалить (bc_granule + bc_activity)
     del(): void;
 }
 
-    interface JsiStorageView {
-        get_granule(name: string): JsiStorageView;   // read, throw если нет
-        exists(): boolean;
-        get(): any;
-    }
+interface JsiStorageView {
+    get(): any;
+    get(name: string): JsiStorageView | null;
+    exists(): boolean;
+}
 
-    interface JsiStorageWritable extends JsiStorageView {
-        get_granule(name: string, ttl: number): JsiStorageWritable;   // orCreate
-        set(value: any): void;
-        del(): void;
-    }
+interface JsiStorageWritable extends JsiStorageView {
+    get(name: string, ttl: number): JsiStorageWritable;
+    set(value: any): void;
+    del(): void;
+}
+
+// interface JsiStorage {
+//     // создать дочерний (ошибка, если уже есть)
+//     create_granule(name: string, ttl: number): JsiStorage;
+
+//     // получить дочерний (ошибка, если нет — try/catch в контракте)
+//     get_granule(name: string): JsiStorage;
+
+//     // данные (container = serialize(value))
+//     set(value: any): void;
+//     get(): any;   // null, если пусто
+
+//     // удалить (bc_granule + bc_activity)
+//     del(): void;
+// }
+
+    // interface JsiStorageView {
+    //     get_granule(name: string): JsiStorageView;   // read, throw если нет
+    //     exists(): boolean;
+    //     get(): any;
+    // }
+
+    // interface JsiStorageWritable extends JsiStorageView {
+    //     get_granule(name: string, ttl: number): JsiStorageWritable;   // orCreate
+    //     set(value: any): void;
+    //     del(): void;
+    // }
 
 // ============================================================
 // JsiMsg — сообщение (для method)
@@ -106,6 +125,14 @@ declare function refundValue(amount: number): void;
 
 declare function remainingValue(): number;
 
-declare function get_granule(path: string): JsiStorageView;
-declare function get_granule(path: string, ttl: number): JsiStorageWritable;
+// declare function get_granule(path: string): JsiStorageView;
+// declare function get_granule(path: string, ttl: number): JsiStorageWritable;
 declare function exists_granule(path: string): boolean;
+
+declare function get(path: string): JsiStorage | null;
+declare function get(path: string, ttl: number): JsiStorage;
+
+// legacy alias
+declare function get_granule(path: string): JsiStorage | null;
+declare function get_granule(path: string, ttl: number): JsiStorage;
+

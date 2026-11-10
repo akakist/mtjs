@@ -98,7 +98,7 @@ async function main() {
         console.log("\n[t1] create_address(bob, [{ed25519, bobPk}]) → ok");
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
             { contract: "root", method: "create_address",
-              params: { addr: bobAddr, keys: [{ type: 0, keybuffer: bobPk }] } },
+              params: { ttl: 10000, addr: bobAddr, keys: [{ type: 0, keybuffer: bobPk }] } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "create_address ok (errstr=" + (block.errstr(rsp.tx_hash)||"") + ")");
         const info1 = await mtjs.get_address_info(node, bobAddr, 3);
@@ -115,7 +115,7 @@ async function main() {
         console.log("\n[t2] create_address(bob) again → err already exists");
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
             { contract: "root", method: "create_address",
-            params: { addr: bobAddr, keys: [{ type: 0, keybuffer: bobPk }], ttl: 86400 } },
+            params: {addr: bobAddr, keys: [{ type: 0, keybuffer: bobPk }], ttl: 86400 } },
         ]);
         check(block.status(rsp.tx_hash) === "err", "status err");
         const es = block.errstr(rsp.tx_hash) || "";

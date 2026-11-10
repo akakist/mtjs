@@ -114,8 +114,8 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
                         chk.unpack_mx(in);
                         if (chk.data.valid()) {
                             auto* b = dynamic_cast<bc_contract_balance*>(chk.data.get());
-                            logErr2("calc_tree_hash: contract_balance dbid=%s amount=%lld",
-                                    base16::encode(c->getDbId()).substr(0,16).c_str(), (long long)(b ? b->getAmount() : -1));
+                            DBG(logErr2("calc_tree_hash: contract_balance dbid=%s amount=%lld",
+                                    base16::encode(c->getDbId()).substr(0,16).c_str(), (long long)(b ? b->getAmount() : -1)));
                         }
                     }                    
                 }
@@ -133,28 +133,29 @@ void data_base::setDirty(Rollback* roll)
 #include "cells.h"
 
 
-void deleteGranule(data_base* g, Rollback* roll,_db_to_save &db_dump)
+void deleteGranule(data_base* g, Rollback* roll, _db_to_save &db_dump)
 {
-    
-    auto cell=g->parent;
+    auto cell = g->parent;
     if (!cell) return;
     cell->setDirty__(roll);
-    while(cell)
-    {
-        if(cell->children_hashes_mx.size())
-        {
-            return;
-        }
-        auto pred=cell->parent;
-        if(!pred) return;
+
+    while (cell) {
+        auto pred = cell->parent;
+        if (!pred) return;
+
+        // 1. Помечаем cell (уровень N) на удаление из БД
         db_dump.del(cell->getDbId());
-        auto id=cell->m_id;
-        {
-            pred->children_hashes_mx.erase(id);
-            pred->children_ptrs_mx.erase(id);
 
-        }
-        cell=pred;
+        // 2. Удаляем ссылку на cell из родителя (уровень N-1)
+        auto id = cell->m_id;
+        pred->children_hashes_mx.erase(id);
+        pred->children_ptrs_mx.erase(id);
 
+        // 3. Если у родителя (pred) остались другие дети — останавливаемся.
+        //    Иначе — родитель стал пустым листом, удаляем его на следующей итерации.
+        if (pred->children_hashes_mx.size())
+            return;
+
+        cell = pred;
     }
 }
