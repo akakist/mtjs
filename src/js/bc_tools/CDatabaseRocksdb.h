@@ -18,7 +18,7 @@ struct CDatabaseRocksdb: public IDatabase
         // rocksdb::Options options;
 
         // 1. Memtable (буфер записи) — минимизируем
-        options.write_buffer_size = 16 * 1024 * 1024; // 16 MB (вместо 64 MB)
+        options.write_buffer_size = 128 * 1024 * 1024; // 16 MB (вместо 64 MB)
         options.max_write_buffer_number = 2; // Максимум 2 memtable = 32 MB
 
         // 2. Block cache (кэш чтения) — основной потребитель
@@ -33,7 +33,7 @@ struct CDatabaseRocksdb: public IDatabase
         options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_opts));
 
         // 3. WAL — минимизируем
-        options.max_total_wal_size = 32 * 1024 * 1024; // 32 MB (вместо 128 MB)
+        options.max_total_wal_size = 256 * 1024 * 1024; // 32 MB (вместо 128 MB)
 
         // 4. Compaction — агрессивнее сбрасываем на диск
         options.level0_file_num_compaction_trigger = 8; // Начинаем compaction раньше
@@ -42,6 +42,32 @@ struct CDatabaseRocksdb: public IDatabase
         // 5. Дополнительные оптимизации для экономии памяти
         options.optimize_filters_for_hits = true; // Меньше памяти на фильтры
         options.compaction_pri = rocksdb::kMinOverlappingRatio; // Эффективнее compaction
+
+////////////
+// ── Memtable ──
+options.write_buffer_size = 256 * 1024 * 1024;   // 128 MB (было 64)
+options.max_write_buffer_number = 6;              // 6 memtable = 768 MB (было 384)
+options.min_write_buffer_number_to_merge = 2;
+
+// ── Block cache ──
+cache_opts.capacity = 256 * 1024 * 1024;          // 256 MB (было 128)
+
+// ── WAL ── (на диске, не память)
+options.max_total_wal_size = 512 * 1024 * 1024;   // 512 MB (было 256)
+
+// ── Compaction ──
+options.level0_file_num_compaction_trigger = 32;   // было 24
+options.level0_slowdown_writes_trigger = 64;       // было 48
+options.level0_stop_writes_trigger = 96;           // было 72
+options.target_file_size_base = 128 * 1024 * 1024; // 128 MB (было 64)
+
+// ── Background ──
+options.max_background_jobs = 12;                  // было 8
+options.max_background_compactions = 6;            // было 4
+options.max_background_flushes = 4;                // было 2
+///////////
+
+
 
         rocksdb::Status status = rocksdb::DB::Open(options, db_name, &db_ptr);
 
@@ -63,45 +89,38 @@ struct CDatabaseRocksdb: public IDatabase
     }
 
 
-    int write_granules_batch(const _db_to_save &v)
-    {
+int write_granules_batch(const _db_to_save &v)
+{
+    const size_t CHUNK = 10000;
 
-        rocksdb::WriteBatch batch;
-#ifdef KALL
-        {
-                //DEBUG KALL
-                for (const auto& [key, data] : v.cells) {
-                    if (key.size() == 32) {
-                        inBuffer in(data);
-                        Cellable c(nullptr, key);
-                        c.unpack_mx(in);
-                        if (c.payload_ctor_idx == hsh::bc_contract_balance) {
-                            auto* b = dynamic_cast<bc_contract_balance*>(c.data.get());
-                            logErr2("write_granules_batch: bc_contract_balance dbid=%s amount=%lld", base16::encode(key).substr(0,16).c_str(), (long long)(b ? b->getAmount() : -1));
-                        }
-                    }
-                    // batch.Put(key, data);
-                }
+    rocksdb::WriteOptions wo;
+    wo.disableWAL = false;   // WAL есть (durable при падении процесса)
+    wo.sync = false;         // не fsync (быстро)
 
-        }
-#endif
-
-        for (const auto& key : v.deleted) batch.Delete(key);
-        for (const auto& [key, data] : v.cells) {
-            batch.Put(key, data);
-        }
-
-        rocksdb::Status status = db_ptr->Write(rocksdb::WriteOptions(), &batch);
-
-        if (!status.ok()) {
-            std::cerr << "Ошибка записи батча: " << status.ToString() << std::endl;
+    size_t n = 0;
+    rocksdb::WriteBatch batch;
+    auto flush = [&]() -> bool {
+        if (batch.Count() == 0) return true;
+        auto s = db_ptr->Write(wo, &batch);
+        if (!s.ok()) {
+            std::cerr << "write batch: " << s.ToString() << "\n";
             return false;
         }
-
+        batch.Clear();
         return true;
-        return 0;
+    };
+
+    for (const auto& key : v.deleted) {
+        batch.Delete(key);
+        if (++n % CHUNK == 0 && !flush()) return 1;
     }
-    
+    for (const auto& [key, data] : v.cells) {
+        batch.Put(key, data);
+        if (++n % CHUNK == 0 && !flush()) return 1;
+    }
+    return flush() ? 0 : 1;
+}
+
 
 /// Удаление гранул батчем
     bool delete_granules_batch(rocksdb::DB* db, const std::vector<std::string>& keys) {

@@ -208,7 +208,7 @@ bool Node::Service::HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::B
                 // l_blocks.clear();
                 // 2) записать нового лидера
                 cli.node_leader = h;
-                l_blocks[h->prev_root_hash_1].leader_cert_2 = h;
+                // l_blocks[h->prev_root_hash_1].leader_cert_2 = h;
                 // 3) ответить
                 reply_HeartBeatRSP(h,route);
                 *need_continue_broadcast=true;
@@ -469,7 +469,7 @@ bool Node::Service::ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP *m, const N
         {
             logNode("lEAder approved %s", m->hb->node_leader.container.c_str());
             // li.request_for_transactions_sent = true;
-            do_request_for_transactions(li,mf);
+            do_request_for_transactions(m->hb.get(),mf);
             bt.ConfirmLeaderRSP_m.clear();
         }
     }
@@ -533,19 +533,19 @@ REF_getter<MsgData::HeartBeatREQ> Node::Service::do_heart_beat(time_t tnow)
                                   this_node_name,  tnow);
 
     // 2) новый HB — старый раунд в мусор (если leader_cert_2 был другой)
-    {
-        auto& li = l_blocks[prev_root_hash_Z()];
-        if (li.leader_cert_2.valid() &&
-            li.leader_cert_2->getHash().container != hb_req->getHash().container) {
-            logNode("do_heart_beat: new HB %s (old %s), l_blocks.clear",
-                    hb_req->getHash().str().c_str(),
-                    li.leader_cert_2->getHash().str().c_str());
-            l_blocks.clear();
-        }
-    }
+    // {
+    //     auto& li = l_blocks[prev_root_hash_Z()];
+    //     if (li.leader_cert_2.valid() &&
+    //         li.leader_cert_2->getHash().container != hb_req->getHash().container) {
+    //         logNode("do_heart_beat: new HB %s (old %s), l_blocks.clear",
+    //                 hb_req->getHash().str().c_str(),
+    //                 li.leader_cert_2->getHash().str().c_str());
+    //         l_blocks.clear();
+    //     }
+    // }
 
     REF_getter<MsgData::LcEnvelopeREQ> lce =new MsgData::LcEnvelopeREQ(hb_req->getBuffer(),prev_block.valid()?prev_block->getBuffer():"");
-    l_blocks[prev_root_hash_Z()].leader_cert_2=hb_req;
+    // l_blocks[prev_root_hash_Z()].leader_cert_2=hb_req;
     cli_leader_info[prev_root_hash_Z()].node_leader=hb_req;
     cli_leader_info[prev_root_hash_Z()].heart_beat_sent[tnow/HB_TIME_WINDOW]=iUtils->getNow();
 

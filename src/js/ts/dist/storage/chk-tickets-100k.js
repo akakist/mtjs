@@ -4,7 +4,7 @@ const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 const GAS_LIMIT = 20000;
 const NODES = 10;
 const USERS = 100;
-const TICKETS_PER_USER = 100; // 100 × 1000 = 100k
+const TICKETS_PER_USER = 1000; // 100 × 1000 = 100k
 const BATCH = 100;
 const USER_CONCURRENCY = 10;
 function nodeAddr(i) {
@@ -86,10 +86,51 @@ async function getNonceWithRetry(addr, preferredNode, retries = 20) {
     }
     throw new Error("getNonceWithRetry: address not found: " + addr);
 }
+// ============================================================
+// callViewRetry — ретрай call_view (root sync'ится после блока)
+// ============================================================
+async function callViewRetry(node, contract, view, params, timeoutSec = 5, timeout = 5, retries = 10) {
+    for (let a = 0; a < retries; a++) {
+        try {
+            const r = await mtjs.call_view(node, contract, view, params, timeoutSec, timeout);
+            // Успех: found=true, или ошибка (view реально упал) — но не "contract not found" / "invalidate root"
+            if (r.found || (r.error && r.result.indexOf("contract not found") < 0
+                && r.result.indexOf("invalidate root") < 0)) {
+                return r;
+            }
+            console.log("  call_view retry " + (a + 1) + "/" + retries + ": " + (r.result || "not found"));
+        }
+        catch (e) {
+            console.log("  call_view exception " + (a + 1) + "/" + retries + ": " + errStr(e));
+        }
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    throw new Error("callViewRetry: retries exhausted (" + contract + "." + view + ")");
+}
+// ============================================================
+// callViewRetryAny — ретрай по всем нодам (если конкретная висит)
+// ============================================================
+async function callViewRetryAny(contract, view, params, timeoutSec = 5, timeout = 5, retries = 10) {
+    for (let a = 0; a < retries; a++) {
+        for (let i = 0; i < NODES; i++) {
+            const node = nodeAddr(i);
+            try {
+                const r = await mtjs.call_view(node, contract, view, params, timeoutSec, timeout);
+                if (r.found || (r.error && r.result.indexOf("contract not found") < 0
+                    && r.result.indexOf("invalidate root") < 0)) {
+                    return r;
+                }
+            }
+            catch (e) { }
+        }
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    throw new Error("callViewRetryAny: retries exhausted (" + contract + "." + view + ")");
+}
 async function submitAndWait(sk, addr, tx, nonce, value, nodeaddr, gasLimit = GAS_LIMIT, retries = 5) {
     for (let a = 0; a < retries; a++) {
         const req = { tx, nonce, value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(nodeaddr, 1, JSON.stringify(req), sk, nonce, () => { });
+        const rsp = await mtjs.tx_submit(nodeaddr, 120, JSON.stringify(req), sk, nonce, () => { });
         if (rsp.err) {
             if (a + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -115,7 +156,7 @@ async function submitBatch(txs) {
     let sent = 0;
     const promises = [];
     for (const t of txs) {
-        const p = mtjs.tx_submit(t.node, 1, JSON.stringify({
+        const p = mtjs.tx_submit(t.node, 120, JSON.stringify({
             tx: t.tx, nonce: t.nonce, value: t.value, gasLimit: GAS_LIMIT,
             priority: 0, sender: t.addr, key_id: 0,
         }), t.sk, t.nonce, () => { })
@@ -132,7 +173,7 @@ async function submitBatch(txs) {
     const t0 = Date.now();
     while (inFlight.size > 0) {
         await new Promise(r => setTimeout(r, 100));
-        if (Date.now() - t0 > 120000) {
+        if (Date.now() - t0 > 300000) { // 5 минут (RocksDB под нагрузкой)
             console.log("  batch timeout: inFlight=" + inFlight.size);
             inFlight.clear();
             break;
@@ -213,11 +254,11 @@ async function main() {
         check(block.status(rsp.tx_hash) === "ok", "createEvent ok (errstr=" + (block.errstr(rsp.tx_hash) || "") + ")");
     }
     // ============================================================
-    // [t2] getEvent
+    // [t2] getEvent (ретрай: root sync'ится после блока)
     // ============================================================
     console.log("\n[t2] getEvent");
     {
-        const r = await mtjs.call_view(nodeAddr(0), "tickets", "getEvent", { event: EVENT_NAME }, 10, 10);
+        const r = await callViewRetryAny("tickets", "getEvent", { event: EVENT_NAME }, 10, 10);
         check(r.found === true && !r.error, "view getEvent ok");
         if (r.found && !r.error) {
             const v = JSON.parse(r.result);
@@ -241,7 +282,7 @@ async function main() {
         const kp = mtjs.generate_keypair(0);
         const nonceCreate = (rootBaseNonce + BigInt(ui * 2)).toString();
         const nonceTransfer = (rootBaseNonce + BigInt(ui * 2 + 1)).toString();
-        promises.push(mtjs.tx_submit(na, 1, JSON.stringify({
+        promises.push(mtjs.tx_submit(na, 120, JSON.stringify({
             tx: [{ contract: "root", method: "create_address", params: {
                         addr: uAddr,
                         keys: [{ type: 0, keybuffer: kp.pk }],
@@ -251,11 +292,11 @@ async function main() {
         }), rootSk, nonceCreate, () => { })
             .then((rsp) => {
             if (!rsp.err)
-                inFlight.add(rsp.tx_hash); // ← добавляем в inFlight
+                inFlight.add(rsp.tx_hash);
             return { ok: !rsp.err, rsp, name: uName, phase: "create" };
         })
             .catch((e) => ({ ok: false, err: e, name: uName, phase: "create" })));
-        promises.push(mtjs.tx_submit(na, 1, JSON.stringify({
+        promises.push(mtjs.tx_submit(na, 120, JSON.stringify({
             tx: [{ contract: "root", method: "transfer", params: {
                         to: uAddr, amount: need.toString(),
                     } }],
@@ -263,7 +304,7 @@ async function main() {
         }), rootSk, nonceTransfer, () => { })
             .then((rsp) => {
             if (!rsp.err)
-                inFlight.add(rsp.tx_hash); // ← добавляем в inFlight
+                inFlight.add(rsp.tx_hash);
             return { ok: !rsp.err, rsp, name: uName, phase: "transfer" };
         })
             .catch((e) => ({ ok: false, err: e, name: uName, phase: "transfer" })));
@@ -283,9 +324,8 @@ async function main() {
         }
     }
     console.log("  all users funded in " + ((Date.now() - tw) / 1000).toFixed(0) + "s");
-    await new Promise(r => setTimeout(r, 2000)); // ждать sync
+    await new Promise(r => setTimeout(r, 2000));
     check(users.length === USERS, "users created: " + users.length + "/" + USERS);
-    // проверка, что адреса видны (на всякий случай)
     let visible = 0;
     for (const u of users) {
         try {
@@ -316,26 +356,32 @@ async function main() {
     console.log("  totalSent=" + progress.sent + " in " + dt + "ms (" + (dt / 1000).toFixed(0) + "s)" +
         " tps=" + (progress.sent / (dt / 1000)).toFixed(0));
     // ============================================================
-    // [t5] getEvent
+    // [t5] getEvent — sold=100k (ретрай)
     // ============================================================
     console.log("\n[t5] getEvent — sold=" + (USERS * TICKETS_PER_USER));
     {
-        const r = await mtjs.call_view(nodeAddr(0), "tickets", "getEvent", { event: EVENT_NAME }, 60, 60);
+        const r = await callViewRetryAny("tickets", "getEvent", { event: EVENT_NAME }, 60, 60);
         if (r.found && !r.error) {
             const v = JSON.parse(r.result);
             check(v.sold === USERS * TICKETS_PER_USER, "sold=" + (USERS * TICKETS_PER_USER) + " (got " + v.sold + ")");
         }
+        else {
+            check(false, "getEvent failed: " + (r.error ? r.result : "not found"));
+        }
     }
     // ============================================================
-    // [t6] getTicket
+    // [t6] getTicket — ретрай
     // ============================================================
     console.log("\n[t6] getTicket uu0/sector0/row0/seat0");
     {
-        const r = await mtjs.call_view(nodeAddr(0), "tickets", "getTicket", { event: EVENT_NAME, sector: 0, row: 0, seat: 0 }, 10, 10);
+        const r = await callViewRetryAny("tickets", "getTicket", { event: EVENT_NAME, sector: 0, row: 0, seat: 0 }, 10, 10);
         if (r.found && !r.error) {
             const v = JSON.parse(r.result);
             check(v.found === true, "ticket found");
             check(v.sold === true, "sold=true");
+        }
+        else {
+            check(false, "getTicket failed: " + (r.error ? r.result : "not found"));
         }
     }
     console.log("\n=== RESULT: " + pass + " passed, " + fail + " failed ===");

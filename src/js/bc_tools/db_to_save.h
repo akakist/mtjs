@@ -7,7 +7,7 @@ struct _db_to_save
 {
     std::map<std::string, std::string> cells;
     std::set<std::string> deleted; 
-    size_t size() {
+    size_t size() const {
         size_t sz = 0;
         for (auto& z : cells)   { sz += z.first.size(); sz += z.second.size(); }
         for (auto& z : deleted) { sz += z.size(); }

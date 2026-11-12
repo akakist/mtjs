@@ -41,6 +41,7 @@
 #include "contract_rt.h"
 #include "ContractHost.h"
 #include "cells.h"
+
 #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 std::set<NODE_id> getValidators(int64_t block_timestamp, IDatabase* db);
 
@@ -50,6 +51,8 @@ std::set<NODE_id> getValidators(int64_t block_timestamp, IDatabase* db);
 
 namespace Node
 {
+    enum Mode { Full = 0, Lite = 1 };
+
     enum timers
     {
         TIMER_PERIODIC_CLOCK,
@@ -59,6 +62,7 @@ namespace Node
         TIMER_BROADCAST_ACK_TIMEDOUT,
         TIMER_BlockDiffValidateREQ,
         TIMER_BlockDBStore,
+        TIMER_STALE_CLEANUP
     };
     class Service:
         public UnknownBase,
@@ -72,8 +76,7 @@ namespace Node
 
 
 
-
-        Service(const SERVICE_id&, const std::string&  nm, IInstance *ins);
+        Service(const SERVICE_id&, const std::string& nm, IInstance *ins, Mode mode);
         ~Service();
 
 
@@ -85,13 +88,16 @@ namespace Node
             ListenerBuffered1Thread::deinit();
         }
 
-        static UnknownBase* construct(const SERVICE_id& id, const std::string&  nm,IInstance* obj)
-        {
-            XTRY;
-            return new Service(id,nm,obj);
-            XPASS;
+        static UnknownBase* constructFull(const SERVICE_id& id, const std::string& nm, IInstance* obj) {
+            return new Service(id, nm, obj, Full);
         }
+        static UnknownBase* constructLite(const SERVICE_id& id, const std::string& nm, IInstance* obj) {
+            return new Service(id, nm, obj, Lite);
+        }
+
         bool on_RequestIncoming(const webHandlerEvent::RequestIncoming* e);
+        bool AddTxREQ(const bcEvent::AddTxREQ *e);
+        bool ClientMsg(const bcEvent::ClientMsg *e);
 
 
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
@@ -150,7 +156,7 @@ namespace Node
 
         struct block_leader
         {
-            REF_getter< MsgData::HeartBeatREQ> leader_cert_2=nullptr;
+            // REF_getter< MsgData::HeartBeatREQ> leader_cert_2=nullptr;
             std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > >HeartBeatRSP_m;
             bool is_HeartBeatRSP_m_quorum(const THASH_id& h, BlockMetaFull* mf);
 
@@ -160,7 +166,7 @@ namespace Node
             std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTransactionRSP> > >GetTransactionRSP_m; /// для подсчета ответивших нод
             bool is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* mf);
 
-            std::map<THASH_id /*hb hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
+            // std::map<THASH_id /*hb hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
 
             std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
             bool is_ValidateBlockRSP_m_quorum(const THASH_id& h, BlockMetaFull* mf);
@@ -168,7 +174,7 @@ namespace Node
             std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
             bool is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db);
 
-            REF_getter<MsgData::BlockDiffValidateREQ> blockDiffValidateREQ=nullptr;
+            std::map<THASH_id, REF_getter<MsgData::BlockDiffValidateREQ> > blockDiffValidateREQ_2;
 
         };
         _db_to_save db_to_save_Z;
@@ -176,7 +182,7 @@ namespace Node
         void dump(nlohmann::json& j);
 
 
-        void do_request_for_transactions( block_leader& li, const REF_getter<BlockMetaFull>& meta);
+        void do_request_for_transactions(MsgData::HeartBeatREQ* hb, const REF_getter<BlockMetaFull>& meta);
 
         struct client_leader_info
         {
@@ -224,7 +230,7 @@ namespace Node
         }
 
 
-        void do_start_block();
+        void do_start_block(MsgData::HeartBeatREQ* hb);
 
 
         std::vector<REF_getter<MsgData::TX>>  collectTransactions();
@@ -271,8 +277,8 @@ namespace Node
 
         MsgFactory msgFactory;
 
-        std::optional<std::string> load_contract(const CONTRACT_id& contract);
-        std::optional<std::string> execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params);
+        // std::optional<std::string> load_contract(const CONTRACT_id& contract);
+        // std::optional<std::string> execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params);
 
 
         REF_getter<ContractHost> contractHost=nullptr;
@@ -295,18 +301,29 @@ namespace Node
         std::optional<std::string> execute_add_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId);
         std::optional<std::string> execute_remove_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId);
 
-        // std::optional<std::string> execute_gc(yyjson_val* params, b_params& b, t_params& t, int seqId, _db_to_save& dbd);
-        // std::optional<std::string> gc_granule_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
-        // std::optional<std::string> gc_contract_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
-        // std::optional<std::string> gc_node_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);
-        // std::optional<std::string> gc_address_apply(const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd);        
         std::optional<std::string> gc_activity_apply(
                 const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd,
                 int& applied_granule, int& applied_contract, int& applied_node, int& applied_address);
 
 
         void invalidate_services();
+        // std::set<SERVICE_id> InvalidateRootRSPS;
+        // REF_getter<MsgData::BlockDBStore> BlockDBStore_for_invalidate=nullptr;
+        // std::set<SERVICE_id> BarrierRSPS;
+        // REF_getter<bcEvent::DBWriteREQ> dbWriteREQ=nullptr;
 
+        Mode mode_ = Full;
+        std::string uplink_http_addr_;                    // lite
+        std::set<msockaddr_in> http_granule_addr_;      // full
+
+        bool get_stale(const std::string& hash, std::string& out);
+
+        struct StaleEntry { std::string body; int64_t ts; };
+        std::map<std::string, StaleEntry> stale_cache;  // hash -> {body, ts}
+        void cleanup_stale(int64_t now);
+        static constexpr int64_t STALE_TTL_SEC = 1 * 60;
+
+        bool on_LiteSetUplinkREQ(const bcEvent::LiteSetUplinkREQ* e);
 
     };
 

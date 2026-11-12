@@ -95,7 +95,12 @@ namespace cells {
         auto it = cur->children_hashes_mx.find(id);
         if (it != cur->children_hashes_mx.end())
         {
-            return replaceLeafNoCreate(cur, db, id);
+            auto r = replaceLeafNoCreate(cur, db, id);
+            if (!r.valid()) {
+                // stale root (hash mismatch) → пробросить NULL, не падать
+                logErr2("replaceLeafOrCreate: NULL at '%s' (stale root)", id.c_str());
+            }
+            return r;
         }
         if (roll)
         {
@@ -114,72 +119,83 @@ namespace cells {
         return c;
     }
 
-    REF_getter<Cellable> replaceLeafNoCreate(Cellable* _cur, IDatabase* db, const std::string& id)
+REF_getter<Cellable> replaceLeafNoCreate(Cellable* _cur, IDatabase* db, const std::string& id)
+{
+    MUTEX_INSPECTOR;
+    auto cur = _cur;
+    auto ip = cur->children_ptrs_mx.find(id);
+    if (ip != cur->children_ptrs_mx.end())
     {
-        MUTEX_INSPECTOR;
-        auto cur = _cur;
+        return ip->second;
+    }
+    auto it = cur->children_hashes_mx.find(id);
+    if (it == cur->children_hashes_mx.end())
+    {
+        return NULL;
+    }
+    REF_getter<Cellable> cc = new Cellable(cur, id);
+
+    std::string result;
+    auto dbId = cc->getDbId();
+    int r = db->getGranule(dbId, &result);
+    if (r)
+        logErr2("db->getGranule err %s", base16::encode(cc->getDbId()).c_str());
+
+    if (result.size())
+    {
+        auto h = blake2b_hash(result);
+        if (it->second == h)
         {
+            inBuffer in(result);
+            cc->unpack_mx(in);
         }
-        auto ip = cur->children_ptrs_mx.find(id);
-        if (ip != cur->children_ptrs_mx.end())
+        else
         {
-            return ip->second;
-        }
-        auto it = cur->children_hashes_mx.find(id);
-        if (it == cur->children_hashes_mx.end())
-        {
+            // ── root устарел (sync / InvalidateRoot ещё не дошёл) — НЕ throw ──
+            logErr2("getGranule: cell hash not matched (stale root) dbId=%s expected=%s actual=%s granule_size=%ld",
+                    base16::encode(dbId).substr(0, 16).c_str(),
+                    base16::encode(it->second.container).substr(0, 16).c_str(),
+                    base16::encode(h.container).substr(0, 16).c_str(),
+                    result.size());
+            db->clear_root = true;
+            db->add_sync_out(dbId);
             return NULL;
         }
-        REF_getter<Cellable> cc = new Cellable(cur, id);
-
-        std::string result;
-        auto dbId = cc->getDbId();
-        int r = db->getGranule(dbId, &result);
-        if (r)
-            logErr2("db->getGranule err %s", base16::encode(cc->getDbId()).c_str());
-
-        if (result.size())
-        {
-            auto h = blake2b_hash(result);
-            if (it->second == h)
-            {
-                inBuffer in(result);
-                cc->unpack_mx(in);
-            }
-            else
-            {
-                db->clear_root = true;
-                db->add_sync_out(dbId);
-                throw CommonError("getGranule: cell hash not matched %s %s granule size %ld body %s",
-                                  base16::encode(it->second.container).c_str(),
-                                  base16::encode(h.container).c_str(),
-                                  result.size(),
-                                  base16::encode(result).c_str());
-            }
-        }
-        cur->children_ptrs_mx.insert({id, cc});
-        return cc;
     }
+    cur->children_ptrs_mx.insert({id, cc});
+    return cc;
+}
 
-    REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, Rollback* roll)
+REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, Rollback* roll)
+{
+    auto cur = root;
+    for (auto& z : v)
     {
-        auto cur = root;
-        for (auto& z : v)
-        {
-            cur = replaceLeafOrCreate(cur, db, z,  roll).get();
+        auto next = replaceLeafOrCreate(cur, db, z, roll);
+        if (!next.valid()) {
+            logErr2("getByPathOrCreate: NULL at '%s' (stale root)", z.c_str());
+            return NULL;
         }
-        return cur;
+        cur = next.get();
     }
+    return cur;
+}
 
-    REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::deque<std::string>& v, Rollback* roll)
+
+REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::deque<std::string>& v, Rollback* roll)
+{
+    auto cur = root;
+    for (auto& z : v)
     {
-        auto cur = root;
-        for (auto& z : v)
-        {
-            cur = replaceLeafOrCreate(cur, db, z,  roll).get();
+        auto next = replaceLeafOrCreate(cur, db, z, roll);
+        if (!next.valid()) {
+            logErr2("getByPathOrCreate(deque): NULL at '%s' (stale root)", z.c_str());
+            return NULL;
         }
-        return cur;
+        cur = next.get();
     }
+    return cur;
+}
 
     REF_getter<Cellable> getByPathNoCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v)
     {

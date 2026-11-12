@@ -431,9 +431,9 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     auto act = cells::getActivityOrCreate(root.get(), db_state.get(), n->getDbId(), {}, ttl, t.block_timestamp, t.roll);
     if (act.valid()) {
         act->dbid = {
-            base16::encode(n->getDbId()),           // contract
-            base16::encode(ab->getDbId()),          // balance
-            base16::encode(rootGranule->getDbId()), // root granule
+            n->getDbId(),           // contract
+            ab->getDbId(),          // balance
+            rootGranule->getDbId(), // root granule
         };
         act->update_time(t.block_timestamp, t.roll);
     }
@@ -792,13 +792,21 @@ std::optional<std::string> Node::Service::gc_activity_apply(
     if (act->ttl <= 0) return "ttl <= 0";
     if (act->_update_time + act->ttl >= now) return "not expired";
 
-    for (auto& dbid_hex : act->dbid) {
-        THASH_id h; h.container = dbid_hex;
-        auto g = cells::getByDbIdNoCreate(root.get(), db_state.get(), h);
-        if (!g.valid() || !g->data.valid()) {
-            logNode("gc: dbid %s not found (skip)", dbid_hex.c_str());
+    for (auto& dbid : act->dbid) {
+        THASH_id h;
+        h.container = dbid;   // ← bin (32 байта), не hex (64)
+        if (h.container.size() != 32) {
+            logNode("gc: dbid '%s' bad size (skip)", dbid.c_str());
             continue;
         }
+
+        auto g = cells::getByDbIdNoCreate(root.get(), db_state.get(), h);
+        if (!g.valid() || !g->data.valid()) {
+            logNode("gc: dbid %s not found (skip)", dbid.c_str());
+            continue;
+        }
+
+        logNode("gc: dbid=%s ctor_idx=%d", base16::encode(dbid).c_str(), (int)g->payload_ctor_idx);
 
         switch (g->payload_ctor_idx) {
         case hsh::bc_granule:
@@ -810,10 +818,10 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             applied_node++;
             auto* n = dynamic_cast<bc_node*>(g->data.get());
             if (!n) break;
-               if (n->isEnabled()) {
-                    logNode("gc: node %s enabled (skip)", n->getName().container.c_str());
-                    break;
-                }
+            if (n->isEnabled()) {
+                logNode("gc: node %s enabled (skip)", n->getName().container.c_str());
+                break;
+            }
             auto name = n->getName();
 
             // 1. Вернуть stakes стейкерам
@@ -887,7 +895,7 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             }
             c->owners.clear();
 
-            deleteGranule(c, t.roll, dbd);   // ← c, не u
+            deleteGranule(c, t.roll, dbd);
             b.emit_command(t.tx_id, 0, "gc_contract_deleted",
                 R"({"name":"%s"})", name.c_str());
             break;

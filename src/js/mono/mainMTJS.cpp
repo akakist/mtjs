@@ -19,11 +19,7 @@ void registerWebHandlerModule(const char* pn);
 void registerTelnetService(const char*);
 void registerMTJSModule(const char* );
 void registerNodeService(const char* pn);
-void registerTxValidatorService(const char* pn);
-//void registerBlockValidatorService(const char* pn);
 void registerBroadcasterTreeService(const char* pn);
-void registerGrainReaderService(const char* pn);
-// void registerGrainWriterService(const char* pn);
 void registerBlockStreamerService(const char* pn);
 void registerMysqlModule(const char*pn);
 void registerScanService(const char *pn);
@@ -96,9 +92,7 @@ int mainMTJS(int argc, char** argv )
 
         registerMTJSModule(NULL);
         registerNodeService(NULL);
-        registerTxValidatorService(NULL);
         registerBroadcasterTreeService(NULL);
-        registerGrainReaderService(NULL);
         registerBlockStreamerService(NULL);
         registerMysqlModule(NULL);
         registerScanService(NULL);

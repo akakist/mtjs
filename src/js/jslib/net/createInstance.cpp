@@ -135,7 +135,7 @@ JSValue js_get_contract(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     REF_getter<MsgData::GetContractREQ> rq = new MsgData::GetContractREQ();
     rq->contract.container = contract;
     auto hash = rq->getHash();
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Node,
                                new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
                                new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
@@ -274,7 +274,7 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     // t->nonce = nonce;
     auto hash = t->getHash();
     t->sig_ed_bin = sign_ed(sk, hash.container);
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::TxValidator, new bcEvent::AddTxREQ(t, op->listener_->serviceId));
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Node, new bcEvent::AddTxREQ(t, op->listener_->serviceId));
     if (JS_IsFunction(ctx, argv[5])) {
         op->node_tx_cb.emplace(hash.container, JSValueGuard(ctx, JS_DupValue(ctx, argv[5])));
         // подписка на блок с этой TX (BlockStreamer шлёт RSP только если tx_hash в блоке)
@@ -325,7 +325,7 @@ JSValue js_get_address_info(JSContext *ctx, JSValueConst, int argc, JSValueConst
     REF_getter<MsgData::GetAddressInfoREQ> rq = new MsgData::GetAddressInfoREQ();
     rq->addr.addr = base16::decode(addr);
     auto hash = rq->getHash();
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Node,
                                new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
                                new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
@@ -386,7 +386,7 @@ JSValue js_get_user_nonce(JSContext *ctx, JSValueConst this_val, int argc, JSVal
     RAND_bytes((unsigned char *)rq->rnd.data(), rq->rnd.size());
 
     auto hash = rq->getHash();
-    op->broadcaster->sendEvent(scope.toStdString(argv[0]), ServiceEnum::GrainReader, new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+    op->broadcaster->sendEvent(scope.toStdString(argv[0]), ServiceEnum::Node, new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
 
     op->broadcaster->sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
 
@@ -522,7 +522,7 @@ JSValue js_get_node_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     REF_getter<MsgData::GetNodeInfoREQ> rq = new MsgData::GetNodeInfoREQ();
     rq->node_name.container = name;
     auto hash = rq->getHash();
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Node,
                                new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
                                new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
@@ -555,7 +555,7 @@ JSValue js_get_values(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
 
     REF_getter<MsgData::GetValuesREQ> rq = new MsgData::GetValuesREQ();
     auto hash = rq->getHash();
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Node,
                                new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
                                new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
@@ -592,7 +592,7 @@ JSValue js_get_contract_data(JSContext *ctx, JSValueConst this_val, int argc, JS
     rq->contract.container = contract;
     rq->key.container = key;
     auto hash = rq->getHash();
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Node,
                                new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
                                new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
@@ -637,7 +637,7 @@ JSValue js_call_view(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     rq->params_json = params_json;
     rq->timeout_sec = timeout_sec;
     auto hash = rq->getHash();
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Node,
                                new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
                                new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
@@ -671,7 +671,7 @@ JSValue js_get_state(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     REF_getter<MsgData::GetStateREQ> rq = new MsgData::GetStateREQ();
     auto hash = rq->getHash();
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Node,
                                new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
                                new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
@@ -729,7 +729,7 @@ JSValue js_get_granule(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
     rq->addr = base16::decode(addr_hex);
     rq->hash = hash_hex.empty() ? "" : base16::decode(hash_hex);
     auto hash = rq->getHash();
-    op->broadcaster->sendEvent(node_addr, ServiceEnum::GrainReader,
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Node,
                                new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
                                new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
@@ -766,7 +766,7 @@ JSValue js_get_granule_lite(JSContext *ctx, JSValueConst this_val, int argc, JSV
     rq->addr = base16::decode(addr_hex);
     rq->hash = hash_hex.empty() ? "" : base16::decode(hash_hex);
     auto hash = rq->getHash();
-    op->broadcaster->sendEvent(ServiceEnum::GrainReaderLite,
+    op->broadcaster->sendEvent(ServiceEnum::NodeLite,
                                new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
     op->broadcaster->sendEvent(ServiceEnum::Timer,
                                new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
@@ -794,7 +794,7 @@ JSValue js_lite_set_uplink(JSContext *ctx, JSValueConst, int argc, JSValueConst 
     std::string addr = scope.toStdString(argv[0]);
     if (addr.empty())
         return JS_ThrowInternalError(ctx, "lite_set_uplink: addr empty");
-    op->broadcaster->sendEvent(ServiceEnum::GrainReaderLite,
+    op->broadcaster->sendEvent(ServiceEnum::NodeLite,
                                new bcEvent::LiteSetUplinkREQ(addr, op->listener_->serviceId));
     return JS_UNDEFINED;
 }

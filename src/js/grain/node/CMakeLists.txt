@@ -8,6 +8,7 @@ add_library(node-serviceS STATIC
     leader_node.cpp
     broadcaster.cpp
     tr_exec.cpp
+    reader.cpp
     
 
 )

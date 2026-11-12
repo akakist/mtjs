@@ -22,6 +22,8 @@ inline std::set<EVENT_id> getEvents_nodeService()
 {
 
 	std::set<EVENT_id> out;
+	out.insert(bcEventEnum::AddTxREQ);
+	out.insert(bcEventEnum::AddTxRSP);
 	out.insert(bcEventEnum::BroadcastMessage);
 	out.insert(bcEventEnum::ClientMsgReply);
 	out.insert(bcEventEnum::GetGranulesREQ);
@@ -29,7 +31,10 @@ inline std::set<EVENT_id> getEvents_nodeService()
 	out.insert(bcEventEnum::NodeMsgREQ);
 	out.insert(bcEventEnum::NodeMsgRSP);
 	out.insert(bcEventEnum::PutTransactionREQ);
+	out.insert(bcEventEnum::SendToChild);
+	out.insert(bcEventEnum::SendToChildAck);
 	out.insert(bcEventEnum::ServiceInit);
+	out.insert(bcEventEnum::StaleGranules);
 	out.insert(bcEventEnum::StreamBlock);
 	out.insert(httpEventEnum::DoListen);
 	out.insert(httpEventEnum::RequestIncoming);
@@ -43,6 +48,7 @@ inline std::set<EVENT_id> getEvents_nodeService()
 	out.insert(timerEventEnum::ResetAlarm);
 	out.insert(timerEventEnum::SetAlarm);
 	out.insert(timerEventEnum::SetTimer);
+	out.insert(timerEventEnum::StopAlarm);
 	out.insert(timerEventEnum::TickAlarm);
 	out.insert(timerEventEnum::TickTimer);
 	out.insert(webHandlerEventEnum::RequestIncoming);
@@ -52,6 +58,8 @@ inline std::set<EVENT_id> getEvents_nodeService()
 
 inline void regEvents_nodeService()
 {
+	iUtils->registerEvent(bcEvent::AddTxREQ::construct);
+	iUtils->registerEvent(bcEvent::AddTxRSP::construct);
 	iUtils->registerEvent(bcEvent::BroadcastMessage::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
 	iUtils->registerEvent(bcEvent::GetGranulesREQ::construct);
@@ -59,7 +67,10 @@ inline void regEvents_nodeService()
 	iUtils->registerEvent(bcEvent::NodeMsgREQ::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgRSP::construct);
 	iUtils->registerEvent(bcEvent::PutTransactionREQ::construct);
+	iUtils->registerEvent(bcEvent::SendToChild::construct);
+	iUtils->registerEvent(bcEvent::SendToChildAck::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
+	iUtils->registerEvent(bcEvent::StaleGranules::construct);
 	iUtils->registerEvent(bcEvent::StreamBlock::construct);
 	iUtils->registerEvent(httpEvent::DoListen::construct);
 	iUtils->registerEvent(httpEvent::RequestIncoming::construct);
@@ -73,6 +84,7 @@ inline void regEvents_nodeService()
 	iUtils->registerEvent(timerEvent::ResetAlarm::construct);
 	iUtils->registerEvent(timerEvent::SetAlarm::construct);
 	iUtils->registerEvent(timerEvent::SetTimer::construct);
+	iUtils->registerEvent(timerEvent::StopAlarm::construct);
 	iUtils->registerEvent(timerEvent::TickAlarm::construct);
 	iUtils->registerEvent(timerEvent::TickTimer::construct);
 	iUtils->registerEvent(webHandlerEvent::RequestIncoming::construct);

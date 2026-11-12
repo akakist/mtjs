@@ -5,6 +5,7 @@
 #include "Events/System/timerEvent.h"
 #include "Event/bcEvent.h"
 #include "IDatabase.h"
+#include "Events/System/Net/rpcEvent.h"
 
 namespace Scan
 {

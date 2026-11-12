@@ -1,4 +1,6 @@
 "use strict";
+// tickets.ts — P0: без user_tickets (владелец в seat), O(1) на buyTicket.
+// P1 (потом): убрать sector/row (seat прямо event/<name>/seat/<sector>/<row>/<seat>), отдельный счётчик sold.
 var TTL_EVENT = 86400 * 30;
 var TTL_TICKET = 86400 * 30;
 registerMethod("createEvent", function (p, m) {
@@ -28,12 +30,7 @@ registerMethod("buyTicket", function (p, m) {
     if (s && s.sold)
         throw new Error("already sold");
     consumeValue(p.amount);
-    seat.set({ owner: String(m.sender), paid: p.amount, sold: true });
-    var userTickets = get("user_tickets", TTL_EVENT);
-    var ut = userTickets.get(String(m.sender), TTL_EVENT);
-    var t = ut.get() || { tickets: [] };
-    t.tickets.push("event/" + p.event + "/Sector" + p.sector + "/row" + p.row + "/seat" + p.seat);
-    ut.set(t);
+    seat.set({ owner: String(m.sender), paid: p.amount, sold: true }); // ← владелец здесь (O(1))
     e.sold = Number(e.sold) + 1;
     event.set(e);
     emit("TicketSold", { event: p.event, sector: p.sector, row: p.row, seat: p.seat, owner: String(m.sender), paid: p.amount });
@@ -62,6 +59,42 @@ registerView("getEvent", function (p) {
         return { found: false };
     var e = event.get();
     return e ? { found: true, name: e.name, price: e.price, total: e.total, sold: e.sold } : { found: false };
+});
+// P0: список билетов юзера — вычисляем (O(n), редко), не храним.
+registerView("getUserTickets", function (p) {
+    var event = get("event/" + String(p.event));
+    if (!event)
+        return { found: false, tickets: [] };
+    var e = event.get();
+    if (!e)
+        return { found: false, tickets: [] };
+    var out = [];
+    for (var si = 0; si < e.sectors; si++) {
+        var sector = event.get("Sector" + si);
+        if (!sector)
+            continue;
+        var sec = sector.get();
+        if (!sec)
+            continue;
+        for (var ri = 0; ri < sec.rows; ri++) {
+            var row = sector.get("row" + ri);
+            if (!row)
+                continue;
+            var r = row.get();
+            if (!r)
+                continue;
+            for (var ti = 0; ti < r.seats; ti++) {
+                var seat = row.get("seat" + ti);
+                if (!seat)
+                    continue;
+                var s = seat.get();
+                if (s && s.sold && s.owner === String(p.user)) {
+                    out.push({ sector: si, row: ri, seat: ti, paid: s.paid });
+                }
+            }
+        }
+    }
+    return { found: true, tickets: out };
 });
 registerMethod("deleteEvent", function (p, m) {
     var event = get("event/" + String(p.name));

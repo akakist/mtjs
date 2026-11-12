@@ -10,15 +10,19 @@
 #include "md/md_BlockDBStore.h"
 #include "md/md_BlockAccepted2REQ.h"
 #include "md/md_attachment_data.h"
+#include "db_to_save.h"
+#include "IDatabase.h"
 namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
-    const SERVICE_id TxValidator(ghash("@g_TxValidator"));
+    const SERVICE_id NodeLite(ghash("@g_NodeLite"));
+    // const SERVICE_id TxValidator(ghash("@g_TxValidator"));
     const SERVICE_id BroadcasterTree(ghash("@g_BroadcasterTree"));
-    const SERVICE_id GrainReader(ghash("@g_GrainReader"));
-    const SERVICE_id GrainReaderLite(ghash("@g_GrainReaderLite"));
+    // const SERVICE_id GrainReader(ghash("@g_GrainReader"));
+    // const SERVICE_id GrainReaderLite(ghash("@g_GrainReaderLite"));
     const SERVICE_id BlockStreamer(ghash("@g_BlockStreamer"));
     const SERVICE_id Scan(ghash("@g_Scan"));
+    const SERVICE_id DBWriter(ghash("@g_DBWriter"));
 
 }
 namespace bcEventEnum
@@ -34,7 +38,8 @@ namespace bcEventEnum
     const EVENT_id ClientTxUnsubscribeREQ(ghash("@g_ClientTxUnsubscribeREQ"));
     const EVENT_id ClientTxSubscribeRSP(ghash("@g_ClientTxSubscribeRSP"));
     const EVENT_id ServiceInit(ghash("@g_ServiceInit"));
-    const EVENT_id InvalidateRoot(ghash("@g_InvalidateRoot"));
+    // const EVENT_id InvalidateRootREQ(ghash("@g_InvalidateRootREQ"));
+    // const EVENT_id InvalidateRootRSP(ghash("@g_InvalidateRootRSP"));
     const EVENT_id BroadcastMessage(ghash("@g_BroadcastMessage"));
     const EVENT_id SendToChild(ghash("@g_SendToChild"));
     const EVENT_id SendToChildAck(ghash("@g_SendToChildAck"));
@@ -49,7 +54,10 @@ namespace bcEventEnum
     const EVENT_id GetGranulesRSP(ghash("@g_GetGranulesRSP"));
     const EVENT_id StaleGranules(ghash("@g_StaleGranules"));
     const EVENT_id LiteSetUplinkREQ(ghash("@g_LiteSetUplinkREQ")); /// выставить для iDatabase адрес ноды откуда брать гранулы
-    
+    // const EVENT_id BarrierOpenREQ(ghash("@g_BarrierOpenREQ__"));
+    // const EVENT_id BarrierOpenRSP(ghash("@g_BarrierOpenRSP+__"));
+    // const EVENT_id DBWriteREQ(ghash("@g_dbWriteREQ"));
+    // const EVENT_id DBWriteRSP(ghash("@g_dbWriteRSP"));
 
 }
 
@@ -304,18 +312,64 @@ namespace bcEvent
         REF_getter<IDatabase> db;
     };
 
-    class InvalidateRoot : public Event::NoPacked
-    {
-    public:
-        static Base *construct(const route_t &r)
-        {
-            return NULL;
-        }
-        InvalidateRoot(const route_t &r)
-            : NoPacked(bcEventEnum::InvalidateRoot, r) {}
+    // class InvalidateRootREQ : public Event::NoPacked
+    // {
+    // public:
+    //     static Base *construct(const route_t &r)
+    //     {
+    //         return NULL;
+    //     }
+    //     InvalidateRootREQ(const route_t &r)
+    //         : NoPacked(bcEventEnum::InvalidateRootREQ, r) {}
         
-    };
+    // };
+    // class InvalidateRootRSP : public Event::NoPacked
+    // {
+    // public:
+    //     static Base *construct(const route_t &r)
+    //     {
+    //         return NULL;
+    //     }
+    //     InvalidateRootRSP(const SERVICE_id& _sid, const route_t &r)
+    //         : NoPacked(bcEventEnum::InvalidateRootRSP, r),sid(_sid) {}
+        
+    //     SERVICE_id sid;
+    // };
+    // class BarrierOpenREQ : public Event::NoPacked
+    // {
+    // public:
+    //     static Base* construct(const route_t &r) { return NULL; }
+    //     BarrierOpenREQ(const route_t &r) : NoPacked(bcEventEnum::BarrierOpenREQ, r) {}
+    // };
 
+    // class BarrierOpenRSP : public Event::NoPacked
+    // {
+    // public:
+    //     static Base* construct(const route_t &r) { return NULL; }
+    //     BarrierOpenRSP(const SERVICE_id& _sid, const route_t &r)
+    //         : NoPacked(bcEventEnum::BarrierOpenRSP, r), sid(_sid) {}
+    //     SERVICE_id sid;
+    // };
+    // class DBWriteREQ : public Event::NoPacked
+    // {
+    // public:
+    //     static Base* construct(const route_t &r) { return NULL; }
+    //     DBWriteREQ(IDatabase*d, const _db_to_save& _dump, const route_t &r) : NoPacked(bcEventEnum::DBWriteREQ, r),db(d),dump(_dump) {}
+    //     _db_to_save dump;
+    //     IDatabase *db;
+    // };
+    // class DBWriteRSP : public Event::NoPacked
+    // {
+    // public:
+    //     static Base *construct(const route_t &r)
+    //     {
+    //         return NULL;
+    //     }
+    //     DBWriteRSP(const SERVICE_id& _sid, const route_t &r)
+    //         : NoPacked(bcEventEnum::DBWriteRSP, r),sid(_sid) {}
+        
+    //     SERVICE_id sid;
+    // };
     class BroadcastMessage : public Event::NoPacked
     {
 

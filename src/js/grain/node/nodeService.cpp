@@ -143,7 +143,7 @@ void Node::Service::dump(nlohmann::json& j)
         auto& lb = j["l_blocks"][base16::encode(prev.container)];
         auto& li = bt;
 
-        lb["leader_cert"] = dump_hb(li.leader_cert_2);
+        // lb["leader_cert"] = dump_hb(li.leader_cert_2);
 
         // confirm_leader rsp (по hb_hash)
         for (auto& [hb_hash, m] : bt.ConfirmLeaderRSP_m) {
@@ -174,35 +174,35 @@ void Node::Service::dump(nlohmann::json& j)
         }
 
         // block_diff_validate rsp
-        for (auto& [bh, v] : bt.BlockDiffValidateRSP_m) {
-            for (auto& rsp : v) {
-                if (!rsp.valid()) continue;
-                lb["diff_validate_rsp"].push_back({
-                    {"block_hash", bh.str()},
-                    {"validator",  rsp->node_validator.container},
-                    {"sig",        base16::encode(rsp->sig.serialize())}
-                });
-            }
-        }
+        // for (auto& [bh, v] : bt.BlockDiffValidateRSP_m) {
+        //     for (auto& rsp : v) {
+        //         if (!rsp.valid()) continue;
+        //         lb["diff_validate_rsp"].push_back({
+        //             {"block_hash", bh.str()},
+        //             {"validator",  rsp->node_validator.container},
+        //             {"sig",        base16::encode(rsp->sig34.serialize())}
+        //         });
+        //     }
+        // }
 
         // blockDiffValidateREQ (лидер)
-        if (bt.blockDiffValidateREQ.valid()) {
-            auto& r = bt.blockDiffValidateREQ;
-            auto& rr = lb["block_diff_validate_req"];
-            rr["blockAccepted2"] = dump_block_accepted2(r->blockAcceptedREQ.valid()
-                ? REF_getter<MsgData::BlockAccepted2REQ>() : nullptr); // placeholder
-            // blockAcceptedREQ (не 2) — отдельно
-            if (r->blockAcceptedREQ.valid()) {
-                rr["blockInfo"] = dump_block_info(r->blockAcceptedREQ->blockInfo);
-                rr["node_validators"] = nlohmann::json::array();
-                for (auto& z : r->blockAcceptedREQ->node_validators) rr["node_validators"].push_back(z.container);
-                rr["agg_sig"] = base16::encode(r->blockAcceptedREQ->agg_sig.serialize());
-            }
-            rr["tx_count"] = (int)r->tx_hashes.size();
-            rr["diffs_count"] = (int)r->diffs.size();
-            // rr["sent"] = bt.blockDiffValidateREQ_sent;
-            // rr["accepted2_sent"] = bt.blockAccepted2REQ_sent;
-        }
+        // if (bt.blockDiffValidateREQ_2.valid()) {
+        //     auto& r = bt.blockDiffValidateREQ_2;
+        //     auto& rr = lb["block_diff_validate_req"];
+        //     rr["blockAccepted2"] = dump_block_accepted2(r->blockAcceptedREQ.valid()
+        //         ? REF_getter<MsgData::BlockAccepted2REQ>() : nullptr); // placeholder
+        //     // blockAcceptedREQ (не 2) — отдельно
+        //     if (r->blockAcceptedREQ.valid()) {
+        //         rr["blockInfo"] = dump_block_info(r->blockAcceptedREQ->blockInfo);
+        //         rr["node_validators"] = nlohmann::json::array();
+        //         for (auto& z : r->blockAcceptedREQ->node_validators) rr["node_validators"].push_back(z.container);
+        //         rr["agg_sig"] = base16::encode(r->blockAcceptedREQ->agg_sig.serialize());
+        //     }
+        //     rr["tx_count"] = (int)r->tx_hashes.size();
+        //     rr["diffs_count"] = (int)r->diffs.size();
+        //     // rr["sent"] = bt.blockDiffValidateREQ_sent;
+        //     // rr["accepted2_sent"] = bt.blockAccepted2REQ_sent;
+        // }
     }
 
     // tx_pool
@@ -247,33 +247,79 @@ void Node::Service::dump(nlohmann::json& j)
         }
     }
 }
+/*bool GrainReader::Service::on_startService(const systemEvent::startService *)
+{
+    MUTEX_INSPECTOR;
+
+    if (mode_ == Lite) {
+        if (uplink_http_addr_.empty())
+            return true;
+        db_state_3 = new CDatabaseLiteNode(db_path_, uplink_http_addr_);
+        auto prev_root = load_last_block(db_state_3.get());
+        root = getRoot(db_state_3.get(), prev_root);
+        
+        contractHost = new ContractHost();
+        contractHost->granules = new NodeGranuleIO(db_state_3);
+        contractHost->source = new NodeContractSourceIO(db_state_3);
+        DBG(logErr2("GrainReader: lite mode, db=%s, http=%s", db_path_.c_str(), uplink_http_addr_.c_str()));
+    } else {
+        DBG(logErr2("GrainReader: full mode, wait ServiceInit"));
+        SECURE sec;
+        sec.use_ssl = false;
+        for (auto& z : http_granule_addr_)
+            sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
+        sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(GrainReader::TIMER_STALE_CLEANUP, NULL, NULL, 60., this));
+    }
+    return true;
+}
+*/
+#include "CDatabaseLiteNode.h"
 bool Node::Service::on_startService(const systemEvent::startService *)
 {
     MUTEX_INSPECTOR;
 
 
-    // last_activity_time=iUtils->getNow();
-
-    SECURE sec;
-    sec.use_ssl = false;
-    for (auto &z : web_addr)
-        sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
-
-    db_state = new CDatabaseRocksdb(db_name);
-
-    contractHost=make_node_contract_host(db_state);
-
+    if (mode_ == Lite) {
+        if (uplink_http_addr_.empty())
+            return true;
+        db_state = new CDatabaseLiteNode(db_name, uplink_http_addr_);
+        // auto prev_root = load_last_block(db_state.get());
+        // root = getRoot(db_state.get(), prev_root);
+        
+        // contractHost = new ContractHost();
+        // contractHost->granules = new NodeGranuleIO(db_state);
+        // contractHost->source = new NodeContractSourceIO(db_state);
+        DBG(logErr2("Node: lite mode, db=%s, http=%s", db_name.c_str(), uplink_http_addr_.c_str()));
+    } else {
+        DBG(logErr2("Node: full mode, wait ServiceInit"));
+        db_state = new CDatabaseRocksdb(db_name);
+        SECURE sec;
+        sec.use_ssl = false;
+        for (auto& z : http_granule_addr_)
+            sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
+        sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(TIMER_STALE_CLEANUP, NULL, NULL, 60., this));
+        db_state->on_sync_finished = [this]() {
+                // prev_block = load_last_block(db_state.get());
+                root = getRoot(db_state.get(), prev_block);
+                block_meta_full.clear();
+    };
     prev_block=load_last_block(db_state.get());
     root=getRoot(db_state.get(),prev_block);
-    db_state->on_sync_finished = [this]() {
-            // prev_block = load_last_block(db_state.get());
-            root = getRoot(db_state.get(), prev_block);
-            block_meta_full.clear();
-    };
-    sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    // sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
     // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
-    sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    // sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
     sendEvent(ServiceEnum::Scan, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+    }
+    // last_activity_time=iUtils->getNow();
+
+    // SECURE sec;
+    // sec.use_ssl = false;
+    // for (auto &z : web_addr)
+    //     sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
+
+    
+    contractHost=make_node_contract_host(db_state);
+
 
     init_genesis(root.get(), db_state.get());
     invalidate_services();
@@ -307,6 +353,51 @@ bool Node::Service::on_startService(const systemEvent::startService *)
 
     return true;
 }
+#include "tools_mt.h"
+bool Node::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
+{
+    MUTEX_INSPECTOR;
+    std::optional<std::string> err;
+    auto hash = e->tx->getHash();
+    auto xroot=root;
+    yyjson_doc* doc = yyjson_read(e->tx->tx_body.data(), e->tx->tx_body.size(), 0);
+    if (!doc) { err = "tx_body: invalid json"; }
+    else {
+        yyjson_val *root = yyjson_doc_get_root(doc);
+        yyjson_val *sv = root ? yyjson_obj_get(root, "sender") : nullptr;
+        yyjson_val *ki = root ? yyjson_obj_get(root, "key_id") : nullptr;
+        std::string sender_hex;
+        if (sv && yyjson_is_str(sv)) sender_hex = yyjson_get_str(sv);
+        int64_t key_id = -1;
+        if (ki && yyjson_is_num(ki)) key_id = yyjson_get_sint(ki);
+
+        if (!sender_hex.empty()) {
+            ADDRESS_id senderAddress;
+            senderAddress.addr = base16::decode(sender_hex);
+            auto u = cells::getAddressStateNoCreate(xroot.get(),db_state.get(), senderAddress);
+            if (!u.valid()) { err = "sender address not found"; }
+            else if (key_id < 0) { err = "key_id required"; }
+            else {
+                auto k = u->getKey((uint64_t)key_id);
+                if (!k) { err = "key_id not found"; }
+                else if (!verify(*k, e->tx->sig_ed_bin, hash.container)) { err = "verify failed"; }
+                else {
+                    e->tx->sender_addr = senderAddress;
+                    e->tx->sender_key_id = (uint64_t)key_id;
+                    e->tx->sender_resolved = true;
+                }
+            }
+        } else {
+            if (!e->tx->verify()) err = "verify failed (legacy ed25519)";
+        }
+        yyjson_doc_free(doc);
+    }
+
+    if (!err) sendEvent(ServiceEnum::Node, new bcEvent::PutTransactionREQ(e->tx, this));
+    passEvent(new bcEvent::AddTxRSP(hash, err.has_value(), err ? *err : "transaction added to pool",
+                                    poppedFrontRoute(e->route)));
+    return true;
+}
 
 std::vector<REF_getter<MsgData::TX>> Node::Service::collectTransactions()
 {
@@ -338,7 +429,7 @@ std::vector<REF_getter<MsgData::TX>> Node::Service::collectTransactions()
     return out;
 }
 
-void Node::Service::do_start_block()
+void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
 {
     MUTEX_INSPECTOR;
 
@@ -362,20 +453,20 @@ void Node::Service::do_start_block()
     }
 
     auto &li = l_blocks[prev];
-    if (!li.leader_cert_2.valid()) {
-        logNode("do_start_block: leader_cert_2 invalid");
-        return;
-    }
+    // if (!li.leader_cert_2.valid()) {
+    //     logNode("do_start_block: leader_cert_2 invalid");
+    //     return;
+    // }
 
-    auto mf = getMetaFull(li.leader_cert_2->block_timestamp);
+    auto mf = getMetaFull(hb->block_timestamp);
     if (!mf.valid()) {
         logNode("do_start_block: meta invalid");
         return;
     }
 
     REF_getter<MsgData::ValidateBlockREQ> vb = new MsgData::ValidateBlockREQ();
-    vb->heart_beat = li.leader_cert_2;
-    vb->lc = makeLeaderCert(li.leader_cert_2.get(), mf.get());
+    vb->heart_beat = hb;
+    vb->lc = makeLeaderCert(hb, mf.get());
 
     auto &bt = l_blocks[prev];
 
@@ -394,6 +485,11 @@ void Node::Service::do_start_block()
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
+    if (e->tid == TIMER_STALE_CLEANUP) {
+        cleanup_stale((int64_t)time(NULL));
+        return true;
+    }
+
     if(e->tid==timers::TIMER_REPORT_MEM)
     {
         // report_mem();
@@ -415,9 +511,12 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         auto &bt = l_blocks[prev_root_hash_Z()];
         THASH_id hb_hash;
         hb_hash.container=e->data->container;
+        MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
+        if(!hb)
+        throw CommonError("if(!hb)");
         if(bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
         {
-            do_start_block();
+            do_start_block(hb);
             logNode("do_start_block();");
             bt.GetTransactionRSP_m[hb_hash].clear();
         }
@@ -425,16 +524,27 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     }
     case TIMER_BlockDBStore:
     {
+        
+
         auto r=dynamic_cast<MsgData::BlockDBStore*>(e->cookie.get());
+
         if(!r)
             throw CommonError("!r BlockDBStore");
         auto & bt= l_blocks[prev_root_hash_Z()];
-        auto h=r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->getHash();
+
+        auto h=r->blockAccepted2REQ->blockAcceptedREQ->getHash();
+        // logNode("alarm hash from coookie %s",h.str().c_str());
+        THASH_id hd;
+        hd.container=e->data->container;
+    // logNode("alarm hash from data %s",hd.str().c_str());
+
         if(bt.is_BlockDiffValidateRSP_m_quorum(h,root.get(), db_state.get()))
         {
+
             auto mf=getMetaFull(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
             broadcast_MsgEvent_via_broadcaster(r,mf->tree_all_nodes);
             bt.BlockDiffValidateRSP_m[h].clear();
+
 
         }
         return true;
@@ -489,6 +599,16 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         auto &ID = e->id;
         switch (ID)
         {
+        case bcEventEnum::LiteSetUplinkREQ:
+            return on_LiteSetUplinkREQ((const bcEvent::LiteSetUplinkREQ*)e.get());
+        case bcEventEnum::ClientMsg:
+            return ClientMsg((const bcEvent::ClientMsg *)e.get());
+        case bcEventEnum::AddTxREQ:
+            return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(e.get()));
+        // case bcEventEnum::DBWriteRSP:
+        //     return DBWriteRSP(static_cast<const bcEvent::DBWriteRSP *>(e.get()));
+        // case bcEventEnum::InvalidateRootRSP:
+        //     return InvalidateRootRSP(static_cast<const bcEvent::InvalidateRootRSP *>(e.get()));
         case bcEventEnum::SendToChild:
             return SendToChild(static_cast<const bcEvent::SendToChild *>(e.get()), false);
         case bcEventEnum::SendToChildAck:
@@ -519,6 +639,8 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             return true;
         case httpEventEnum::RequestIncoming:
             return RequestIncoming(static_cast<const httpEvent::RequestIncoming *>(e.get()));
+        // case bcEventEnum::BarrierOpenRSP:
+        //     return BarrierOpenRSP(static_cast<const bcEvent::BarrierOpenRSP *>(e.get()));
         case rpcEventEnum::IncomingOnAcceptor:
         {
             MUTEX_INSPECTOR;
@@ -527,6 +649,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
 
             switch (IDA)
             {
+            case bcEventEnum::ClientMsg:
+                return ClientMsg((const bcEvent::ClientMsg *)ev->e.get());
+            case bcEventEnum::AddTxREQ:
+                return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(ev->e.get()));
             case bcEventEnum::SendToChild:
                 return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
             case bcEventEnum::SendToChildAck:
@@ -552,6 +678,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             auto &IDC = ev->e->id;
             switch (IDC)
             {
+            case bcEventEnum::ClientMsg:
+                return ClientMsg((const bcEvent::ClientMsg *)ev->e.get());
+            case bcEventEnum::AddTxREQ:
+                return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(ev->e.get()));
             case bcEventEnum::SendToChild:
                 return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
             case bcEventEnum::SendToChildAck:
@@ -651,15 +781,27 @@ Node::Service::~Service()
 
 }
 
-Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *ins)
+Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *ins, Mode m)
     : UnknownBase(nm),
       ListenerBuffered1Thread(nm, id),
       Broadcaster(ins),
-      iInstance(ins)
+      iInstance(ins),
+      mode_(m)
 {
     MUTEX_INSPECTOR;
+    node_start_timestamp=iUtils->getNow();
+
+    if (mode_ == Lite) {
+        // Lite: без сети, без ключей. Только uplink + локальный кеш.
+        uplink_http_addr_ = ins->getConfig()->get_string("node_http_addr", "", "full node /granule addr (required for lite)");
+        db_name = ins->getConfig()->get_string2("db_name", "db/nl0", "lite db name");
+        return;
+    }
+
+    // Full
     rpc_addr = ins->getConfig()->get_tcpaddr("rpc_addr", "127.0.0.1:2345", "rpc address(es) of node ex: ip:port,ip2:port2");
     web_addr = ins->getConfig()->get_tcpaddr("web_addr", "127.0.0.1:2347", "web address(es) of node ex: ip:port,ip2:port2");
+
     std::string bls_sk_hex = iInstance->getConfig()->get_string("my_sk_bls", "", "BLS secret (hex, inline)");
     std::string ed_sk_hex  = iInstance->getConfig()->get_string("my_sk_ed",  "", "Ed secret (hex, inline)");
     if (!bls_sk_hex.empty()) my_sk_bls.deserializebase16Str(bls_sk_hex);
@@ -668,12 +810,8 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
     else                     my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
 
     this_node_name.container = ins->getConfig()->get_string("this_node_name", "n0", "registered name of node");
-
-// std::string bls_sk_hex = iInstance->getConfig()->get_string("my_sk_bls", "", "BLS secret (hex, inline)");
-// std::string ed_sk_hex  = iInstance->getConfig()->get_string("my_sk_ed",  "", "Ed secret (hex, inline)");
-
-    db_name=ins->getConfig()->get_string2("db_name", "grain", "db name");
-    node_start_timestamp=iUtils->getNow();
+    db_name = ins->getConfig()->get_string2("db_name", "grain", "db name");
+    http_granule_addr_ = ins->getConfig()->get_tcpaddr("http_granule_addr", "127.0.0.1:3301", "HTTP /granule addr (full mode)");
 }
 
 bool Node::Service::on_RequestIncoming(const webHandlerEvent::RequestIncoming *)
@@ -690,47 +828,84 @@ void registerNodeService(const char *pn)
     if (pn)
     {
         iUtils->registerPlugingInfo(pn, IUtils::PLUGIN_TYPE_SERVICE, ServiceEnum::Node, "Node", getEvents_nodeService());
+        iUtils->registerPlugingInfo(pn, IUtils::PLUGIN_TYPE_SERVICE, ServiceEnum::NodeLite, "NodeLite", getEvents_nodeService());
     }
     else
     {
-        iUtils->registerService(ServiceEnum::Node, Node::Service::construct, "Node");
+        iUtils->registerService(ServiceEnum::Node, Node::Service::constructFull, "Node");
+        iUtils->registerService(ServiceEnum::NodeLite, Node::Service::constructLite, "NodeLite");
         regEvents_nodeService();
     }
     XPASS;
 }
 
-bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming *e)
+bool Node::Service::RequestIncoming(const httpEvent::RequestIncoming* e)
 {
     MUTEX_INSPECTOR;
+    if (mode_ != Full) return true;
     auto uri = std::string(e->req->url);
-    if (uri == "/dump" || uri.rfind("/dump?", 0) == 0) {
-        try {
-            nlohmann::json j;
-            dump(j);
-            HTTP::Response r(e->req);
-            r.setHeader("Content-Type", "application/json");
-            r.make_response(j.dump(2));
-        } catch (std::exception& ex) {
-            HTTP::Response r(e->req);
-            r.setHeader("Content-Type", "text/plain");
-            r.make_response(std::string("dump error: ") + ex.what());
+    if (uri.rfind("/granule", 0) != 0) return true;
+
+    std::map<std::string,std::string> q;
+    auto pos = uri.find('?');
+    if (pos != std::string::npos) {
+        std::string qs = uri.substr(pos + 1);
+        size_t start = 0;
+        while (start < qs.size()) {
+            size_t amp = qs.find('&', start);
+            std::string pair = qs.substr(start, amp == std::string::npos ? std::string::npos : amp - start);
+            size_t eq = pair.find('=');
+            if (eq != std::string::npos) q[pair.substr(0, eq)] = pair.substr(eq + 1);
+            if (amp == std::string::npos) break;
+            start = amp + 1;
         }
-        return true;
     }
-    logNode("RequestIncoming %s", uri.c_str());
+    std::string addr_hex = q.count("addr") ? q["addr"] : "";
+    std::string hash_hex = q.count("hash") ? q["hash"] : "";
+
+    HTTP::Response rsp(e->req);
+    rsp.setHeader("Content-Type", "application/json");
+    if (addr_hex.empty()) {
+        rsp.setStatus(400); rsp.make_response(R"({"error":"addr required"})"); return true;
+    }
+    std::string addr_bin = base16::decode(addr_hex);
+    if (addr_bin.size() != 32) {
+        rsp.setStatus(400); rsp.make_response(R"({"error":"addr must be 32 bytes hex"})"); return true;
+    }
+    std::string expected_hash = hash_hex.empty() ? "" : base16::decode(hash_hex);
+    if (!expected_hash.empty() && expected_hash.size() != 32) {
+        rsp.setStatus(400); rsp.make_response(R"({"error":"hash must be 32 bytes hex"})"); return true;
+    }
+
+    // 1) актуальное
+    std::string body;
+    int r = db_state->getGranule(addr_bin, &body);
+    if (r == 0 && !body.empty()) {
+        if (expected_hash.empty() || blake2b_hash(body).container == expected_hash) {
+            rsp.make_response(R"({"body":")" + base16::encode(body) + R"(","stale":false})");
+            return true;
+        }
+    }
+    // 2) stale_cache по hash
+    if (!expected_hash.empty()) {
+        std::string stale_body;
+        if (get_stale(expected_hash, stale_body)) {
+            rsp.make_response(R"({"body":")" + base16::encode(stale_body) + R"(","stale":true})");
+            return true;
+        }
+    }
+    // 3) 404
+    rsp.setStatus(404);
+    rsp.make_response(R"({"error":"not found"})");
     return true;
 }
 
-void Node::Service::do_request_for_transactions( block_leader& li, const REF_getter<BlockMetaFull>& meta)
+void Node::Service::do_request_for_transactions(MsgData::HeartBeatREQ* hb, const REF_getter<BlockMetaFull>& meta)
 {
     MUTEX_INSPECTOR;
 
     REF_getter<MsgData::GetTransactionREQ> rt = new MsgData::GetTransactionREQ();
-    if(!li.leader_cert_2.valid())
-    {
-        throw CommonError("if(!li.leader_cert_2.valid())");
-    }
-    rt->hb = li.leader_cert_2;
+    rt->hb = hb;
     // li.request_for_transactions_time = iUtils->getNow();
 
     broadcast_MsgEvent_via_broadcaster(rt.get(),meta->tree_all_nodes);
@@ -952,7 +1127,7 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
         do_heart_beat(time(NULL));
     }
     else {
-        logNode("no heart beat timediff %ld",iUtils->getNow()-stage_is_working);
+        // logNode("no heart beat timediff %ld",iUtils->getNow()-stage_is_working);
     }
     return true;
 }
@@ -1591,9 +1766,13 @@ bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_i
 }
 void Node::Service::invalidate_services()
 {
-    sendEvent(ServiceEnum::GrainReader,new bcEvent::InvalidateRoot(this));
-    sendEvent(ServiceEnum::TxValidator,new bcEvent::InvalidateRoot(this));
+    // sendEvent(ServiceEnum::GrainReader,new bcEvent::InvalidateRootREQ(this));
+    // sendEvent(ServiceEnum::TxValidator,new bcEvent::InvalidateRootREQ(this));
+    // InvalidateRootRSPS.insert(ServiceEnum::GrainReader);
+    // InvalidateRootRSPS.insert(ServiceEnum::TxValidator);
 }
+
+
 
 void Node::Service::logNode(const char *fmt, ...)
 {

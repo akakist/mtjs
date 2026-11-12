@@ -20,12 +20,12 @@ namespace MsgData
         }
 
         std::vector<REF_getter<MsgData::TX>>  trs;
-        THASH_id hb_hash;
+        REF_getter<MsgData::HeartBeatREQ> hb;
         void update(Blake2bHasher& h) const
         {
             for(auto& z:trs )
                 h.update(z->tx_body);
-            h.update(hb_hash.container);
+            hb->update(h);
         }
 
         void pack(outBuffer& b) const final
@@ -34,14 +34,14 @@ namespace MsgData
 
             Base::pack(b);
             b<<trs;
-            b<< hb_hash;
+            b<< hb;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>trs;
-            b>> hb_hash;
+            b>> hb;
         }
 
     };

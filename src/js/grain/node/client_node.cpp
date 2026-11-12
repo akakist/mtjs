@@ -115,8 +115,19 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     }
     REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
     bdvrs->node_validator=this_node_name;
-    bdvrs->sig.sign(my_sk_bls,r->blockAcceptedREQ->getHash().container);
-    bdvrs->blockInfoHash=r->blockAcceptedREQ->blockInfo->getHash();
+    bdvrs->sig34.sign(my_sk_bls,r->blockAcceptedREQ->getHash().container);
+    bdvrs->blockAcceptedHash=r->blockAcceptedREQ->getHash();
+
+    // DIAG: what validator signs
+    {
+        blst_cpp::PublicKey my_pk(my_sk_bls);
+        DBG(logNode("[DIAG BlockDiffValidateRSP sign] validator=%s pk=%s sig=%s hash=%s",
+            this_node_name.container.c_str(),
+            base16::encode(my_pk.serialize()).c_str(),
+            base16::encode(bdvrs->sig34.serialize()).c_str(),
+            r->blockAcceptedREQ->getHash().str().c_str()));
+    }
+
     pass_NodeMsgRSP(bdvrs.get(),route);
     return true;
 }
@@ -263,63 +274,147 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         if (db_state->getGranule(z, &old_body) == 0 && !old_body.empty())
             stale.push_back({blake2b_hash(old_body).container, old_body});
     }
+    // BarrierRSPS.insert(ServiceEnum::GrainReader);
+    // BarrierRSPS.insert(ServiceEnum::TxValidator);
+    // REF_getter<bcEvent::DBWriteREQ> dbreq=new bcEvent::DBWriteREQ(db_state.get(), db_to_save_Z, this);
+    // dbWriteREQ=dbreq;
+    // BlockDBStore_for_invalidate=r;
+    // if (!stale.empty())
+    //     sendEvent(ServiceEnum::GrainReader, new bcEvent::StaleGranules(stale, this));
+
+    int64_t now = (int64_t)time(NULL);
+    for (auto& z : stale)
+        stale_cache[z.first] = { z.second, now };
+
+    // sendEvent(ServiceEnum::GrainReader,new bcEvent::BarrierOpenREQ(this));
+    // sendEvent(ServiceEnum::TxValidator,new bcEvent::BarrierOpenREQ(this));
 
     db_state->write_granules_batch(db_to_save_Z);
-
-    if (!stale.empty())
-        sendEvent(ServiceEnum::GrainReader, new bcEvent::StaleGranules(stale, this));
-
     db_to_save_Z.clear();
+
+        // REF_getter<MsgData::BlockDBStore> r=BlockDBStore_for_invalidate;
+        // BlockDBStore_for_invalidate=nullptr;
+        sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
+
+        prev_block=r->blockAccepted2REQ;
+        l_blocks.clear();
+        block_meta_full.clear();
+
+        for (auto &z : r->tx_hashes)
+        {
+
+            MUTEX_INSPECTOR;
+            XTRY;
+            auto it = transaction_pool_of_leader.find(z);
+            if (it != transaction_pool_of_leader.end())
+            {
+                transaction_pool_of_leader.erase(it);
+                DBG(logNode("removed tx %s", base16::encode(z.container).c_str()));
+            }
+            XPASS;
+        }
+        auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
+        auto ttl_cache=v->getValue("ttl_cache");
+        if(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->new_epoch % 100 == 0)
+        {
+    #ifdef DEBUG
+            for(auto& z: contractHost->contract_cache)
+            {
+                dump_mem("ccc",z.second->rt);
+            }
+    #endif
+            contractHost->contract_cache.clear();
+            root=getRoot(db_state.get(),prev_block);
+        }
+        cli_leader_info.clear();
+
+        stage_is_working=0;
+
+        if(transaction_pool_of_leader.size())
+        {
+            do_heart_beat(time(NULL));
+        }
+
+    // db_to_save_Z.clear();
     // grain/node/client_node.cpp, BlockDBStore, после write_granules_batch:
-    {
-        auto root_hex = base16::encode(
-            r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->new_root_hash1.container).substr(0, 16);
-        DBG(logNode("BlockDBStore: after write, root=%s, sending InvalidateRoot", root_hex.c_str()));
-    }
-    invalidate_services();    
+    // {
+    //     auto root_hex = base16::encode(
+    //         r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->new_root_hash1.container).substr(0, 16);
+    //     DBG(logNode("BlockDBStore: after write, root=%s, sending InvalidateRoot", root_hex.c_str()));
+    // }
+    // {
 
-    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
+    // }
+    // invalidate_services(r);    
 
-    prev_block=r->blockAccepted2REQ;
-    l_blocks.clear();
-    block_meta_full.clear();
-
-    for (auto &z : r->tx_hashes)
-    {
-
-        MUTEX_INSPECTOR;
-        XTRY;
-        auto it = transaction_pool_of_leader.find(z);
-        if (it != transaction_pool_of_leader.end())
-        {
-            transaction_pool_of_leader.erase(it);
-            DBG(logNode("removed tx %s", base16::encode(z.container).c_str()));
-        }
-        XPASS;
-    }
-    auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
-    auto ttl_cache=v->getValue("ttl_cache");
-    {
-#ifdef DEBUG
-        for(auto& z: contractHost->contract_cache)
-        {
-            dump_mem("ccc",z.second->rt);
-        }
-#endif
-        contractHost->contract_cache.clear();
-        root=getRoot(db_state.get(),prev_block);
-    }
-    cli_leader_info.clear();
-
-    stage_is_working=0;
-
-    if(transaction_pool_of_leader.size())
-    {
-        do_heart_beat(time(NULL));
-    }
     XPASS;
     return true;
 }
+
+
+// bool Node::Service::BarrierOpenRSP(const bcEvent::BarrierOpenRSP* e)
+// {
+//     BarrierRSPS.erase(e->sid);
+//     if(BarrierRSPS.empty())
+//     {
+//         sendEvent(ServiceEnum::DBWriter,dbWriteREQ.get());
+//         dbWriteREQ=nullptr;
+//     }
+//     return true;    
+// }
+
+// bool Node::Service::InvalidateRootRSP(const bcEvent::InvalidateRootRSP* e)
+// {
+//     InvalidateRootRSPS.erase(e->sid);
+
+//     if(InvalidateRootRSPS.empty() && BlockDBStore_for_invalidate.valid())
+//     {
+//         REF_getter<MsgData::BlockDBStore> r=BlockDBStore_for_invalidate;
+//         BlockDBStore_for_invalidate=nullptr;
+//         sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
+
+//         prev_block=r->blockAccepted2REQ;
+//         l_blocks.clear();
+//         block_meta_full.clear();
+
+//         for (auto &z : r->tx_hashes)
+//         {
+
+//             MUTEX_INSPECTOR;
+//             XTRY;
+//             auto it = transaction_pool_of_leader.find(z);
+//             if (it != transaction_pool_of_leader.end())
+//             {
+//                 transaction_pool_of_leader.erase(it);
+//                 DBG(logNode("removed tx %s", base16::encode(z.container).c_str()));
+//             }
+//             XPASS;
+//         }
+//         auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
+//         auto ttl_cache=v->getValue("ttl_cache");
+//         {
+//     #ifdef DEBUG
+//             for(auto& z: contractHost->contract_cache)
+//             {
+//                 dump_mem("ccc",z.second->rt);
+//             }
+//     #endif
+//             contractHost->contract_cache.clear();
+//             root=getRoot(db_state.get(),prev_block);
+//         }
+//         cli_leader_info.clear();
+
+//         stage_is_working=0;
+
+//         if(transaction_pool_of_leader.size())
+//         {
+//             do_heart_beat(time(NULL));
+//         }
+
+//     }
+
+//     return true;
+// }
 
 bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const NODE_id &src_node, const route_t &route)
 {
@@ -353,7 +448,7 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     {
         rsp->trs.push_back(z.second);
     }
-    rsp->hb_hash=r->hb->getHash();
+    rsp->hb=r->hb;
     pass_NodeMsgRSP(rsp.get(), route);
     return true;
 }

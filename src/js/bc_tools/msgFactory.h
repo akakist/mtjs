@@ -16,7 +16,7 @@ public:
         auto it = registry.find(id);
         if(it==registry.end())
         {
-            throw CommonError("Message type not found %d %s", id,msgName(id));
+        throw CommonError("Message type not found %d %s", id,msgName(id));
         }
         return it->second();
     }
