@@ -88,17 +88,17 @@ namespace cells {
 // ============================================================
 // replaceLeaf / getByPath / getByDbId
 // ============================================================
-    REF_getter<Cellable> replaceLeafOrCreate(Cellable* _cur, IDatabase* db, const std::string& id, Rollback* roll)
+    REF_getter<Cellable> getLeafOrCreate(Cellable* _cur, IDatabase* db, const std::string& id, Rollback* roll, bool checkHash)
     {
         MUTEX_INSPECTOR;
         auto cur = _cur;
         auto it = cur->children_hashes_mx.find(id);
         if (it != cur->children_hashes_mx.end())
         {
-            auto r = replaceLeafNoCreate(cur, db, id);
+            auto r = getLeafNoCreate(cur, db, id, checkHash);
             if (!r.valid()) {
                 // stale root (hash mismatch) → пробросить NULL, не падать
-                logErr2("replaceLeafOrCreate: NULL at '%s' (stale root)", id.c_str());
+                logErr2("getLeafOrCreate: NULL at '%s' (stale root)", id.c_str());
             }
             return r;
         }
@@ -119,7 +119,7 @@ namespace cells {
         return c;
     }
 
-REF_getter<Cellable> replaceLeafNoCreate(Cellable* _cur, IDatabase* db, const std::string& id)
+REF_getter<Cellable> getLeafNoCreate(Cellable* _cur, IDatabase* db, const std::string& id, bool checkHash)
 {
     MUTEX_INSPECTOR;
     auto cur = _cur;
@@ -143,35 +143,44 @@ REF_getter<Cellable> replaceLeafNoCreate(Cellable* _cur, IDatabase* db, const st
 
     if (result.size())
     {
-        auto h = blake2b_hash(result);
-        if (it->second == h)
+        if(checkHash)
         {
-            inBuffer in(result);
-            cc->unpack_mx(in);
+            auto h = blake2b_hash(result);
+            if (it->second == h)
+            {
+                inBuffer in(result);
+                cc->unpack_mx(in);
+            }
+            else
+            {
+                // ── root устарел (sync / InvalidateRoot ещё не дошёл) — НЕ throw ──
+                logErr2("getLeafNoCreate: cell hash not matched (stale root) dbId=%s expected=%s actual=%s granule_size=%ld dbname=%s",
+                        base16::encode(dbId).substr(0, 16).c_str(),
+                        base16::encode(it->second.container).substr(0, 16).c_str(),
+                        base16::encode(h.container).substr(0, 16).c_str(),
+                        result.size(),db->getDbName().c_str());
+                db->clear_root = true;
+                db->add_sync_out(dbId);
+                return NULL;
+            }
+
         }
         else
         {
-            // ── root устарел (sync / InvalidateRoot ещё не дошёл) — НЕ throw ──
-            logErr2("getGranule: cell hash not matched (stale root) dbId=%s expected=%s actual=%s granule_size=%ld",
-                    base16::encode(dbId).substr(0, 16).c_str(),
-                    base16::encode(it->second.container).substr(0, 16).c_str(),
-                    base16::encode(h.container).substr(0, 16).c_str(),
-                    result.size());
-            db->clear_root = true;
-            db->add_sync_out(dbId);
-            return NULL;
+                inBuffer in(result);
+                cc->unpack_mx(in);
         }
     }
     cur->children_ptrs_mx.insert({id, cc});
     return cc;
 }
 
-REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, Rollback* roll)
+REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, Rollback* roll, bool checkHash)
 {
     auto cur = root;
     for (auto& z : v)
     {
-        auto next = replaceLeafOrCreate(cur, db, z, roll);
+        auto next = getLeafOrCreate(cur, db, z, roll, checkHash);
         if (!next.valid()) {
             logErr2("getByPathOrCreate: NULL at '%s' (stale root)", z.c_str());
             return NULL;
@@ -182,12 +191,12 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
 }
 
 
-REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::deque<std::string>& v, Rollback* roll)
+REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::deque<std::string>& v, Rollback* roll, bool checkHash)
 {
     auto cur = root;
     for (auto& z : v)
     {
-        auto next = replaceLeafOrCreate(cur, db, z, roll);
+        auto next = getLeafOrCreate(cur, db, z, roll,checkHash);
         if (!next.valid()) {
             logErr2("getByPathOrCreate(deque): NULL at '%s' (stale root)", z.c_str());
             return NULL;
@@ -197,12 +206,12 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     return cur;
 }
 
-    REF_getter<Cellable> getByPathNoCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v)
+    REF_getter<Cellable> getByPathNoCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, bool checkHash)
     {
         auto cur = root;
         for (auto& z : v)
         {
-            auto next = replaceLeafNoCreate(cur, db, z);
+            auto next = getLeafNoCreate(cur, db, z, checkHash);
             if (!next.valid())
                 return NULL;
             cur = next.get();
@@ -210,16 +219,16 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         return cur;
     }
 
-    REF_getter<Cellable> getByDbIdNoCreate(Cellable* root, IDatabase* db, const THASH_id& h)
+    REF_getter<Cellable> getByDbIdNoCreate(Cellable* root, IDatabase* db, const THASH_id& h, bool checkHash)
     {
         MUTEX_INSPECTOR;
-        return getByPathNoCreate(root, db, getPathFromHash(h));
+        return getByPathNoCreate(root, db, getPathFromHash(h),checkHash);
     }
 
-    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& h, Rollback* roll, const std::string& buffer)
+    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& h, Rollback* roll, const std::string& buffer, bool checkHash)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathOrCreate(root, db, getPathFromHash(h), roll);
+        auto cc = getByPathOrCreate(root, db, getPathFromHash(h), roll, checkHash);
         if (!cc.valid())
             throw CommonError("if (!cc.valid()) 4");
         {
@@ -239,7 +248,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_address_state> getAddressStateOrCreate(Cellable* root, IDatabase* db, const ADDRESS_id& addr, Rollback* roll)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathOrCreate(root, db, getAddressStatePath(addr), roll);
+        auto cc = getByPathOrCreate(root, db, getAddressStatePath(addr), roll,true);
         if (!cc.valid())
             return NULL;
         if (cc->data.valid())
@@ -263,7 +272,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_address_state> getAddressStateNoCreate(Cellable* root, IDatabase* db, const ADDRESS_id& addr)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathNoCreate(root, db, getAddressStatePath(addr));
+        auto cc = getByPathNoCreate(root, db, getAddressStatePath(addr),true);
         if (!cc.valid())
             return NULL;
         if (!cc->data.valid())
@@ -274,7 +283,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<const bc_address_state> getAddressStateNoCreateConst(Cellable* root, IDatabase* db, const ADDRESS_id& addr)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathNoCreate(root, db, getAddressStatePath(addr));
+        auto cc = getByPathNoCreate(root, db, getAddressStatePath(addr),true);
         if (!cc.valid())
             return NULL;
         if (!cc->data.valid())
@@ -288,7 +297,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_contract> getContractOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathOrCreate(root, db, getContractPath(name), roll);
+        auto cc = getByPathOrCreate(root, db, getContractPath(name), roll,true);
         if (!cc.valid())
             throw CommonError("if(!cc.valid())");
         if (cc->data.valid())
@@ -303,7 +312,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_contract> getContractNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathNoCreate(root, db, getContractPath(name));
+        auto cc = getByPathNoCreate(root, db, getContractPath(name),true);
         if (!cc.valid())
             return NULL;
         if (!cc->data.valid())
@@ -314,7 +323,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<const bc_contract> getContractNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& name)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathNoCreate(root, db, getContractPath(name));
+        auto cc = getByPathNoCreate(root, db, getContractPath(name), true);
         if (!cc.valid())
             return NULL;
         if (!cc->data.valid())
@@ -325,7 +334,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_granule> getContractDataOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& name, Rollback* roll, int ttl, time_t create_time)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathOrCreate(root, db, getContractDataPath(con, name), roll);
+        auto cc = getByPathOrCreate(root, db, getContractDataPath(con, name), roll, true);
         if (!cc.valid())
             throw CommonError("if(!cc.valid())");
         if (cc->data.valid())
@@ -346,7 +355,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_granule> getContractDataNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathNoCreate(root, db, getContractDataPath(con, key));
+        auto cc = getByPathNoCreate(root, db, getContractDataPath(con, key), true);
         if (!cc.valid())
             return NULL;
         if (!cc->data.valid())
@@ -357,7 +366,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<const bc_granule> getContractDataNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathNoCreate(root, db, getContractDataPath(con, key));
+        auto cc = getByPathNoCreate(root, db, getContractDataPath(con, key), true);
         if (!cc.valid())
             return NULL;
         if (!cc->data.valid())
@@ -368,7 +377,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_contract_balance> getContractBalanceOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& contract, Rollback* roll)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathOrCreate(root, db, getContractBalancePath(contract), roll);
+        auto cc = getByPathOrCreate(root, db, getContractBalancePath(contract), roll, true);
         if (!cc.valid())
             throw CommonError("if(!cc.valid())");
         if (cc->data.valid())
@@ -383,7 +392,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_contract_balance> getContractBalanceNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& contract)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathNoCreate(root, db, getContractBalancePath(contract));
+        auto cc = getByPathNoCreate(root, db, getContractBalancePath(contract), true);
         if (!cc.valid())
             return NULL;
         if (!cc->data.valid())
@@ -406,7 +415,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_node> getNodeNoCreate(Cellable* root, IDatabase* db, const NODE_id& name)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathNoCreate(root, db, getNodePath(name));
+        auto cc = getByPathNoCreate(root, db, getNodePath(name), true);
         if (!cc.valid())
             return NULL;
         if (!cc->data.valid())
@@ -425,7 +434,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_nodelist> getNodeListNoCreate(Cellable* root, IDatabase* db)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathNoCreate(root, db, getPath("NODE LIST"));
+        auto cc = getByPathNoCreate(root, db, getPath("NODE LIST"), true);
         if (!cc.valid())
             return NULL;
         if (!cc->data.valid())
@@ -444,7 +453,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_nodelist> getNodeListOrCreate(Cellable* root, IDatabase* db, Rollback* roll)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathOrCreate(root, db, getPath("NODE LIST"), roll);
+        auto cc = getByPathOrCreate(root, db, getPath("NODE LIST"), roll, true);
         if (!cc.valid())
             return NULL;
         if (cc->data.valid())
@@ -466,7 +475,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         nl->insert(name);
         nl->setDirty(roll);
 
-        auto cc = getByPathOrCreate(root, db, getNodePath(name), roll);
+        auto cc = getByPathOrCreate(root, db, getNodePath(name), roll, true);
         if (cc->data.valid())
             throw CommonError("if(cc->data.valid())");
 
@@ -508,7 +517,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_values> getValuesOrCreate(Cellable* root, IDatabase* db, Rollback* roll)
     {
         MUTEX_INSPECTOR;
-        auto l = getByPathOrCreate(root, db, getPath("VALUES"), roll);
+        auto l = getByPathOrCreate(root, db, getPath("VALUES"), roll, true);
         if (!l.valid())
             throw CommonError("if(!l.valid())");
         if (l->data.valid())
@@ -525,7 +534,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_values> getValuesNoCreate(Cellable* root, IDatabase* db)
     {
         MUTEX_INSPECTOR;
-        auto l = getByPathNoCreate(root, db, getPath("VALUES"));
+        auto l = getByPathNoCreate(root, db, getPath("VALUES"), true);
         if (!l.valid())
             return NULL;
         if (!l->data.valid())
@@ -545,7 +554,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_votes> getVotesOrCreate(Cellable* root, IDatabase* db, Rollback* roll)
     {
         MUTEX_INSPECTOR;
-        auto l = getByPathOrCreate(root, db, getPath("VOTES"), roll);
+        auto l = getByPathOrCreate(root, db, getPath("VOTES"), roll, true);
         if (!l.valid())
             throw CommonError("if(!l.valid())");
         if (l->data.valid())
@@ -561,7 +570,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_votes> getVotesNoCreate(Cellable* root, IDatabase* db)
     {
         MUTEX_INSPECTOR;
-        auto l = getByPathNoCreate(root, db, getPath("VOTES"));
+        auto l = getByPathNoCreate(root, db, getPath("VOTES"), true);
         if (!l.valid())
             return NULL;
         if (!l->data.valid())
@@ -581,7 +590,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_state> getStateOrCreate(Cellable* root, IDatabase* db, Rollback* roll)
     {
         MUTEX_INSPECTOR;
-        auto l = getByPathOrCreate(root, db, getStatePath(), roll);
+        auto l = getByPathOrCreate(root, db, getStatePath(), roll, true);
         if (!l.valid())
             throw CommonError("if(!l.valid())");
         if (l->data.valid())
@@ -595,7 +604,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<bc_state> getStateNoCreate(Cellable* root, IDatabase* db)
     {
         MUTEX_INSPECTOR;
-        auto l = getByPathNoCreate(root, db, getStatePath());
+        auto l = getByPathNoCreate(root, db, getStatePath(), true);
         if (!l.valid())
             return NULL;
         if (!l->data.valid())
@@ -606,7 +615,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     REF_getter<const bc_state> getStateNoCreateConst(Cellable* root, IDatabase* db)
     {
         MUTEX_INSPECTOR;
-        auto l = getByPathNoCreate(root, db, getStatePath());
+        auto l = getByPathNoCreate(root, db, getStatePath(), true);
         if (!l.valid())
             return NULL;
         if (!l->data.valid())
@@ -620,7 +629,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
 
     REF_getter<bc_activity> getContractActivityOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll)
     {
-        auto cc = getByPathOrCreate(root, db, getContractActivityPath(name), roll);
+        auto cc = getByPathOrCreate(root, db, getContractActivityPath(name), roll, true);
         if (!cc.valid()) throw CommonError("if(!cc.valid())");
         if (cc->data.valid()) return dynamic_cast<bc_activity*>(cc->data.get());
         REF_getter<bc_activity> bc = new bc_activity(cc.get());
@@ -633,7 +642,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
 
     REF_getter<bc_activity> getContractActivityNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name)
     {
-        auto cc = getByPathNoCreate(root, db, getContractActivityPath(name));
+        auto cc = getByPathNoCreate(root, db, getContractActivityPath(name), true);
         if (!cc.valid()) return NULL;
         if (!cc->data.valid()) return NULL;
         return dynamic_cast<bc_activity*>(cc->data.get());
@@ -654,7 +663,7 @@ std::vector<std::string> getActivityPath(const std::string& granule_dbid) {
 
 
 REF_getter<bc_activity> getActivityNoCreate(Cellable* root, IDatabase* db, const std::string& granule_dbid) {
-    auto cc = getByPathNoCreate(root, db, getActivityPath(granule_dbid));
+    auto cc = getByPathNoCreate(root, db, getActivityPath(granule_dbid),true);
     if (!cc.valid() || !cc->data.valid()) 
         throw CommonError("if (!cc.valid() || !cc->data.valid()) ");
     auto *p=dynamic_cast<bc_activity*>(cc->data.get());
@@ -666,7 +675,7 @@ REF_getter<bc_activity> getActivityNoCreate(Cellable* root, IDatabase* db, const
 REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
                                       const std::string& granule_dbid, const std::set<std::string> & additional,
                                       int ttl, time_t now, Rollback* roll) {
-    auto cc = getByPathOrCreate(root, db, getActivityPath(granule_dbid), roll);
+    auto cc = getByPathOrCreate(root, db, getActivityPath(granule_dbid), roll, true);
     if (!cc.valid()) throw CommonError("if(!cc.valid())");
     if (cc->data.valid()) {
         auto act = dynamic_cast<bc_activity*>(cc->data.get());
@@ -686,13 +695,12 @@ REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
     return act;
 }
 
-void touchActivity(Cellable* root, IDatabase* db,
-                   const std::string& granule_dbid,
-                   Rollback* roll, int64_t now) {
-    auto act = getActivityNoCreate(root, db, granule_dbid);
-    if (!act.valid()) return;
-    act->update_time(now, roll);
-    // act->setDirty(roll);
+    void touchActivity(Cellable* root, IDatabase* db,
+                    const std::string& granule_dbid,
+                    Rollback* roll, int64_t now) {
+        auto act = getActivityNoCreate(root, db, granule_dbid);
+        if (!act.valid()) return;
+        act->update_time(now, roll);
+        // act->setDirty(roll);
+    }
 }
-
-} // namespace cells

@@ -84,7 +84,7 @@ static JSValue js_block_get_block_timestamp(JSContext* ctx, JSValueConst this_va
     if (!b) return JS_EXCEPTION;
     if (!b->ba2.valid() || !b->ba2->blockAcceptedREQ.valid())
         return JS_NewInt64(ctx, 0);
-    return JS_NewInt64(ctx, (int64_t)b->ba2->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+    return JS_NewInt64(ctx, (int64_t)b->ba2->blockAcceptedREQ->blockInfo->block_timestamp);
 }
 
 static const EmitNode* find_tx_node(JS_Block* b, const std::string& tx_hex)

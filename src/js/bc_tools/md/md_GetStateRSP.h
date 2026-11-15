@@ -1,12 +1,13 @@
 #pragma once
 #include "md_Base.h"
 #include <string>
+#include "rsp_status.h"
+
 namespace MsgData
 {
-    struct GetStateRSP: public Base
+    struct GetStateRSP: public Base, public rsp_status
     {
         GetStateRSP():Base(msgid::GetStateRSP) {}
-        bool found = false;
         std::string total_supply;   // i128::str()
         std::string total_stake;    // i128::str()
         int64_t account_count = 0;
@@ -18,7 +19,7 @@ namespace MsgData
         int64_t chain_id = 0;
         void update(Blake2bHasher& h) const
         {
-            h.update(found ? "1" : "0");
+            update_status(h);
             h.update(total_supply); h.update(total_stake);
             h.update(std::to_string(account_count));
             h.update(std::to_string(node_count));
@@ -31,14 +32,16 @@ namespace MsgData
         void pack(outBuffer& b) const final
         {
             Base::pack(b);
-            b<<found<<total_supply<<total_stake
+            pack_status(b);
+            b<<total_supply<<total_stake
              <<account_count<<node_count<<contract_count
              <<tx_count<<block_height<<genesis_time<<chain_id;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
-            b>>found>>total_supply>>total_stake
+            unpack_status(b);
+            b>>total_supply>>total_stake
              >>account_count>>node_count>>contract_count
              >>tx_count>>block_height>>genesis_time>>chain_id;
         }

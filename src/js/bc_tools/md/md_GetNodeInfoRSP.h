@@ -3,12 +3,13 @@
 #include "NODE_id.h"
 #include "ADDRESS_id.h"
 #include <map>
+#include "rsp_status.h"
+
 namespace MsgData
 {
-    struct GetNodeInfoRSP: public Base
+    struct GetNodeInfoRSP: public Base, public rsp_status
     {
         GetNodeInfoRSP():Base(msgid::GetNodeInfoRSP) {}
-        bool found = false;
         NODE_id name;
         ADDRESS_id owner;
         std::string ed_pk;
@@ -21,7 +22,7 @@ namespace MsgData
         std::map<ADDRESS_id, int64_t> stakes;
         void update(Blake2bHasher& h) const
         {
-            h.update(found ? "1" : "0");
+            update_status(h);
             h.update(name.container);
             h.update(owner.addr);
             h.update(ed_pk); h.update(bls_pk); h.update(ip);
@@ -34,12 +35,14 @@ namespace MsgData
         void pack(outBuffer& b) const final
         {
             Base::pack(b);
-            b<<found<<name<<owner<<ed_pk<<bls_pk<<ip<<enabled<<missed_rounds<<answered_rounds<<full_stake<<stakes;
+            pack_status(b);
+            b<<name<<owner<<ed_pk<<bls_pk<<ip<<enabled<<missed_rounds<<answered_rounds<<full_stake<<stakes;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
-            b>>found>>name>>owner>>ed_pk>>bls_pk>>ip>>enabled>>missed_rounds>>answered_rounds>>full_stake>>stakes;
+            unpack_status(b);
+            b>>name>>owner>>ed_pk>>bls_pk>>ip>>enabled>>missed_rounds>>answered_rounds>>full_stake>>stakes;
         }
         static Base* construct() { return new GetNodeInfoRSP(); }
     };

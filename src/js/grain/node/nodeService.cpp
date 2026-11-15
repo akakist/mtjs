@@ -79,7 +79,6 @@ static nlohmann::json dump_hb(const REF_getter<MsgData::HeartBeatREQ>& hb)
         {"prev",   hb->prev_root_hash_1.str()},
         {"epoch",  hb->new_epoch},
         {"leader", hb->node_leader.container},
-        {"ts",     (long long)hb->block_timestamp},
         {"hash",   hb->getHash().str()}
     };
 }
@@ -126,37 +125,13 @@ void Node::Service::dump(nlohmann::json& j)
     j["prev_root_hash"] = prev_root_hash_Z().str();
     j["epoch"] = epoch_current();
     j["sync_empty"] = db_state.valid() ? (bool)db_state->sync_empty : false;
-    j["stage_is_working"] = stage_is_working;
 
-    // cli_leader_info
-    for (auto& [prev, cli] : cli_leader_info) {
-        auto& c = j["cli_leader_info"][base16::encode(prev.container)];
-        if (cli.node_leader.valid()) {
-            c["node_leader"] = dump_hb(cli.node_leader);
-        }
-        // c["confirm_leader_sent"] = cli.confirm_leader_sent_c;
-        for (auto& [tw, ts] : cli.heart_beat_sent) c["hb_sent"][std::to_string(tw)] = ts;
-    }
 
     // l_blocks (все события)
     for (auto& [prev, bt] : l_blocks) {
         auto& lb = j["l_blocks"][base16::encode(prev.container)];
         auto& li = bt;
 
-        // lb["leader_cert"] = dump_hb(li.leader_cert_2);
-
-        // confirm_leader rsp (по hb_hash)
-        for (auto& [hb_hash, m] : bt.ConfirmLeaderRSP_m) {
-            for (auto& [signer, rsp] : m) {
-                if (!rsp.valid()) continue;
-                lb["confirm_rsp"].push_back({
-                    {"signer",  signer.container},
-                    {"hb_hash", hb_hash.str()},
-                    {"hb",      dump_hb(rsp->hb)},
-                    {"sig",     base16::encode(rsp->signature.serialize())}
-                });
-            }
-        }
 
         // validate_block rsp
         for (auto& [bh, v] : bt.ValidateBlockRSP_m) {
@@ -173,36 +148,6 @@ void Node::Service::dump(nlohmann::json& j)
             }
         }
 
-        // block_diff_validate rsp
-        // for (auto& [bh, v] : bt.BlockDiffValidateRSP_m) {
-        //     for (auto& rsp : v) {
-        //         if (!rsp.valid()) continue;
-        //         lb["diff_validate_rsp"].push_back({
-        //             {"block_hash", bh.str()},
-        //             {"validator",  rsp->node_validator.container},
-        //             {"sig",        base16::encode(rsp->sig34.serialize())}
-        //         });
-        //     }
-        // }
-
-        // blockDiffValidateREQ (лидер)
-        // if (bt.blockDiffValidateREQ_2.valid()) {
-        //     auto& r = bt.blockDiffValidateREQ_2;
-        //     auto& rr = lb["block_diff_validate_req"];
-        //     rr["blockAccepted2"] = dump_block_accepted2(r->blockAcceptedREQ.valid()
-        //         ? REF_getter<MsgData::BlockAccepted2REQ>() : nullptr); // placeholder
-        //     // blockAcceptedREQ (не 2) — отдельно
-        //     if (r->blockAcceptedREQ.valid()) {
-        //         rr["blockInfo"] = dump_block_info(r->blockAcceptedREQ->blockInfo);
-        //         rr["node_validators"] = nlohmann::json::array();
-        //         for (auto& z : r->blockAcceptedREQ->node_validators) rr["node_validators"].push_back(z.container);
-        //         rr["agg_sig"] = base16::encode(r->blockAcceptedREQ->agg_sig.serialize());
-        //     }
-        //     rr["tx_count"] = (int)r->tx_hashes.size();
-        //     rr["diffs_count"] = (int)r->diffs.size();
-        //     // rr["sent"] = bt.blockDiffValidateREQ_sent;
-        //     // rr["accepted2_sent"] = bt.blockAccepted2REQ_sent;
-        // }
     }
 
     // tx_pool
@@ -233,46 +178,8 @@ void Node::Service::dump(nlohmann::json& j)
                 {"missed_rounds", n->missed_rounds}
             });
         }
-        auto mf = getMetaFull(time(NULL));
-        if (mf.valid()) {
-            j["meta"]["full_stake"] = std::to_string(mf->fullStake());
-            j["meta"]["all_nodes_enabled"] = nlohmann::json::array();
-            for (auto& z : mf->all_nodes_enabled) j["meta"]["all_nodes_enabled"].push_back(z.container);
-            j["meta"]["committe_members"] = nlohmann::json::array();
-            for (auto& z : mf->committe_members) j["meta"]["committe_members"].push_back(z.container);
-            j["meta"]["position_of_node"] = nlohmann::json::object();
-            for (auto& [n, p] : mf->position_of_node) j["meta"]["position_of_node"][n.container] = p;
-            j["meta"]["prev_stakes"] = nlohmann::json::object();
-            for (auto& [n, s] : mf->prev_stakes) j["meta"]["prev_stakes"][n.container] = std::to_string(s);
-        }
     }
 }
-/*bool GrainReader::Service::on_startService(const systemEvent::startService *)
-{
-    MUTEX_INSPECTOR;
-
-    if (mode_ == Lite) {
-        if (uplink_http_addr_.empty())
-            return true;
-        db_state_3 = new CDatabaseLiteNode(db_path_, uplink_http_addr_);
-        auto prev_root = load_last_block(db_state_3.get());
-        root = getRoot(db_state_3.get(), prev_root);
-        
-        contractHost = new ContractHost();
-        contractHost->granules = new NodeGranuleIO(db_state_3);
-        contractHost->source = new NodeContractSourceIO(db_state_3);
-        DBG(logErr2("GrainReader: lite mode, db=%s, http=%s", db_path_.c_str(), uplink_http_addr_.c_str()));
-    } else {
-        DBG(logErr2("GrainReader: full mode, wait ServiceInit"));
-        SECURE sec;
-        sec.use_ssl = false;
-        for (auto& z : http_granule_addr_)
-            sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
-        sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(GrainReader::TIMER_STALE_CLEANUP, NULL, NULL, 60., this));
-    }
-    return true;
-}
-*/
 #include "CDatabaseLiteNode.h"
 bool Node::Service::on_startService(const systemEvent::startService *)
 {
@@ -283,12 +190,6 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         if (uplink_http_addr_.empty())
             return true;
         db_state = new CDatabaseLiteNode(db_name, uplink_http_addr_);
-        // auto prev_root = load_last_block(db_state.get());
-        // root = getRoot(db_state.get(), prev_root);
-        
-        // contractHost = new ContractHost();
-        // contractHost->granules = new NodeGranuleIO(db_state);
-        // contractHost->source = new NodeContractSourceIO(db_state);
         DBG(logErr2("Node: lite mode, db=%s, http=%s", db_name.c_str(), uplink_http_addr_.c_str()));
     } else {
         DBG(logErr2("Node: full mode, wait ServiceInit"));
@@ -302,27 +203,17 @@ bool Node::Service::on_startService(const systemEvent::startService *)
                 // prev_block = load_last_block(db_state.get());
                 root = getRoot(db_state.get(), prev_block);
                 block_meta_full.clear();
-    };
-    prev_block=load_last_block(db_state.get());
-    root=getRoot(db_state.get(),prev_block);
-    // sendEvent(ServiceEnum::TxValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
-    // sendEvent(ServiceEnum::BroadcasterTree, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
-    // sendEvent(ServiceEnum::GrainReader, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
-    sendEvent(ServiceEnum::Scan, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
+        };
+        prev_block=load_last_block(db_state.get());
+        root=getRoot(db_state.get(),prev_block);
+        sendEvent(ServiceEnum::Scan, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
     }
-    // last_activity_time=iUtils->getNow();
-
-    // SECURE sec;
-    // sec.use_ssl = false;
-    // for (auto &z : web_addr)
-    //     sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
 
     
     contractHost=make_node_contract_host(db_state);
 
 
     init_genesis(root.get(), db_state.get());
-    invalidate_services();
 
     if(prev_block.valid())
     {
@@ -330,18 +221,13 @@ bool Node::Service::on_startService(const systemEvent::startService *)
             prev_block=NULL;
     }
 
-    // my_sk_bls.deserializebase16Str(getenv2(my_sk_bls_env_key));
-
-    // my_sk_ed = base16::decode(getenv2(my_sk_ed_env_key));
-    // logNode("ServiceInit nodename %s", this_node_name.container.c_str());
-    // sendEvent(ServiceEnum::BlockValidator, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
     for (auto &z : rpc_addr)
     {
         SECURE sec;
         sec.use_ssl = false;
         sendEvent(ServiceEnum::RPC, new rpcEvent::DoListen(z, sec));
     }
-    sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 1., this));
+    sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 0.1, this));
     sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_REPORT_MEM, NULL, NULL, 30., this));
 
     std::string res;
@@ -444,21 +330,8 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
 
     const auto prev = prev_root_hash_Z();
 
-    {
-        auto &cli = cli_leader_info[prev];
-        if (cli.node_leader.valid() && cli.node_leader->node_leader != this_node_name) {
-            logNode("do_start_block: not leader (cli=%s)", cli.node_leader->node_leader.container.c_str());
-            return;
-        }
-    }
 
-    auto &li = l_blocks[prev];
-    // if (!li.leader_cert_2.valid()) {
-    //     logNode("do_start_block: leader_cert_2 invalid");
-    //     return;
-    // }
-
-    auto mf = getMetaFull(hb->block_timestamp);
+    auto mf = getMetaFull();
     if (!mf.valid()) {
         logNode("do_start_block: meta invalid");
         return;
@@ -466,7 +339,8 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
 
     REF_getter<MsgData::ValidateBlockREQ> vb = new MsgData::ValidateBlockREQ();
     vb->heart_beat = hb;
-    vb->lc = makeLeaderCert(hb, mf.get());
+    vb->block_timestamp=iUtils->getNow();
+    // vb->lc = makeLeaderCert(hb, mf.get());
 
     auto &bt = l_blocks[prev];
 
@@ -486,10 +360,18 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
     if (e->tid == TIMER_STALE_CLEANUP) {
-        cleanup_stale((int64_t)time(NULL));
+        cleanup_stale(iUtils->getNow());
         return true;
     }
+    if(e->tid == TIMER_PERIODIC_CLOCK)
+    {
+        if(current_leader()==this_node_name)
+        {
+            sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(TIMER_GetTxFromLeader,NULL,NULL,0.02,this));
 
+        }
+        return true;
+    }
     if(e->tid==timers::TIMER_REPORT_MEM)
     {
         // report_mem();
@@ -502,7 +384,27 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     switch (e->tid)
     {
-    case timers::TIMER_GetTransactionRSP:
+    case timers::TIMER_BLOCK_EXPIRED:
+    {
+        logNode("fail leader %s",e->data->container.c_str());
+        auto & cli=cli_leader_info[prev_root_hash_Z()];
+        if(cli.node_leader.valid() && cli.node_leader->node_leader.container==e->data->container)
+            cli.node_leader=nullptr;
+        return true;
+    }
+    case timers::TIMER_GetTxFromLeader:
+    {
+        if(current_leader()==this_node_name)
+        {
+            REF_getter<MsgData::HeartBeatREQ> h=new MsgData::HeartBeatREQ(prev_root_hash_Z(),
+                        epoch_current(),
+                        this_node_name, iUtils->getNow(), 0);
+            auto mf=getMetaFull();
+            do_request_for_transactions(h.get(),mf);
+        }
+        return true;
+    }
+    case timers::TIMER_GetTxRSP:
     {
         if(!db_state->sync_empty)
         {
@@ -518,7 +420,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         {
             do_start_block(hb);
             logNode("do_start_block();");
-            bt.GetTransactionRSP_m[hb_hash].clear();
+            bt.GetTxRSP_m[hb_hash].clear();
         }
         return true;
     }
@@ -541,7 +443,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         if(bt.is_BlockDiffValidateRSP_m_quorum(h,root.get(), db_state.get()))
         {
 
-            auto mf=getMetaFull(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+            auto mf=getMetaFull();
             broadcast_MsgEvent_via_broadcaster(r,mf->tree_all_nodes);
             bt.BlockDiffValidateRSP_m[h].clear();
 
@@ -556,7 +458,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         auto r=dynamic_cast<MsgData::BlockDiffValidateREQ*>(e->cookie.get());
         if(!r)
             throw CommonError("!r BlockDiffValidateREQ");
-        auto mf=getMetaFull(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+        auto mf=getMetaFull();
         auto h=r->blockAcceptedREQ->blockInfo->getHash();
         if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
         {
@@ -614,10 +516,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         case bcEventEnum::SendToChildAck:
             return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(e.get()), false);
 
-        case bcEventEnum::GetGranulesREQ:
-            return GetGranulesREQ((const bcEvent::GetGranulesREQ *)e.get());
-        case bcEventEnum::GetGranulesRSP:
-            return GetGranulesRSP((const bcEvent::GetGranulesRSP *)e.get());
+        case bcEventEnum::syncGetGranulesREQ:
+            return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)e.get());
+        case bcEventEnum::syncGetGranulesRSP:
+            return syncGetGranulesRSP((const bcEvent::syncGetGranulesRSP *)e.get());
         case bcEventEnum::NodeMsgREQ:
             return NodeMsgREQ((const bcEvent::NodeMsgREQ *)e.get());
         case bcEventEnum::NodeMsgRSP:
@@ -658,10 +560,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             case bcEventEnum::SendToChildAck:
                 return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
 
-            case bcEventEnum::GetGranulesREQ:
-                return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
-            case bcEventEnum::GetGranulesRSP:
-                return GetGranulesRSP((const bcEvent::GetGranulesRSP *)ev->e.get());
+            case bcEventEnum::syncGetGranulesREQ:
+                return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)ev->e.get());
+            case bcEventEnum::syncGetGranulesRSP:
+                return syncGetGranulesRSP((const bcEvent::syncGetGranulesRSP *)ev->e.get());
             case bcEventEnum::NodeMsgREQ:
                 return NodeMsgREQ((const bcEvent::NodeMsgREQ *)ev->e.get());
             case bcEventEnum::NodeMsgRSP:
@@ -686,10 +588,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
             case bcEventEnum::SendToChildAck:
                 return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
-            case bcEventEnum::GetGranulesREQ:
-                return GetGranulesREQ((const bcEvent::GetGranulesREQ *)ev->e.get());
-            case bcEventEnum::GetGranulesRSP:
-                return GetGranulesRSP((const bcEvent::GetGranulesRSP *)ev->e.get());
+            case bcEventEnum::syncGetGranulesREQ:
+                return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)ev->e.get());
+            case bcEventEnum::syncGetGranulesRSP:
+                return syncGetGranulesRSP((const bcEvent::syncGetGranulesRSP *)ev->e.get());
             case bcEventEnum::NodeMsgREQ:
                 return NodeMsgREQ((const bcEvent::NodeMsgREQ *)ev->e.get());
             case bcEventEnum::NodeMsgRSP:
@@ -904,7 +806,7 @@ void Node::Service::do_request_for_transactions(MsgData::HeartBeatREQ* hb, const
 {
     MUTEX_INSPECTOR;
 
-    REF_getter<MsgData::GetTransactionREQ> rt = new MsgData::GetTransactionREQ();
+    REF_getter<MsgData::GetTxREQ> rt = new MsgData::GetTxREQ();
     rt->hb = hb;
     // li.request_for_transactions_time = iUtils->getNow();
 
@@ -915,7 +817,6 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
 {
     MUTEX_INSPECTOR;
     // logNode("[execute_block] sender %s",b.)
-    // ▼▼▼ INSERT: bc_state block_height++ (NULL — не rollback)
     {
         auto st = cells::getStateNoCreate(root.get(), db_state.get());
         auto bh=lc->new_epoch;
@@ -926,16 +827,13 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         st->setDirty(NULL);
     }
     DBG(logNode("execute_block: tx_count=%zu", (size_t)b.validateBlockREQ->transaction_bodies.size()));
-    // ▲▲▲    
     for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
     {
         MUTEX_INSPECTOR;
+        resetBlockExpired(b.validateBlockREQ->heart_beat->node_leader);
         std::optional<std::string> t_err;
         auto tt=b.validateBlockREQ->transaction_bodies[ti];
         auto tx_hash=tt->getHash();
-        // auto &pk_bin=tt->pk_ed_bin;
-        // ADDRESS_id senderAddress;
-        // senderAddress.addr=blake2b_hash(pk_bin).container;
         auto &tj = tt->tx_body;
         yyjson_val *jroot2 = yyjson_doc_get_root(tt->doc);
         std::string sender_hex;
@@ -1120,20 +1018,13 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
     MUTEX_INSPECTOR;
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
-    if(iUtils->getNow()-stage_is_working> STAGE_IS_WORKING_TIMEOUT* _1sec)
-    {
-        stage_is_working=iUtils->getNow();
-
-        do_heart_beat(time(NULL));
-    }
-    else {
-        // logNode("no heart beat timediff %ld",iUtils->getNow()-stage_is_working);
-    }
     return true;
 }
 
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 {
+    // db_state->sync_empty;
+
     auto &s=filter_NodeMsgREQ[m->node_signer][m->node_start_timestamp];
     while(s.size()>100)
     {
@@ -1145,13 +1036,17 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
         return true;
     }
     s.insert(m->seqId2);
-    auto n = cells::getNodeNoCreate(root.get(), db_state.get(),m->node_signer);
-    if(!n.valid())
-        return true;
-    if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
+    if(db_state->sync_empty)
     {
-        logNode("verify failed 11");
-        return true;
+        auto n = cells::getNodeNoCreate(root.get(), db_state.get(),m->node_signer);
+        if(!n.valid())
+            return true;
+        if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
+        {
+            logNode("verify failed 11");
+            return true;
+        }
+
     }
     inBuffer in(m->msg_payload);
     auto id = in.get_PN();
@@ -1159,27 +1054,55 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     REF_getter<MsgData::Base> msg = msgFactory.create(id);
     msg->unpack(in);
 
-    switch (msg->type)
+    if(db_state->sync_empty)
     {
-    case msgid::GetTransactionREQ:
-        return GetTransactionREQ(static_cast<const MsgData::GetTransactionREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::ValidateBlockREQ:
-        // last_activity_time=iUtils->getNow();
-        return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::BlockAccepted2REQ:
-        // last_activity_time=iUtils->getNow();
-        return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
-    case msgid::ConfirmLeaderREQ:
-        return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::DelayNotificationREQ:
-        return DelayNotificationREQ(static_cast<const MsgData::DelayNotificationREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::BlockDiffValidateREQ:
-        return BlockDiffValidateREQ(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
-    case msgid::BlockDBStore:
-        return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
+        switch (msg->type)
+        {
+        case msgid::GetTxREQ:
+            return GetTxREQ(static_cast<const MsgData::GetTxREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::ValidateBlockREQ:
+            // last_activity_time=iUtils->getNow();
+            return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::BlockAccepted2REQ:
+            // last_activity_time=iUtils->getNow();
+            return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
+        // case msgid::ConfirmLeaderREQ:
+        //     return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::DelayNotificationREQ:
+            return DelayNotificationREQ(static_cast<const MsgData::DelayNotificationREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::BlockDiffValidateREQ:
+            return BlockDiffValidateREQ(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::BlockDBStore:
+            return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
+        // case msgid::LcEnvelopeREQ:
+        // {
+        //     bool nc=true;
+        //     return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route,&nc);
 
-    default:
-        throw CommonError("unjandled3 MsgData %s", msgName(msg->type));
+        // }
+
+        default:
+            throw CommonError("unjandled3 MsgData %s", msgName(msg->type));
+        }
+
+    }
+    else
+    {
+        switch (msg->type)
+        {
+        case msgid::BlockDiffValidateREQ:
+            return BlockDiffValidateREQ_sync(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::GetTxREQ:
+        case msgid::ValidateBlockREQ:
+        case msgid::BlockAccepted2REQ:
+        case msgid::ConfirmLeaderREQ:
+        case msgid::DelayNotificationREQ:
+        case msgid::BlockDBStore:
+
+        default:
+            logNode("skipped in sync mode %s", msgName(msg->type));
+        }
+
     }
 
     return true;
@@ -1212,12 +1135,12 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     switch (id)
     {
-    case msgid::HeartBeatRSP:
-        return HeartBeatRSP(static_cast<const MsgData::HeartBeatRSP *>(ee.get()), m->node_signer, m->route);
-    case msgid::ConfirmLeaderRSP:
-        return ConfirmLeaderRSP(static_cast<const MsgData::ConfirmLeaderRSP *>(ee.get()), m->node_signer, m->route);
-    case msgid::GetTransactionRSP:
-        return GetTransactionRSP(static_cast<const MsgData::GetTransactionRSP *>(ee.get()), m->node_signer, m->route);
+    // case msgid::HeartBeatRSP:
+    //     return HeartBeatRSP(static_cast<const MsgData::HeartBeatRSP *>(ee.get()), m->node_signer, m->route);
+    // case msgid::ConfirmLeaderRSP:
+    //     return ConfirmLeaderRSP(static_cast<const MsgData::ConfirmLeaderRSP *>(ee.get()), m->node_signer, m->route);
+    case msgid::GetTxRSP:
+        return GetTransactionRSP(static_cast<const MsgData::GetTxRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ValidateBlockRSP:
         return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::BlockDiffValidateRSP:
@@ -1443,7 +1366,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.gasLimitGas = gasLimit_gas;
     t.deleted_granules=&deleted_granules;
     t.block_timestamp = prev_block.valid()
-        ? (int64_t)prev_block->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp
+        ? (int64_t)prev_block->blockAcceptedREQ->blockInfo->block_timestamp
         : 0;
     t.block_height = 0; // TBD
     {
@@ -1567,25 +1490,30 @@ inline uint64_t read_uint64(const uint8_t* data) {
            (static_cast<uint64_t>(data[6]) << 8)  |
            (static_cast<uint64_t>(data[7]));
 }
-
-REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
+NODE_id Node::Service::current_leader()
+{
+    auto mf=getMetaFull();
+    int64_t lastBlockTime=0;
+    if(prev_block.valid())
+        lastBlockTime=prev_block->blockAcceptedREQ->blockInfo->block_timestamp;
+    auto now=iUtils->getNow();
+    auto idx=(now-lastBlockTime)/SLOT_MKS;
+    return mf->vne[idx % mf->vne.size()].name;
+}
+REF_getter<BlockMetaFull> Node::Service::getMetaFull()
 {
     MUTEX_INSPECTOR;
+    // int round=hb->round;
     auto b=prev_root_hash_Z();
-    auto t_win=ti_ / HB_TIME_WINDOW;
+    // auto round=ti_ / HB_TIME_WINDOW;
     auto it=block_meta_full.find(b);
-
     if(it!=block_meta_full.end())
     {
-        auto ii=it->second.find(t_win);
-        if(ii!=it->second.end())
-        {
-            if(ii->second.valid())
-                return ii->second;
-        }
+        return it->second;
     }
+
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
-    block_meta_full[b][t_win]=m;
+    block_meta_full[b]=m;
     auto an=cells::getAllNodes(root.get(),db_state.get());
     int live_nodes=0;
     for(auto& z: an)
@@ -1602,7 +1530,6 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 
     size_t validator_count=(live_nodes * validators_percent)/100;
 
-    std::vector<NodeElement> vne;
     std::map<int64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
 
     for(auto &x: an)
@@ -1616,7 +1543,8 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
         {
             seed+=prev_block->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.container;
         }
-        seed+=std::to_string(t_win);
+        // else logNode("!if(prev_block.valid())");
+        // seed+=std::to_string(round);
         auto h=blake2b_hash(seed);
         if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
         auto w=read_uint64((uint8_t*)h.container.data());
@@ -1629,13 +1557,13 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
     {
         for(auto& z:x.second)
         {
-            m->position_of_node[z.second->getName()]=vne.size();
-            vne.push_back(z.second->getElement());
+            m->position_of_node[z.second->getName()]=m->vne.size();
+            m->vne.push_back(z.second->getElement());
         }
     }
-    m->tree_all_nodes=buildTree(vne);
+    m->tree_all_nodes=buildTree(m->vne);
 
-    if(validator_count>=vne.size())
+    if(validator_count>=m->vne.size())
         throw CommonError("if(validator_count>=vne.size())");
     std::vector<NodeElement> vne_committe;
 
@@ -1643,17 +1571,17 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
     auto answered_min=v->getValue("answered_committee_min");
 
     // Попытка 1: строгий фильтр (answered > answered_min && stake >= minstake)
-    for(size_t i=0; vne_committe.size()< validator_count && i< vne.size(); i++)
+    for(size_t i=0; vne_committe.size()< validator_count && i< m->vne.size(); i++)
     {
-        auto n = cells::getNodeNoCreate(root.get(), db_state.get(),vne[i].name);
+        auto n = cells::getNodeNoCreate(root.get(), db_state.get(),m->vne[i].name);
         if (!n.valid())
             continue;
         if (n->answered_rounds <= answered_min)
             continue;
-        if(vne[i].stake_A>=minstake)
+        if(m->vne[i].stake_A>=minstake)
         {
-            auto n=vne[i].name;
-            vne_committe.push_back(vne[i]);
+            auto n=m->vne[i].name;
+            vne_committe.push_back(m->vne[i]);
             m->committe_members.insert(n);
         }
     }
@@ -1661,16 +1589,16 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
     // Попытка 2: без answered (только stake) — если строгий не набрался
     if (vne_committe.size() < validator_count)
     {
-        logNode("getMetaFull: strict filter gave %zu < %zu, relax answered",
-                vne_committe.size(), (size_t)validator_count);
-        for(size_t i=0; vne_committe.size()< validator_count && i< vne.size(); i++)
+        // logNode("getMetaFull: strict filter gave %zu < %zu, relax answered",
+                // vne_committe.size(), (size_t)validator_count);
+        for(size_t i=0; vne_committe.size()< validator_count && i< m->vne.size(); i++)
         {
-            if (m->committe_members.count(vne[i].name))
+            if (m->committe_members.count(m->vne[i].name))
                 continue;   // уже в комитете
-            if(vne[i].stake_A>=minstake)
+            if(m->vne[i].stake_A>=minstake)
             {
-                auto n=vne[i].name;
-                vne_committe.push_back(vne[i]);
+                auto n=m->vne[i].name;
+                vne_committe.push_back(m->vne[i]);
                 m->committe_members.insert(n);
             }
         }
@@ -1678,28 +1606,17 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(time_t ti_)
 
     if (vne_committe.empty())
         throw CommonError("getMetaFull: no committee (even relaxed)");
+    
+    std::string com;
+    for(auto &z : m->vne)
+    {
+        com+=z.name.container+ " ";
+    }
+    logNode("vne %s",com.c_str());
 
     m->tree_committe=buildTree(vne_committe);
 
     return m;
-}
-bool Node::Service::block_leader::is_HeartBeatRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf)
-{
-    int64_t stakeVal = 0;
-    for (auto &z : HeartBeatRSP_m[h])
-    {
-        stakeVal += mf->getPrevStake(z.first);
-    }
-    int64_t fullstake=0;
-    for(auto &z: mf->all_nodes_enabled)
-    {
-        fullstake += mf->getPrevStake(z);
-
-    }
-    if ((stakeVal * 100) / fullstake > QUORUM )
-        return true;
-    return false;
-    
 }
 
 bool Node::Service::block_leader::is_ValidateBlockRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf)
@@ -1731,7 +1648,7 @@ bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& 
             fullstakeVal += z->get_full_stake();
     }
     int64_t stakeVal = 0;
-    auto &mm=GetTransactionRSP_m[h];
+    auto &mm=GetTxRSP_m[h];
     for (auto &z : mm)
     {
         auto n=cells::getNodeNoCreateConst(r, db,z.first);
@@ -1763,13 +1680,6 @@ bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_i
     if ((stakeVal * 100) / fullstakeVal > QUORUM )
         return true;
     return false;
-}
-void Node::Service::invalidate_services()
-{
-    // sendEvent(ServiceEnum::GrainReader,new bcEvent::InvalidateRootREQ(this));
-    // sendEvent(ServiceEnum::TxValidator,new bcEvent::InvalidateRootREQ(this));
-    // InvalidateRootRSPS.insert(ServiceEnum::GrainReader);
-    // InvalidateRootRSPS.insert(ServiceEnum::TxValidator);
 }
 
 

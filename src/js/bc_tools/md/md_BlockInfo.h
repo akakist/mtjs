@@ -20,13 +20,16 @@ namespace MsgData
         const THASH_id & _tx_hash,
         const THASH_id & _diffs_hash,
         const THASH_id & _att_hash,
-        const REF_getter<HeartBeatREQ> &_heart_beat
+        const REF_getter<HeartBeatREQ> &_heart_beat,
+        int64_t bs
         ):Base(msgid::BlockInfo),
         new_root_hash1(_new_root_hash),
         tx_hash(_tx_hash),
         diffs_hash(_diffs_hash),
         att_data_hash(_att_hash),
-        heart_beat(_heart_beat)
+        heart_beat(_heart_beat),
+        block_timestamp(bs)
+
         {
 
         }
@@ -35,6 +38,8 @@ namespace MsgData
         THASH_id diffs_hash;
         THASH_id att_data_hash;
         REF_getter<HeartBeatREQ> heart_beat;
+        int64_t block_timestamp;
+
 
         void update(Blake2bHasher& h) const
         {
@@ -45,6 +50,7 @@ namespace MsgData
             h.update(att_data_hash.container);
            
             heart_beat->update(h);
+            h.update(std::to_string(block_timestamp));
         }
 
         void pack(outBuffer& b) const final
@@ -56,6 +62,7 @@ namespace MsgData
             b<<tx_hash;
             b<<diffs_hash;
             b<<heart_beat;
+            b<<block_timestamp;
         }
         void unpack(inBuffer& b) final
         {
@@ -66,8 +73,7 @@ namespace MsgData
             b>>tx_hash;
             b>>diffs_hash;
             b>>heart_beat;
-            // b>>node_stake_changes;
-            // b>>node_enables;
+            b>>block_timestamp;
         }
 
     };

@@ -4,10 +4,10 @@
 #include "md_HeartBeatREQ.h"
 namespace MsgData
 {
-    struct GetTransactionREQ: public Base
+    struct GetTxREQ: public Base
     {
 
-        GetTransactionREQ():Base(msgid::GetTransactionREQ),hb(new MsgData::HeartBeatREQ())
+        GetTxREQ():Base(msgid::GetTxREQ),hb(new MsgData::HeartBeatREQ())
         {
         }
         REF_getter<MsgData::HeartBeatREQ> hb;
@@ -32,22 +32,22 @@ namespace MsgData
 
         static Base* construct()
         {
-            return new GetTransactionREQ();
+            return new GetTxREQ();
         }
     };
 
 }
-inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetTransactionREQ> &s)
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetTxREQ> &s)
 {
     b<<1;
     s->pack(b);
     return b;
 }
-inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetTransactionREQ> &s)
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetTxREQ> &s)
 {
     auto ver=b.get_PN();
     if(!s.valid())
-        s=new MsgData::GetTransactionREQ();
+        s=new MsgData::GetTxREQ();
     s->unpack2(b);
     return b;
 }

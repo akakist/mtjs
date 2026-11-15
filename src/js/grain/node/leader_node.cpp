@@ -11,7 +11,7 @@
 #include <vector>
 #include "md/md_BlockDiffValidateREQ.h"
 
-bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::GetTransactionRSP(const MsgData::GetTxRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
     MUTEX_INSPECTOR;
@@ -33,13 +33,13 @@ bool Node::Service::GetTransactionRSP(const MsgData::GetTransactionRSP *r, const
     //     return true;
     // }
     auto h=r->hb->getHash();
-    bt.GetTransactionRSP_m[h].insert_or_assign(src_node,r);
-    auto mf=getMetaFull(r->hb->block_timestamp);
+    bt.GetTxRSP_m[h].insert_or_assign(src_node,r);
+    auto mf=getMetaFull();
 
 
     if (bt.is_GetTransactionRSP_m_quorum(h,root.get(), db_state.get()))
     {
-        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTransactionRSP, toRef(h.container), r->hb.get(),0.05, this));
+        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTxRSP, toRef(h.container), r->hb.get(),0.05, this));
     }
     XPASS;
     return true;
@@ -142,17 +142,6 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
             logNode("validators %s",iUtils->join(" ",nnn).c_str());
 
 
-        std::string nodelist;
-        if(bt.ConfirmLeaderRSP_m_copy.size())
-        {
-            auto cfh=bt.ConfirmLeaderRSP_m_copy.begin()->first;
-            for(auto &z: bt.ConfirmLeaderRSP_m_copy[cfh])
-            {
-                nodelist+=z.first.container+" ";
-            }
-        }
-        if(src_node==br->blockAcceptedREQ->blockInfo->heart_beat->node_leader)
-            logNode("hb list %s",nodelist.c_str());
 
         REF_getter<MsgData::BlockDBStore> bds=new MsgData::BlockDBStore;
         // bds->att_data=r->
@@ -172,61 +161,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     return true;
 }
 
-bool Node::Service::verifyLeaderCert(const MsgData::LeaderCert* lc, const BlockMetaFull* mf)
-{
-    std::vector<blst_cpp::PublicKey> agg_pk_lc;
-    int64_t stake_lc=0;
-    for(auto &z: lc->node_validators)
-    {
-        auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(), z);
-        if(!n.valid())
-            throw CommonError("if(!n.valid()) @@$8");
-        agg_pk_lc.push_back(n->get_bls_pk());
-        stake_lc+=mf->getPrevStake(z);
-    }
-    if (!lc->agg_sig.verify(agg_pk_lc, lc->hb->getHash().container))
-    {
-        logNode("hb aggsig not matched");
-        return false;
-    }
-    if((stake_lc*100)/mf->fullStake()< QUORUM)
-    {
-        logNode("QUORUM LC failed");
-        return false;
-    }
 
-    return true;
-}
-
-REF_getter<MsgData::LeaderCert> Node::Service::makeLeaderCert(const MsgData::HeartBeatREQ* hb, const BlockMetaFull* mf)
-{
-    auto &bt = l_blocks[prev_root_hash_Z()];
-    REF_getter<MsgData::LeaderCert> lc=new MsgData::LeaderCert;
-    lc->hb=hb;
-    auto hb_hash=hb->getHash();
-    std::vector<blst_cpp::PublicKey> agg_pk_lc;
-    int64_t stake_lc=0;
-    for(auto& z:bt.ConfirmLeaderRSP_m_copy[hb_hash])
-    {
-        auto n=cells::getNodeNoCreateConst(root.get(), db_state.get(),z.second->node_signer);
-        if(!n.valid())
-            throw CommonError("if(!n.valid()) ##124");
-        agg_pk_lc.push_back(n->get_bls_pk());
-        lc->agg_sig.add(z.second->signature);
-        lc->node_validators.insert(z.second->node_signer);
-        stake_lc+=mf->getPrevStake(z.second->node_signer);
-
-    }
-    if(!lc->agg_sig.verify(agg_pk_lc,hb_hash.container))
-    {
-        throw CommonError("lc verify failed");
-    }
-    if((stake_lc* 100)/mf->fullStake() < QUORUM)
-        throw CommonError("if((stake_lc* 100)/mf->fullStake() < QUORUM) %lld",(stake_lc * 100)/mf->fullStake());
-
-    return lc;
-
-}
 bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
@@ -255,7 +190,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
     auto h=r->blockInfo->getHash();
     // logNode("blockInfo->getHash() %s from node %s",h.str().c_str(),src_node.container.c_str());
     bt.ValidateBlockRSP_m[h].push_back(r);
-    auto mf=getMetaFull(r->blockInfo->heart_beat->block_timestamp);
+    auto mf=getMetaFull();
     if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
     {
         XTRY;
@@ -309,12 +244,12 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         logNode("validators %s",iUtils->join(" ",nnn).c_str());
 
 
-        std::string nodelist;
-        for(auto &z: bt.HeartBeatRSP_m[h])
-        {
-            nodelist+=z.first.container+" ";
-        }
-        logNode("hb list %s",nodelist.c_str());
+        // std::string nodelist;
+        // for(auto &z: bt.HeartBeatRSP_m[h])
+        // {
+        //     nodelist+=z.first.container+" ";
+        // }
+        // logNode("hb list %s",nodelist.c_str());
         XPASS;
     }
     XPASS;

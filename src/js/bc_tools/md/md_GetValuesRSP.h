@@ -1,27 +1,29 @@
 #pragma once
 #include "md_Base.h"
 #include <map>
+#include "rsp_status.h"
 namespace MsgData
 {
-    struct GetValuesRSP: public Base
+    struct GetValuesRSP: public Base, public rsp_status
     {
         GetValuesRSP():Base(msgid::GetValuesRSP) {}
-        bool found = false;
         std::map<std::string, int64_t> fees;
         void update(Blake2bHasher& h) const
         {
-            h.update(found ? "1" : "0");
+            update_status(h);
             for(auto& z: fees) { h.update(z.first); h.update(std::to_string(z.second)); }
         }
         void pack(outBuffer& b) const final
         {
             Base::pack(b);
-            b<<found<<fees;
+            pack_status(b);
+            b<<fees;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
-            b>>found>>fees;
+            unpack_status(b);
+            b>>fees;
         }
         static Base* construct() { return new GetValuesRSP(); }
     };

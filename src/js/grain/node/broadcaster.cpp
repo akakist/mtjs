@@ -34,7 +34,7 @@ void Node::Service::make_broadcast_message_to_tree(SERVICE_id dstService, const 
         REF_getter<bcEvent::SendToChild> e1 = new bcEvent::SendToChild(node_signer, node_start_timestamp, seqId, signature, msg, *it, dstService, it->node.name, route);
         REF_getter<bcEvent::SendToChild> e2 = new bcEvent::SendToChild(node_signer, node_start_timestamp, seqId, signature, msg, *it, dstService, it->node.name, route);
         sendEvent(it->node.ip, ServiceEnum::Node, e1.get());
-
+        // logNode("SendToChild from %s to %s",this_node_name.container.c_str(),it->node.name.container.c_str());
         sendEvent(ServiceEnum::Timer, new timerEvent::SetAlarm(TIMER_BROADCAST_ACK_TIMEDOUT,
                   toRef(e2->hash()), e2.get(), BROADCAST_ACK_TIMEDOUT_SEC, this));
     }
@@ -88,8 +88,8 @@ bool Node::Service::handle_send_to_child(const NODE_id &node_signer, int64_t nod
 
     switch (msgb->type)
     {
-    case msgid::LcEnvelopeREQ:
-        return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msgb.get()), node_signer, route,need_continue_broadcast);
+    // case msgid::LcEnvelopeREQ:
+    //     return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msgb.get()), node_signer, route,need_continue_broadcast);
 
     default:
         throw CommonError("unjandled323 MsgData %s", msgName(msgb->type));

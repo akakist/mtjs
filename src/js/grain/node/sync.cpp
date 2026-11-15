@@ -50,7 +50,7 @@ void collect_sync_req2(const std::string& id, const std::string &granule,IDataba
     }
 }
 
-bool Node::Service::GetGranulesREQ(const bcEvent::GetGranulesREQ*e)
+bool Node::Service::syncGetGranulesREQ(const bcEvent::syncGetGranulesREQ*e)
 {
 
     // bcEvent::GetGranulesRSP()
@@ -74,11 +74,11 @@ bool Node::Service::GetGranulesREQ(const bcEvent::GetGranulesREQ*e)
         logErr2("GetGranulesREQ: ret add %s",base16::encode(z).c_str());
         ret.push_back({z,rg});
     }
-    passEvent(new bcEvent::GetGranulesRSP(root_hash, this_node_name, ret, poppedFrontRoute(e->route)));
+    passEvent(new bcEvent::syncGetGranulesRSP(root_hash, this_node_name, ret, poppedFrontRoute(e->route)));
     return true;
 }
 
-bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
+bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
 {
 
     // root->replaceLeafNoCreate()
@@ -89,38 +89,52 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
 
     for(auto& z: m->v)
     {
-        if(z.first=="")
-        {
+        // if(z.first=="")
+        // {
+        //     logNode("prev_block->blockAcceptedREQ->blockInfo->new_root_hash1 %s",prev_block->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
+        //     auto hh=blake2b_hash(z.second);
+        //     if(hh!=prev_block->blockAcceptedREQ->blockInfo->new_root_hash1)
+        //         throw CommonError("if(hh!=prev_block->blockAcceptedREQ->blockInfo->new_root_hash1)");
+        //     logNode("hh %s",hh.str().c_str());
+        //     auto r = new Cellable(NULL, "");
+        //     inBuffer in(z.second);
+        //     r->unpack_mx(in);
+        //     root = r;
+        //     DBG(logNode("GetGranulesRSP: root refreshed (hash=%s)",
+        //         base16::encode(blake2b_hash(z.second).container).substr(0,16).c_str()));        
+        // }
+        // else
+        // {
+        //     logNode("GetGranulesRSP: recv granule '%s'",base16::encode(z.first).c_str());
+        //     // auto id=splice(z.first);
+        //     // auto parent_id=id.
+        //     // std::string pbuf;
+        //     // auto r2=db_state->getGranule(z.first, &pbuf);
+        //     if(r2) throw CommonError("if(r2) ");
 
-        }
-        else
-        {
-            logNode("GetGranulesRSP: recv granule '%s'",base16::encode(z.first).c_str());
-            auto id=splice(z.first);
-            std::string pbuf;
-            auto r2=db_state->getGranule(id.first, &pbuf);
-            // if(r2) throw CommonError("if(r2) ");
-            if(pbuf.size())
-            {
-                REF_getter< Cellable> par=new Cellable(NULL,id.first);
-                inBuffer inpar(pbuf);
-                par->unpack_mx(inpar);
-                auto it = par->children_hashes_mx.find(id.second);
-                if (it == par->children_hashes_mx.end()) {
-                    logNode("GetGranulesRSP: parent %s has no child %s (skip hash check)",
-                            base16::encode(id.first).c_str(),
-                            base16::encode(id.second).c_str());
-                    // ← НЕ throw
-                } else if (it->second != blake2b_hash(z.second)) {
-                    logNode("GetGranulesRSP: hash mismatch for %s (expected %s, got %s) — skip, will re-sync after root update",
-                            base16::encode(z.first).c_str(),
-                            base16::encode(it->second.container).c_str(),
-                            base16::encode(blake2b_hash(z.second).container).c_str());
-                    // ← НЕ throw, записать (root обновится, потом re-sync)
-                }            }
+        //     cells::getByPathNoCreate()
+        //     if(pbuf.size())
+        //     {
+
+        //         REF_getter< Cellable> par=new Cellable(NULL,id.first);
+        //         inBuffer inpar(pbuf);
+        //         par->unpack_mx(inpar);
+        //         auto it = par->children_hashes_mx.find(id.second);
+        //         if (it == par->children_hashes_mx.end()) {
+        //             logNode("GetGranulesRSP: parent %s has no child %s (skip hash check)",
+        //                     base16::encode(id.first).c_str(),
+        //                     base16::encode(id.second).c_str());
+        //             // ← НЕ throw
+        //         } else if (it->second != blake2b_hash(z.second)) {
+        //             logNode("GetGranulesRSP: hash mismatch for %s (expected %s, got %s) — skip, will re-sync after root update",
+        //                     base16::encode(z.first).c_str(),
+        //                     base16::encode(it->second.container).c_str(),
+        //                     base16::encode(blake2b_hash(z.second).container).c_str());
+        //             // ← НЕ throw, записать (root обновится, потом re-sync)
+        //         }            }
 
 
-        }
+        // }
         db.add(z.first,z.second);
     }
     db_state->write_granules_batch(db);
@@ -135,14 +149,14 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
     std::vector<std::string> pathes=db_state->getPathes();
     if(pathes.size())
     {
-        auto n=cells::getNodeNoCreate(root.get(),db_state.get(),m->responder);
-        if (!n.valid()) {
-            logNode("GetGranulesRSP: responder %s not found locally, ignore (sync)", m->responder.container.c_str());
-            return true;   // не throw — responder ещё не досинкан
+        // Во время синка состояние (root) недостоверно — responder ищем НЕ в root.
+        // ip отправителя сохранён в do_sync (db_state->setIp(ip)).
+        auto ip = db_state->getIp();
+        if (ip.empty()) {
+            logNode("GetGranulesRSP: sync_ip empty, ignore (sync)");
+            return true;
         }
-        auto ip=n->get_ip();
-        sendEvent(ip,ServiceEnum::Node,new bcEvent::GetGranulesREQ(pathes,ListenerBase::serviceId));
-
+        sendEvent(ip,ServiceEnum::Node,new bcEvent::syncGetGranulesREQ(pathes,ListenerBase::serviceId));
     }
     else {
     }
@@ -151,43 +165,51 @@ bool Node::Service::GetGranulesRSP(const bcEvent::GetGranulesRSP* m)
 void Node::Service::continue_sync()
 {
     auto p=db_state->getPathes();
-    sendEvent(db_state->getIp(),ServiceEnum::Node,new bcEvent::GetGranulesREQ(p,ListenerBase::serviceId));
+    sendEvent(db_state->getIp(),ServiceEnum::Node,new bcEvent::syncGetGranulesREQ(p,ListenerBase::serviceId));
 
 }
 
-void Node::Service::do_sync(const NODE_id &src_node, const THASH_id& prev_root_hash_remote)
+void Node::Service::do_sync(const NODE_id &src_node, const std::string& src_ip,
+                            const THASH_id& prev_root_hash_remote)
 {
     MUTEX_INSPECTOR;
-    logNode("do_sync START: src=%s prev_root=%s", src_node.container.c_str(), prev_root_hash_remote.str().c_str());
-
-    // logNode ("do_sync");
+    logNode("do_sync START: src=%s ip=%s prev_root=%s",
+            src_node.container.c_str(), src_ip.c_str(),
+            prev_root_hash_remote.str().c_str());
 
     db_state->add_sync_out("");
 
-    auto n=cells::getNodeNoCreate(root.get(),db_state.get(),src_node);
-    if(!n.valid())
-        throw CommonError("if(!n.valid()) eer@##");
-    // root=NULL;
-    auto ip=n->get_ip();
-    db_state->setIp(ip);
+    // Во время синка root недостоверен — ip приходит аргументом от вызывающего.
+    db_state->setIp(src_ip);
     continue_sync();
-
-
-
 }
+
+
 bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r, const NODE_id &src_node, const route_t &route)
 {
+    if(!db_state->sync_empty)
+    {
+        logNode("DelayNotificationREQ: sync in progress, ignore");
+        return true;
+    }
+
     bool remote_verified=verify_block_all(r->lc);
     if(!remote_verified)
         return true;
+
     if(!prev_block.valid() || r->lc->blockAcceptedREQ->blockInfo->heart_beat->new_epoch > prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch)
     {
         MUTEX_INSPECTOR;
         logNode("STATE_SYNCING");
         prev_block=r->lc;
-        do_sync(src_node,r->lc->blockAcceptedREQ->blockInfo->new_root_hash1);
+        // ip берём из root ДО начала синка (root ещё достоверен)
+        auto n_src = cells::getNodeNoCreate(root.get(), db_state.get(), src_node);
+        if (!n_src.valid()) {
+            logNode("DelayNotificationREQ: src_node %s not found, skip sync", src_node.container.c_str());
+            return true;
+        }
+        do_sync(src_node, n_src->get_ip(),
+                r->lc->blockAcceptedREQ->blockInfo->new_root_hash1);
     }
-
-
     return true;
 }

@@ -23,6 +23,8 @@ struct BlockMetaFull: public Refcountable
         return r;
     }
     std::vector<NODE_id> all_nodes_enabled;
+    std::vector<NodeElement> vne;
+
     TreeNode tree_all_nodes;
     TreeNode tree_committe;
     std::map<NODE_id, size_t> position_of_node;

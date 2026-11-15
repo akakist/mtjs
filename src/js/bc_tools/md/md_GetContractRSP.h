@@ -3,12 +3,13 @@
 #include "CONTRACT_id.h"
 #include "ADDRESS_id.h"
 #include <set>
+#include "rsp_status.h"
+
 namespace MsgData
 {
-    struct GetContractRSP: public Base
+    struct GetContractRSP: public Base, public rsp_status
     {
         GetContractRSP():Base(msgid::GetContractRSP) {}
-        bool found = false;
         CONTRACT_id contract;
         std::set<ADDRESS_id> owners;
         std::string src;
@@ -16,7 +17,7 @@ namespace MsgData
         int64_t update_time = 0;     // ← новое
         void update(Blake2bHasher& h) const
         {
-            h.update(found ? "1" : "0");
+            update_status(h);
             h.update(contract.container);
             for (auto& o : owners) h.update(o.addr);
             h.update(src);
@@ -26,12 +27,14 @@ namespace MsgData
         void pack(outBuffer& b) const final
         {
             Base::pack(b);
-            b<<found<<contract<<owners<<src<<ttl<<update_time;
+            pack_status(b);
+            b<<contract<<owners<<src<<ttl<<update_time;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
-            b>>found>>contract>>owners>>src>>ttl>>update_time;
+            unpack_status(b);
+            b>>contract>>owners>>src>>ttl>>update_time;
         }
         static Base* construct() { return new GetContractRSP(); }
     };

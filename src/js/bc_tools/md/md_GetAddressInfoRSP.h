@@ -13,14 +13,13 @@ struct KeyInfo {
 inline outBuffer& operator<<(outBuffer& o, const KeyInfo& k) { k.pack(o); return o; }
 inline inBuffer&  operator>>(inBuffer& in, KeyInfo& k) { k.unpack(in); return in; }
 
-struct GetAddressInfoRSP: public Base {
+struct GetAddressInfoRSP: public Base, public rsp_status  {
     GetAddressInfoRSP():Base(msgid::GetAddressInfoRSP) {}
-    bool found = false;
     int64_t balance = 0;
     int64_t nonce = 0;
     std::vector<KeyInfo> keys;
     void update(Blake2bHasher& h) const {
-        h.update(found ? "1" : "0");
+        update_status(h);
         h.update(std::to_string(balance));
         h.update(std::to_string(nonce));
         for (auto& k : keys) {
@@ -29,8 +28,8 @@ struct GetAddressInfoRSP: public Base {
             h.update(k.keybuffer);
         }
     }
-    void pack(outBuffer& b) const final { Base::pack(b); b << found <<  balance << nonce << keys; }
-    void unpack(inBuffer& b) final { Base::unpack(b); b >> found >>  balance >> nonce >> keys; }
+    void pack(outBuffer& b) const final { Base::pack(b); pack_status(b);  b <<  balance << nonce << keys; }
+    void unpack(inBuffer& b) final { Base::unpack(b); unpack_status(b); b  >>  balance >> nonce >> keys; }
     static Base* construct() { return new GetAddressInfoRSP(); }
 };
 }

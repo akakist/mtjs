@@ -58,15 +58,15 @@ namespace cells {
 // ============================================================
 // path / cell traversal
 // ============================================================
-    REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, Rollback* roll);
-    REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::deque<std::string>& v, Rollback* roll);
-    REF_getter<Cellable> getByPathNoCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v);
+    REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, Rollback* roll, bool checkHash);
+    REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::deque<std::string>& v, Rollback* roll, bool checkHash);
+    REF_getter<Cellable> getByPathNoCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, bool checkHash);
 
-    REF_getter<Cellable> getByDbIdNoCreate(Cellable* root, IDatabase* db, const THASH_id& h);
+    REF_getter<Cellable> getByDbIdNoCreate(Cellable* root, IDatabase* db, const THASH_id& h, bool checkHash);
 
-    REF_getter<Cellable> replaceLeafOrCreate(Cellable* cur, IDatabase* db, const std::string& id, Rollback* roll);
-    REF_getter<Cellable> replaceLeafNoCreate(Cellable* cur, IDatabase* db, const std::string& id);
-    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& name, Rollback* roll, const std::string& buffer);
+    REF_getter<Cellable> getLeafOrCreate(Cellable* cur, IDatabase* db, const std::string& id, Rollback* roll, bool checkHash);
+    REF_getter<Cellable> getLeafNoCreate(Cellable* cur, IDatabase* db, const std::string& id, bool checkHash);
+    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& name, Rollback* roll, const std::string& buffer, bool checkHash);
 
 // ============================================================
 // address state
@@ -131,4 +131,8 @@ namespace cells {
     void touchActivity(Cellable* root, IDatabase* db,
                     const std::string& granule_dbid,
                     Rollback* roll, time_t now);
+
+
+
 } // namespace cells
+

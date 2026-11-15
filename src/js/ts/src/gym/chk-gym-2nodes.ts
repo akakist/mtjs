@@ -125,7 +125,7 @@ async function ensureGym(src: string) {
         check(block.status(rsp.tx_hash) === "ok", "contract_update gym ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
     } else {
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-            { contract: "root", method: "contract_deploy", params: { name: "gym", src } },
+            { contract: "root", method: "contract_deploy", params: { name: "gym", src, ttl: 1000000 } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "contract_deploy gym ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
     }

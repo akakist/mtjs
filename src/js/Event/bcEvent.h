@@ -50,8 +50,8 @@ namespace bcEventEnum
     const EVENT_id GetUserNonceRSP(ghash("@g_GetUserNonceRSP"));
     const EVENT_id WriteGranules(ghash("@g_WriteGranules"));
     const EVENT_id WriteBlock(ghash("@g_WriteBlock"));
-    const EVENT_id GetGranulesREQ(ghash("@g_GetGranulesREQ"));
-    const EVENT_id GetGranulesRSP(ghash("@g_GetGranulesRSP"));
+    const EVENT_id syncGetGranulesREQ(ghash("@g_GetGranulesREQ"));
+    const EVENT_id syncGetGranulesRSP(ghash("@g_GetGranulesRSP"));
     const EVENT_id StaleGranules(ghash("@g_StaleGranules"));
     const EVENT_id LiteSetUplinkREQ(ghash("@g_LiteSetUplinkREQ")); /// выставить для iDatabase адрес ноды откуда брать гранулы
     // const EVENT_id BarrierOpenREQ(ghash("@g_BarrierOpenREQ__"));
@@ -604,21 +604,21 @@ namespace bcEvent
         const int64_t epoch;
         const REF_getter<IDatabase> db;
     };
-    class GetGranulesREQ : public Event::Base
+    class syncGetGranulesREQ : public Event::Base
     {
 
     public:
         static Base *construct(const route_t &r)
         {
-            return new GetGranulesREQ(r);
+            return new syncGetGranulesREQ(r);
         }
-        GetGranulesREQ(const std::vector<std::string> &_keys, const route_t &r)
-            : Base(bcEventEnum::GetGranulesREQ, r), keys(_keys) {}
+        syncGetGranulesREQ(const std::vector<std::string> &_keys, const route_t &r)
+            : Base(bcEventEnum::syncGetGranulesREQ, r), keys(_keys) {}
 
         std::vector<std::string> keys;
 
-        GetGranulesREQ(const route_t &r)
-            : Base(bcEventEnum::GetGranulesREQ, r) {}
+        syncGetGranulesREQ(const route_t &r)
+            : Base(bcEventEnum::syncGetGranulesREQ, r) {}
 
 
         void unpack(inBuffer &o)
@@ -630,16 +630,16 @@ namespace bcEvent
             o<<keys;
         }
     };
-    class GetGranulesRSP : public Event::Base
+    class syncGetGranulesRSP : public Event::Base
     {
 
     public:
         static Base *construct(const route_t &r)
         {
-            return new GetGranulesRSP(r);
+            return new syncGetGranulesRSP(r);
         }
-        GetGranulesRSP(const THASH_id& _root_hash, const NODE_id &_responder, const std::vector<std::pair<std::string,std::string>> &_v, const route_t &r)
-            : Base(bcEventEnum::GetGranulesRSP, r), 
+        syncGetGranulesRSP(const THASH_id& _root_hash, const NODE_id &_responder, const std::vector<std::pair<std::string,std::string>> &_v, const route_t &r)
+            : Base(bcEventEnum::syncGetGranulesRSP, r), 
             root_hash(_root_hash),
             responder(_responder),
             v(_v) {}
@@ -648,8 +648,8 @@ namespace bcEvent
         NODE_id responder;
         std::vector<std::pair<std::string,std::string>> v;
 
-        GetGranulesRSP(const route_t &r)
-            : Base(bcEventEnum::GetGranulesRSP, r) {}
+        syncGetGranulesRSP(const route_t &r)
+            : Base(bcEventEnum::syncGetGranulesRSP, r) {}
 
 
         void unpack(inBuffer &o)

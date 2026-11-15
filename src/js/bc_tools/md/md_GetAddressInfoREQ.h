@@ -1,13 +1,14 @@
 #pragma once
 #include "md_Base.h"
 #include "ADDRESS_id.h"
+#include "rsp_status.h"
 namespace MsgData {
-struct GetAddressInfoREQ: public Base {
+struct GetAddressInfoREQ: public Base  {
     GetAddressInfoREQ():Base(msgid::GetAddressInfoREQ) {}
     ADDRESS_id addr;
-    void update(Blake2bHasher& h) const { h.update(addr.addr); }
-    void pack(outBuffer& b) const final { Base::pack(b); b << addr; }
-    void unpack(inBuffer& b) final { Base::unpack(b); b >> addr; }
+    void update(Blake2bHasher& h) const { h.update(addr.addr);  }
+    void pack(outBuffer& b) const final { Base::pack(b);  b << addr; }
+    void unpack(inBuffer& b) final { Base::unpack(b);  b >> addr; }
     static Base* construct() { return new GetAddressInfoREQ(); }
 };
 }

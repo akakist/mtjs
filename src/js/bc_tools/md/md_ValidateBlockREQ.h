@@ -8,8 +8,7 @@ namespace MsgData
     {
 
         ValidateBlockREQ():Base(msgid::ValidateBlockREQ),
-            heart_beat(new MsgData::HeartBeatREQ()),
-            lc(new MsgData::LeaderCert)
+            heart_beat(new MsgData::HeartBeatREQ())
         {
         }
         static Base* construct()
@@ -19,7 +18,7 @@ namespace MsgData
 
         REF_getter<MsgData::HeartBeatREQ>  heart_beat;
         std::vector<REF_getter<MsgData::TX> > transaction_bodies;
-        REF_getter<MsgData::LeaderCert>  lc;
+        int64_t block_timestamp;
         void update(Blake2bHasher& h) const
         {
             heart_beat->update(h);
@@ -29,7 +28,7 @@ namespace MsgData
                 h.update(z->tx_body);
                 h.update(z->pk_ed_bin);
             }
-            lc->update(h);
+            h.update(std::to_string(block_timestamp));
         }
 
         void pack(outBuffer& b) const final
@@ -39,7 +38,7 @@ namespace MsgData
             Base::pack(b);
             b << heart_beat;
             b << transaction_bodies;
-            b << lc;
+            b << block_timestamp;
         }
         void unpack(inBuffer& b) final
         {
@@ -47,7 +46,7 @@ namespace MsgData
             Base::unpack(b);
             b >> heart_beat;
             b >> transaction_bodies;
-            b >> lc;
+            b >> block_timestamp;
         }
 
     };

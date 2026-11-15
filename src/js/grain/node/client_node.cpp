@@ -20,6 +20,34 @@
 #include "cells.h"
 #include "proceed_merkle_on_transaction_pool_hashers.h"
 #include <vector>
+bool Node::Service::BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route)
+{
+    for(auto& z: r->deleted)
+    {
+        if(z.size()!=32) throw CommonError("if(z.first.size()!=32)");
+            THASH_id h;
+            h.container=z;
+            auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h, false);
+            if (!cc.valid()) { logNode("deleted: cell not found %s", base16::encode(z).c_str()); continue; }
+            if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            
+            cc->setDirty__(NULL);
+            deleteGranule(cc->data.get(),NULL,db_to_save_Z);
+    }
+    // for(auto &z: db_dump)
+    for(auto& z: r->diffs)
+    {
+        if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
+        THASH_id h;
+        h.container=z.first;
+        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, NULL,z.second,false);
+        leaf->setDirty(NULL);
+    }
+
+
+    auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
+
+    return true;
+}
 bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
@@ -27,8 +55,8 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     {
         return true;
     }
-    stage_is_working=iUtils->getNow();
     auto &cli = cli_leader_info[prev_root_hash_Z()];
+
     if(!cli.node_leader.valid())
     {
         logNode("if(!cli.node_leader.valid()) 1@");
@@ -38,6 +66,11 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     if(cli.node_leader->node_leader!=src_node)
     {
         logNode("invalid leader 12");
+        return true;
+    }
+    if(!cli.node_leader->equals(r->blockAcceptedREQ->blockInfo->heart_beat))
+    {
+        logNode("if(!cli.node_leader->equals(r->blockAcceptedREQ->blockInfo->heart_beat))");
         return true;
     }
     std::vector<blst_cpp::PublicKey> agg_pk;
@@ -66,7 +99,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         XPASS;
     }
     /// TODO: проверка стейка
-    auto mf=getMetaFull(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+    auto mf=getMetaFull();
 
     int64_t staked=0;
     for(auto &z: r->blockAcceptedREQ->node_validators)
@@ -92,9 +125,10 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         if(z.size()!=32) throw CommonError("if(z.first.size()!=32)");
             THASH_id h;
             h.container=z;
-            auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h);
+            auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h, true);
             if (!cc.valid()) { logNode("deleted: cell not found %s", base16::encode(z).c_str()); continue; }
-            if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }
+            if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            
+            cc->setDirty__(&roll);
             deleteGranule(cc->data.get(),&roll,db_to_save_Z);
     }
     // for(auto &z: db_dump)
@@ -103,7 +137,8 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
         THASH_id h;
         h.container=z.first;
-        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second);
+        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second,true);
+        leaf->setDirty(&roll);
     }
 
 
@@ -153,30 +188,35 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     {
         return true;
     }
-    stage_is_working=iUtils->getNow();
-
-
-
-    XTRY;
+    
     auto &cli = cli_leader_info[prev_root_hash_Z()];
+
     if(!cli.node_leader.valid())
     {
-        logNode("if(!cli.node_leader.valid()) @2");
+        logNode("if(!cli.node_leader.valid()) 1@");
         return true;
     }
 
     if(cli.node_leader->node_leader!=src_node)
     {
-        logNode("invalid leader #12");
+        logNode("invalid leader 12");
         return true;
     }
+    if(!cli.node_leader->equals(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat))
+    {
+        logNode("if(!cli.node_leader->equals(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat))");
+        return true;
+    }
+
+
+    XTRY;
 
     if (r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->node_leader != src_node)
     {
         logNode("if(blockDBStore->validateBlockREQ->leader_cert->heart_beat->node_leader!=src_node)");
         return true;
     }
-    auto mf=getMetaFull(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+    auto mf=getMetaFull();
 
     if(!db_state->sync_empty)
     {
@@ -274,26 +314,15 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         if (db_state->getGranule(z, &old_body) == 0 && !old_body.empty())
             stale.push_back({blake2b_hash(old_body).container, old_body});
     }
-    // BarrierRSPS.insert(ServiceEnum::GrainReader);
-    // BarrierRSPS.insert(ServiceEnum::TxValidator);
-    // REF_getter<bcEvent::DBWriteREQ> dbreq=new bcEvent::DBWriteREQ(db_state.get(), db_to_save_Z, this);
-    // dbWriteREQ=dbreq;
-    // BlockDBStore_for_invalidate=r;
-    // if (!stale.empty())
-    //     sendEvent(ServiceEnum::GrainReader, new bcEvent::StaleGranules(stale, this));
 
-    int64_t now = (int64_t)time(NULL);
+    int64_t now = (int64_t)iUtils->getNow();
     for (auto& z : stale)
         stale_cache[z.first] = { z.second, now };
 
-    // sendEvent(ServiceEnum::GrainReader,new bcEvent::BarrierOpenREQ(this));
-    // sendEvent(ServiceEnum::TxValidator,new bcEvent::BarrierOpenREQ(this));
 
     db_state->write_granules_batch(db_to_save_Z);
     db_to_save_Z.clear();
 
-        // REF_getter<MsgData::BlockDBStore> r=BlockDBStore_for_invalidate;
-        // BlockDBStore_for_invalidate=nullptr;
         sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
 
         prev_block=r->blockAccepted2REQ;
@@ -315,7 +344,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         }
         auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
         auto ttl_cache=v->getValue("ttl_cache");
-        if(r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->new_epoch % 100 == 0)
         {
     #ifdef DEBUG
             for(auto& z: contractHost->contract_cache)
@@ -326,101 +354,28 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
             contractHost->contract_cache.clear();
             root=getRoot(db_state.get(),prev_block);
         }
-        cli_leader_info.clear();
 
-        stage_is_working=0;
 
-        if(transaction_pool_of_leader.size())
-        {
-            do_heart_beat(time(NULL));
-        }
-
-    // db_to_save_Z.clear();
-    // grain/node/client_node.cpp, BlockDBStore, после write_granules_batch:
-    // {
-    //     auto root_hex = base16::encode(
-    //         r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->new_root_hash1.container).substr(0, 16);
-    //     DBG(logNode("BlockDBStore: after write, root=%s, sending InvalidateRoot", root_hex.c_str()));
-    // }
-    // {
-
-    // }
-    // invalidate_services(r);    
-
+    sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BLOCK_EXPIRED,toRef(cli.node_leader->node_leader.container),this));
+    cli.node_leader=nullptr;
     XPASS;
     return true;
 }
 
+void Node::Service::resetBlockExpired(const NODE_id &n)
+{
+    sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(TIMER_BLOCK_EXPIRED,toRef(n.container),NULL,5., this));
+}
 
-// bool Node::Service::BarrierOpenRSP(const bcEvent::BarrierOpenRSP* e)
-// {
-//     BarrierRSPS.erase(e->sid);
-//     if(BarrierRSPS.empty())
-//     {
-//         sendEvent(ServiceEnum::DBWriter,dbWriteREQ.get());
-//         dbWriteREQ=nullptr;
-//     }
-//     return true;    
-// }
-
-// bool Node::Service::InvalidateRootRSP(const bcEvent::InvalidateRootRSP* e)
-// {
-//     InvalidateRootRSPS.erase(e->sid);
-
-//     if(InvalidateRootRSPS.empty() && BlockDBStore_for_invalidate.valid())
-//     {
-//         REF_getter<MsgData::BlockDBStore> r=BlockDBStore_for_invalidate;
-//         BlockDBStore_for_invalidate=nullptr;
-//         sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
-
-//         prev_block=r->blockAccepted2REQ;
-//         l_blocks.clear();
-//         block_meta_full.clear();
-
-//         for (auto &z : r->tx_hashes)
-//         {
-
-//             MUTEX_INSPECTOR;
-//             XTRY;
-//             auto it = transaction_pool_of_leader.find(z);
-//             if (it != transaction_pool_of_leader.end())
-//             {
-//                 transaction_pool_of_leader.erase(it);
-//                 DBG(logNode("removed tx %s", base16::encode(z.container).c_str()));
-//             }
-//             XPASS;
-//         }
-//         auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
-//         auto ttl_cache=v->getValue("ttl_cache");
-//         {
-//     #ifdef DEBUG
-//             for(auto& z: contractHost->contract_cache)
-//             {
-//                 dump_mem("ccc",z.second->rt);
-//             }
-//     #endif
-//             contractHost->contract_cache.clear();
-//             root=getRoot(db_state.get(),prev_block);
-//         }
-//         cli_leader_info.clear();
-
-//         stage_is_working=0;
-
-//         if(transaction_pool_of_leader.size())
-//         {
-//             do_heart_beat(time(NULL));
-//         }
-
-//     }
-
-//     return true;
-// }
-
-bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
 
-    stage_is_working=iUtils->getNow();
+    if(current_leader()!=src_node)
+    {
+        logNode("if(current_leader()!=src_node)");
+        return true;
+    }
 
 
     if(!db_state->sync_empty)
@@ -430,20 +385,27 @@ bool Node::Service::GetTransactionREQ(const MsgData::GetTransactionREQ *r, const
     }
 
     auto prev_root_hash=prev_root_hash_Z();
-    auto & cli=cli_leader_info[prev_root_hash];
-    if(!cli.node_leader.valid())
+    auto &cli=cli_leader_info[prev_root_hash_Z()];
+    if(r->hb->node_leader!=src_node)
     {
-        logNode("if(!cli.node_leader.valid())##4");
+        logNode("if(r->hb->node_leader!=src_node)");
         return true;
     }
-
-    if(!cli.node_leader.valid() || cli.node_leader->node_leader!=src_node)
+    if(cli.node_leader.valid())
     {
-        logNode("GetTransaction invalid leader #14  my %s remote %s", cli.node_leader.valid()?cli.node_leader->node_leader.container.c_str():"", src_node.container.c_str());
+        // logNode("if(cli.node_leader.valid()) @@@3");
         return true;
     }
+    if(current_leader()!=src_node)
+    {
+        logNode("if(current_leader()!=src_node)");
+        return true;
+    }
+    cli.node_leader=r->hb;
+    
+    resetBlockExpired(r->hb->node_leader);
 
-    REF_getter<MsgData::GetTransactionRSP> rsp = new MsgData::GetTransactionRSP;
+    REF_getter<MsgData::GetTxRSP> rsp = new MsgData::GetTxRSP;
     for (auto &z : transaction_pool_of_leader)
     {
         rsp->trs.push_back(z.second);
@@ -503,42 +465,36 @@ int get_global_refcount();
 bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;
-    stage_is_working=iUtils->getNow();
 
-
+    logNode("ValidateBlockREQ from %s",src_node.container.c_str());
     if(!db_state->sync_empty)
     {
         return true;
     }
     auto prev_root_hash=prev_root_hash_Z();
     b_params t(db_state.get());
-    t.meta=getMetaFull(r->heart_beat->block_timestamp);
+    t.meta=getMetaFull();
 
     bool err = false;
 
     auto &cli=cli_leader_info[prev_root_hash];
     if(!cli.node_leader.valid())
     {
-        logNode("if(!cli.node_leader.valid())##7");
+        logNode("if(!cli.node_leader.valid())");
         return true;
     }
-    if(cli.node_leader->node_leader!=src_node)
+    if(!r->heart_beat->equals(cli.node_leader))
     {
-        logNode("invalid leader #15");
+        logNode("if(!r->heart_beat->equals(cli.node_leader->node_leader))");
         return true;
     }
-
-
-    if (!err)
+    if(r->heart_beat->node_leader!=src_node)
     {
-        if (!r->heart_beat->equals(cli_leader_info[r->heart_beat->prev_root_hash_1].node_leader))
-        {
-            t.emit_block("error", R"({"code":-32602,"error":"cert node leader mismatched"})");
-            // t.att_data->block_report = {1, "cert node leader mismatched"};
-            err = true;
-            logNode("cert node leader mismatched");
-        }
+        logNode("if(r->heart_beat->node_leader!=src_node)");
+        return true;
     }
+    resetBlockExpired(r->heart_beat->node_leader);
+
     if (!err && r->heart_beat->prev_root_hash_1 != prev_root_hash)
     {
 
@@ -550,13 +506,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         }
         logNode("ERROR: ValidateBlock block %s, nextblock %s", r->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z().str().c_str());
     }
-    if(!err)
-    {
-        if(!verifyLeaderCert(r->lc.get(),t.meta.get()))
-            err="leader cert verify failed";
-    }
-    if(!err)
-        fix_missed_rounds(r->lc->node_validators, r->lc->hb->block_timestamp);
     if (!err)
     {
 
@@ -620,7 +569,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         diff_hash.container=dh.final();
 
 
-        REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo(new_root_hash,tx_hash,diff_hash,t.att_data->getHash(),r->heart_beat);
+        REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo(new_root_hash,tx_hash,diff_hash,t.att_data->getHash(),r->heart_beat, r->block_timestamp);
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
 
         rsp->blockInfo = blockInfo;

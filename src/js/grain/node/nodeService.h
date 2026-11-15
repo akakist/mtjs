@@ -23,8 +23,8 @@
 #include "md/md_BlockAccepted2REQ.h"
 #include "md/md_ValidateBlockRSP.h"
 #include "md/md_ValidateBlockREQ.h"
-#include "md/md_GetTransactionRSP.h"
-#include "md/md_GetTransactionREQ.h"
+#include "md/md_GetTxREQ.h"
+#include "md/md_GetTxRSP.h"
 #include "md/md_BlockAcceptedREQ.h"
 #include "md/md_BlockDiffValidateREQ.h"
 #include "md/md_BlockDiffValidateRSP.h"
@@ -46,8 +46,10 @@
 std::set<NODE_id> getValidators(int64_t block_timestamp, IDatabase* db);
 
 // #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
-#define HB_TIME_WINDOW 10
-
+#define HB_TIME_WINDOW 2
+#define HB_SEND_TIMEOUT 4
+#define HB_VERIFY_TIMEOUT 5
+#define SLOT_MKS 3000000
 
 namespace Node
 {
@@ -56,13 +58,16 @@ namespace Node
     enum timers
     {
         TIMER_PERIODIC_CLOCK,
-        TIMER_GetTransactionRSP,
+        TIMER_GetTxRSP,
+        TIMER_GetTxFromLeader,
         TIMER_SYNC_TIMEDOUT,
         TIMER_REPORT_MEM,
         TIMER_BROADCAST_ACK_TIMEDOUT,
         TIMER_BlockDiffValidateREQ,
         TIMER_BlockDBStore,
-        TIMER_STALE_CLEANUP
+        TIMER_STALE_CLEANUP,
+        TIMER_BLOCK_EXPIRED,
+
     };
     class Service:
         public UnknownBase,
@@ -103,24 +108,25 @@ namespace Node
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
         bool PutTransactionREQ(const bcEvent::PutTransactionREQ* e);
 
-        REF_getter<MsgData::HeartBeatREQ> do_heart_beat(time_t tnow);
+        // REF_getter<MsgData::HeartBeatREQ> do_heart_beat(const MsgData::HeartBeatREQ* hb);
 
-        bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast);
-        bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAccepted2REQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast);
-        void reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route);
+        // bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast);
+        // bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAccepted2REQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast);
+        // void reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route);
 
-        bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
-        bool GetTransactionREQ(const MsgData::GetTransactionREQ* r, const NODE_id & src_node, const route_t& route);
-        bool GetTransactionRSP(const MsgData::GetTransactionRSP* r, const NODE_id & src_node, const route_t& route);
+        // bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
+        bool GetTxREQ(const MsgData::GetTxREQ* r, const NODE_id & src_node, const route_t& route);
+        bool GetTransactionRSP(const MsgData::GetTxRSP* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockREQ(const MsgData::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockRSP(const MsgData::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
         bool BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route);
 
         bool BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route);
+        bool BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route);
         bool BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r, const NODE_id & src_node, const route_t& route);
 
-        bool ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
-        bool ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
+        // bool ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
+        // bool ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
 
 
         bool DelayNotificationREQ(const MsgData::DelayNotificationREQ* m, const NODE_id & src_node, const route_t& route);
@@ -129,8 +135,8 @@ namespace Node
         bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);
 
-        bool GetGranulesRSP(const bcEvent::GetGranulesRSP* m);
-        bool GetGranulesREQ(const bcEvent::GetGranulesREQ*e);
+        bool syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m);
+        bool syncGetGranulesREQ(const bcEvent::syncGetGranulesREQ*e);
         bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
         bool SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork);
 
@@ -156,17 +162,10 @@ namespace Node
 
         struct block_leader
         {
-            // REF_getter< MsgData::HeartBeatREQ> leader_cert_2=nullptr;
-            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::HeartBeatRSP> > >HeartBeatRSP_m;
-            bool is_HeartBeatRSP_m_quorum(const THASH_id& h, BlockMetaFull* mf);
 
-            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m; /// сбрасывается после посылки гетТХ
-            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::ConfirmLeaderRSP> > >ConfirmLeaderRSP_m_copy; /// для подсчета ответивших нод
-
-            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTransactionRSP> > >GetTransactionRSP_m; /// для подсчета ответивших нод
+            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTxRSP> > >GetTxRSP_m; /// для подсчета ответивших нод
             bool is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* mf);
 
-            // std::map<THASH_id /*hb hash*/,REF_getter<MsgData::BlockInfo> > blockInfo_Z;
 
             std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
             bool is_ValidateBlockRSP_m_quorum(const THASH_id& h, BlockMetaFull* mf);
@@ -186,17 +185,15 @@ namespace Node
 
         struct client_leader_info
         {
-            REF_getter<MsgData::HeartBeatREQ> node_leader;
-            std::map<time_t /*time_window*/, int64_t> heart_beat_sent;
-            // int64_t confirm_leader_sent_c=0;
+            REF_getter<MsgData::HeartBeatREQ> node_leader=nullptr;
         };
 
         std::map<THASH_id,block_leader> l_blocks;
         std::map<THASH_id, client_leader_info> cli_leader_info;
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
-        std::map<THASH_id, std::map< time_t,REF_getter<BlockMetaFull>>> block_meta_full;
-        REF_getter<BlockMetaFull> getMetaFull(time_t ti);
+        std::map<THASH_id/* block */, REF_getter<BlockMetaFull>> block_meta_full;
+        REF_getter<BlockMetaFull> getMetaFull();
 
         THASH_id prev_root_hash_Z()
         {
@@ -214,17 +211,13 @@ namespace Node
 
         }
         REF_getter<MsgData::BlockAccepted2REQ> prev_block;
-        // State state_Z=STATE_NORMAL;
-        int64_t stage_is_working = 0;
         int64_t node_start_timestamp=0;
         int64_t seqId2=0;
         void clear()
         {
             l_blocks.clear();
             block_meta_full.clear();
-            cli_leader_info.clear();
             transaction_pool_of_leader.clear();
-            stage_is_working=false;
             prev_block=NULL;
 
         }
@@ -236,7 +229,8 @@ namespace Node
         std::vector<REF_getter<MsgData::TX>>  collectTransactions();
         THASH_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc);
 
-        void do_sync(const NODE_id &src_node, const THASH_id& prev_root_hash_remote);
+        void do_sync(const NODE_id &src_node, const std::string& src_ip,
+                            const THASH_id& prev_root_hash_remote);
         void continue_sync();
 
 
@@ -251,8 +245,6 @@ namespace Node
         std::optional<std::string> execute_tx_commands(b_params &b, t_params& t,
                 yyjson_val * j_tx, std::set<REF_getter<data_base>> * deleted_granules);
 
-        REF_getter<MsgData::LeaderCert> makeLeaderCert(const MsgData::HeartBeatREQ* hb, const BlockMetaFull* mf);
-        bool verifyLeaderCert(const MsgData::LeaderCert* lc, const BlockMetaFull* mf);
 
 
         REF_getter<IDatabase> db_state=nullptr;
@@ -277,8 +269,6 @@ namespace Node
 
         MsgFactory msgFactory;
 
-        // std::optional<std::string> load_contract(const CONTRACT_id& contract);
-        // std::optional<std::string> execute_contract(const CONTRACT_id& ct, const std::string & method, yyjson_val* params);
 
 
         REF_getter<ContractHost> contractHost=nullptr;
@@ -306,11 +296,6 @@ namespace Node
                 int& applied_granule, int& applied_contract, int& applied_node, int& applied_address);
 
 
-        void invalidate_services();
-        // std::set<SERVICE_id> InvalidateRootRSPS;
-        // REF_getter<MsgData::BlockDBStore> BlockDBStore_for_invalidate=nullptr;
-        // std::set<SERVICE_id> BarrierRSPS;
-        // REF_getter<bcEvent::DBWriteREQ> dbWriteREQ=nullptr;
 
         Mode mode_ = Full;
         std::string uplink_http_addr_;                    // lite
@@ -324,6 +309,9 @@ namespace Node
         static constexpr int64_t STALE_TTL_SEC = 1 * 60;
 
         bool on_LiteSetUplinkREQ(const bcEvent::LiteSetUplinkREQ* e);
+        NODE_id current_leader();
+        void resetBlockExpired(const NODE_id &n);
+
 
     };
 

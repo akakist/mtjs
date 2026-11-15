@@ -23,10 +23,10 @@ const char *msgName(int id)
         return "BlockAcceptedREQ";
     case msgid::BlockAccepted2REQ:
         return "BlockAccepted2REQ";
-    case msgid::GetTransactionREQ:
-        return "GetTransactionREQ";
-    case msgid::GetTransactionRSP:
-        return "GetTransactionRSP";
+    case msgid::GetTxREQ:
+        return "GetTxREQ";
+    case msgid::GetTxRSP:
+        return "GetTxRSP";
     case msgid::BlockDBStore:
         return "BlockDBStore";
     case msgid::DoHeartBeatREQ:

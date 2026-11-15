@@ -122,7 +122,7 @@ async function main() {
     {
         console.log("\n[t3] contract_deploy без ttl → err");
         const { rsp, block } = await submitAndWaitErr([
-            { contract: "root", method: "contract_deploy", params: { name: NAME + "_nottl", src: SRC } },
+            { contract: "root", method: "contract_deploy", params: { name: NAME + "_nottl", src: SRC, ttl: 100000 } },
         ]);
         check(block.status(rsp.tx_hash) === "err", "status err");
         const es = block.errstr(rsp.tx_hash) || "";

@@ -10,11 +10,15 @@ interface KeyPair {
     interface ScanResult { dbids: string[]; next_from: string; done: boolean; scanned: number; }
     interface Granule {
         found: boolean;
+        errcode?: number;
+        errstr?: string;        
         stale: boolean;     // этап 2; сейчас всегда false
         body: string;       // тело гранулы hex (JS не умеет бинарные строки)
     }
     interface CallViewResult {
         found: boolean;
+        errcode?: number;
+        errstr?: string;
         error: boolean;
         result: string;   // JSON-строка
     }
@@ -22,6 +26,8 @@ interface KeyPair {
 
     interface AddressInfo {
         found: boolean;
+        errcode?: number;
+        errstr?: string;
         balance: string;
         nonce: string;
         keys: AddressKey[];
@@ -29,6 +35,8 @@ interface KeyPair {
 
     interface StateInfo {
         found: boolean;
+        errcode?: number;
+        errstr?: string;
         total_supply: string;
         total_stake: string;
         account_count: number;
@@ -42,6 +50,8 @@ interface KeyPair {
 
     interface ContractInfo {
         found: boolean;
+        errcode?: number;
+        errstr?: string;
         contract: string;
         owners: string[];
         src: string;
@@ -52,6 +62,8 @@ interface KeyPair {
         nonce: string;
         balance: string;
         found: bool;
+        errcode?: number;
+        errstr?: string;
     }
 
     interface mintRequest {
@@ -87,6 +99,8 @@ interface KeyPair {
     }
     interface NodeInfo {
         found: boolean;
+        errcode?: number;
+        errstr?: string;
         name: string;
         owner: string;
         ed_pk: string;
@@ -100,10 +114,14 @@ interface KeyPair {
     }
     interface ValuesInfo {
         found: boolean;
+        errcode?: number;
+        errstr?: string;
         fees: { [k: string]: string };
     }
     interface ContractData {
         found: boolean;
+        errcode?: number;
+        errstr?: string;
         contract: string;
         key: string;
         value: string;

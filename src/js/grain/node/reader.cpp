@@ -20,6 +20,39 @@
 #include <md_CallViewREQ.h>
 #include <md_GetContractDataREQ.h>
 #include "CallStack.h"
+
+// ============================================================
+// SYNCING: пока db_state->sync_empty == false, Get*REQ → 503
+// CallView / GetGranule / Scan — работают на stale root (не 503)
+// ============================================================
+static bool is_syncing_state_req(int p) {
+    switch (p) {
+    case msgid::GetUserNonceREQ:
+    case msgid::GetNodeInfoREQ:
+    case msgid::GetValuesREQ:
+    case msgid::GetContractDataREQ:
+    case msgid::GetContractREQ:
+    case msgid::GetStateREQ:
+    case msgid::GetAddressInfoREQ:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static REF_getter<MsgData::Base> make_syncing_rsp(int p) {
+    switch (p) {
+    case msgid::GetUserNonceREQ:     return new MsgData::GetUserNonceRSP;
+    case msgid::GetNodeInfoREQ:     return new MsgData::GetNodeInfoRSP;
+    case msgid::GetValuesREQ:       return new MsgData::GetValuesRSP;
+    case msgid::GetContractDataREQ: return new MsgData::GetContractDataRSP;
+    case msgid::GetContractREQ:     return new MsgData::GetContractRSP;
+    case msgid::GetStateREQ:        return new MsgData::GetStateRSP;
+    case msgid::GetAddressInfoREQ:  return new MsgData::GetAddressInfoRSP;
+    default:                        return nullptr;
+    }
+}
+
 bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
 {
     MUTEX_INSPECTOR;
@@ -29,7 +62,16 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
     REF_getter<MsgData::Base> b = msgFactory.create(p);
     b->unpack(in);
     auto hash = b->getHash();
-
+    // SYNCING: пока нода синкается — Get*REQ → 503 (CallView/GetGranule/Scan — не 503)
+    if (!db_state->sync_empty && is_syncing_state_req(p)) {
+        auto rsp = make_syncing_rsp(p);
+        if (rsp.valid()) {
+            auto* rs = dynamic_cast<rsp_status*>(rsp.get());
+            if (rs) rs->setError(msgcode::SYNCING, "node syncing");
+            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
+            return true;
+        }
+    }
     try {   // ← try/catch: root может быть устаревшим (Node записал блок, InvalidateRoot ещё не обработан) → hash not matched → throw
         switch(p)
         {
@@ -54,21 +96,23 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             int r = db_state->getGranule(pp->addr, &body);
             if (r == 0 && !body.empty()) {
                 if (pp->hash.empty() || blake2b_hash(body).container == pp->hash) {
-                    rsp->found = true;
+                    rsp->setOk();
                     rsp->stale = false;
                     rsp->body = body;
                 }
             }
 
             // 2) stale_cache по hash (только full)
-            if (!rsp->found && !pp->hash.empty() && mode_ == Full) {
+            if (!rsp->found() && !pp->hash.empty() && mode_ == Full) {
                 std::string stale_body;
                 if (get_stale(pp->hash, stale_body)) {
-                    rsp->found = true;
+                    rsp->setOk();
                     rsp->stale = true;
                     rsp->body = stale_body;
                 }
             }
+            if (!rsp->found())
+                rsp->setError(msgcode::NOT_FOUND, "granule not found");
 
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
@@ -80,7 +124,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             // rsp->addr = pp->addr;
             auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), pp->addr);   // normalize — в getPath
             if (u.valid()) {
-                rsp->found = true;
+                rsp->setOk();
                 rsp->balance = u->balance;
                 rsp->nonce = u->nonce;
                 // rsp->name = pp->addr.addr;
@@ -91,6 +135,9 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                     ki.keybuffer = base16::encode(k.keybuffer);
                     rsp->keys.push_back(ki);
                 }
+            }
+            else {
+                rsp->setError(msgcode::NOT_FOUND, "address not found");
             }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
@@ -111,14 +158,14 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
 #endif
                 rsp->nonce = u->nonce;
                 rsp->balance = u->balance;
-                rsp->found = true;
+                rsp->setOk();
             } else {
 #ifdef DEBUG
                 logErr2("case msgid::GetUserNonceREQ: pp->user_address %s !found",pp->user_address.str().c_str());
 #endif
                 rsp->nonce = 0;
                 rsp->balance = 0;
-                rsp->found = false;
+                rsp->setError(msgcode::NOT_FOUND,"404 not found");
             }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             // ▲▲▲
@@ -130,7 +177,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             REF_getter<MsgData::GetNodeInfoRSP> rsp = new MsgData::GetNodeInfoRSP;
             auto n = cells::getNodeNoCreate(root.get(),db_state.get(), pp->node_name);
             if (n.valid()) {
-                rsp->found = true;
+                rsp->setOk();
                 rsp->name = n->getName();
                 rsp->owner = n->get_owner();
                 rsp->ed_pk = base16::encode(n->get_ed_pk());
@@ -142,6 +189,9 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 rsp->full_stake = n->get_full_stake();
                 rsp->stakes = n->getStakes();
             }
+            else {
+                rsp->setError(msgcode::NOT_FOUND, "node not found");
+            }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }
@@ -150,8 +200,10 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             REF_getter<MsgData::GetValuesRSP> rsp = new MsgData::GetValuesRSP;
             auto v = cells::getValuesNoCreate(root.get(),db_state.get());
             if (v.valid()) {
-                rsp->found = true;
+                rsp->setOk();
                 rsp->fees = v->values;
+            } else {
+                rsp->setError(msgcode::NOT_FOUND, "values not found");
             }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
@@ -164,8 +216,10 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             rsp->key = pp->key.container;
             auto d = cells::getContractDataNoCreate(root.get(),db_state.get(), pp->contract, pp->key);
             if (d.valid()) {
-                rsp->found = true;
+                rsp->setOk();
                 rsp->value = d->container;
+            } else {
+                rsp->setError(msgcode::NOT_FOUND, "contract data not found");
             }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
@@ -177,7 +231,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             rsp->contract = pp->contract;
             auto c = cells::getContractNoCreateConst(root.get(), db_state.get(), pp->contract);
             if (c.valid()) {
-                rsp->found = true;
+                rsp->setOk();
                 rsp->owners = c->owners;
                 rsp->src = c->src;
                 auto act = cells::getActivityNoCreate(root.get(), db_state.get(), c->getDbId());
@@ -185,6 +239,8 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                     throw CommonError("if(!act.valid())");
                 rsp->ttl = act->ttl;   // ← activity.ttl (маркер), не bc_contract.ttl (0)
                 rsp->update_time = act->_update_time;
+            } else {
+                rsp->setError(msgcode::NOT_FOUND, "contract not found");
             }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
@@ -196,7 +252,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             REF_getter<MsgData::GetStateRSP> rsp = new MsgData::GetStateRSP;
             auto st = cells::getStateNoCreateConst(root.get(), db_state.get());
             if (st.valid()) {
-                rsp->found = true;
+                rsp->setOk();
                 rsp->total_supply = st->total_supply.str();
                 rsp->total_stake  = st->total_stake.str();
                 rsp->account_count = st->account_count;
@@ -206,6 +262,8 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 rsp->block_height = st->block_height;
                 rsp->genesis_time = st->genesis_time;
                 rsp->chain_id = st->chain_id;
+            } else {
+                rsp->setError(msgcode::NOT_FOUND, "state not found");
             }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
@@ -221,15 +279,15 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
 
             auto cc = contractHost->get_contract(root.get(), pp->contract);
             if (!cc.valid()) {
-                rsp->found = false;
+                rsp->setError(404,"contract not found");
                 rsp->error = true;
                 rsp->result_json = "contract not found: " + pp->contract.container;
             } else if (cc->views.find(pp->view) == cc->views.end()) {
-                rsp->found = false;
+                rsp->setError(404,"view not found");
                 rsp->error = true;
                 rsp->result_json = "view not found: " + pp->view;
             } else {
-                rsp->found = true;
+                rsp->setOk();
                 nlohmann::json params;
                 bool params_ok = true;
                 try {
@@ -280,7 +338,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
         switch (p) {
         case msgid::CallViewREQ: {
             auto rsp = new MsgData::CallViewRSP;
-            rsp->found = false;
+            rsp->setError(404, ex.what());
             rsp->error = true;
             rsp->result_json = std::string("invalidate root: ") + ex.what();
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
@@ -288,49 +346,49 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
         }
         case msgid::GetGranuleREQ: {
             auto rsp = new MsgData::GetGranuleRSP;
-            rsp->found = false;
+            rsp->setError(msgcode::SYNCING, ex.what());
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }
         case msgid::GetContractREQ: {
             auto rsp = new MsgData::GetContractRSP;
-            rsp->found = false;
+            rsp->setError(msgcode::SYNCING, ex.what());
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }
         case msgid::GetContractDataREQ: {
             auto rsp = new MsgData::GetContractDataRSP;
-            rsp->found = false;
+            rsp->setError(msgcode::SYNCING, ex.what());
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }
         case msgid::GetStateREQ: {
             auto rsp = new MsgData::GetStateRSP;
-            rsp->found = false;
+            rsp->setError(msgcode::SYNCING, ex.what());
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }
         case msgid::GetValuesREQ: {
             auto rsp = new MsgData::GetValuesRSP;
-            rsp->found = false;
+            rsp->setOk();
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }
         case msgid::GetNodeInfoREQ: {
             auto rsp = new MsgData::GetNodeInfoRSP;
-            rsp->found = false;
+            rsp->setOk();
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }
         case msgid::GetAddressInfoREQ: {
             auto rsp = new MsgData::GetAddressInfoRSP;
-            rsp->found = false;
+            rsp->setError(msgcode::SYNCING, ex.what());
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }
         case msgid::GetUserNonceREQ: {
             auto rsp = new MsgData::GetUserNonceRSP;
-            rsp->found = false;
+            rsp->setError(msgcode::SYNCING, ex.what());
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }

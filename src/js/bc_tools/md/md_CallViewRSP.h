@@ -1,28 +1,30 @@
 #pragma once
 #include "md_Base.h"
+#include "rsp_status.h"
 namespace MsgData
 {
-    struct CallViewRSP: public Base
+    struct CallViewRSP: public Base, public rsp_status
     {
         CallViewRSP():Base(msgid::CallViewRSP) {}
-        bool found = false;        // контракт/view найден
         bool error = false;        // view бросил исключение
         std::string result_json;   // JSON-строка результата (или errstr)
         void update(Blake2bHasher& h) const
         {
-            h.update(found ? "1" : "0");
+            update_status(h);
             h.update(error ? "1" : "0");
             h.update(result_json);
         }
         void pack(outBuffer& b) const final
         {
             Base::pack(b);
-            b<<found<<error<<result_json;
+            pack_status(b);
+            b<<error<<result_json;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
-            b>>found>>error>>result_json;
+            unpack_status(b);
+            b>>error>>result_json;
         }
         static Base* construct() { return new CallViewRSP(); }
     };

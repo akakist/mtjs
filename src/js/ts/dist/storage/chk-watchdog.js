@@ -187,7 +187,7 @@ async function main() {
             check(g.applied > 0, "gc applied > 0 (got " + g.applied + ")");
             check(g.granule > 0, "gc_granule > 0 (got " + g.granule + ")");
         }
-        // wait InvalidateRoot (GrainReader root перечитан)
+        // wait InvalidateRoot (Node root перечитан)
         await new Promise(r => setTimeout(r, 2000));
         const g1 = await wdState("wd_short");
         check(g1.found === false, "wd_short deleted (view found=false)");
@@ -232,7 +232,7 @@ async function main() {
             const g = await gcOnce("t4 gc", scan.dbids);
             check(g.granule > 0, "gc_granule > 0 (child)");
         }
-        // wait InvalidateRoot (GrainReader root перечитан)
+        // wait InvalidateRoot (Node root перечитан)
         await new Promise(r => setTimeout(r, 2000));
         const gp1 = await wdState("wd_chain");
         const gc1 = await wdState("wd_chain/wd_child");

@@ -545,7 +545,7 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
     if (n->get_owner() != t.senderAddress)
         return "insufficient privileges, node owner required";
 
-    int64_t block_ts = b.validateBlockREQ->heart_beat->block_timestamp;
+    int64_t block_ts = b.validateBlockREQ->block_timestamp;
     auto vhash = blake2b_hash(param + value);
 
     {
@@ -623,9 +623,7 @@ std::optional<std::string> Node::Service::execute_gc(
     yyjson_val* arr = yyjson_obj_get(params, "items");
     if (!arr || !yyjson_is_arr(arr)) return "param 'items' must be array";
 
-    // ← P0: now = max(block_timestamp, time(NULL))
-    // (scan_expired использует time(NULL); gc не должен отставать из-за block_timestamp prev_block)
-    int64_t now = std::max((int64_t)t.block_timestamp, (int64_t)time(NULL));
+    int64_t now = std::max((int64_t)t.block_timestamp, (int64_t)iUtils->getNow());
 
     int applied = 0, skipped = 0;
     int applied_granule = 0, applied_contract = 0, applied_node = 0, applied_address = 0;
@@ -638,7 +636,7 @@ std::optional<std::string> Node::Service::execute_gc(
         THASH_id h; h.container = base16::decode(hex);
         if (h.container.size() != 32) { skipped++; continue; }
 
-        auto cc = cells::getByDbIdNoCreate(root.get(), db_state.get(), h);
+        auto cc = cells::getByDbIdNoCreate(root.get(), db_state.get(), h, true);
         if (!cc.valid() || !cc->data.valid()) { skipped++; continue; }
 
         logNode("execute_gc: dbid=%s payload_ctor_idx=%d", hex.c_str(), (int)cc->payload_ctor_idx);
@@ -800,7 +798,7 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             continue;
         }
 
-        auto g = cells::getByDbIdNoCreate(root.get(), db_state.get(), h);
+        auto g = cells::getByDbIdNoCreate(root.get(), db_state.get(), h,true);
         if (!g.valid() || !g->data.valid()) {
             logNode("gc: dbid %s not found (skip)", dbid.c_str());
             continue;

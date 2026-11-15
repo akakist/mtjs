@@ -67,7 +67,7 @@ namespace msgid
         ValidateBlockRSP=3,
         BlockInfo=4,
         BlockAcceptedREQ=5,
-        GetTransactionREQ=6,GetTransactionRSP=7,
+        GetTxREQ=6,GetTxRSP=7,
         BlockDBStore=8,
         DoHeartBeatREQ=9,
         ConfirmLeaderREQ=10, ConfirmLeaderRSP=11,

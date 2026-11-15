@@ -25,7 +25,6 @@ const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
                 Node_rpc_addr=127.0.0.1:${2300 + i}
                 Node_web_addr=0.0.0.0:${7700 + i}
 		Node_http_granule_addr=0.0.0.0:${4500 + i}
-		Node_http_granule_addr=0.0.0.0:${7500 + i}
                 Node_rockdb_path=db/r${i}
                 MTJS_PENDING_TIMEOUT=0.2
                 MTJS_STACK_SIZE=8388608

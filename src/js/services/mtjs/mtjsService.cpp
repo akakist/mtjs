@@ -649,7 +649,9 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JSScope<20,20> scope(ctx);
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found()));
+        JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
+        JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));
         JS_SetPropertyStr(ctx, obj, "stale", JS_NewBool(ctx, rs->stale));
         JS_SetPropertyStr(ctx, obj, "body", JS_NewString(ctx, base16::encode(rs->body).c_str()));
         JSValue ret = JS_Call(ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
@@ -665,7 +667,9 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JSScope<20,20> scope(ctx);
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found()));
+        JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
+        JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));        
         JS_SetPropertyStr(ctx, obj, "error", JS_NewBool(ctx, rs->error));
         JS_SetPropertyStr(ctx, obj, "result", JS_NewString(ctx, rs->result_json.c_str()));
         JSValue ret = JS_Call(ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
@@ -680,7 +684,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JSScope<20,20> scope(ctx);
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found()));
         JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, std::to_string(rs->balance).c_str()));
         JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, std::to_string(rs->nonce).c_str()));
         JSValue keys_arr = JS_NewArray(ctx);
@@ -706,7 +710,9 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JSScope<20, 20> scope(it->second.ctx);
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found()));
+        JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
+        JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));        
         JS_SetPropertyStr(ctx, obj, "total_supply", JS_NewString(ctx, rs->total_supply.c_str()));
         JS_SetPropertyStr(ctx, obj, "total_stake",  JS_NewString(ctx, rs->total_stake.c_str()));
         JS_SetPropertyStr(ctx, obj, "account_count",  JS_NewInt64(ctx, rs->account_count));
@@ -729,7 +735,9 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JSScope<20, 20> scope(it->second.ctx);
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found()));
+        JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
+        JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));
         JS_SetPropertyStr(ctx, obj, "contract", JS_NewString(ctx, rs->contract.container.c_str()));
         JSValue owners_arr = JS_NewArray(ctx);
         uint32_t oi = 0;
@@ -751,7 +759,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         auto *rs=(MsgData::GetUserNonceRSP*) b.get();
         auto *ctx = it->second.ctx;
         JSScope<20, 20> scope(it->second.ctx);
-        if (!rs->found) {
+        if (!rs->found()) {
             auto err = JS_NewError(ctx);
             scope.addValue(err);
             JS_DefinePropertyValueStr(ctx, err, "message",
@@ -765,7 +773,9 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         }
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found()));
+        JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
+        JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));        
         JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, std::to_string(rs->nonce).c_str()));
         JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, std::to_string(rs->balance).c_str()));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
@@ -782,7 +792,9 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JSScope<20, 20> scope(it->second.ctx);
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found()));
+        JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
+        JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));        
         JS_SetPropertyStr(ctx, obj, "name", JS_NewString(ctx, rs->name.container.c_str()));
         JS_SetPropertyStr(ctx, obj, "owner", JS_NewString(ctx, base16::encode(rs->owner.addr).c_str()));
         JS_SetPropertyStr(ctx, obj, "ed_pk", JS_NewString(ctx, rs->ed_pk.c_str()));
@@ -813,7 +825,9 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JSScope<20, 20> scope(it->second.ctx);
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found()));
+        JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
+        JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));        
         JSValue fees_obj = JS_NewObject(ctx);
         // scope.addValue(fees_obj);
         for (auto& kv : rs->fees) {
@@ -835,7 +849,9 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JSScope<20, 20> scope(it->second.ctx);
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
-        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found));
+        JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found()));
+        JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
+        JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));        
         JS_SetPropertyStr(ctx, obj, "contract", JS_NewString(ctx, rs->contract.c_str()));
         JS_SetPropertyStr(ctx, obj, "key", JS_NewString(ctx, rs->key.c_str()));
         JS_SetPropertyStr(ctx, obj, "value", JS_NewString(ctx, rs->value.c_str()));

@@ -2,8 +2,8 @@
 #include "msg.h"
 #include "md/md_HeartBeatREQ.h"
 #include "md/md_HeartBeatRSP.h"
-#include "md/md_GetTransactionREQ.h"
-#include "md/md_GetTransactionRSP.h"
+#include "md/md_GetTxREQ.h"
+#include "md/md_GetTxRSP.h"
 #include "md/md_ValidateBlockREQ.h"
 #include "md/md_ValidateBlockRSP.h"
 #include "md/md_BlockAcceptedREQ.h"
@@ -45,8 +45,8 @@ MsgFactory::MsgFactory()
 {
     registerMsg(msgid::HeartBeatREQ, MsgData::HeartBeatREQ::construct);
     registerMsg(msgid::HeartBeatRSP, MsgData::HeartBeatRSP::construct);
-    registerMsg(msgid::GetTransactionREQ, MsgData::GetTransactionREQ::construct);
-    registerMsg(msgid::GetTransactionRSP, MsgData::GetTransactionRSP::construct);
+    registerMsg(msgid::GetTxREQ, MsgData::GetTxREQ::construct);
+    registerMsg(msgid::GetTxRSP, MsgData::GetTxRSP::construct);
     registerMsg(msgid::ValidateBlockREQ, MsgData::ValidateBlockREQ::construct);
     registerMsg(msgid::ValidateBlockRSP, MsgData::ValidateBlockRSP::construct);
     registerMsg(msgid::BlockAcceptedREQ, MsgData::BlockAcceptedREQ::construct);

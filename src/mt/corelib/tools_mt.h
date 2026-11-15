@@ -153,3 +153,33 @@ inline std::string sqlDbName(const std::string& nm)
     }
     return iUtils->gCacheDir()+"/"+n+".db";
 }
+
+
+#include <string>
+#include <cstdarg>
+#include <vector>
+#include <cstdio>
+
+inline std::string string_format(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    va_list args_copy;
+    va_copy(args_copy, args);
+
+    const int size = std::vsnprintf(nullptr, 0, fmt, args_copy);
+    va_end(args_copy);
+
+    if (size < 0)
+    {
+        va_end(args);
+        return {};
+    }
+
+    std::vector<char> buf(size + 1);
+    std::vsnprintf(buf.data(), buf.size(), fmt, args);
+    va_end(args);
+
+    return std::string(buf.data(), size);
+}

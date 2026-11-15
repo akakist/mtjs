@@ -1,20 +1,22 @@
 #pragma once
 #include "md_Base.h"
 #include "md_TX.h"
+#include "rsp_status.h"
+
 namespace MsgData
 {
-    struct GetTransactionRSP: public Base
+    struct GetTxRSP: public Base, public rsp_status
     {
 
         static Base* construct()
         {
-            return new GetTransactionRSP();
+            return new GetTxRSP();
         }
-        GetTransactionRSP():Base(msgid::GetTransactionRSP)
+        GetTxRSP():Base(msgid::GetTxRSP)
         {
 
         }
-        GetTransactionRSP(inBuffer &in):Base(msgid::GetTransactionRSP)
+        GetTxRSP(inBuffer &in):Base(msgid::GetTxRSP)
         {
             unpack(in);
         }
@@ -48,17 +50,17 @@ namespace MsgData
 
 
 }
-inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetTransactionRSP> &s)
+inline outBuffer & operator<< (outBuffer& b,const REF_getter<MsgData::GetTxRSP> &s)
 {
     b<<1;
     s->pack(b);
     return b;
 }
-inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetTransactionRSP> &s)
+inline inBuffer & operator>> (inBuffer& b,  REF_getter<MsgData::GetTxRSP> &s)
 {
     auto ver=b.get_PN();
     if(!s.valid())
-        s=new MsgData::GetTransactionRSP();
+        s=new MsgData::GetTxRSP();
     s->unpack2(b);
     return b;
 }

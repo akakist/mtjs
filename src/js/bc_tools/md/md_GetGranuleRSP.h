@@ -1,28 +1,31 @@
 #pragma once
 #include "md_Base.h"
+#include "rsp_status.h"
+
 namespace MsgData
 {
-    struct GetGranuleRSP: public Base
+    struct GetGranuleRSP: public Base, public rsp_status
     {
         GetGranuleRSP():Base(msgid::GetGranuleRSP) {}
-        bool found = false;
         bool stale = false;     // true — из stale_cache (этап 2)
         std::string body;       // тело гранулы (бинарный)
         void update(Blake2bHasher& h) const
         {
-            h.update(found ? "1" : "0");
+            update_status(h);
             h.update(stale ? "1" : "0");
             h.update(body);
         }
         void pack(outBuffer& b) const final
         {
             Base::pack(b);
-            b<<found<<stale<<body;
+            pack_status(b);
+            b<<stale<<body;
         }
         void unpack(inBuffer& b) final
         {
             Base::unpack(b);
-            b>>found>>stale>>body;
+            unpack_status(b);
+            b>>stale>>body;
         }
         static Base* construct() { return new GetGranuleRSP(); }
     };
