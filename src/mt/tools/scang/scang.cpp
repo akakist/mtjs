@@ -150,6 +150,7 @@ int main() {
     std::cout << "*/\n";
     std::cout << "\n/// === GENERATED CODE ===\n";
     std::cout << "#include <stdint.h>\n";
+    std::cout << "#include \"ghash.h\"\n";
 
     parser.generateSwitchCode();
 //    parser.generateReverseLookup();

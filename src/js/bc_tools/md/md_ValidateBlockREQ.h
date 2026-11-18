@@ -26,7 +26,6 @@ namespace MsgData
             {
                 
                 h.update(z->tx_body);
-                h.update(z->pk_ed_bin);
             }
             h.update(std::to_string(block_timestamp));
         }

@@ -15,9 +15,9 @@ bool Node::Service::GetTxRSP(const MsgData::GetTxRSP *r, const NODE_id &src_node
 {
     XTRY;
     MUTEX_INSPECTOR;
-    if(!db_state->sync_empty)
+    if(sync_in_progress)
     {
-        logNode("GetTransactionRSP if(!db_state->sync_empty)");
+        logNode("GetTransactionRSP skipped: sync in progress");
         return true;
     }
 
@@ -48,9 +48,9 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
 {
     MUTEX_INSPECTOR;
 
-    if(!db_state->sync_empty)
+    if(sync_in_progress)
     {
-        logNode("ValidateBlockRSP if(!db_state->sync_empty)");
+        logNode("ValidateBlockRSP skipped: sync in progress");
         return true;
     }
     auto& bt=l_blocks[prev_root_hash_Z()];
@@ -166,9 +166,9 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 {
     XTRY;
     MUTEX_INSPECTOR;
-    if(!db_state->sync_empty)
+    if(sync_in_progress)
     {
-        logNode("ValidateBlockRSP if(!db_state->sync_empty)");
+        logNode("ValidateBlockRSP skipped: sync in progress");
         return true;
     }
 

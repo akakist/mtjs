@@ -49,8 +49,6 @@ namespace bcEventEnum
     const EVENT_id syncGetGranulesRSP(ghash("@g_GetGranulesRSP"));
     const EVENT_id StaleGranules(ghash("@g_StaleGranules"));
     const EVENT_id LiteSetUplinkREQ(ghash("@g_LiteSetUplinkREQ")); /// выставить для iDatabase адрес ноды откуда брать гранулы
-    const EVENT_id PrevBlockREQ(ghash("@g_PrevBlockREQ"));
-    const EVENT_id PrevBlockRSP(ghash("@g_PrevBlockRSP"));
 
 }
 
@@ -641,44 +639,5 @@ namespace bcEvent
         std::vector<std::pair<std::string,std::string>> v;   // {hash (32 bin), body}
     };    
 
-
-    class PrevBlockREQ : public Event::Base
-    {
-    public:
-        static Base *construct(const route_t &r)
-        {
-            return new PrevBlockREQ(r);
-        }
-        PrevBlockREQ(const route_t &r)
-            : Base(bcEventEnum::PrevBlockREQ, r) {}
-        
-        void unpack(inBuffer &o)
-        {
-        }
-        void pack(outBuffer &o) const
-        {
-        }
-    };    
-    class PrevBlockRSP : public Event::Base
-    {
-    public:
-        static Base *construct(const route_t &r)
-        {
-            return new PrevBlockRSP(r);
-        }
-        PrevBlockRSP(const std::string& s, const route_t &r)
-            : Base(bcEventEnum::PrevBlockRSP, r), buf(s) {}
-        PrevBlockRSP(const route_t &r)
-            : Base(bcEventEnum::PrevBlockRSP, r) {}
-        std::string  buf;   
-        void unpack(inBuffer &o)
-        {
-            o>>buf;
-        }
-        void pack(outBuffer &o) const
-        {
-            o<<buf;
-        }
-    };    
 
 }

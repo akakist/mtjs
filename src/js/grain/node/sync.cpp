@@ -159,6 +159,7 @@ bool Node::Service::syncGetGranulesREQ(const bcEvent::syncGetGranulesREQ*e)
 bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
 {
     logNode("syncGetGranulesRSP");
+    sync_watchdog_arm();   // активность: продлеваем watchdog
     // root->replaceLeafNoCreate()
     // getByPathNoCreate()
 
@@ -181,7 +182,7 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
         auto roothash=proceed_merkle_on_transaction_pool_hashers(root.get(),db);
         if(m->root_hash!=roothash)
         {
-            // оставляем sync_empty=false: дерево неполное, нужен повтор
+            // sync_in_progress остаётся true: дерево неполное, нужен повтор
             // (ретрай/watchdog — отдельная задача)
             logNode("sync: root hash not matched %s %s", m->root_hash.str().c_str(),roothash.str().c_str());
             return true;
@@ -224,13 +225,6 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
             prev_block=new_pb;
             l_blocks.clear();
             block_meta_full.clear();
-            for(auto it=hello_certs.begin();it!=hello_certs.end();)
-            {
-                if(it->first<=prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch)
-                    it=hello_certs.erase(it);
-                else
-                    ++it;
-            }
             logNode("sync: done epoch=%lld root=%s",
                     (long long)prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
                     prev_root_hash_Z().str().c_str());
@@ -240,92 +234,9 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
             logNode("sync: done (prev_block not updated)");
         }
 
-        db_state->sync_empty=true;   // последним: до этого момента состояние неконсистентно
+        sync_watchdog_stop();
+        sync_in_progress=false;   // последним: до этого момента состояние неконсистентно
     }
 
-    return true;
-}
-void Node::Service::continue_sync()
-{
-    // auto p=db_state->getPathes();
-    // // sendEvent(db_state->getIp(),ServiceEnum::Node,new bcEvent::syncGetGranulesREQ(p,ListenerBase::serviceId));
-
-}
-
-void Node::Service::do_sync(const NODE_id &src_node, const std::string& src_ip,
-                            const THASH_id& prev_root_hash_remote)
-{
-    MUTEX_INSPECTOR;
-    logNode("do_sync START: src=%s ip=%s prev_root=%s",
-            src_node.container.c_str(), src_ip.c_str(),
-            prev_root_hash_remote.str().c_str());
-
-    // db_state->add_sync_out("");
-
-    // Во время синка root недостоверен — ip приходит аргументом от вызывающего.
-    // db_state->setIp(src_ip);
-    // continue_sync();
-}
-
-
-bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r, const NODE_id &src_node, const route_t &route)
-{
-    if(!db_state->sync_empty)
-    {
-        logNode("DelayNotificationREQ: sync in progress, ignore");
-        return true;
-    }
-
-    bool remote_verified=verify_block_all(r->lc);
-    if(!remote_verified)
-        return true;
-
-    if(!prev_block.valid() || r->lc->blockAcceptedREQ->blockInfo->heart_beat->new_epoch > prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch)
-    {
-        MUTEX_INSPECTOR;
-        logNode("STATE_SYNCING");
-        prev_block=r->lc;
-        // ip берём из root ДО начала синка (root ещё достоверен)
-        auto n_src = cells::getNodeNoCreate(root.get(), db_state.get(), src_node);
-        if (!n_src.valid()) {
-            logNode("DelayNotificationREQ: src_node %s not found, skip sync", src_node.container.c_str());
-            return true;
-        }
-        do_sync(src_node, n_src->get_ip(),
-                r->lc->blockAcceptedREQ->blockInfo->new_root_hash1);
-    }
-    return true;
-}
-
-
-bool Node::Service::PrevBlockREQ(const bcEvent::PrevBlockREQ *e)
-{
-    std::string buf;
-    if(prev_block.valid())
-        buf=prev_block->getBuffer();
-
-    passEvent(new bcEvent::PrevBlockRSP(buf,poppedFrontRoute(e->route)));
-    return true;
-}
-bool Node::Service::PrevBlockRSP(const bcEvent::PrevBlockRSP *e)
-{
-    // if(e->buf.size())
-    // {
-    //     inBuffer in(e->buf);
-    //     REF_getter<MsgData::BlockAccepted2REQ> r=new MsgData::BlockAccepted2REQ;
-    //     r->unpack2(in);
-    //     if(verify_block_all(r))
-    //     {
-    //         auto cur=current_leader();
-    //         auto n=cells::getNodeNoCreate(root.get(),db_state.get(),cur);
-    //         if(!n.valid())
-    //         throw CommonError("if(!n.valid()) #43239@");
-    //         do_sync(cur,n->get_ip(),r->blockAcceptedREQ->blockInfo->new_root_hash1);
-    //     }
-    //     else logNode("[PrevBlockRSP] verify failed");
-    // }
-    
-
-    
     return true;
 }

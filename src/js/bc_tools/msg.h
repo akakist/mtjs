@@ -76,21 +76,19 @@ namespace msgid
         GetUserNonceREQ=14, GetUserNonceRSP=15,
 
         LcEnvelopeREQ=16,
-        DelayNotificationREQ=17,
 
-        BlockDiffValidateREQ=18, BlockDiffValidateRSP=19,
-        BlockAccepted2REQ = 20,
-        LeaderCert = 21,
-        GetNodeInfoREQ=22, GetNodeInfoRSP=23,
-        GetValuesREQ=24, GetValuesRSP=25,
-        GetContractDataREQ=26, GetContractDataRSP=27,
-        GetContractREQ=28, GetContractRSP=29,
-        GetStateREQ=30, GetStateRSP=31,
-        GetAddressInfoREQ=32, GetAddressInfoRSP=33,
-        CallViewREQ=34, CallViewRSP=35,
-        GetGranuleREQ=36, GetGranuleRSP=37,
-        ScanREQ=38, ScanRSP=39,    
-        HelloREQ=40, HelloRSP=41,    
+        BlockDiffValidateREQ=17, BlockDiffValidateRSP=18,
+        BlockAccepted2REQ = 19,
+        LeaderCert = 20,
+        GetNodeInfoREQ=21, GetNodeInfoRSP=22,
+        GetValuesREQ=23, GetValuesRSP=24,
+        GetContractDataREQ=25, GetContractDataRSP=26,
+        GetContractREQ=27, GetContractRSP=28,
+        GetStateREQ=29, GetStateRSP=30,
+        GetAddressInfoREQ=31, GetAddressInfoRSP=32,
+        CallViewREQ=33, CallViewRSP=34,
+        GetGranuleREQ=35, GetGranuleRSP=36,
+        ScanREQ=37, ScanRSP=38,    
     };
 
 }

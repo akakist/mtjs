@@ -24,7 +24,6 @@ namespace MsgData
         }
     public:
         std::string tx_body;
-        std::string pk_ed_bin;
         std::string sig_ed_bin;
     // локально (TxValidator → execute_block), НЕ pack/unpack
         ADDRESS_id sender_addr;
@@ -35,14 +34,14 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<tx_body<<pk_ed_bin<<sig_ed_bin;
+            b<<tx_body<<sig_ed_bin;
 
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>tx_body>>pk_ed_bin>>sig_ed_bin;
+            b>>tx_body>>sig_ed_bin;
 
             doc=yyjson_read(tx_body.data(),tx_body.size(),0);
         }
@@ -51,7 +50,6 @@ namespace MsgData
             MUTEX_INSPECTOR;
             // throw CommonError("unimpl");
             h.update(tx_body);
-            h.update(pk_ed_bin);
         }
         std::optional<std::string> getNonce(int64_t & nonce)
         {
@@ -145,10 +143,28 @@ namespace MsgData
             else return "yyjson: value must be string or num";
             return std::nullopt;
         }
-        bool verify()
+        /// sender/key_id из tx_body (оба входят в подписываемый хеш).
+        std::optional<std::pair<std::string,int64_t>> getSenderKey() const
         {
-            auto h=getHash();
-            return verify_ed_pk(pk_ed_bin,sig_ed_bin,h);
+            yyjson_doc* d=yyjson_read(tx_body.data(),tx_body.size(),0);
+            if(!d)
+                return std::nullopt;
+            std::string sender;
+            int64_t key_id=-1;
+            auto r=yyjson_doc_get_root(d);
+            if(r)
+            {
+                auto sv=yyjson_obj_get(r,"sender");
+                if(sv && yyjson_is_str(sv))
+                    sender=yyjson_get_str(sv);
+                auto ki=yyjson_obj_get(r,"key_id");
+                if(ki && yyjson_is_num(ki))
+                    key_id=yyjson_get_sint(ki);
+            }
+            yyjson_doc_free(d);
+            if(sender.empty())
+                return std::nullopt;
+            return std::make_pair(sender,key_id);
         }
     };
 

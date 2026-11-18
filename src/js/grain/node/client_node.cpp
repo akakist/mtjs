@@ -53,7 +53,7 @@ bool Node::Service::BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateRE
 bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
-    if(!db_state->sync_empty)
+    if(sync_in_progress)
     {
         return true;
     }
@@ -186,7 +186,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 {
     MUTEX_INSPECTOR;
 
-    if(!db_state->sync_empty)
+    if(sync_in_progress)
     {
         return true;
     }
@@ -220,9 +220,9 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     }
     auto mf=getMetaFull();
 
-    if(!db_state->sync_empty)
+    if(sync_in_progress)
     {
-        logNode("if(!db_state->sync_empty)");
+        logNode("skipped: sync in progress");
         return true;
     }
 
@@ -376,9 +376,9 @@ bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node
 {
     MUTEX_INSPECTOR;
 
-    if(!db_state->sync_empty)
+    if(sync_in_progress)
     {
-        logNode("GetTxREQ: if(!db_state->sync_empty)");
+        logNode("GetTxREQ: skipped: sync in progress");
         return true;
     }
 
@@ -395,7 +395,8 @@ bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node
         REF_getter<bcEvent::syncGetGranulesREQ> e=new bcEvent::syncGetGranulesREQ(since,this_node_name,iUtils->getNow(),ListenerBase::serviceId);
         e->sign(my_sk_ed);
         sendEvent(r->ip,ServiceEnum::Node,e.get());
-        db_state->sync_empty=false;
+        sync_in_progress=true;
+        sync_watchdog_arm();
         return true;
 
     }
@@ -413,13 +414,7 @@ bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node
         return true;
     }
     if(r->hb->prev_root_hash_1!=prev_root_hash)
-    {
-        if(r->hb->new_epoch>epoch_current())
-        {
-            sendEvent(r->ip,ServiceEnum::Node, new bcEvent::PrevBlockREQ(ListenerBase::serviceId));
-        }
-        return true;
-    }
+        return true;   // другой root, но epoch ещё не разошёлся — ждём
     auto cl=current_leader();
     if(!cl.valid())
     {
@@ -499,7 +494,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     MUTEX_INSPECTOR;
 
     // logNode("ValidateBlockREQ from %s",src_node.container.c_str());
-    if(!db_state->sync_empty)
+    if(sync_in_progress)
     {
         return true;
     }

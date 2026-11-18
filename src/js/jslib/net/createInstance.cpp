@@ -12,6 +12,7 @@
 #include "bcEvent.h"
 
 #include "md_TX.h"
+#include "s_key.h"
 #include "quickjs.h"
 
 #include "quickjs.h"
@@ -230,8 +231,8 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     // logErr2("js_tx_submit");
     JSScope<10, 10> scope(ctx);
     mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
-    if (argc != 6)
-        return JS_ThrowInternalError(ctx, "number of argument must be 6");
+    if (argc != 6 && argc != 7)
+        return JS_ThrowInternalError(ctx, "number of argument must be 6 or 7");
 
     if (!JS_IsString(argv[0]))
         return JS_ThrowInternalError(ctx, "node addr not specified, must be string");
@@ -255,7 +256,14 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     }
     auto msg = scope.toStdString(argv[2]);
     auto sk = base16::decode(scope.toStdString(argv[3]));
-    auto pk = extract_public_ed(sk);
+    int key_type = KEY_ED25519;
+    if (argc == 7)
+    {
+        if (JS_ToInt32(ctx, &key_type, argv[6]))
+            return JS_ThrowInternalError(ctx, "error parsing key_type");
+        if (key_type != KEY_ED25519 && key_type != KEY_SECP256K1 && key_type != KEY_P256)
+            return JS_ThrowInternalError(ctx, "key_type must be 0 (ed25519), 1 (secp256k1) or 2 (p256)");
+    }
     auto nonce_str = scope.toStdString(argv[4]);
     // JSValueGuard g_func(ctx,JS_DupValue(ctx,argv[5]));
     int64_t nonce=0;
@@ -270,10 +278,9 @@ JSValue js_tx_submit(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
 
     REF_getter<MsgData::TX> t = new MsgData::TX;
     t->tx_body = msg;
-    t->pk_ed_bin = pk;
     // t->nonce = nonce;
     auto hash = t->getHash();
-    t->sig_ed_bin = sign_ed(sk, hash.container);
+    t->sig_ed_bin = sign(Key{0,(uint8_t)key_type,""}, sk, hash.container);
     op->broadcaster->sendEvent(node_addr, ServiceEnum::Node, new bcEvent::AddTxREQ(t, op->listener_->serviceId));
     if (JS_IsFunction(ctx, argv[5])) {
         op->node_tx_cb.emplace(hash.container, JSValueGuard(ctx, JS_DupValue(ctx, argv[5])));
@@ -927,7 +934,7 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     // logErr2("js_register_add_instance");
     JS_SetPropertyStr(ctx, mtjs_obj, "addInstance",       JS_NewCFunction(ctx, js_add_instance,       "addInstance", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "killInstance",     JS_NewCFunction(ctx, js_kill_instance,     "killInstance", 1));
-    JS_SetPropertyStr(ctx, mtjs_obj, "tx_submit",         JS_NewCFunction(ctx, js_tx_submit,          "tx_submit", 6));
+    JS_SetPropertyStr(ctx, mtjs_obj, "tx_submit",         JS_NewCFunction(ctx, js_tx_submit,          "tx_submit", 7));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_subscribe",      JS_NewCFunction(ctx, js_tx_subscribe,       "tx_subscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_user_nonce",    JS_NewCFunction(ctx, js_get_user_nonce,     "get_user_nonce", 3));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_wait_block",     JS_NewCFunction(ctx, js_tx_wait_block,      "tx_wait_block", 3));

@@ -1,18 +1,16 @@
 /*
-Found 182 symbols starting with @g_
+Found 173 symbols starting with @g_
   @g_AV -> 0xa211021e at ./mt/corelib/ifacesEvent.h:9
-  @g_AddTxREQ -> 0x5d9cb4d0 at ./js/Event/bcEvent.h:30
-  @g_AddTxRSP -> 0x2a79d245 at ./js/Event/bcEvent.h:31
-  @g_BarrierOpenREQ__ -> 0x744acd46 at ./js/Event/bcEvent.h:57
-  @g_BarrierOpenRSP -> 0xc80e7aa5 at ./js/Event/bcEvent.h:58
-  @g_BlockStreamer -> 0xf81ec75d at ./js/Event/bcEvent.h:23
-  @g_BroadcastMessage -> 0x345115a3 at ./js/Event/bcEvent.h:43
-  @g_BroadcasterTree -> 0x88a3eeef at ./js/Event/bcEvent.h:20
-  @g_ClientTxSubscribeREQ -> 0x41eba206 at ./js/Event/bcEvent.h:36
-  @g_ClientTxSubscribeRSP -> 0x722f21f at ./js/Event/bcEvent.h:39
-  @g_ClientTxUnsubscribeREQ -> 0x9c838efd at ./js/Event/bcEvent.h:38
-  @g_ClientTxWaitREQ -> 0x8d249e0d at ./js/Event/bcEvent.h:37
-  @g_DBWriter -> 0x7f0382dc at ./js/Event/bcEvent.h:25
+  @g_AddTxREQ -> 0x5d9cb4d0 at ./js/Event/bcEvent.h:27
+  @g_AddTxRSP -> 0x2a79d245 at ./js/Event/bcEvent.h:28
+  @g_BlockStreamer -> 0xf81ec75d at ./js/Event/bcEvent.h:20
+  @g_BroadcastMessage -> 0x345115a3 at ./js/Event/bcEvent.h:38
+  @g_BroadcasterTree -> 0x88a3eeef at ./js/Event/bcEvent.h:19
+  @g_ClientTxSubscribeREQ -> 0x41eba206 at ./js/Event/bcEvent.h:33
+  @g_ClientTxSubscribeRSP -> 0x722f21f at ./js/Event/bcEvent.h:36
+  @g_ClientTxUnsubscribeREQ -> 0x9c838efd at ./js/Event/bcEvent.h:35
+  @g_ClientTxWaitREQ -> 0x8d249e0d at ./js/Event/bcEvent.h:34
+  @g_DBWriter -> 0x7f0382dc at ./js/Event/bcEvent.h:22
   @g_DFSCaps -> 0x347aaa85 at ./mt/Events/DFS/capsEvent.h:12
   @g_DFSCaps_GetCloudRootsREQ -> 0x70568b38 at ./mt/Events/DFS/capsEvent.h:21
   @g_DFSCaps_GetCloudRootsRSP -> 0x3d835a8d at ./mt/Events/DFS/capsEvent.h:22
@@ -40,57 +38,50 @@ Found 182 symbols starting with @g_
   @g_GEOIP -> 0x5ecb0003 at ./mt/corelib/ifacesEvent.h:11
   @g_GetBindPortsREQ -> 0x133ead50 at ./mt/Events/System/Net/httpEvent.h:15
   @g_GetBindPortsRSP -> 0xe01bcac5 at ./mt/Events/System/Net/httpEvent.h:16
-  @g_GetGranulesREQ -> 0xe94cd5cc at ./js/Event/bcEvent.h:53
-  @g_GetGranulesRSP -> 0x26171bd9 at ./js/Event/bcEvent.h:54
-  @g_GetUserNonceREQ -> 0xf3c6da11 at ./js/Event/bcEvent.h:49
-  @g_GetUserNonceRSP -> 0x2e8f89f8 at ./js/Event/bcEvent.h:50
-  @g_GrainReader -> 0x8912dec7 at ./js/Event/bcEvent.h:21
-  @g_GrainReaderLite -> 0xdfe22023 at ./js/Event/bcEvent.h:22
+  @g_GetGranulesREQ -> 0xe94cd5cc at ./js/Event/bcEvent.h:48
+  @g_GetGranulesRSP -> 0x26171bd9 at ./js/Event/bcEvent.h:49
+  @g_GetUserNonceREQ -> 0xf3c6da11 at ./js/Event/bcEvent.h:44
+  @g_GetUserNonceRSP -> 0x2e8f89f8 at ./js/Event/bcEvent.h:45
   @g_HTTP -> 0xf8f8e915 at ./mt/Events/System/Net/httpEvent.h:10
-  @g_HeartBeatREQ -> 0x81966a5d at ./js/Event/bcEvent.h:47
-  @g_InvalidateRootREQ -> 0x783c97d0 at ./js/Event/bcEvent.h:41
-  @g_InvalidateRootRSP -> 0x4519b545 at ./js/Event/bcEvent.h:42
+  @g_HeartBeatREQ -> 0x81966a5d at ./js/Event/bcEvent.h:42
   @g_JsonREQ -> 0x689b16c9 at ./mt/Events/System/Net/jsonRefEvent.h:11
   @g_JsonRSP -> 0x23649030 at ./mt/Events/System/Net/jsonRefEvent.h:13
-  @g_LiteSetUplinkREQ -> 0xda4c7caa at ./js/Event/bcEvent.h:56
+  @g_LiteSetUplinkREQ -> 0xda4c7caa at ./js/Event/bcEvent.h:51
   @g_Logger -> 0x58fe27c5 at ./mt/Events/Tools/loggerEvent.h:16
   @g_Mysql -> 0x1eb55b6d at ./mt/corelib/DBHEvent.h:6
   @g_Node -> 0x68e6b4fd at ./js/Event/bcEvent.h:17
   @g_NodeLite -> 0x953b9541 at ./js/Event/bcEvent.h:18
-  @g_NodeMsgREQ -> 0x2c9faa42 at ./js/Event/bcEvent.h:32
-  @g_NodeMsgRSP -> 0xe1721493 at ./js/Event/bcEvent.h:33
+  @g_NodeMsgREQ -> 0x2c9faa42 at ./js/Event/bcEvent.h:29
+  @g_NodeMsgRSP -> 0xe1721493 at ./js/Event/bcEvent.h:30
   @g_ObjectProxyPolled -> 0x30489b56 at ./mt/Events/System/Net/rpcEvent.h:13
   @g_ObjectProxyThreaded -> 0x835c46b3 at ./mt/Events/System/Net/rpcEvent.h:14
   @g_Oscar -> 0x5795b27f at ./mt/Events/System/Net/oscarEvent.h:12
   @g_OscarSecure -> 0x86d21df6 at ./mt/Events/System/Net/oscarEvent.h:13
   @g_Postgres -> 0xaf73ca5e at ./mt/corelib/DBHEvent.h:7
-  @g_PrevBlockREQ -> 0xba3871ff at ./js/Event/bcEvent.h:59
-  @g_PrevBlockRSP -> 0x8d0b0b8a at ./js/Event/bcEvent.h:60
-  @g_PutTransactionREQ -> 0x8f837012 at ./js/Event/bcEvent.h:48
+  @g_PutTransactionREQ -> 0x8f837012 at ./js/Event/bcEvent.h:43
   @g_RPC -> 0xd7a04764 at ./mt/Events/System/Net/rpcEvent.h:12
   @g_RefferrerClient -> 0xec5a94b7 at ./mt/Events/DFS/referrerEvent.h:13
   @g_SSL -> 0xc02aafad at ./mt/corelib/ifacesEvent.h:10
-  @g_Scan -> 0x75f708b8 at ./js/Event/bcEvent.h:24
-  @g_SendToChild -> 0xa6491fa0 at ./js/Event/bcEvent.h:44
-  @g_SendToChildAck -> 0xf4240201 at ./js/Event/bcEvent.h:45
-  @g_ServiceInit -> 0x6c13a296 at ./js/Event/bcEvent.h:40
+  @g_Scan -> 0x75f708b8 at ./js/Event/bcEvent.h:21
+  @g_SendToChild -> 0xa6491fa0 at ./js/Event/bcEvent.h:39
+  @g_SendToChildAck -> 0xf4240201 at ./js/Event/bcEvent.h:40
+  @g_ServiceInit -> 0x6c13a296 at ./js/Event/bcEvent.h:37
   @g_Socket -> 0x766cd5dc at ./mt/Events/System/Net/socketEvent.h:13
   @g_Socks5 -> 0xbba35c75 at ./mt/Events/System/Net/socketEvent.h:14
-  @g_StaleGranules -> 0x3e6e7145 at ./js/Event/bcEvent.h:55
-  @g_StreamBlock -> 0x292ad1d2 at ./js/Event/bcEvent.h:46
+  @g_StaleGranules -> 0x3e6e7145 at ./js/Event/bcEvent.h:50
+  @g_StreamBlock -> 0x292ad1d2 at ./js/Event/bcEvent.h:41
   @g_Telnet -> 0xd7fc786d at ./mt/Events/Tools/telnetEvent.h:10
   @g_Timer -> 0x624ad572 at ./mt/Events/System/timerEvent.h:9
-  @g_TxValidator -> 0x9eb9ef5d at ./js/Event/bcEvent.h:19
   @g_WSDisaccepted -> 0xae69496c at ./mt/Events/System/Net/httpEvent.h:18
   @g_WSDisconnected -> 0xa435c09c at ./mt/Events/System/Net/httpEvent.h:19
   @g_WSTextMessage -> 0x8cc926af at ./mt/Events/System/Net/httpEvent.h:17
   @g_WSWrite -> 0xd99e86f2 at ./mt/Events/System/Net/httpEvent.h:20
   @g_WebHandler -> 0xf8eb4187 at ./mt/Events/Tools/webHandlerEvent.h:14
   @g_WebSocketClient -> 0xe043d1cf at ./mt/Events/System/Net/webSocketClientEvent.h:6
-  @g_WriteBlock -> 0x95431445 at ./js/Event/bcEvent.h:52
-  @g_WriteGranules -> 0x42352db at ./js/Event/bcEvent.h:51
-  @g_bcClientMsg -> 0x66eb46e6 at ./js/Event/bcEvent.h:34
-  @g_bcClientMsgReply -> 0xf5a8f29a at ./js/Event/bcEvent.h:35
+  @g_WriteBlock -> 0x95431445 at ./js/Event/bcEvent.h:47
+  @g_WriteGranules -> 0x42352db at ./js/Event/bcEvent.h:46
+  @g_bcClientMsg -> 0x66eb46e6 at ./js/Event/bcEvent.h:31
+  @g_bcClientMsgReply -> 0xf5a8f29a at ./js/Event/bcEvent.h:32
   @g_errorDispatcherNotifySubscriber -> 0x4f809243 at ./mt/Events/Tools/errorDispatcherEvent.h:23
   @g_errorDispatcherSendMessage -> 0xf855f5d9 at ./mt/Events/Tools/errorDispatcherEvent.h:20
   @g_errorDispatcherSubscribe -> 0xc556104c at ./mt/Events/Tools/errorDispatcherEvent.h:21
@@ -193,8 +184,6 @@ const char* get_symbol_name(uint32_t hash) {
         case ghash("@g_AV") : return "AV";
         case ghash("@g_AddTxREQ") : return "AddTxREQ";
         case ghash("@g_AddTxRSP") : return "AddTxRSP";
-        case ghash("@g_BarrierOpenREQ__") : return "BarrierOpenREQ__";
-        case ghash("@g_BarrierOpenRSP") : return "BarrierOpenRSP";
         case ghash("@g_BlockStreamer") : return "BlockStreamer";
         case ghash("@g_BroadcastMessage") : return "BroadcastMessage";
         case ghash("@g_BroadcasterTree") : return "BroadcasterTree";
@@ -234,12 +223,8 @@ const char* get_symbol_name(uint32_t hash) {
         case ghash("@g_GetGranulesRSP") : return "GetGranulesRSP";
         case ghash("@g_GetUserNonceREQ") : return "GetUserNonceREQ";
         case ghash("@g_GetUserNonceRSP") : return "GetUserNonceRSP";
-        case ghash("@g_GrainReader") : return "GrainReader";
-        case ghash("@g_GrainReaderLite") : return "GrainReaderLite";
         case ghash("@g_HTTP") : return "HTTP";
         case ghash("@g_HeartBeatREQ") : return "HeartBeatREQ";
-        case ghash("@g_InvalidateRootREQ") : return "InvalidateRootREQ";
-        case ghash("@g_InvalidateRootRSP") : return "InvalidateRootRSP";
         case ghash("@g_JsonREQ") : return "JsonREQ";
         case ghash("@g_JsonRSP") : return "JsonRSP";
         case ghash("@g_LiteSetUplinkREQ") : return "LiteSetUplinkREQ";
@@ -254,8 +239,6 @@ const char* get_symbol_name(uint32_t hash) {
         case ghash("@g_Oscar") : return "Oscar";
         case ghash("@g_OscarSecure") : return "OscarSecure";
         case ghash("@g_Postgres") : return "Postgres";
-        case ghash("@g_PrevBlockREQ") : return "PrevBlockREQ";
-        case ghash("@g_PrevBlockRSP") : return "PrevBlockRSP";
         case ghash("@g_PutTransactionREQ") : return "PutTransactionREQ";
         case ghash("@g_RPC") : return "RPC";
         case ghash("@g_RefferrerClient") : return "RefferrerClient";
@@ -270,7 +253,6 @@ const char* get_symbol_name(uint32_t hash) {
         case ghash("@g_StreamBlock") : return "StreamBlock";
         case ghash("@g_Telnet") : return "Telnet";
         case ghash("@g_Timer") : return "Timer";
-        case ghash("@g_TxValidator") : return "TxValidator";
         case ghash("@g_WSDisaccepted") : return "WSDisaccepted";
         case ghash("@g_WSDisconnected") : return "WSDisconnected";
         case ghash("@g_WSTextMessage") : return "WSTextMessage";

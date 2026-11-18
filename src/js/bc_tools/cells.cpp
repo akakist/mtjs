@@ -159,7 +159,6 @@ REF_getter<Cellable> getLeafNoCreate(Cellable* _cur, IDatabase* db, const std::s
                         base16::encode(it->second.container).substr(0, 16).c_str(),
                         base16::encode(h.container).substr(0, 16).c_str(),
                         result.size(),db->getDbName().c_str());
-                db->clear_root = true;
                 // db->add_sync_out(dbId);
                 return NULL;
             }

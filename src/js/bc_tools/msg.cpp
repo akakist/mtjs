@@ -43,8 +43,6 @@ const char *msgName(int id)
         return "GetUserNonceREQ";
     case msgid::LcEnvelopeREQ:
         return "LcEnvelopeREQ";
-    case msgid::DelayNotificationREQ:
-        return "DelayNotificationREQ";
     case msgid::BlockDiffValidateREQ:
         return "BlockDiffValidateREQ";
     case msgid::BlockDiffValidateRSP:
@@ -66,8 +64,6 @@ const char *msgName(int id)
     case msgid::CallViewRSP: return "CallViewRSP";
     case msgid::GetGranuleREQ: return "GetGranuleREQ";
     case msgid::GetGranuleRSP: return "GetGranuleRSP";    
-    case msgid::HelloREQ: return "HelloREQ";
-    case msgid::HelloRSP: return "HelloRSP";    
     default:
         return "unknown";
     }

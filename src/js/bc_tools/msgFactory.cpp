@@ -26,7 +26,6 @@
 #include "md/md_GetValuesRSP.h"
 #include "md/md_GetContractDataREQ.h"
 #include "md/md_GetContractDataRSP.h"
-#include "md/md_DelayNotificationREQ.h"
 #include "md/md_GetContractREQ.h"
 #include "md/md_GetContractRSP.h"
 #include "md/md_GetStateREQ.h"
@@ -39,8 +38,6 @@
 #include "md/md_GetGranuleRSP.h"
 #include "md/md_ScanREQ.h"
 #include "md/md_ScanRSP.h"
-#include "md/md_HelloREQ.h"
-#include "md/md_HelloRSP.h"
 
 
 
@@ -60,7 +57,6 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetUserNonceREQ, MsgData::GetUserNonceREQ::construct);
     registerMsg(msgid::GetUserNonceRSP, MsgData::GetUserNonceRSP::construct);
     registerMsg(msgid::LcEnvelopeREQ, MsgData::LcEnvelopeREQ::construct);
-    registerMsg(msgid::DelayNotificationREQ, MsgData::DelayNotificationREQ::construct);
 
     registerMsg(msgid::GetNodeInfoREQ, MsgData::GetNodeInfoREQ::construct);
     registerMsg(msgid::GetNodeInfoRSP, MsgData::GetNodeInfoRSP::construct);
@@ -85,6 +81,4 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetGranuleRSP, MsgData::GetGranuleRSP::construct);    
     registerMsg(msgid::ScanREQ, MsgData::ScanREQ::construct);
     registerMsg(msgid::ScanRSP, MsgData::ScanRSP::construct);
-    registerMsg(msgid::HelloREQ, MsgData::HelloREQ::construct);
-    registerMsg(msgid::HelloRSP, MsgData::HelloRSP::construct);
 }

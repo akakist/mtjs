@@ -24,17 +24,12 @@ inline std::set<EVENT_id> getEvents_nodeService()
 	std::set<EVENT_id> out;
 	out.insert(bcEventEnum::AddTxREQ);
 	out.insert(bcEventEnum::AddTxRSP);
-	out.insert(bcEventEnum::BroadcastMessage);
 	out.insert(bcEventEnum::ClientMsg);
 	out.insert(bcEventEnum::ClientMsgReply);
 	out.insert(bcEventEnum::LiteSetUplinkREQ);
 	out.insert(bcEventEnum::NodeMsgREQ);
 	out.insert(bcEventEnum::NodeMsgRSP);
-	out.insert(bcEventEnum::PrevBlockREQ);
-	out.insert(bcEventEnum::PrevBlockRSP);
 	out.insert(bcEventEnum::PutTxREQ);
-	out.insert(bcEventEnum::SendToChild);
-	out.insert(bcEventEnum::SendToChildAck);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(bcEventEnum::StreamBlock);
 	out.insert(bcEventEnum::syncGetGranulesREQ);
@@ -63,17 +58,12 @@ inline void regEvents_nodeService()
 {
 	iUtils->registerEvent(bcEvent::AddTxREQ::construct);
 	iUtils->registerEvent(bcEvent::AddTxRSP::construct);
-	iUtils->registerEvent(bcEvent::BroadcastMessage::construct);
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
 	iUtils->registerEvent(bcEvent::LiteSetUplinkREQ::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgREQ::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgRSP::construct);
-	iUtils->registerEvent(bcEvent::PrevBlockREQ::construct);
-	iUtils->registerEvent(bcEvent::PrevBlockRSP::construct);
 	iUtils->registerEvent(bcEvent::PutTxREQ::construct);
-	iUtils->registerEvent(bcEvent::SendToChild::construct);
-	iUtils->registerEvent(bcEvent::SendToChildAck::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(bcEvent::StreamBlock::construct);
 	iUtils->registerEvent(bcEvent::syncGetGranulesREQ::construct);

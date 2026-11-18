@@ -676,11 +676,14 @@ std::optional<std::string> Node::Service::execute_add_address_key(yyjson_val* pa
     auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),addr);
     if (!u.valid()) return "execute_add_address_key: address not found";
 
-    bool is_owner = false;
-    for (auto& [id, k] : u->keys) if (k.keybuffer == t.tx->pk_ed_bin) { is_owner = true; break; }
-    if (!is_owner) return "sender is not an owner";
+    // подпись уже проверена ключом из состояния этого же адреса в AddTxREQ,
+    // поэтому «владелец адреса» — это sender == addr
+    auto sk=t.tx->getSenderKey();
+    if (!sk || base16::decode(sk->first)!=addr.addr) return "sender is not an owner";
 
     auto kb = base16::decode(kb_hex);
+    if (type != KEY_ED25519 && type != KEY_SECP256K1 && type != KEY_P256)
+        return "key: unknown type";
     if (type == KEY_ED25519 && kb.size() != 32) return "key: bad ed25519 size";
     if ((type == KEY_SECP256K1 || type == KEY_P256) && kb.size() != 33 && kb.size() != 65)
         return "key: bad ecdsa size (33/65)";
@@ -707,9 +710,10 @@ std::optional<std::string> Node::Service::execute_remove_address_key(yyjson_val*
     auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),addr);
     if (!u.valid()) return (std::string)"execute_remove_address_key: address not found "+addr.str();
 
-    bool is_owner = false;
-    for (auto& [id, k] : u->keys) if (k.keybuffer == t.tx->pk_ed_bin) { is_owner = true; break; }
-    if (!is_owner) return "sender is not an owner";
+    // подпись уже проверена ключом из состояния этого же адреса в AddTxREQ,
+    // поэтому «владелец адреса» — это sender == addr
+    auto sk=t.tx->getSenderKey();
+    if (!sk || base16::decode(sk->first)!=addr.addr) return "sender is not an owner";
 
     if (!u->hasKeyId((uint64_t)key_id)) return "key_id not found";
     if (u->sizeKeys() <= 1) return "cannot remove last key";
@@ -752,6 +756,8 @@ std::optional<std::string> Node::Service::execute_create_address(yyjson_val* par
         if (auto e = yy_get_int64_t(item, "type", type)) return e;
         if (auto e = yy_get_string(item, "keybuffer", kb_hex)) return e;
         auto kb = base16::decode(kb_hex);
+        if (type != KEY_ED25519 && type != KEY_SECP256K1 && type != KEY_P256)
+            return "key: unknown type";
         if (type == KEY_ED25519 && kb.size() != 32) return "key: bad ed25519 size";
         if ((type == KEY_SECP256K1 || type == KEY_P256) && kb.size() != 33 && kb.size() != 65)
             return "key: bad ecdsa size (33/65)";

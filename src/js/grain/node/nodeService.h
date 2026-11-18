@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include "broadcaster.h"
 #include "QUORUM.h"
 // #include "signedBuffer.h"
@@ -32,23 +33,17 @@
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
 #include "md/md_LcEnvelopeREQ.h"
-#include "md_HelloREQ.h"
-#include "md_HelloRSP.h"
-
 #include "blockMeta.h"
 
 
-#include "md/md_DelayNotificationREQ.h"
 #include "t_params.h"
 #include "contract_rt.h"
 #include "ContractHost.h"
 #include "cells.h"
 
-#define BROADCAST_ACK_TIMEDOUT_SEC 0.2
 std::set<NODE_id> getValidators(int64_t block_timestamp, IDatabase* db);
 
-// #define BROADCAST_ACK_TIMEDOUT_SEC 0.2
-#define HB_TIME_WINDOW 2
+// #define HB_TIME_WINDOW 2
 #define HB_SEND_TIMEOUT 4
 #define HB_VERIFY_TIMEOUT 5
 #define SLOT_MKS 3000000
@@ -57,6 +52,10 @@ std::set<NODE_id> getValidators(int64_t block_timestamp, IDatabase* db);
 /// Нужна, чтобы на правой границе слота ноды с рассинхроном часов
 /// не считали лидером разных участников и не устраивали гонку.
 #define NO_LEADER_FRAME_MKS 100000
+
+/// Idle-таймаут синка: если за это время не было ни одного акта активности
+/// (запрос или пачка гранул) — синк прибивается, root поднимается из БД.
+#define SYNC_WATCHDOG_SEC 5.0
 
 namespace Node
 {
@@ -67,14 +66,12 @@ namespace Node
         TIMER_PERIODIC_CLOCK,
         TIMER_GetTxRSP,
         TIMER_GetTxFromLeader,
-        TIMER_SYNC_TIMEDOUT,
+        ALARM_SYNC_WATCHDOG,
         TIMER_REPORT_MEM,
-        TIMER_BROADCAST_ACK_TIMEDOUT,
         TIMER_BlockDiffValidateREQ,
         TIMER_BlockDBStore,
         TIMER_STALE_CLEANUP,
         TIMER_BLOCK_EXPIRED,
-        ALARM_START_SYNC,
 
     };
     class Service:
@@ -112,16 +109,11 @@ namespace Node
         bool AddTxREQ(const bcEvent::AddTxREQ *e);
         bool ClientMsg(const bcEvent::ClientMsg *e);
 
-        bool PrevBlockREQ(const bcEvent::PrevBlockREQ *e);
-        bool PrevBlockRSP(const bcEvent::PrevBlockRSP *e);
-
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
         bool PutTxREQ(const bcEvent::PutTxREQ* e);
 
 
         // bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
-        bool HelloREQ(const MsgData::HelloREQ* r, const NODE_id & src_node, const route_t& route);
-        bool HelloRSP(const MsgData::HelloRSP* r, const NODE_id & src_node, const route_t& route);
         bool GetTxREQ(const MsgData::GetTxREQ* r, const NODE_id & src_node, const route_t& route);
         bool GetTxRSP(const MsgData::GetTxRSP* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockREQ(const MsgData::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
@@ -136,18 +128,12 @@ namespace Node
         // bool ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
 
 
-        bool DelayNotificationREQ(const MsgData::DelayNotificationREQ* m, const NODE_id & src_node, const route_t& route);
-
 
         bool NodeMsgREQ(const bcEvent::NodeMsgREQ* m);
         bool NodeMsgRSP(const bcEvent::NodeMsgRSP* m);
 
         bool syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m);
         bool syncGetGranulesREQ(const bcEvent::syncGetGranulesREQ*e);
-        bool SendToChild(const bcEvent::SendToChild*e, bool fromNetwork);
-        bool SendToChildAck(const bcEvent::SendToChildAck*e, bool fromNetwork);
-
-        void make_broadcast_message_to_tree(SERVICE_id dstService, const NODE_id & node_signer, int64_t node_start_timestamp, int64_t seqId, const std::string& signature, const std::string &msg, const TreeNode &root, const route_t &route);
 
 
 
@@ -158,12 +144,7 @@ namespace Node
 
 
         void broadcast_MsgEvent_via_broadcaster(const REF_getter<MsgData::Base>& p,  const TreeNode &tree);
-        void broadcast_MsgEvent_via_node(const REF_getter<MsgData::Base>& p,  const TreeNode &tree);
         void pass_NodeMsgRSP(const MsgData::Base *e,const route_t& r);
-
-        bool handle_send_to_child(const NODE_id &_node_signer, int64_t _node_start_timestamp, int64_t _seqId, const std::string &sig,
-                                  const std::string &_msg,
-                                  const route_t &r, bool *need_continue_broadcast);
 
 
 
@@ -183,7 +164,6 @@ namespace Node
             std::map<THASH_id, REF_getter<MsgData::BlockDiffValidateREQ> > blockDiffValidateREQ_2;
 
         };
-        std::map<int64_t /*height*/,std::vector< std::pair<NODE_id, REF_getter<MsgData::BlockAccepted2REQ> > > > hello_certs;
         _db_to_save db_to_save_Z;
 
         void dump(nlohmann::json& j);
@@ -195,6 +175,12 @@ namespace Node
         {
             REF_getter<MsgData::HeartBeatREQ> node_leader=nullptr;
         };
+
+        /// Синк идёт: гейт для всех обработчиков консенсуса.
+        std::atomic<bool> sync_in_progress{false};
+        /// Продлить/снять watchdog синка (перевзводится на каждой активности).
+        void sync_watchdog_arm();
+        void sync_watchdog_stop();
 
         std::map<THASH_id,block_leader> l_blocks;
         std::map<THASH_id, client_leader_info> cli_leader_info;
@@ -238,11 +224,6 @@ namespace Node
 
         std::vector<REF_getter<MsgData::TX>>  collectTx();
         THASH_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc);
-
-        void do_sync(const NODE_id &src_node, const std::string& src_ip,
-                            const THASH_id& prev_root_hash_remote);
-        void continue_sync();
-
 
 
         void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::HeartBeatREQ> &lc);

@@ -124,7 +124,7 @@ void Node::Service::dump(nlohmann::json& j)
     j["node"] = this_node_name.container;
     j["prev_root_hash"] = prev_root_hash_Z().str();
     j["epoch"] = epoch_current();
-    j["sync_empty"] = db_state.valid() ? (bool)db_state->sync_empty : false;
+    j["sync_in_progress"] = (bool)sync_in_progress;
 
 
     // l_blocks (все события)
@@ -154,10 +154,12 @@ void Node::Service::dump(nlohmann::json& j)
     j["tx_pool"]["size"] = (int)transaction_pool_of_leader.size();
     for (auto& [h, tx] : transaction_pool_of_leader) {
         if (!tx.valid()) continue;
+        auto sk=tx->getSenderKey();
         j["tx_pool"]["txs"].push_back({
             {"hash", base16::encode(h.container)},
             {"body", tx->tx_body},
-            {"pk",   base16::encode(tx->pk_ed_bin)}
+            {"sender", sk ? sk->first : std::string()},
+            {"key_id", sk ? sk->second : -1}
         });
     }
 
@@ -199,11 +201,6 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         for (auto& z : http_granule_addr_)
             sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
         sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(TIMER_STALE_CLEANUP, NULL, NULL, 60., this));
-        db_state->on_sync_finished = [this]() {
-                // prev_block = load_last_block(db_state.get());
-                root = getRoot(db_state.get(), prev_block);
-                block_meta_full.clear();
-        };
         prev_block=load_last_block(db_state.get());
         root=getRoot(db_state.get(),prev_block);
         sendEvent(ServiceEnum::Scan, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
@@ -236,7 +233,6 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^go\\s+(.+)$", "go to child element", ListenerBase::serviceId));
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^back$", "go to parent", ListenerBase::serviceId));
 
-    // REF_getter<MsgData::HelloREQ> e= new MsgData::HelloREQ;
     // broadcast_MsgEvent_via_broadcaster(e.get(),getMetaFull()->tree_all_nodes);
 
     return true;
@@ -276,7 +272,7 @@ bool Node::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
                 }
             }
         } else {
-            if (!e->tx->verify()) err = "verify failed (legacy ed25519)";
+            err = "sender required";
         }
         yyjson_doc_free(doc);
     }
@@ -292,7 +288,12 @@ std::vector<REF_getter<MsgData::TX>> Node::Service::collectTx()
     MUTEX_INSPECTOR;
     std::map<std::string, std::map<int64_t, std::vector<REF_getter<MsgData::TX>>>> ordered;
     for (auto &z : transaction_pool_of_leader) {
-        std::string &pk = z.second->pk_ed_bin;
+        auto sk = z.second->getSenderKey();
+        if (!sk) {
+            logNode("collectTx: skip tx %s (no sender)",
+                    base16::encode(z.first.container).c_str());
+            continue;
+        }
         int64_t nonce = 0;
         auto err = z.second->getNonce(nonce);
         if (err) {
@@ -300,7 +301,7 @@ std::vector<REF_getter<MsgData::TX>> Node::Service::collectTx()
                     base16::encode(z.first.container).c_str(), err->c_str());
             continue;
         }
-        ordered[pk][nonce].push_back(z.second);
+        ordered[sk->first][nonce].push_back(z.second);
     }
     transaction_pool_of_leader.clear();
     std::vector<REF_getter<MsgData::TX>> out;
@@ -325,7 +326,7 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
         logNode("do_start_block: db_state invalid");
         return;
     }
-    if (!db_state->sync_empty) {
+    if (sync_in_progress) {
         logNode("do_start_block: sync in progress");
         return;
     }
@@ -354,7 +355,10 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
     logNode("do_start_block: broadcast ValidateBlockREQ tx_count=%zu (sorted)",
             vb->transaction_bodies.size());
     // ▲▲▲
-
+    if(vb->transaction_bodies.empty())
+    {
+        // return;
+    }
     broadcast_MsgEvent_via_broadcaster(vb.get(), mf->tree_committe);
 }
 
@@ -369,9 +373,9 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
     if(e->tid == TIMER_PERIODIC_CLOCK)
     {
         MUTEX_INSPECTOR;
-        if(!db_state->sync_empty)
+        if(sync_in_progress)
         {
-            logNode("if(!db_state->sync_empty) %s %d",__FILE__,__LINE__);
+            logNode("skipped: sync in progress %s %d",__FILE__,__LINE__);
             return true;
 
         }
@@ -396,9 +400,15 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     switch (e->tid)
     {
-    case timers::ALARM_START_SYNC:
-        logNode("case timers::ALARM_START_SYNC:");
+    case timers::ALARM_SYNC_WATCHDOG:
+    {
+        if(!sync_in_progress)
+            return true;
+        logNode("sync watchdog: no activity for %.1f s — aborting sync, root from DB",SYNC_WATCHDOG_SEC);
+        sync_in_progress=false;
+        root=getRoot(db_state.get(),prev_block);
         return true;
+    }
     case timers::TIMER_BLOCK_EXPIRED:
     {
         logNode("fail leader %s",e->data->container.c_str());
@@ -422,7 +432,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     }
     case timers::TIMER_GetTxRSP:
     {
-        if(!db_state->sync_empty)
+        if(sync_in_progress)
         {
             return true;
         }
@@ -434,6 +444,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         throw CommonError("if(!hb)");
         if(bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
         {
+            // if()
             do_start_block(hb);
             logNode("do_start_block();");
             bt.GetTxRSP_m[hb_hash].clear();
@@ -485,24 +496,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         return true;
     }
     break;        
-    case TIMER_BROADCAST_ACK_TIMEDOUT:
-    {
-        MUTEX_INSPECTOR;
-        bcEvent::SendToChild *c = dynamic_cast<bcEvent::SendToChild *>(e->cookie.get());
-        if (!c)
-            throw CommonError("if(!c) 1222447");
 
-        logErr2("TIMER_BROADCAST_ACK_TIMEDOUT %s", c->dstNodeName.container.c_str());
-
-        make_broadcast_message_to_tree(c->dst_service,c->node_signer,c->node_start_timestamp,c->seqId2,c->payload_signature,  c->payload, c->bt, c->route);
-
-        return true;
-    }
-    break;
-
-    case timers::TIMER_SYNC_TIMEDOUT:
-        logNode("FAILED SYNC, NODE STOPPED---------------------------------------------------------------");
-        return true;
     default: logNode("unhandled alarm %d",e->tid);
     }
 
@@ -519,20 +513,12 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         auto &ID = e->id;
         switch (ID)
         {
-        case bcEventEnum::PrevBlockREQ:
-            return PrevBlockREQ((const bcEvent::PrevBlockREQ*)e.get());
-        case bcEventEnum::PrevBlockRSP:
-            return PrevBlockRSP((const bcEvent::PrevBlockRSP*)e.get());
         case bcEventEnum::LiteSetUplinkREQ:
             return on_LiteSetUplinkREQ((const bcEvent::LiteSetUplinkREQ*)e.get());
         case bcEventEnum::ClientMsg:
             return ClientMsg((const bcEvent::ClientMsg *)e.get());
         case bcEventEnum::AddTxREQ:
             return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(e.get()));
-        case bcEventEnum::SendToChild:
-            return SendToChild(static_cast<const bcEvent::SendToChild *>(e.get()), false);
-        case bcEventEnum::SendToChildAck:
-            return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(e.get()), false);
 
         case bcEventEnum::syncGetGranulesREQ:
             return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)e.get());
@@ -567,18 +553,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
 
             switch (IDA)
             {
-            case bcEventEnum::PrevBlockREQ:
-                return PrevBlockREQ((const bcEvent::PrevBlockREQ*)ev->e.get());
-            case bcEventEnum::PrevBlockRSP:
-                return PrevBlockRSP((const bcEvent::PrevBlockRSP*)ev->e.get());
             case bcEventEnum::ClientMsg:
                 return ClientMsg((const bcEvent::ClientMsg *)ev->e.get());
             case bcEventEnum::AddTxREQ:
                 return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(ev->e.get()));
-            case bcEventEnum::SendToChild:
-                return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
-            case bcEventEnum::SendToChildAck:
-                return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
 
             case bcEventEnum::syncGetGranulesREQ:
                 return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)ev->e.get());
@@ -600,18 +578,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             auto &IDC = ev->e->id;
             switch (IDC)
             {
-            case bcEventEnum::PrevBlockREQ:
-                return PrevBlockREQ((const bcEvent::PrevBlockREQ*)ev->e.get());
-            case bcEventEnum::PrevBlockRSP:
-                return PrevBlockRSP((const bcEvent::PrevBlockRSP*)ev->e.get());
             case bcEventEnum::ClientMsg:
                 return ClientMsg((const bcEvent::ClientMsg *)ev->e.get());
             case bcEventEnum::AddTxREQ:
                 return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(ev->e.get()));
-            case bcEventEnum::SendToChild:
-                return SendToChild(static_cast<const bcEvent::SendToChild *>(ev->e.get()), true);
-            case bcEventEnum::SendToChildAck:
-                return SendToChildAck(static_cast<const bcEvent::SendToChildAck *>(ev->e.get()), true);
             case bcEventEnum::syncGetGranulesREQ:
                 return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)ev->e.get());
             case bcEventEnum::syncGetGranulesRSP:
@@ -705,6 +675,133 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 Node::Service::~Service()
 {
 
+}
+
+bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
+{
+    if(sync_in_progress)
+    {
+        logNode("skipped: sync in progress %s %d",__FILE__,__LINE__);
+    }
+
+    auto &s=filter_NodeMsgREQ[m->node_signer][m->node_start_timestamp];
+    while(s.size()>100)
+    {
+        s.erase(s.begin());
+    }
+    if(s.count(m->seqId2))
+    {
+        logNode("filter_NodeMsgREQ.count(m->seqId2) %lld",m->seqId2);
+        return true;
+    }
+    s.insert(m->seqId2);
+    if(!sync_in_progress)
+    {
+        auto n = cells::getNodeNoCreate(root.get(), db_state.get(),m->node_signer);
+        if(!n.valid())
+            return true;
+        if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
+        {
+            logNode("verify failed 11");
+            return true;
+        }
+    }
+    inBuffer in(m->msg_payload);
+    auto id = in.get_PN();
+
+    REF_getter<MsgData::Base> msg = msgFactory.create(id);
+    msg->unpack(in);
+
+    if(!sync_in_progress)
+    {
+        switch (msg->type)
+        {
+        case msgid::GetTxREQ:
+            return GetTxREQ(static_cast<const MsgData::GetTxREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::ValidateBlockREQ:
+            // last_activity_time=iUtils->getNow();
+            return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::BlockAccepted2REQ:
+            // last_activity_time=iUtils->getNow();
+            return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
+        // case msgid::ConfirmLeaderREQ:
+        //     return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::BlockDiffValidateREQ:
+            return BlockDiffValidateREQ(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::BlockDBStore:
+            return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
+        // case msgid::LcEnvelopeREQ:
+        // {
+        //     bool nc=true;
+        //     return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route,&nc);
+
+        // }
+
+        default:
+            throw CommonError("unjandled3 MsgData %s", msgName(msg->type));
+        }
+
+    }
+    else
+    {
+        switch (msg->type)
+        {
+        // case msgid::BlockDiffValidateREQ:
+        //     return BlockDiffValidateREQ_sync(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::GetTxREQ:
+        case msgid::ValidateBlockREQ:
+        case msgid::BlockAccepted2REQ:
+        case msgid::ConfirmLeaderREQ:
+        case msgid::BlockDBStore:
+
+        default:
+            logNode("skipped in sync mode %s", msgName(msg->type));
+        }
+
+    }
+
+    return true;
+}
+
+bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
+{
+    if (m->route.size())
+    {
+        passEvent(m);
+        return true;
+    }
+
+    auto n = cells::getNodeNoCreate(root.get(), db_state.get(),m->node_signer);
+    if(!n.valid())
+    { 
+        logNode("NodeMsgRSP from unknown node %s, ignore", m->node_signer.container.c_str()); 
+        return true; 
+    }
+    if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
+    {
+        logNode("verify failed @4");
+        return true;
+    }
+    inBuffer in(m->msg_payload);
+    auto id = in.get_PN();
+
+    REF_getter<MsgData::Base> ee = msgFactory.create(id);
+    ee->unpack(in);
+
+    switch (id)
+    {
+    case msgid::GetTxRSP:
+        return GetTxRSP(static_cast<const MsgData::GetTxRSP *>(ee.get()), m->node_signer, m->route);
+    case msgid::ValidateBlockRSP:
+        return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
+    case msgid::BlockDiffValidateRSP:
+        return BlockDiffValidateRSP(static_cast<const MsgData::BlockDiffValidateRSP *>(ee.get()), m->node_signer, m->route);
+    default:
+        throw CommonError("unhandled22 p020 %s", msgName(id));
+        break;
+    }
+
+    return true;
 }
 
 Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *ins, Mode m)
@@ -885,8 +982,6 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
             }
         } else {
             t_err= "sender address not specified";
-            // senderAddress.addr = blake2b_hash(pk_bin).container;
-            // if (!tt->verify()) { t_err = "verify failed (legacy ed25519)"; }
         }
         if (!t_err)
         {
@@ -1049,141 +1144,6 @@ bool Node::Service::PutTxREQ(const bcEvent::PutTxREQ *e)
     return true;
 }
 
-bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
-{
-    // db_state->sync_empty;
-    if(!db_state->sync_empty)
-    {
-        logNode("if(!db_state->sync_empty) %s %d",__FILE__,__LINE__);
-    }
-
-    auto &s=filter_NodeMsgREQ[m->node_signer][m->node_start_timestamp];
-    while(s.size()>100)
-    {
-        s.erase(s.begin());
-    }
-    if(s.count(m->seqId2))
-    {
-        logNode("filter_NodeMsgREQ.count(m->seqId2) %lld",m->seqId2);
-        return true;
-    }
-    s.insert(m->seqId2);
-    if(db_state->sync_empty)
-    {
-        auto n = cells::getNodeNoCreate(root.get(), db_state.get(),m->node_signer);
-        if(!n.valid())
-            return true;
-        if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
-        {
-            logNode("verify failed 11");
-            return true;
-        }
-
-    }
-    inBuffer in(m->msg_payload);
-    auto id = in.get_PN();
-
-    REF_getter<MsgData::Base> msg = msgFactory.create(id);
-    msg->unpack(in);
-
-    if(db_state->sync_empty)
-    {
-        switch (msg->type)
-        {
-        case msgid::HelloREQ:
-            return HelloREQ(static_cast<const MsgData::HelloREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::GetTxREQ:
-            return GetTxREQ(static_cast<const MsgData::GetTxREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::ValidateBlockREQ:
-            // last_activity_time=iUtils->getNow();
-            return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::BlockAccepted2REQ:
-            // last_activity_time=iUtils->getNow();
-            return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
-        // case msgid::ConfirmLeaderREQ:
-        //     return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::DelayNotificationREQ:
-            return DelayNotificationREQ(static_cast<const MsgData::DelayNotificationREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::BlockDiffValidateREQ:
-            return BlockDiffValidateREQ(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::BlockDBStore:
-            return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
-        // case msgid::LcEnvelopeREQ:
-        // {
-        //     bool nc=true;
-        //     return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route,&nc);
-
-        // }
-
-        default:
-            throw CommonError("unjandled3 MsgData %s", msgName(msg->type));
-        }
-
-    }
-    else
-    {
-        switch (msg->type)
-        {
-        // case msgid::BlockDiffValidateREQ:
-        //     return BlockDiffValidateREQ_sync(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::GetTxREQ:
-        case msgid::ValidateBlockREQ:
-        case msgid::BlockAccepted2REQ:
-        case msgid::ConfirmLeaderREQ:
-        case msgid::DelayNotificationREQ:
-        case msgid::BlockDBStore:
-
-        default:
-            logNode("skipped in sync mode %s", msgName(msg->type));
-        }
-
-    }
-
-    return true;
-}
-
-bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
-{
-    if (m->route.size())
-    {
-        passEvent(m);
-        return true;
-    }
-
-    auto n = cells::getNodeNoCreate(root.get(), db_state.get(),m->node_signer);
-    if(!n.valid())
-    { 
-        logNode("NodeMsgRSP from unknown node %s, ignore", m->node_signer.container.c_str()); 
-        return true; 
-    }
-    if (!verify_ed_pk(n->get_ed_pk(), m->signature, blake2b_hash(m->msg_payload)))
-    {
-        logNode("verify failed @4");
-        return true;
-    }
-    inBuffer in(m->msg_payload);
-    auto id = in.get_PN();
-
-    REF_getter<MsgData::Base> ee = msgFactory.create(id);
-    ee->unpack(in);
-
-    switch (id)
-    {
-    case msgid::HelloRSP:
-        return HelloRSP(static_cast<const MsgData::HelloRSP *>(ee.get()), m->node_signer, m->route);
-    case msgid::GetTxRSP:
-        return GetTxRSP(static_cast<const MsgData::GetTxRSP *>(ee.get()), m->node_signer, m->route);
-    case msgid::ValidateBlockRSP:
-        return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
-    case msgid::BlockDiffValidateRSP:
-        return BlockDiffValidateRSP(static_cast<const MsgData::BlockDiffValidateRSP *>(ee.get()), m->node_signer, m->route);
-    default:
-        throw CommonError("unhandled22 p020 %s", msgName(id));
-        break;
-    }
-
-    return true;
-}
 void print_exception(JSIContext* ctx);
 
 std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_params& t,
@@ -1519,9 +1479,17 @@ inline uint64_t read_uint64(const uint8_t* data) {
            (static_cast<uint64_t>(data[6]) << 8)  |
            (static_cast<uint64_t>(data[7]));
 }
+void Node::Service::sync_watchdog_arm()
+{
+    sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::ALARM_SYNC_WATCHDOG,NULL,NULL,SYNC_WATCHDOG_SEC,this));
+}
+void Node::Service::sync_watchdog_stop()
+{
+    sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(timers::ALARM_SYNC_WATCHDOG,NULL,this));
+}
 REF_getter<bc_node> Node::Service::current_leader()
 {
-    if(!db_state->sync_empty)
+    if(sync_in_progress)
     {
         logNode("current_leader: sync in progress %s %d",__FILE__,__LINE__);
     }
@@ -1735,39 +1703,6 @@ bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_i
         return true;
     return false;
 }
-
-bool Node::Service::HelloREQ(const MsgData::HelloREQ* r, const NODE_id & src_node, const route_t& route)
-{
-    REF_getter<MsgData::HelloRSP> rsp=new MsgData::HelloRSP;
-    if(prev_block.valid())
-        rsp->prev_block=prev_block->getBuffer();   
-
-    pass_NodeMsgRSP(rsp.get(), route);
-    return true;
-}
-bool Node::Service::HelloRSP(const MsgData::HelloRSP* r, const NODE_id & src_node, const route_t& route)
-{
-    logNode("HelloRSP");
-    if(r->prev_block.size())
-    {
-        REF_getter<MsgData::BlockAccepted2REQ> ba2=new MsgData::BlockAccepted2REQ;
-        inBuffer in(r->prev_block);
-        ba2->unpack2(in);
-        if(!verify_block_all(ba2))
-        {
-            logNode("if(!verify_block_all(ba2))");
-            return false;
-        }
-        hello_certs[ba2->blockAcceptedREQ->blockInfo->heart_beat->new_epoch].push_back({src_node,ba2});
-
-        if(ba2->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1!=prev_root_hash_Z())
-            sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(ALARM_START_SYNC,NULL,NULL,0.5,this));
-
-    }
-    return true;
-    
-}
-
 
 void Node::Service::logNode(const char *fmt, ...)
 {

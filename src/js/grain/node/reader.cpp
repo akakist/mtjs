@@ -22,7 +22,7 @@
 #include "CallStack.h"
 
 // ============================================================
-// SYNCING: пока db_state->sync_empty == false, Get*REQ → 503
+// SYNCING: пока sync_in_progress, Get*REQ → 503
 // CallView / GetGranule / Scan — работают на stale root (не 503)
 // ============================================================
 static bool is_syncing_state_req(int p) {
@@ -63,7 +63,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
     b->unpack(in);
     auto hash = b->getHash();
     // SYNCING: пока нода синкается — Get*REQ → 503 (CallView/GetGranule/Scan — не 503)
-    if (!db_state->sync_empty && is_syncing_state_req(p)) {
+    if (sync_in_progress && is_syncing_state_req(p)) {
         auto rsp = make_syncing_rsp(p);
         if (rsp.valid()) {
             auto* rs = dynamic_cast<rsp_status*>(rsp.get());
