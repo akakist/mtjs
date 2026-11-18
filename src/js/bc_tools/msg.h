@@ -90,6 +90,7 @@ namespace msgid
         CallViewREQ=34, CallViewRSP=35,
         GetGranuleREQ=36, GetGranuleRSP=37,
         ScanREQ=38, ScanRSP=39,    
+        HelloREQ=40, HelloRSP=41,    
     };
 
 }

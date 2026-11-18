@@ -49,11 +49,11 @@ struct JSI_Granule : public Refcountable {
     }
     void setDirtyD() { dirtyD = true; }
 
-    void flush(Rollback* roll) {
+    void flush(Rollback* roll, int64_t block_timestamp) {
         if (_deleted) return;   // удаление — через deleted_granules (jsg_del)
         if (__update_time) cnode->update_time(__update_time, roll);
-        if (dirtyD) cnode->setDirty(roll);
-        for (auto& z : children) z.second->flush(roll);
+        if (dirtyD) cnode->setDirty(roll,block_timestamp);
+        for (auto& z : children) z.second->flush(roll,block_timestamp);
     }
 };
 

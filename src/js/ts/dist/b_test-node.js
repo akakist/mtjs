@@ -66,7 +66,7 @@ const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
             sleep(200);
         }
     }
-    const nums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const nums = [0, 1, 2, 3, 4, 5, 6, 7, 8,9 ];
     for (let i of nums) {
         const name = `n${i}`;
         const k = keys.nodes && keys.nodes[name];

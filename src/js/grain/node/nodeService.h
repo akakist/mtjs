@@ -32,6 +32,8 @@
 #include "md/md_ConfirmLeaderREQ.h"
 #include "md/md_ConfirmLeaderRSP.h"
 #include "md/md_LcEnvelopeREQ.h"
+#include "md_HelloREQ.h"
+#include "md_HelloRSP.h"
 
 #include "blockMeta.h"
 
@@ -51,6 +53,11 @@ std::set<NODE_id> getValidators(int64_t block_timestamp, IDatabase* db);
 #define HB_VERIFY_TIMEOUT 5
 #define SLOT_MKS 3000000
 
+/// Мёртвая зона в конце слота (100 мс): лидера в ней нет.
+/// Нужна, чтобы на правой границе слота ноды с рассинхроном часов
+/// не считали лидером разных участников и не устраивали гонку.
+#define NO_LEADER_FRAME_MKS 100000
+
 namespace Node
 {
     enum Mode { Full = 0, Lite = 1 };
@@ -67,6 +74,7 @@ namespace Node
         TIMER_BlockDBStore,
         TIMER_STALE_CLEANUP,
         TIMER_BLOCK_EXPIRED,
+        ALARM_START_SYNC,
 
     };
     class Service:
@@ -104,25 +112,24 @@ namespace Node
         bool AddTxREQ(const bcEvent::AddTxREQ *e);
         bool ClientMsg(const bcEvent::ClientMsg *e);
 
+        bool PrevBlockREQ(const bcEvent::PrevBlockREQ *e);
+        bool PrevBlockRSP(const bcEvent::PrevBlockRSP *e);
 
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
-        bool PutTransactionREQ(const bcEvent::PutTransactionREQ* e);
+        bool PutTxREQ(const bcEvent::PutTxREQ* e);
 
-        // REF_getter<MsgData::HeartBeatREQ> do_heart_beat(const MsgData::HeartBeatREQ* hb);
-
-        // bool LcEnvelopeREQ(const MsgData::LcEnvelopeREQ* r, const NODE_id & src_node, const route_t& route, bool *need_continue_broadcast);
-        // bool HeartBeatREQ(const MsgData::HeartBeatREQ *h,const MsgData::BlockAccepted2REQ *remote_prev_lc, const NODE_id &src_node, const route_t &route, bool * need_continue_broadcast);
-        // void reply_HeartBeatRSP(const MsgData::HeartBeatREQ *h, const route_t &route);
 
         // bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
+        bool HelloREQ(const MsgData::HelloREQ* r, const NODE_id & src_node, const route_t& route);
+        bool HelloRSP(const MsgData::HelloRSP* r, const NODE_id & src_node, const route_t& route);
         bool GetTxREQ(const MsgData::GetTxREQ* r, const NODE_id & src_node, const route_t& route);
-        bool GetTransactionRSP(const MsgData::GetTxRSP* r, const NODE_id & src_node, const route_t& route);
+        bool GetTxRSP(const MsgData::GetTxRSP* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockREQ(const MsgData::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockRSP(const MsgData::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
         bool BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route);
 
         bool BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route);
-        bool BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route);
+        // bool BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route);
         bool BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r, const NODE_id & src_node, const route_t& route);
 
         // bool ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
@@ -176,6 +183,7 @@ namespace Node
             std::map<THASH_id, REF_getter<MsgData::BlockDiffValidateREQ> > blockDiffValidateREQ_2;
 
         };
+        std::map<int64_t /*height*/,std::vector< std::pair<NODE_id, REF_getter<MsgData::BlockAccepted2REQ> > > > hello_certs;
         _db_to_save db_to_save_Z;
 
         void dump(nlohmann::json& j);
@@ -191,6 +199,8 @@ namespace Node
         std::map<THASH_id,block_leader> l_blocks;
         std::map<THASH_id, client_leader_info> cli_leader_info;
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
+        /// anti-replay для syncGetGranulesREQ: последний принятый current_time (mks) на узел
+        std::map<NODE_id,int64_t> last_sync_req_time;
         std::map<THASH_id, REF_getter<MsgData::TX> >  transaction_pool_of_leader;
         std::map<THASH_id/* block */, REF_getter<BlockMetaFull>> block_meta_full;
         REF_getter<BlockMetaFull> getMetaFull();
@@ -226,7 +236,7 @@ namespace Node
         void do_start_block(MsgData::HeartBeatREQ* hb);
 
 
-        std::vector<REF_getter<MsgData::TX>>  collectTransactions();
+        std::vector<REF_getter<MsgData::TX>>  collectTx();
         THASH_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc);
 
         void do_sync(const NODE_id &src_node, const std::string& src_ip,
@@ -309,8 +319,11 @@ namespace Node
         static constexpr int64_t STALE_TTL_SEC = 1 * 60;
 
         bool on_LiteSetUplinkREQ(const bcEvent::LiteSetUplinkREQ* e);
-        NODE_id current_leader();
+        /// Лидер текущего слота. nullptr — лидера нет:
+        /// последние NO_LEADER_FRAME_MKS слота, пустой vne, либо нет prev_block.
+        REF_getter<bc_node> current_leader();
         void resetBlockExpired(const NODE_id &n);
+        void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, int64_t block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
 
 
     };

@@ -4,10 +4,10 @@
 struct bc_nodelist:  public data_base
 {
 
-    bc_nodelist(Cellable *p):data_base(hsh::bc_nodelist,p, 0,0) {}
+    bc_nodelist(Cellable *p):data_base(hsh::bc_nodelist,p) {}
 private:
-    std::set<NODE_id> list;
 public:
+    std::set<NODE_id> list;
     size_t size() const
     {
         

@@ -22,7 +22,7 @@ inline inBuffer& operator>>(inBuffer &o,vote& z)
 struct bc_votes:  public data_base
 {
 
-    bc_votes(Cellable *p):data_base(hsh::bc_votes,p, 0,0) {}
+    bc_votes(Cellable *p):data_base(hsh::bc_votes,p) {}
     std::map<THASH_id, vote> votes;
     size_t size() const
     {

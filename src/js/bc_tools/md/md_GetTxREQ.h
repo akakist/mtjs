@@ -11,9 +11,12 @@ namespace MsgData
         {
         }
         REF_getter<MsgData::HeartBeatREQ> hb;
+        std::string ip;
+
         void update(Blake2bHasher& h) const
         {
             hb->update(h);
+            h.update(ip);
         }
 
         void pack(outBuffer& b) const final
@@ -21,13 +24,13 @@ namespace MsgData
             MUTEX_INSPECTOR;
 
             Base::pack(b);
-            b<<hb;
+            b<<hb<<ip;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>hb;
+            b>>hb>>ip;
         }
 
         static Base* construct()

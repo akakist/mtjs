@@ -54,16 +54,17 @@ struct t_params
     int64_t value = 0;
     Rollback *roll = NULL;
     Dirty dirty_1;
+    b_params* b;
     std::set<REF_getter<data_base>> *deleted_granules;
     // FeesSnapshot fees;
     // для msg-геттеров (источник истины — t_params; jsiMsg не собираем)
-    int64_t  block_timestamp = 0;   // из prev_block->heart_beat->block_timestamp
-    int64_t  block_height    = 0;   // TBD
+    // int64_t  block_timestamp = 0;   // из prev_block->heart_beat->block_timestamp
+    // int64_t  block_height__Z = 0;   // TBD
     int64_t  nonce           = 0;   // из TX
     int64_t  chain_id        = 0;   // из TX
     int64_t  tx_index        = 0;   // TBD
 
-    void markDirty(data_base *p) { p->setDirty(roll); dirty_1.add(p); }
+    void markDirty(data_base *p) { p->setDirty(roll, b->validateBlockREQ->block_timestamp); dirty_1.add(p); }
     void rollback()
     {
         for(auto &z: roll->data) {

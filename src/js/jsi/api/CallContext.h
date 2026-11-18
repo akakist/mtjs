@@ -28,7 +28,7 @@ struct CallContext {
     int64_t* value_ptr = nullptr;   // текущий value (нода: &t.value; test_runner: &test_value)
 
     CONTRACT_id caller;
-
+    int64_t block_timestamp;
     FeesSnapshot *fees = nullptr;
     std::set<REF_getter<data_base>> * deleted_granules = nullptr;
     Cellable* root = nullptr;
@@ -37,7 +37,7 @@ struct CallContext {
     {
         for(auto& z: JSI_Granule_children)
         {
-            z.second->flush(roll);
+            z.second->flush(roll, block_timestamp);
         }
         auto max_time=0;
         for(auto& z: JSI_Granule_children)

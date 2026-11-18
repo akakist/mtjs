@@ -43,7 +43,7 @@ std::optional<std::string> Node::Service::execute_mint(yyjson_val *params, b_par
         u->balance+=amount;
     }
     t.markDirty(u.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId())->update_time(t.block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
 
 
  // ▼▼▼ INSERT: bc_state total_supply
@@ -90,7 +90,7 @@ std::optional<std::string> Node::Service::execute_transfer(yyjson_val *params, b
         to->balance += amount;
     }
     t.markDirty(to.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),to->getDbId())->update_time(t.block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),to->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
 
     b.emit_command(t.tx_id, seqId, "transfer",
         R"({"from":"%s","to":"%s","amount":"%s"})",
@@ -134,7 +134,7 @@ std::optional<std::string> Node::Service::execute_node_update(yyjson_val *params
     }
 
     t.markDirty(nn.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),nn->getDbId())->update_time(t.block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),nn->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
 
 
     t.gasUsed+=b.fees.gas_node_update;
@@ -161,7 +161,7 @@ std::optional<std::string> Node::Service::execute_node_create(yyjson_val *params
     auto us = cells::getAddressStateNoCreate(root.get(), db_state.get(),t.senderAddress);
     if (!us.valid()) return "if(!us.valid())";
 
-    auto n = cells::addNode(root.get(),db_state.get(),name, t.roll);
+    auto n = cells::addNode(root.get(),db_state.get(),name, t.roll, t.b->validateBlockREQ->block_timestamp);
     if(!n.valid()) return "addNode failed";
 
     std::string ip,pk_ed,pk_bls;
@@ -178,13 +178,13 @@ std::optional<std::string> Node::Service::execute_node_create(yyjson_val *params
     // ▼▼▼ INSERT: обратный индекс owner -> owned_nodes
     us->owned_nodes.insert(name);
     t.markDirty(us.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(t.block_timestamp,t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp,t.roll);
     
 
     // ▲▲▲
 
     t.markDirty(n.get());
-    cells::getActivityOrCreate(root.get(),db_state.get(),n->getDbId(),{},ttl,t.block_timestamp,t.roll)->update_time(t.block_timestamp, t.roll);
+    cells::getActivityOrCreate(root.get(),db_state.get(),n->getDbId(),{},ttl,t.b->validateBlockREQ->block_timestamp,t.roll)->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
     t.gasUsed+=b.fees.gas_node_create;
 
     b.emit_command(t.tx_id, seqId, "node_create",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
@@ -217,7 +217,7 @@ std::optional<std::string> Node::Service::execute_node_stake(yyjson_val *params,
 
     // ▼▼▼ INSERT: обратный индекс staker -> staked_in
     us->staked_in.insert(node);
-    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(t.block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
     t.markDirty(us.get());
     // ▲▲▲
 
@@ -234,7 +234,7 @@ std::optional<std::string> Node::Service::execute_node_stake(yyjson_val *params,
                    std::to_string(amount).c_str(),
                    base16::encode(t.senderAddress.addr).c_str());
     t.markDirty(n.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(t.block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
 
     return std::nullopt;
 }
@@ -267,15 +267,15 @@ std::optional<std::string> Node::Service::execute_unstake_node(yyjson_val *param
         u->staked_in.erase(node);
     }
     auto actu=cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId());
-    actu->update_time(t.block_timestamp,t.roll);
+    actu->update_time(t.b->validateBlockREQ->block_timestamp,t.roll);
     auto actn=cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId());
-    actn->update_time(t.block_timestamp,t.roll);
+    actn->update_time(t.b->validateBlockREQ->block_timestamp,t.roll);
 
     t.markDirty(u.get());
 
     t.markDirty(n.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(t.block_timestamp, t.roll);
-    cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId())->update_time(t.block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
     {
         auto st = cells::getStateNoCreate(root.get(), db_state.get());
         if (!st.valid()) return "state create failed";
@@ -313,7 +313,7 @@ std::optional<std::string> Node::Service::execute_node_enable(yyjson_val *params
 
     n->setEnabled(1);
     t.markDirty(n.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(t.block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
 
     t.gasUsed+=b.fees.gas_node_enable;
 
@@ -346,7 +346,7 @@ std::optional<std::string> Node::Service::execute_node_disable(yyjson_val *param
 
     n->setEnabled(0);
     t.markDirty(n.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(t.block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
     
 
     t.gasUsed+=b.fees.gas_node_disable;
@@ -390,7 +390,7 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     if (ttl <= 0) return "contract_deploy: ttl must be > 0";
     if (ttl > MAX_GRANULE_TTL) return "contract_deploy: ttl > MAX_TTL";
 
-    auto n = cells::getContractOrCreate(root.get(), db_state.get(), cn, t.roll);
+    auto n = cells::getContractOrCreate(root.get(), db_state.get(), cn, t.roll,t.b->validateBlockREQ->block_timestamp);
 
     std::string src;
     err = yy_get_string(params, "src", src);
@@ -403,16 +403,16 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     }
     t.markDirty(n.get());
 
-    auto ab = cells::getContractBalanceOrCreate(root.get(), db_state.get(), cn, t.roll);
+    auto ab = cells::getContractBalanceOrCreate(root.get(), db_state.get(), cn, t.roll,t.b->validateBlockREQ->block_timestamp);
     if (!ab.valid())
         throw CommonError("if(!ab.valid())");
-    ab->setDirty(t.roll);
+    ab->setDirty(t.roll,t.b->validateBlockREQ->block_timestamp);
 
     // ▼▼▼ корневая гранула контракта (dataId="")
     CONTRACT_DATA_id rootKey;
     rootKey.container = "";
     auto rootGranule = cells::getContractDataOrCreate(root.get(), db_state.get(), cn, rootKey,
-                                                      t.roll, ttl, t.block_timestamp);
+                                                      t.roll, ttl, t.b->validateBlockREQ->block_timestamp);
     if (!rootGranule.valid())
         return "contract_deploy: root granule create failed";
     rootGranule->container = "";   // пустой value
@@ -420,22 +420,22 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
 
     // activity для корневой гранулы (delete_list = root_granule)
     auto rootAct = cells::getActivityOrCreate(root.get(), db_state.get(), rootGranule->getDbId(),
-                                              {}, ttl, t.block_timestamp, t.roll);
+                                              {}, ttl, t.b->validateBlockREQ->block_timestamp, t.roll);
     if (rootAct.valid()) {
         rootAct->dbid = { base16::encode(rootGranule->getDbId()) };
-        rootAct->update_time(t.block_timestamp, t.roll);
+        rootAct->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
     }
     // ▲▲▲
 
     // activity контракта (delete_list = contract + balance + root_granule)
-    auto act = cells::getActivityOrCreate(root.get(), db_state.get(), n->getDbId(), {}, ttl, t.block_timestamp, t.roll);
+    auto act = cells::getActivityOrCreate(root.get(), db_state.get(), n->getDbId(), {}, ttl, t.b->validateBlockREQ->block_timestamp, t.roll);
     if (act.valid()) {
         act->dbid = {
             n->getDbId(),           // contract
             ab->getDbId(),          // balance
             rootGranule->getDbId(), // root granule
         };
-        act->update_time(t.block_timestamp, t.roll);
+        act->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
     }
 
     // газ: gas_contract_deploy + ceil(ttl/ttl_seconds_per_gas)
@@ -453,7 +453,7 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
 
     us->contracts.insert(cn);
     t.markDirty(us.get());
-    cells::getActivityNoCreate(root.get(), db_state.get(), us->getDbId())->update_time(t.block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(), db_state.get(), us->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
 
     b.emit_command(t.tx_id, seqId, "contract_deploy",
         R"({"name":"%s","owner":"%s","ttl":"%lld"})",
@@ -492,8 +492,8 @@ std::optional<std::string> Node::Service::execute_contract_update(yyjson_val *pa
         n->src=src;
     }
     t.markDirty(n.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(t.block_timestamp,t.roll);
-    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(t.block_timestamp,t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp,t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(t.b->validateBlockREQ->block_timestamp,t.roll);
 
 
     b.emit_command(t.tx_id, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",cn.container.c_str(),base16::encode(t.senderAddress.addr).c_str());
@@ -623,7 +623,7 @@ std::optional<std::string> Node::Service::execute_gc(
     yyjson_val* arr = yyjson_obj_get(params, "items");
     if (!arr || !yyjson_is_arr(arr)) return "param 'items' must be array";
 
-    int64_t now = std::max((int64_t)t.block_timestamp, (int64_t)iUtils->getNow());
+    int64_t now = std::max((int64_t)t.b->validateBlockREQ->block_timestamp, (int64_t)iUtils->getNow());
 
     int applied = 0, skipped = 0;
     int applied_granule = 0, applied_contract = 0, applied_node = 0, applied_address = 0;
@@ -758,14 +758,14 @@ std::optional<std::string> Node::Service::execute_create_address(yyjson_val* par
         parsed.push_back({(uint8_t)type, kb});
     }
 
-    auto u = cells::getAddressStateOrCreate(root.get(), db_state.get(),addr, t.roll);
+    auto u = cells::getAddressStateOrCreate(root.get(), db_state.get(),addr, t.roll,t.b->validateBlockREQ->block_timestamp);
     if (!u.valid()) return "create failed";
     for (auto& k : parsed) {
         auto id = u->addKey(k.type, k.kb);
         if (!id) return "addKey failed";
     }
     t.markDirty(u.get());
-    cells::getActivityOrCreate(root.get(),db_state.get(),u->getDbId(),{},ttl,t.block_timestamp,t.roll)->update_time(t.block_timestamp,t.roll);
+    cells::getActivityOrCreate(root.get(),db_state.get(),u->getDbId(),{},ttl,t.b->validateBlockREQ->block_timestamp,t.roll)->update_time(t.b->validateBlockREQ->block_timestamp,t.roll);
 
     t.gasUsed += b.fees.gas_create_address;
     b.emit_command(t.tx_id, seqId, "create_address",
@@ -809,7 +809,7 @@ std::optional<std::string> Node::Service::gc_activity_apply(
         switch (g->payload_ctor_idx) {
         case hsh::bc_granule:
             applied_granule++;
-            deleteGranule(g->data.get(), t.roll, dbd);
+            deleteGranule(g->data.get(), t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
             break;
 
         case hsh::bc_node: {
@@ -832,7 +832,7 @@ std::optional<std::string> Node::Service::gc_activity_apply(
                     u->staked_in.erase(name);
                     t.markDirty(u.get());
                     cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId())
-                        ->update_time(t.block_timestamp, t.roll);
+                        ->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
                 }
                 st->total_stake -= i128(stake);
             }
@@ -846,8 +846,8 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             }
 
             // 3. Удалить bc_node
-            n->setDirty(t.roll);
-            deleteGranule(n, t.roll, dbd);
+            n->setDirty(t.roll,t.b->validateBlockREQ->block_timestamp);
+            deleteGranule(n, t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
 
             b.emit_command(t.tx_id, 0, "gc_node",
                 R"({"name":"%s","stake_returned":true})", name.container.c_str());
@@ -868,7 +868,7 @@ std::optional<std::string> Node::Service::gc_activity_apply(
                 t.markDirty(st.get());
             }
 
-            deleteGranule(u, t.roll, dbd);
+            deleteGranule(u, t.roll, dbd, t.b->validateBlockREQ->block_timestamp);
             b.emit_command(t.tx_id, 0, "gc_address_deleted",
                 R"({"addr":"%s","burned":"%lld"})",
                 base16::encode(g->getDbId()).c_str(), (long long)burned);
@@ -888,12 +888,12 @@ std::optional<std::string> Node::Service::gc_activity_apply(
                     u->contracts.erase(cn);
                     t.markDirty(u.get());
                     cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId())
-                        ->update_time(t.block_timestamp, t.roll);
+                        ->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
                 }
             }
             c->owners.clear();
 
-            deleteGranule(c, t.roll, dbd);
+            deleteGranule(c, t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
             b.emit_command(t.tx_id, 0, "gc_contract_deleted",
                 R"({"name":"%s"})", name.c_str());
             break;
@@ -908,15 +908,15 @@ std::optional<std::string> Node::Service::gc_activity_apply(
                     t.markDirty(st.get());
                 }
             }
-            deleteGranule(g->data.get(), t.roll, dbd);
+            deleteGranule(g->data.get(), t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
             break;
         }
 
         default:
-            deleteGranule(g->data.get(), t.roll, dbd);
+            deleteGranule(g->data.get(), t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
             break;
         }
     }
-    deleteGranule(act, t.roll, dbd);
+    deleteGranule(act, t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
     return std::nullopt;
 }

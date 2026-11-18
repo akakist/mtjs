@@ -3,17 +3,17 @@
 
 struct bc_activity: public data_base
 {
-    bc_activity(Cellable *p): data_base(hsh::bc_activity, p, 0, 0) {}
+    bc_activity(Cellable *p): data_base(hsh::bc_activity, p) {}
     std::string name_;   // имя контракта (ссылка на bc_contract)
     std::set<std::string> dbid;
-    time_t _update_time=0;
+    int64_t _update_time=0;
     int ttl=0;
-    void update_time(time_t t, Rollback* roll)
+    void update_time(int64_t t, Rollback* roll)
     {
         if(t>_update_time)
         {
             _update_time=t;
-            setDirty(roll);
+            setDirty(roll, t);
         }
     }
     size_t size() const { return size_() + name_.size(); }

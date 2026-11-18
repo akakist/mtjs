@@ -32,57 +32,57 @@ struct IDatabase: public Refcountable
 
 
     IDatabase():Refcountable("Idatabse") {}
-    void add_sync_out(const std::string &k)
-    {
-        sync_empty=false;
-        M_LOCK(mx);
-        sync_out[k.size()].insert(k);
-    }
+    // void add_sync_out(const std::string &k)
+    // {
+    //     sync_empty=false;
+    //     M_LOCK(mx);
+    //     sync_out[k.size()].insert(k);
+    // }
     
     std::function<void()> on_sync_finished;   // вызывается при переходе sync_empty false→true
 
-    void remove_sync_out(const std::string &k)
-    {
-        // M_LOCK(mx);
-        MutexLockerDeferred l(mx);
-        l.lock();
-        auto &s = sync_out[k.size()];
-        s.erase(k);
-        if (s.empty()) sync_out.erase(k.size());
-        if (sync_out.empty() && !sync_empty.exchange(true)) {
-            // был false → стал true: sync завершён
-            auto cb = on_sync_finished;   // копия под локом
-            // unlock перед вызовом? см. ниже
-            l.unlock();
-            if (cb) cb();
-        }
-    }
+    // void remove_sync_out(const std::string &k)
+    // {
+    //     // M_LOCK(mx);
+    //     MutexLockerDeferred l(mx);
+    //     l.lock();
+    //     auto &s = sync_out[k.size()];
+    //     s.erase(k);
+    //     if (s.empty()) sync_out.erase(k.size());
+    //     if (sync_out.empty() && !sync_empty.exchange(true)) {
+    //         // был false → стал true: sync завершён
+    //         auto cb = on_sync_finished;   // копия под локом
+    //         // unlock перед вызовом? см. ниже
+    //         l.unlock();
+    //         if (cb) cb();
+    //     }
+    // }
 
-    std::vector<std::string> getPathes()
-    {
-        std::vector<std::string> pathes;
-        M_LOCK(mx);
-        for(auto &z: sync_out)
-        {
-            if(z.second.size())
-            {
-                for(auto& x: z.second)
-                {
-                    pathes.push_back(x);
-                    if(pathes.size()>1000)
-                        break;
-                }
-                break;
-            }
-        }
-        return pathes;
-    }
-    void setIp(const std::string& ip)
+    // std::vector<std::string> getPathes()
+    // {
+    //     std::vector<std::string> pathes;
+    //     M_LOCK(mx);
+    //     for(auto &z: sync_out)
+    //     {
+    //         if(z.second.size())
+    //         {
+    //             for(auto& x: z.second)
+    //             {
+    //                 pathes.push_back(x);
+    //                 if(pathes.size()>1000)
+    //                     break;
+    //             }
+    //             break;
+    //         }
+    //     }
+    //     return pathes;
+    // }
+    void setIp__Z(const std::string& ip)
     {
         M_LOCK(mx);
         sync_ip=ip;
     }
-    std::string getIp()
+    std::string getIp__Z()
     {
         M_LOCK(mx);
         return sync_ip;
@@ -91,7 +91,7 @@ struct IDatabase: public Refcountable
 
 
 private:
-    std::map<int, std::set<std::string> > sync_out;
+    // std::map<int, std::set<std::string> > sync_out;
     std::string sync_ip;
 
 public:

@@ -330,6 +330,7 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             int64_t test_value = tx.msg.value;
             call_ctx.value_ptr = &test_value;
             call_ctx.deleted_granules=& deleted_granules;
+            call_ctx.block_timestamp=0;
 
             void* saved_opaque = JSI_GetContextOpaque(cc->ctx);
             JSI_SetContextOpaque(cc->ctx, &call_ctx);
@@ -343,7 +344,7 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             } else {
                 result = cc->call_contract_method(NULL, cmd.method, cmd.params, &msg_src,
                                                   call_ctx.call_stack, host, NULL,
-                                                  caller, &fees, &deleted_granules);
+                                                  caller, &fees, &deleted_granules,0);
             }
             JSI_SetContextOpaque(cc->ctx, saved_opaque);
             

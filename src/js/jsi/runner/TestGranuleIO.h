@@ -15,7 +15,7 @@ struct TestGranuleIO : GranuleIO {
         out = it->second;
         return true;
     }
-    std::optional<std::string> addContractBalance(Cellable*,const CONTRACT_id& c, int64_t delta, Rollback* roll) override {
+    std::optional<std::string> addContractBalance(Cellable*,const CONTRACT_id& c, int64_t delta, Rollback* roll, int64_t blocktimestamp) override {
         balances[c.container] += delta;
         return std::nullopt;
     }

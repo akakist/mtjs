@@ -39,6 +39,9 @@
 #include "md/md_GetGranuleRSP.h"
 #include "md/md_ScanREQ.h"
 #include "md/md_ScanRSP.h"
+#include "md/md_HelloREQ.h"
+#include "md/md_HelloRSP.h"
+
 
 
 MsgFactory::MsgFactory()
@@ -82,4 +85,6 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetGranuleRSP, MsgData::GetGranuleRSP::construct);    
     registerMsg(msgid::ScanREQ, MsgData::ScanREQ::construct);
     registerMsg(msgid::ScanRSP, MsgData::ScanRSP::construct);
+    registerMsg(msgid::HelloREQ, MsgData::HelloREQ::construct);
+    registerMsg(msgid::HelloRSP, MsgData::HelloRSP::construct);
 }

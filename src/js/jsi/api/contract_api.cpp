@@ -365,7 +365,7 @@ JSIValue jsi_consumeValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueCons
             return JSI_ThrowTypeError(ctx, "consumeValue: insufficient value (amount=%lld remaining=%lld)",
                                       (long long)amount, (long long)remaining);
         call->msg_source->consume_value(amount);
-        if (auto err = call->host->granules->addContractBalance(call->root, call->contract->name, amount, call->roll))
+        if (auto err = call->host->granules->addContractBalance(call->root, call->contract->name, amount, call->roll, call->block_timestamp))
             return JSI_ThrowTypeError(ctx, "consumeValue: %s", err->c_str());
         {
             int64_t newbal = 0;
@@ -404,7 +404,7 @@ JSIValue jsi_refundValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst
             return JSI_ThrowTypeError(ctx, "refundValue: insufficient contract balance (amount=%lld balance=%lld)",
                                       (long long)amount, (long long)cur);
         // contract -> sender
-        if (auto err = call->host->granules->addContractBalance(call->root, call->contract->name, -amount, call->roll))
+        if (auto err = call->host->granules->addContractBalance(call->root, call->contract->name, -amount, call->roll, call->block_timestamp))
             return JSI_ThrowTypeError(ctx, "refundValue: %s", err->c_str());
         call->msg_source->refund_value(amount);
         return JSI_UNDEFINED;
@@ -479,7 +479,7 @@ JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
         void* prev = JSI_GetContextOpaque(cc->ctx);      // ContractContext* (или nullptr)
         JSI_SetContextOpaque(cc->ctx, call);             // CallContext* caller
         JSIValue r = cc->call_contract_method(call->root, method_name, params, call->msg_source, 
-                                               call->call_stack, call->host, call->roll, call->contract->name,call->fees,call->deleted_granules);
+                                               call->call_stack, call->host, call->roll, call->contract->name,call->fees,call->deleted_granules, call->block_timestamp);
         JSI_SetContextOpaque(cc->ctx, prev);             // восстановить
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
         JSIValue r_caller = convert_value(cc->ctx, ctx, r);

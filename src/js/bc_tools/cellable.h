@@ -18,13 +18,13 @@ struct data_base : public Refcountable
 
 
 
-    data_base(int t, Cellable* _parent, time_t _create_time, int _ttl ): Refcountable("data_base"),
+    data_base(int t, Cellable* _parent ): Refcountable("data_base"),
         type(t), parent(_parent) {
     }
     ~data_base()
     {
     }
-    void setDirty(Rollback* roll);
+    void setDirty(Rollback* roll, int64_t block_timestamp);
     ;
     size_t size_() const
     {
@@ -78,6 +78,8 @@ struct Cellable: public Refcountable
     /// @brief  не изменяется, выставляется только в конструкторе
     const std::string m_id;
 
+    int64_t last_block_timestamp=0;
+
     std::map<std::string,THASH_id > children_hashes_mx;
     std::map<std::string, REF_getter<Cellable>> children_ptrs_mx;
 
@@ -104,7 +106,7 @@ public:
         }
         return sz;
     }
-    void setDirty__(Rollback* r)
+    void setDirty__(Rollback* r, int64_t block_timestamp)
     {
         {
             if(r)
@@ -113,10 +115,12 @@ public:
                     r->data[this]=getBuffer_mx();
             }
             is_dirty=true;
+            if(block_timestamp > last_block_timestamp)
+                last_block_timestamp = block_timestamp;
         }
         if(parent)
         {
-            parent->setDirty__(r);
+            parent->setDirty__(r, block_timestamp);
         }
     }
 
@@ -179,6 +183,7 @@ public:
     {
         o<<1;
         o<<payload_ctor_idx;
+        o<<last_block_timestamp;
         {
             o<<children_hashes_mx;
             bool valid=data.valid();
@@ -192,6 +197,7 @@ public:
     {
         int v=in.get_PN();
         in>>payload_ctor_idx;
+        in>>last_block_timestamp;
         {
             in>>children_hashes_mx;
             bool valid;
@@ -236,4 +242,4 @@ public:
 };
 
 
-void deleteGranule(data_base* g, Rollback* roll,_db_to_save &db_dump);
+void deleteGranule(data_base* g, Rollback* roll,_db_to_save &db_dump, int64_t block_timestamp);

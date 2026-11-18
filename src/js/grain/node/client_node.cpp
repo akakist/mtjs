@@ -20,6 +20,7 @@
 #include "cells.h"
 #include "proceed_merkle_on_transaction_pool_hashers.h"
 #include <vector>
+#ifdef KALL
 bool Node::Service::BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route)
 {
     for(auto& z: r->deleted)
@@ -30,8 +31,8 @@ bool Node::Service::BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateRE
             auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h, false);
             if (!cc.valid()) { logNode("deleted: cell not found %s", base16::encode(z).c_str()); continue; }
             if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            
-            cc->setDirty__(NULL);
-            deleteGranule(cc->data.get(),NULL,db_to_save_Z);
+            cc->setDirty__(NULL,r->blockAcceptedREQ->blockInfo->block_timestamp);
+            deleteGranule(cc->data.get(),NULL,db_to_save_Z,);
     }
     // for(auto &z: db_dump)
     for(auto& z: r->diffs)
@@ -39,8 +40,8 @@ bool Node::Service::BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateRE
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
         THASH_id h;
         h.container=z.first;
-        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, NULL,z.second,false);
-        leaf->setDirty(NULL);
+        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, NULL,z.second,false,r->blockAcceptedREQ->blockInfo->block_timestamp);
+        leaf->setDirty(NULL,r->blockAcceptedREQ->blockInfo->block_timestamp);
     }
 
 
@@ -48,6 +49,7 @@ bool Node::Service::BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateRE
 
     return true;
 }
+#endif
 bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
@@ -128,8 +130,8 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
             auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h, true);
             if (!cc.valid()) { logNode("deleted: cell not found %s", base16::encode(z).c_str()); continue; }
             if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            
-            cc->setDirty__(&roll);
-            deleteGranule(cc->data.get(),&roll,db_to_save_Z);
+            cc->setDirty__(&roll,r->blockAcceptedREQ->blockInfo->block_timestamp);
+            deleteGranule(cc->data.get(),&roll,db_to_save_Z,r->blockAcceptedREQ->blockInfo->block_timestamp);
     }
     // for(auto &z: db_dump)
     for(auto& z: r->diffs)
@@ -137,8 +139,8 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
         THASH_id h;
         h.container=z.first;
-        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second,true);
-        leaf->setDirty(&roll);
+        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second,true,r->blockAcceptedREQ->blockInfo->block_timestamp);
+        leaf->setDirty(&roll,r->blockAcceptedREQ->blockInfo->block_timestamp);
     }
 
 
@@ -260,14 +262,17 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     }
     int64_t stake_n=0;
     std::vector<blst_cpp::PublicKey> agg_pk_n;
+    std::set<std::string> vals;
     for(auto & z: r->blockAccepted2REQ->node_diff_validators)
     {
+        vals.insert(z.container);
         auto n=cells::getNodeNoCreateConst(root.get(), db_state.get(),z);
         if(!n.valid())
             throw CommonError("if(!n.valid()) ##88");
         stake_n+=n->get_full_stake();
         agg_pk_n.push_back(n->get_bls_pk());
     }
+    logNode("diff validators %s", iUtils->join(" ",vals).c_str());
     int64_t full_stake=0;
     auto ls=cells::getAllNodes(root.get(), db_state.get());
     for(auto &z: ls)
@@ -371,17 +376,28 @@ bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node
 {
     MUTEX_INSPECTOR;
 
-    if(current_leader()!=src_node)
+    if(!db_state->sync_empty)
     {
-        logNode("if(current_leader()!=src_node)");
+        logNode("GetTxREQ: if(!db_state->sync_empty)");
         return true;
     }
 
 
-    if(!db_state->sync_empty)
+    if(r->hb->prev_root_hash_1!=prev_root_hash_Z()
+        && (!prev_block.valid() || r->hb->new_epoch > prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch+1))
     {
-        logNode("GetTransaction if(!db_state->sync_empty)");
+        // since=0 — базы нет (свежий узел без prev_block): просим дерево целиком
+        const int64_t since = prev_block.valid()
+            ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp : 0;
+        logNode("request sync since=%lld epoch_req=%lld local_epoch=%lld prev_block=%s",
+                (long long)since,(long long)r->hb->new_epoch,(long long)epoch_current(),
+                prev_block.valid()?"yes":"no");
+        REF_getter<bcEvent::syncGetGranulesREQ> e=new bcEvent::syncGetGranulesREQ(since,this_node_name,iUtils->getNow(),ListenerBase::serviceId);
+        e->sign(my_sk_ed);
+        sendEvent(r->ip,ServiceEnum::Node,e.get());
+        db_state->sync_empty=false;
         return true;
+
     }
 
     auto prev_root_hash=prev_root_hash_Z();
@@ -396,11 +412,27 @@ bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node
         // logNode("if(cli.node_leader.valid()) @@@3");
         return true;
     }
-    if(current_leader()!=src_node)
+    if(r->hb->prev_root_hash_1!=prev_root_hash)
     {
-        logNode("if(current_leader()!=src_node)");
+        if(r->hb->new_epoch>epoch_current())
+        {
+            sendEvent(r->ip,ServiceEnum::Node, new bcEvent::PrevBlockREQ(ListenerBase::serviceId));
+        }
         return true;
     }
+    auto cl=current_leader();
+    if(!cl.valid())
+    {
+        logNode("GetTxREQ: no leader in slot frame (NO_LEADER_FRAME) — ignore");
+        return true;
+    }
+    if(cl->getName()!=src_node)
+    {
+        logNode("GetTxREQ: current_leader=%s != src_node=%s",
+                cl->getName().container.c_str(),src_node.container.c_str());
+        return true;
+    }
+
     cli.node_leader=r->hb;
     
     resetBlockExpired(r->hb->node_leader);
@@ -445,13 +477,13 @@ void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, 
                 logNode("disable node");
                 z->setEnabled(false);
             }
-            z->setDirty(NULL);
+            z->setDirty(NULL, block_timestamp);
         }
         else
         {
             z->missed_rounds=0;
             z->answered_rounds++;
-            z->setDirty(NULL);
+            z->setDirty(NULL, block_timestamp);
         }
         auto act = cells::getActivityNoCreate(root.get(), db_state.get(), z->getDbId());
         if (act.valid()) {
@@ -466,7 +498,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 {
     MUTEX_INSPECTOR;
 
-    logNode("ValidateBlockREQ from %s",src_node.container.c_str());
+    // logNode("ValidateBlockREQ from %s",src_node.container.c_str());
     if(!db_state->sync_empty)
     {
         return true;

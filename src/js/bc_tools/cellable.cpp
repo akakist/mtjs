@@ -124,20 +124,20 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     }
     is_dirty = false;
 }
-void data_base::setDirty(Rollback* roll)
+void data_base::setDirty(Rollback* roll, int64_t block_timestamp)
 {
     MUTEX_INSPECTOR;
 
-    parent->setDirty__(roll);
+    parent->setDirty__(roll,block_timestamp);
 }
 #include "cells.h"
 
 
-void deleteGranule(data_base* g, Rollback* roll, _db_to_save &db_dump)
+void deleteGranule(data_base* g, Rollback* roll, _db_to_save &db_dump, int64_t block_timestamp)
 {
     auto cell = g->parent;
     if (!cell) return;
-    cell->setDirty__(roll);
+    cell->setDirty__(roll,block_timestamp);
 
     while (cell) {
         auto pred = cell->parent;

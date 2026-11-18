@@ -11,12 +11,12 @@
 struct CNode: public Refcountable
 {
     CNode(): Refcountable("CNode"){}
-    virtual void set(const std::string &s) =0;
+    virtual void set(const std::string &s, int64_t block_timestamp) =0;
     virtual std::string get() =0;
     virtual void touch(time_t t)=0;
     virtual int ttl()=0;
     virtual void update_time(time_t t, Rollback* r)=0;
-    virtual void setDirty(Rollback* r)=0;
+    virtual void setDirty(Rollback* r, int64_t block_timestamp)=0;
     virtual ~CNode() = default;
 };
 struct GranuleIO : public Refcountable {
@@ -42,7 +42,7 @@ struct GranuleIO : public Refcountable {
                                                          
 
     virtual bool getContractBalance(Cellable*,const CONTRACT_id& c, int64_t& out) = 0;
-    virtual std::optional<std::string> addContractBalance(Cellable*,const CONTRACT_id& c, int64_t delta, Rollback* roll) = 0;
+    virtual std::optional<std::string> addContractBalance(Cellable*,const CONTRACT_id& c, int64_t delta, Rollback* roll, int64_t block_timestamp) = 0;
 
     virtual std::optional<std::string> deleteGranule(Cellable*,const CONTRACT_id& contract, const CONTRACT_DATA_id& key,
                                                      Rollback* roll,

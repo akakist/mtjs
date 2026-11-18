@@ -30,30 +30,56 @@ std::pair<std::string,std::string> splice(const std::string& id)
         throw CommonError("defauil switch(id.size())");
     }
 }
-void collect_sync_req2(const std::string& id, const std::string &granule,IDatabase* db)
+// void collect_sync_req2(const std::string& id, const std::string &granule,IDatabase* db)
+// {
+//     {
+//         inBuffer in(granule);
+//         REF_getter< Cellable> c=new Cellable(NULL,id);
+//         c->unpack_mx(in);
+//         for(auto& z: c->children_hashes_mx)
+//         {
+//             std::string cid=id+z.first;
+//             std::string cbuf;
+//             auto r2=db->getGranule(cid, &cbuf);
+//             auto h=blake2b_hash(cbuf);
+//             if(h!=z.second)
+//             {
+//                 db->add_sync_out(cid);
+//             }
+//         }
+//     }
+// }
+
+void Node::Service::collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, int64_t block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route)
 {
+    
+    if(c->m_id.size()==28 && c->last_block_timestamp > block_timestamp)
     {
-        inBuffer in(granule);
-        REF_getter< Cellable> c=new Cellable(NULL,id);
-        c->unpack_mx(in);
-        for(auto& z: c->children_hashes_mx)
+        dbdump.push_back({c->getDbId(),c->getBuffer_mx()});
+        cnt++;
+    }
+    for(auto& x:c->children_hashes_mx)
+    {
+        auto cc=cells::getLeafNoCreate(c,db,x.first,true);
+        if(!cc.valid())
         {
-            std::string cid=id+z.first;
-            std::string cbuf;
-            auto r2=db->getGranule(cid, &cbuf);
-            auto h=blake2b_hash(cbuf);
-            if(h!=z.second)
-            {
-                db->add_sync_out(cid);
-            }
+            // лист отсутствует локально либо хеш не сошёлся с родителем —
+            // раньше это был разыменованный NULL. Отдаём неполное дерево,
+            // клиент поймает это по несовпадению root hash.
+            logNode("[collect_granules] getLeafNoCreate NULL for %s (stale local root)",base16::encode(x.first).c_str());
+            continue;
         }
+        if(cc->last_block_timestamp > block_timestamp)
+            collect_granules_since_blocktimestamp(cc.get(),db,block_timestamp,dbdump,cnt,route);
+    }
+    if(dbdump.size() > 10)
+    {
+        passEvent(new bcEvent::syncGetGranulesRSP(prev_root_hash_Z(), this_node_name,dbdump,cnt++,false,"",poppedFrontRoute(route)));
+        dbdump.clear();
     }
 }
-
 bool Node::Service::syncGetGranulesREQ(const bcEvent::syncGetGranulesREQ*e)
 {
-
-    // bcEvent::GetGranulesRSP()
     std::vector<std::pair<std::string,std::string>> ret;
     std::string rg;
     int err=db_state->getGranule("",& rg);
@@ -63,109 +89,166 @@ bool Node::Service::syncGetGranulesREQ(const bcEvent::syncGetGranulesREQ*e)
         return true;
     }
     auto root_hash=blake2b_hash(rg);
-    for(auto& z: e->keys)
+    auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(),e->src_node);
+    if(!n.valid())
     {
-        err=db_state->getGranule(z,& rg);
-        if(err)
+        logNode("[syncGetGranulesREQ] node %s not found", e->src_node.container.c_str());
+        return true;
+    }
+    if(!e->verify(n->get_ed_pk()))
+    {
+        logNode("if(!e->verify(n->get_ed_pk()))");
+        return true;
+    }
+
+    // ── anti-replay ───────────────────────────────────────────────────────────
+    // Подпись уже проверена. current_time — свой, монотонный, счётчик запросов
+    // (iUtils->getNow(), микросекунды). Повтор того же REQ отклоняется по
+    // монотонности, вне окна — по свежести, а размер запрашиваемой дельты
+    // ограничен, чтобы реплей/мусорный since не заставлял отдавать весь чейн.
+    const int64_t now=iUtils->getNow();
+    static constexpr int64_t SYNC_REQ_TTL_MKS   = 30LL*1000*1000;   // 30 s
+    static constexpr int64_t MAX_SYNC_DELTA_MKS = 3600LL*1000*1000; // 1 h
+
+    if(e->current_time<=0 || e->current_time>now+SYNC_REQ_TTL_MKS/2)
+    {
+        logNode("[syncGetGranulesREQ] bad current_time now=%lld req=%lld",
+                (long long)now,(long long)e->current_time);
+        return true;
+    }
+    if(now-e->current_time>SYNC_REQ_TTL_MKS)
+    {
+        logNode("[syncGetGranulesREQ] expired request age=%lld mks",(long long)(now-e->current_time));
+        return true;
+    }
+    {
+        auto it=last_sync_req_time.find(e->src_node);
+        if(it!=last_sync_req_time.end() && e->current_time<=it->second)
         {
-            logNode("granule not found %s",base16::encode(z).c_str());
+            logNode("[syncGetGranulesREQ] replay from %s: %lld <= %lld",
+                    e->src_node.container.c_str(),(long long)e->current_time,(long long)it->second);
             return true;
         }
-        logErr2("GetGranulesREQ: ret add %s",base16::encode(z).c_str());
-        ret.push_back({z,rg});
+        last_sync_req_time[e->src_node]=e->current_time;
     }
-    passEvent(new bcEvent::syncGetGranulesRSP(root_hash, this_node_name, ret, poppedFrontRoute(e->route)));
+    if(e->since_block_timestamp>e->current_time)
+    {
+        logNode("[syncGetGranulesREQ] since_block_timestamp in the future");
+        return true;
+    }
+    if(e->since_block_timestamp>0 && e->current_time-e->since_block_timestamp>MAX_SYNC_DELTA_MKS)
+    {
+        logNode("[syncGetGranulesREQ] delta too big: %lld mks",
+                (long long)(e->current_time-e->since_block_timestamp));
+        return true;
+    }
+
+    int64_t cnt=0;
+    collect_granules_since_blocktimestamp(root.get(),db_state.get(),e->since_block_timestamp,ret,cnt,e->route);
+
+    // prev_block отдаём вместе с финальной пачкой: без него клиент не может
+    // обновить prev_root_hash_Z()/epoch_current()/current_leader().
+    std::string prev_block_buf;
+    if(prev_block.valid())
+        prev_block_buf=prev_block->getBuffer();
+
+    passEvent(new bcEvent::syncGetGranulesRSP(root_hash, this_node_name, ret,cnt, true, prev_block_buf, poppedFrontRoute(e->route)));
     return true;
 }
-
+#include "proceed_merkle_on_transaction_pool_hashers.h"
 bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
 {
-
+    logNode("syncGetGranulesRSP");
     // root->replaceLeafNoCreate()
     // getByPathNoCreate()
 
-
-    _db_to_save db;
-
+    // auto newroot=getRoot(db_state.get(),prev_block);
     for(auto& z: m->v)
     {
-        // if(z.first=="")
-        // {
-        //     logNode("prev_block->blockAcceptedREQ->blockInfo->new_root_hash1 %s",prev_block->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
-        //     auto hh=blake2b_hash(z.second);
-        //     if(hh!=prev_block->blockAcceptedREQ->blockInfo->new_root_hash1)
-        //         throw CommonError("if(hh!=prev_block->blockAcceptedREQ->blockInfo->new_root_hash1)");
-        //     logNode("hh %s",hh.str().c_str());
-        //     auto r = new Cellable(NULL, "");
-        //     inBuffer in(z.second);
-        //     r->unpack_mx(in);
-        //     root = r;
-        //     DBG(logNode("GetGranulesRSP: root refreshed (hash=%s)",
-        //         base16::encode(blake2b_hash(z.second).container).substr(0,16).c_str()));        
-        // }
-        // else
-        // {
-        //     logNode("GetGranulesRSP: recv granule '%s'",base16::encode(z.first).c_str());
-        //     // auto id=splice(z.first);
-        //     // auto parent_id=id.
-        //     // std::string pbuf;
-        //     // auto r2=db_state->getGranule(z.first, &pbuf);
-        //     if(r2) throw CommonError("if(r2) ");
-
-        //     cells::getByPathNoCreate()
-        //     if(pbuf.size())
-        //     {
-
-        //         REF_getter< Cellable> par=new Cellable(NULL,id.first);
-        //         inBuffer inpar(pbuf);
-        //         par->unpack_mx(inpar);
-        //         auto it = par->children_hashes_mx.find(id.second);
-        //         if (it == par->children_hashes_mx.end()) {
-        //             logNode("GetGranulesRSP: parent %s has no child %s (skip hash check)",
-        //                     base16::encode(id.first).c_str(),
-        //                     base16::encode(id.second).c_str());
-        //             // ← НЕ throw
-        //         } else if (it->second != blake2b_hash(z.second)) {
-        //             logNode("GetGranulesRSP: hash mismatch for %s (expected %s, got %s) — skip, will re-sync after root update",
-        //                     base16::encode(z.first).c_str(),
-        //                     base16::encode(it->second.container).c_str(),
-        //                     base16::encode(blake2b_hash(z.second).container).c_str());
-        //             // ← НЕ throw, записать (root обновится, потом re-sync)
-        //         }            }
-
-
-        // }
-        db.add(z.first,z.second);
+        if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
+        THASH_id h;
+        h.container=z.first;
+        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, NULL,z.second,false,0);
+        leaf->setDirty(NULL,leaf->parent->last_block_timestamp);
+        logNode("sync: %s",base16::encode(z.first).c_str());
     }
-    db_state->write_granules_batch(db);
-    for(auto &z :m->v)
+    
+    if(!m->done)
+        return true;
+    else
     {
-        db_state->remove_sync_out(z.first);
-    }
-    for(auto &z :m->v)
-    {
-        collect_sync_req2(z.first,z.second, db_state.get());
-    }
-    std::vector<std::string> pathes=db_state->getPathes();
-    if(pathes.size())
-    {
-        // Во время синка состояние (root) недостоверно — responder ищем НЕ в root.
-        // ip отправителя сохранён в do_sync (db_state->setIp(ip)).
-        auto ip = db_state->getIp();
-        if (ip.empty()) {
-            logNode("GetGranulesRSP: sync_ip empty, ignore (sync)");
+        _db_to_save db;
+        auto roothash=proceed_merkle_on_transaction_pool_hashers(root.get(),db);
+        if(m->root_hash!=roothash)
+        {
+            // оставляем sync_empty=false: дерево неполное, нужен повтор
+            // (ретрай/watchdog — отдельная задача)
+            logNode("sync: root hash not matched %s %s", m->root_hash.str().c_str(),roothash.str().c_str());
             return true;
         }
-        sendEvent(ip,ServiceEnum::Node,new bcEvent::syncGetGranulesREQ(pathes,ListenerBase::serviceId));
+
+        // ── prev_block ────────────────────────────────────────────────────────
+        // Без него prev_root_hash_Z()/epoch_current()/current_leader() остаются
+        // от старого блока: нода не узнаёт нового лидера и снова просит синк.
+        REF_getter<MsgData::BlockAccepted2REQ> new_pb=nullptr;
+        if(m->prev_block.size())
+        {
+            new_pb=new MsgData::BlockAccepted2REQ;
+            inBuffer in(m->prev_block);
+            new_pb->unpack2(in);
+            if(!verify_block_all(new_pb))
+            {
+                logNode("sync: prev_block verify failed");
+                return true;   // синк не завершаем
+            }
+            if(new_pb->blockAcceptedREQ->blockInfo->new_root_hash1!=m->root_hash)
+            {
+                logNode("sync: prev_block root %s != rsp root %s",
+                        new_pb->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str(),
+                        m->root_hash.str().c_str());
+                return true;
+            }
+        }
+        else
+        {
+            logNode("sync: WARNING RSP without prev_block — epoch/leader останутся от старого блока");
+        }
+
+        if(new_pb.valid())
+            db.add("...last_block...",m->prev_block);   // иначе после рестарта поднимется старый блок
+
+        db_state->write_granules_batch(db);
+
+        if(new_pb.valid())
+        {
+            prev_block=new_pb;
+            l_blocks.clear();
+            block_meta_full.clear();
+            for(auto it=hello_certs.begin();it!=hello_certs.end();)
+            {
+                if(it->first<=prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch)
+                    it=hello_certs.erase(it);
+                else
+                    ++it;
+            }
+            logNode("sync: done epoch=%lld root=%s",
+                    (long long)prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
+                    prev_root_hash_Z().str().c_str());
+        }
+        else
+        {
+            logNode("sync: done (prev_block not updated)");
+        }
+
+        db_state->sync_empty=true;   // последним: до этого момента состояние неконсистентно
     }
-    else {
-    }
+
     return true;
 }
 void Node::Service::continue_sync()
 {
-    auto p=db_state->getPathes();
-    sendEvent(db_state->getIp(),ServiceEnum::Node,new bcEvent::syncGetGranulesREQ(p,ListenerBase::serviceId));
+    // auto p=db_state->getPathes();
+    // // sendEvent(db_state->getIp(),ServiceEnum::Node,new bcEvent::syncGetGranulesREQ(p,ListenerBase::serviceId));
 
 }
 
@@ -177,11 +260,11 @@ void Node::Service::do_sync(const NODE_id &src_node, const std::string& src_ip,
             src_node.container.c_str(), src_ip.c_str(),
             prev_root_hash_remote.str().c_str());
 
-    db_state->add_sync_out("");
+    // db_state->add_sync_out("");
 
     // Во время синка root недостоверен — ip приходит аргументом от вызывающего.
-    db_state->setIp(src_ip);
-    continue_sync();
+    // db_state->setIp(src_ip);
+    // continue_sync();
 }
 
 
@@ -211,5 +294,38 @@ bool Node::Service::DelayNotificationREQ(const MsgData::DelayNotificationREQ *r,
         do_sync(src_node, n_src->get_ip(),
                 r->lc->blockAcceptedREQ->blockInfo->new_root_hash1);
     }
+    return true;
+}
+
+
+bool Node::Service::PrevBlockREQ(const bcEvent::PrevBlockREQ *e)
+{
+    std::string buf;
+    if(prev_block.valid())
+        buf=prev_block->getBuffer();
+
+    passEvent(new bcEvent::PrevBlockRSP(buf,poppedFrontRoute(e->route)));
+    return true;
+}
+bool Node::Service::PrevBlockRSP(const bcEvent::PrevBlockRSP *e)
+{
+    // if(e->buf.size())
+    // {
+    //     inBuffer in(e->buf);
+    //     REF_getter<MsgData::BlockAccepted2REQ> r=new MsgData::BlockAccepted2REQ;
+    //     r->unpack2(in);
+    //     if(verify_block_all(r))
+    //     {
+    //         auto cur=current_leader();
+    //         auto n=cells::getNodeNoCreate(root.get(),db_state.get(),cur);
+    //         if(!n.valid())
+    //         throw CommonError("if(!n.valid()) #43239@");
+    //         do_sync(cur,n->get_ip(),r->blockAcceptedREQ->blockInfo->new_root_hash1);
+    //     }
+    //     else logNode("[PrevBlockRSP] verify failed");
+    // }
+    
+
+    
     return true;
 }

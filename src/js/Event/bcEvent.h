@@ -16,10 +16,7 @@ namespace ServiceEnum
 {
     const SERVICE_id Node(ghash("@g_Node"));
     const SERVICE_id NodeLite(ghash("@g_NodeLite"));
-    // const SERVICE_id TxValidator(ghash("@g_TxValidator"));
     const SERVICE_id BroadcasterTree(ghash("@g_BroadcasterTree"));
-    // const SERVICE_id GrainReader(ghash("@g_GrainReader"));
-    // const SERVICE_id GrainReaderLite(ghash("@g_GrainReaderLite"));
     const SERVICE_id BlockStreamer(ghash("@g_BlockStreamer"));
     const SERVICE_id Scan(ghash("@g_Scan"));
     const SERVICE_id DBWriter(ghash("@g_DBWriter"));
@@ -38,14 +35,12 @@ namespace bcEventEnum
     const EVENT_id ClientTxUnsubscribeREQ(ghash("@g_ClientTxUnsubscribeREQ"));
     const EVENT_id ClientTxSubscribeRSP(ghash("@g_ClientTxSubscribeRSP"));
     const EVENT_id ServiceInit(ghash("@g_ServiceInit"));
-    // const EVENT_id InvalidateRootREQ(ghash("@g_InvalidateRootREQ"));
-    // const EVENT_id InvalidateRootRSP(ghash("@g_InvalidateRootRSP"));
     const EVENT_id BroadcastMessage(ghash("@g_BroadcastMessage"));
     const EVENT_id SendToChild(ghash("@g_SendToChild"));
     const EVENT_id SendToChildAck(ghash("@g_SendToChildAck"));
     const EVENT_id StreamBlock(ghash("@g_StreamBlock"));
     const EVENT_id HeartBeatREQ(ghash("@g_HeartBeatREQ"));
-    const EVENT_id PutTransactionREQ(ghash("@g_PutTransactionREQ"));
+    const EVENT_id PutTxREQ(ghash("@g_PutTransactionREQ"));
     const EVENT_id GetUserNonceREQ(ghash("@g_GetUserNonceREQ"));
     const EVENT_id GetUserNonceRSP(ghash("@g_GetUserNonceRSP"));
     const EVENT_id WriteGranules(ghash("@g_WriteGranules"));
@@ -54,10 +49,8 @@ namespace bcEventEnum
     const EVENT_id syncGetGranulesRSP(ghash("@g_GetGranulesRSP"));
     const EVENT_id StaleGranules(ghash("@g_StaleGranules"));
     const EVENT_id LiteSetUplinkREQ(ghash("@g_LiteSetUplinkREQ")); /// выставить для iDatabase адрес ноды откуда брать гранулы
-    // const EVENT_id BarrierOpenREQ(ghash("@g_BarrierOpenREQ__"));
-    // const EVENT_id BarrierOpenRSP(ghash("@g_BarrierOpenRSP+__"));
-    // const EVENT_id DBWriteREQ(ghash("@g_dbWriteREQ"));
-    // const EVENT_id DBWriteRSP(ghash("@g_dbWriteRSP"));
+    const EVENT_id PrevBlockREQ(ghash("@g_PrevBlockREQ"));
+    const EVENT_id PrevBlockRSP(ghash("@g_PrevBlockRSP"));
 
 }
 
@@ -312,64 +305,6 @@ namespace bcEvent
         REF_getter<IDatabase> db;
     };
 
-    // class InvalidateRootREQ : public Event::NoPacked
-    // {
-    // public:
-    //     static Base *construct(const route_t &r)
-    //     {
-    //         return NULL;
-    //     }
-    //     InvalidateRootREQ(const route_t &r)
-    //         : NoPacked(bcEventEnum::InvalidateRootREQ, r) {}
-        
-    // };
-    // class InvalidateRootRSP : public Event::NoPacked
-    // {
-    // public:
-    //     static Base *construct(const route_t &r)
-    //     {
-    //         return NULL;
-    //     }
-    //     InvalidateRootRSP(const SERVICE_id& _sid, const route_t &r)
-    //         : NoPacked(bcEventEnum::InvalidateRootRSP, r),sid(_sid) {}
-        
-    //     SERVICE_id sid;
-    // };
-    // class BarrierOpenREQ : public Event::NoPacked
-    // {
-    // public:
-    //     static Base* construct(const route_t &r) { return NULL; }
-    //     BarrierOpenREQ(const route_t &r) : NoPacked(bcEventEnum::BarrierOpenREQ, r) {}
-    // };
-
-    // class BarrierOpenRSP : public Event::NoPacked
-    // {
-    // public:
-    //     static Base* construct(const route_t &r) { return NULL; }
-    //     BarrierOpenRSP(const SERVICE_id& _sid, const route_t &r)
-    //         : NoPacked(bcEventEnum::BarrierOpenRSP, r), sid(_sid) {}
-    //     SERVICE_id sid;
-    // };
-    // class DBWriteREQ : public Event::NoPacked
-    // {
-    // public:
-    //     static Base* construct(const route_t &r) { return NULL; }
-    //     DBWriteREQ(IDatabase*d, const _db_to_save& _dump, const route_t &r) : NoPacked(bcEventEnum::DBWriteREQ, r),db(d),dump(_dump) {}
-    //     _db_to_save dump;
-    //     IDatabase *db;
-    // };
-    // class DBWriteRSP : public Event::NoPacked
-    // {
-    // public:
-    //     static Base *construct(const route_t &r)
-    //     {
-    //         return NULL;
-    //     }
-    //     DBWriteRSP(const SERVICE_id& _sid, const route_t &r)
-    //         : NoPacked(bcEventEnum::DBWriteRSP, r),sid(_sid) {}
-        
-    //     SERVICE_id sid;
-    // };
     class BroadcastMessage : public Event::NoPacked
     {
 
@@ -493,7 +428,7 @@ namespace bcEvent
         std::map<std::string,std::string> diffs;
         REF_getter<MsgData::attachment_data> att_data;
     };
-    class PutTransactionREQ : public Event::NoPacked
+    class PutTxREQ : public Event::NoPacked
     {
 
     public:
@@ -501,8 +436,8 @@ namespace bcEvent
         {
             return NULL;
         }
-        PutTransactionREQ(const REF_getter<MsgData::TX> & _tx, const route_t &r)
-            : NoPacked(bcEventEnum::PutTransactionREQ, r), tx(_tx) {}
+        PutTxREQ(const REF_getter<MsgData::TX> & _tx, const route_t &r)
+            : NoPacked(bcEventEnum::PutTxREQ, r), tx(_tx) {}
 
         const REF_getter<MsgData::TX> tx;
     };
@@ -612,22 +547,42 @@ namespace bcEvent
         {
             return new syncGetGranulesREQ(r);
         }
-        syncGetGranulesREQ(const std::vector<std::string> &_keys, const route_t &r)
-            : Base(bcEventEnum::syncGetGranulesREQ, r), keys(_keys) {}
+        syncGetGranulesREQ(int64_t  since_block_timestamp_, const NODE_id& src_node_,  int64_t curtime, const route_t &r)
+            : Base(bcEventEnum::syncGetGranulesREQ, r), since_block_timestamp(since_block_timestamp_), src_node(src_node_), current_time(curtime) {}
 
-        std::vector<std::string> keys;
+        // int64_t status;
+        int64_t since_block_timestamp;
+        NODE_id src_node;
+        int64_t current_time;/// for prevent replay attack
+        std::string signature;
 
         syncGetGranulesREQ(const route_t &r)
             : Base(bcEventEnum::syncGetGranulesREQ, r) {}
 
+        std::string getHash() const
+        {
+            Blake2bHasher h;
+            h.update(std::to_string(since_block_timestamp));
+            h.update(src_node.container);
+            h.update(std::to_string(current_time));
+            return h.final();
 
+        }
+        void sign(const std::string &ed_sk)
+        {
+            signature=sign_ed(ed_sk,getHash());
+        }
+        bool verify(const std::string& ed_pk) const
+        {
+            return verify_ed_pk(ed_pk,signature,getHash());
+        }
         void unpack(inBuffer &o)
         {
-            o>>keys;
+            o>>since_block_timestamp >> src_node >> current_time >> signature;
         }
         void pack(outBuffer &o) const
         {
-            o<<keys;
+            o<<since_block_timestamp << src_node << current_time << signature;
         }
     };
     class syncGetGranulesRSP : public Event::Base
@@ -638,15 +593,21 @@ namespace bcEvent
         {
             return new syncGetGranulesRSP(r);
         }
-        syncGetGranulesRSP(const THASH_id& _root_hash, const NODE_id &_responder, const std::vector<std::pair<std::string,std::string>> &_v, const route_t &r)
+        syncGetGranulesRSP(const THASH_id& _root_hash, const NODE_id &_responder, const std::vector<std::pair<std::string,std::string>> &_v, int64_t _cnt, bool _done, const std::string &_prev_block, const route_t &r)
             : Base(bcEventEnum::syncGetGranulesRSP, r), 
             root_hash(_root_hash),
             responder(_responder),
-            v(_v) {}
+            cnt(_cnt),
+            v(_v), done(_done), prev_block(_prev_block) {}
 
         THASH_id root_hash;
         NODE_id responder;
+        int64_t cnt;
         std::vector<std::pair<std::string,std::string>> v;
+        bool done;
+        /// сериализованный MsgData::BlockAccepted2REQ — только при done=true.
+        /// Без него клиент не может обновить prev_block/epoch, а значит и current_leader().
+        std::string prev_block;
 
         syncGetGranulesRSP(const route_t &r)
             : Base(bcEventEnum::syncGetGranulesRSP, r) {}
@@ -656,13 +617,19 @@ namespace bcEvent
         {
             o>>root_hash;
             o>>responder;
+            o>>cnt;
             o>>v;
+            o>>done;
+            o>>prev_block;
         }
         void pack(outBuffer &o) const
         {
             o<<root_hash;
             o<<responder;
+            o<<cnt;
             o<<v;
+            o<<done;
+            o<<prev_block;
         }
     };
     class StaleGranules : public Event::NoPacked
@@ -674,5 +641,44 @@ namespace bcEvent
         std::vector<std::pair<std::string,std::string>> v;   // {hash (32 bin), body}
     };    
 
- 
+
+    class PrevBlockREQ : public Event::Base
+    {
+    public:
+        static Base *construct(const route_t &r)
+        {
+            return new PrevBlockREQ(r);
+        }
+        PrevBlockREQ(const route_t &r)
+            : Base(bcEventEnum::PrevBlockREQ, r) {}
+        
+        void unpack(inBuffer &o)
+        {
+        }
+        void pack(outBuffer &o) const
+        {
+        }
+    };    
+    class PrevBlockRSP : public Event::Base
+    {
+    public:
+        static Base *construct(const route_t &r)
+        {
+            return new PrevBlockRSP(r);
+        }
+        PrevBlockRSP(const std::string& s, const route_t &r)
+            : Base(bcEventEnum::PrevBlockRSP, r), buf(s) {}
+        PrevBlockRSP(const route_t &r)
+            : Base(bcEventEnum::PrevBlockRSP, r) {}
+        std::string  buf;   
+        void unpack(inBuffer &o)
+        {
+            o>>buf;
+        }
+        void pack(outBuffer &o) const
+        {
+            o<<buf;
+        }
+    };    
+
 }

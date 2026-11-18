@@ -227,7 +227,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         sec.use_ssl = false;
         sendEvent(ServiceEnum::RPC, new rpcEvent::DoListen(z, sec));
     }
-    sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 0.1, this));
+    sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_PERIODIC_CLOCK, NULL, NULL, 0.05, this));
     sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(timers::TIMER_REPORT_MEM, NULL, NULL, 30., this));
 
     std::string res;
@@ -236,6 +236,8 @@ bool Node::Service::on_startService(const systemEvent::startService *)
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^go\\s+(.+)$", "go to child element", ListenerBase::serviceId));
     sendEvent(ServiceEnum::Telnet, new telnetEvent::RegisterCommand("", "^back$", "go to parent", ListenerBase::serviceId));
 
+    // REF_getter<MsgData::HelloREQ> e= new MsgData::HelloREQ;
+    // broadcast_MsgEvent_via_broadcaster(e.get(),getMetaFull()->tree_all_nodes);
 
     return true;
 }
@@ -279,13 +281,13 @@ bool Node::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
         yyjson_doc_free(doc);
     }
 
-    if (!err) sendEvent(ServiceEnum::Node, new bcEvent::PutTransactionREQ(e->tx, this));
+    if (!err) sendEvent(ServiceEnum::Node, new bcEvent::PutTxREQ(e->tx, this));
     passEvent(new bcEvent::AddTxRSP(hash, err.has_value(), err ? *err : "transaction added to pool",
                                     poppedFrontRoute(e->route)));
     return true;
 }
 
-std::vector<REF_getter<MsgData::TX>> Node::Service::collectTransactions()
+std::vector<REF_getter<MsgData::TX>> Node::Service::collectTx()
 {
     MUTEX_INSPECTOR;
     std::map<std::string, std::map<int64_t, std::vector<REF_getter<MsgData::TX>>>> ordered;
@@ -345,7 +347,7 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
     auto &bt = l_blocks[prev];
 
     // ▼▼▼ collectTransactions возвращает отсортированный vector
-    auto txs = collectTransactions();
+    auto txs = collectTx();
     for (auto &tx : txs) {
         vb->transaction_bodies.push_back(tx);
     }
@@ -360,12 +362,22 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
     if (e->tid == TIMER_STALE_CLEANUP) {
+        MUTEX_INSPECTOR;
         cleanup_stale(iUtils->getNow());
         return true;
     }
     if(e->tid == TIMER_PERIODIC_CLOCK)
     {
-        if(current_leader()==this_node_name)
+        MUTEX_INSPECTOR;
+        if(!db_state->sync_empty)
+        {
+            logNode("if(!db_state->sync_empty) %s %d",__FILE__,__LINE__);
+            return true;
+
+        }
+        // auto me=cells::getNodeNoCreateConst(root.get(),db_state.get(),this_node_name);
+        auto cl=current_leader();
+        if(cl.valid() && cl->getName()==this_node_name)
         {
             sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(TIMER_GetTxFromLeader,NULL,NULL,0.02,this));
 
@@ -384,6 +396,9 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     switch (e->tid)
     {
+    case timers::ALARM_START_SYNC:
+        logNode("case timers::ALARM_START_SYNC:");
+        return true;
     case timers::TIMER_BLOCK_EXPIRED:
     {
         logNode("fail leader %s",e->data->container.c_str());
@@ -394,7 +409,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     }
     case timers::TIMER_GetTxFromLeader:
     {
-        if(current_leader()==this_node_name)
+        auto cl=current_leader();
+        if(cl.valid() && cl->getName()==this_node_name)
         {
             REF_getter<MsgData::HeartBeatREQ> h=new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                         epoch_current(),
@@ -486,8 +502,10 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
     case timers::TIMER_SYNC_TIMEDOUT:
         logNode("FAILED SYNC, NODE STOPPED---------------------------------------------------------------");
-        break;
+        return true;
+    default: logNode("unhandled alarm %d",e->tid);
     }
+
     return false;
 }
 
@@ -501,16 +519,16 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
         auto &ID = e->id;
         switch (ID)
         {
+        case bcEventEnum::PrevBlockREQ:
+            return PrevBlockREQ((const bcEvent::PrevBlockREQ*)e.get());
+        case bcEventEnum::PrevBlockRSP:
+            return PrevBlockRSP((const bcEvent::PrevBlockRSP*)e.get());
         case bcEventEnum::LiteSetUplinkREQ:
             return on_LiteSetUplinkREQ((const bcEvent::LiteSetUplinkREQ*)e.get());
         case bcEventEnum::ClientMsg:
             return ClientMsg((const bcEvent::ClientMsg *)e.get());
         case bcEventEnum::AddTxREQ:
             return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(e.get()));
-        // case bcEventEnum::DBWriteRSP:
-        //     return DBWriteRSP(static_cast<const bcEvent::DBWriteRSP *>(e.get()));
-        // case bcEventEnum::InvalidateRootRSP:
-        //     return InvalidateRootRSP(static_cast<const bcEvent::InvalidateRootRSP *>(e.get()));
         case bcEventEnum::SendToChild:
             return SendToChild(static_cast<const bcEvent::SendToChild *>(e.get()), false);
         case bcEventEnum::SendToChildAck:
@@ -524,8 +542,8 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             return NodeMsgREQ((const bcEvent::NodeMsgREQ *)e.get());
         case bcEventEnum::NodeMsgRSP:
             return NodeMsgRSP((const bcEvent::NodeMsgRSP *)e.get());
-        case bcEventEnum::PutTransactionREQ:
-            return PutTransactionREQ((const bcEvent::PutTransactionREQ *)e.get());
+        case bcEventEnum::PutTxREQ:
+            return PutTxREQ((const bcEvent::PutTxREQ *)e.get());
         case timerEventEnum::TickTimer:
             return on_timer((const timerEvent::TickTimer *)e.get());
         case timerEventEnum::TickAlarm:
@@ -541,8 +559,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             return true;
         case httpEventEnum::RequestIncoming:
             return RequestIncoming(static_cast<const httpEvent::RequestIncoming *>(e.get()));
-        // case bcEventEnum::BarrierOpenRSP:
-        //     return BarrierOpenRSP(static_cast<const bcEvent::BarrierOpenRSP *>(e.get()));
         case rpcEventEnum::IncomingOnAcceptor:
         {
             MUTEX_INSPECTOR;
@@ -551,6 +567,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
 
             switch (IDA)
             {
+            case bcEventEnum::PrevBlockREQ:
+                return PrevBlockREQ((const bcEvent::PrevBlockREQ*)ev->e.get());
+            case bcEventEnum::PrevBlockRSP:
+                return PrevBlockRSP((const bcEvent::PrevBlockRSP*)ev->e.get());
             case bcEventEnum::ClientMsg:
                 return ClientMsg((const bcEvent::ClientMsg *)ev->e.get());
             case bcEventEnum::AddTxREQ:
@@ -580,6 +600,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             auto &IDC = ev->e->id;
             switch (IDC)
             {
+            case bcEventEnum::PrevBlockREQ:
+                return PrevBlockREQ((const bcEvent::PrevBlockREQ*)ev->e.get());
+            case bcEventEnum::PrevBlockRSP:
+                return PrevBlockRSP((const bcEvent::PrevBlockRSP*)ev->e.get());
             case bcEventEnum::ClientMsg:
                 return ClientMsg((const bcEvent::ClientMsg *)ev->e.get());
             case bcEventEnum::AddTxREQ:
@@ -808,6 +832,10 @@ void Node::Service::do_request_for_transactions(MsgData::HeartBeatREQ* hb, const
 
     REF_getter<MsgData::GetTxREQ> rt = new MsgData::GetTxREQ();
     rt->hb = hb;
+    auto n=cells::getNodeNoCreateConst(root.get(), db_state.get(), this_node_name);
+    if(!n.valid())
+        throw CommonError("if(!n) @330944");
+    rt->ip=n->get_ip();
     // li.request_for_transactions_time = iUtils->getNow();
 
     broadcast_MsgEvent_via_broadcaster(rt.get(),meta->tree_all_nodes);
@@ -824,7 +852,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
             
             st->block_height=bh;
         }
-        st->setDirty(NULL);
+        st->setDirty(NULL,b.validateBlockREQ->block_timestamp);
     }
     DBG(logNode("execute_block: tx_count=%zu", (size_t)b.validateBlockREQ->transaction_bodies.size()));
     for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
@@ -891,7 +919,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
                     // t.senderAddress=senderAddress;
                     t_err=execute_transaction(tt->getHash(),  b, senderAddress, tt, epoch_current());
                     u->incNonce();
-                    u->setDirty(NULL);
+                    u->setDirty(NULL,b.validateBlockREQ->block_timestamp);
                     // logNode("execute_block: after tx att_blockRoot_children=%d", (int)b.att_data->blockRoot.children.size());
 
                 }
@@ -940,13 +968,13 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
                     
                     u->balance += portion;
                 }
-                u->setDirty(NULL);
+                u->setDirty(NULL,b.validateBlockREQ->block_timestamp);
             } else {
                 // owner не найден — аномалия (node_create owner должен быть)
                 logNode("calc_fee_rewards: owner not found for node %s (skip reward %lld)",
                         z.container.c_str(), (long long)portion);
             }
-            u->setDirty(NULL);
+            u->setDirty(NULL, b.validateBlockREQ->block_timestamp);
             b.emit_block("reward",R"({"node":"%s","fee":"%s"})",z.container.c_str(),std::to_string(portion).c_str());
         }
 
@@ -1013,7 +1041,7 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
     return true;
 }
 
-bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
+bool Node::Service::PutTxREQ(const bcEvent::PutTxREQ *e)
 {
     MUTEX_INSPECTOR;
     auto h=e->tx->getHash();
@@ -1024,6 +1052,10 @@ bool Node::Service::PutTransactionREQ(const bcEvent::PutTransactionREQ *e)
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
 {
     // db_state->sync_empty;
+    if(!db_state->sync_empty)
+    {
+        logNode("if(!db_state->sync_empty) %s %d",__FILE__,__LINE__);
+    }
 
     auto &s=filter_NodeMsgREQ[m->node_signer][m->node_start_timestamp];
     while(s.size()>100)
@@ -1058,6 +1090,8 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     {
         switch (msg->type)
         {
+        case msgid::HelloREQ:
+            return HelloREQ(static_cast<const MsgData::HelloREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::GetTxREQ:
             return GetTxREQ(static_cast<const MsgData::GetTxREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::ValidateBlockREQ:
@@ -1090,8 +1124,8 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     {
         switch (msg->type)
         {
-        case msgid::BlockDiffValidateREQ:
-            return BlockDiffValidateREQ_sync(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
+        // case msgid::BlockDiffValidateREQ:
+        //     return BlockDiffValidateREQ_sync(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::GetTxREQ:
         case msgid::ValidateBlockREQ:
         case msgid::BlockAccepted2REQ:
@@ -1135,12 +1169,10 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
 
     switch (id)
     {
-    // case msgid::HeartBeatRSP:
-    //     return HeartBeatRSP(static_cast<const MsgData::HeartBeatRSP *>(ee.get()), m->node_signer, m->route);
-    // case msgid::ConfirmLeaderRSP:
-    //     return ConfirmLeaderRSP(static_cast<const MsgData::ConfirmLeaderRSP *>(ee.get()), m->node_signer, m->route);
+    case msgid::HelloRSP:
+        return HelloRSP(static_cast<const MsgData::HelloRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::GetTxRSP:
-        return GetTransactionRSP(static_cast<const MsgData::GetTxRSP *>(ee.get()), m->node_signer, m->route);
+        return GetTxRSP(static_cast<const MsgData::GetTxRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ValidateBlockRSP:
         return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::BlockDiffValidateRSP:
@@ -1241,7 +1273,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 NodeMsgSource src(&t);
                 CONTRACT_id caller;
                 JSIValue result = cc->call_contract_method(root.get(), method_str, params_json, &src, 
-                                                           &call_stack, contractHost.get(), t.roll, caller, & b.fees, deleted_granules);
+                                                           &call_stack, contractHost.get(), t.roll, caller, & b.fees, deleted_granules,b.validateBlockREQ->block_timestamp);
 
                 JSI_SetContextOpaque(cc->ctx, prev_ctx);
 
@@ -1328,7 +1360,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         if (!st.valid()) 
             throw CommonError("if (!st.valid()) ");
         st->tx_count++;
-        st->setDirty(NULL);
+        st->setDirty(NULL, b.validateBlockREQ->block_timestamp);
     }
     // ▲▲▲    
     int64_t gasLimitTokens = 0, priority = 0, value = 0;
@@ -1365,10 +1397,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     t.value = value;
     t.gasLimitGas = gasLimit_gas;
     t.deleted_granules=&deleted_granules;
-    t.block_timestamp = prev_block.valid()
-        ? (int64_t)prev_block->blockAcceptedREQ->blockInfo->block_timestamp
-        : 0;
-    t.block_height = 0; // TBD
+    t.b=&b;
     {
         int64_t n = 0;
         if (!tx->getNonce(n)) t.nonce = (int64_t)n;
@@ -1445,7 +1474,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     _db_to_save db_dump;
     for(auto& z: deleted_granules)
     {
-        deleteGranule(z.get(),&roll,db_dump);
+        deleteGranule(z.get(),&roll,db_dump,t.b->validateBlockREQ->block_timestamp);
     }
     root->calc_tree_hash(db_dump);
     // t.gasUsed += db_dump.size();
@@ -1490,15 +1519,30 @@ inline uint64_t read_uint64(const uint8_t* data) {
            (static_cast<uint64_t>(data[6]) << 8)  |
            (static_cast<uint64_t>(data[7]));
 }
-NODE_id Node::Service::current_leader()
+REF_getter<bc_node> Node::Service::current_leader()
 {
+    if(!db_state->sync_empty)
+    {
+        logNode("current_leader: sync in progress %s %d",__FILE__,__LINE__);
+    }
     auto mf=getMetaFull();
+    if(!mf.valid() || mf->vne.empty())
+        return nullptr;
+
     int64_t lastBlockTime=0;
     if(prev_block.valid())
         lastBlockTime=prev_block->blockAcceptedREQ->blockInfo->block_timestamp;
-    auto now=iUtils->getNow();
-    auto idx=(now-lastBlockTime)/SLOT_MKS;
-    return mf->vne[idx % mf->vne.size()].name;
+    const auto now=iUtils->getNow();
+    if(now<lastBlockTime)
+        return nullptr;   // часы ушли назад относительно блока — слот не определён
+
+    const int64_t since=now-lastBlockTime;
+    // правая граница слота — мёртвая зона: лидера нет
+    if(since%SLOT_MKS>=SLOT_MKS-NO_LEADER_FRAME_MKS)
+        return nullptr;
+
+    const NODE_id& name=mf->vne[(since/SLOT_MKS)%mf->vne.size()].name;
+    return cells::getNodeNoCreate(root.get(),db_state.get(),name);
 }
 REF_getter<BlockMetaFull> Node::Service::getMetaFull()
 {
@@ -1514,17 +1558,27 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
 
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
     block_meta_full[b]=m;
-    auto an=cells::getAllNodes(root.get(),db_state.get());
+    // auto an=cells::getAllNodes(root.get(),db_state.get());
+    auto aan=cells::getNodeListNoCreateConst(root.get(),db_state.get());
+    if(!aan.valid())
+        return nullptr;
     int live_nodes=0;
-    for(auto& z: an)
+    std::map<NODE_id,REF_getter<bc_node>> nnn;
+    for(auto& z: aan->list)
     {
-        if(z->isEnabled())
+        auto n=cells::getNodeNoCreate(root.get(),db_state.get(),z);
+        if(!n.valid())
+            return nullptr;
+        nnn[z]=n;
+        if(n->isEnabled())
         {
             live_nodes++;
         }
     }
 
     auto v=cells::getValuesNoCreateConst(root.get(),db_state.get());
+    if(!v.valid())
+        return nullptr;
 
     auto validators_percent=v->getValue("validator_count_percent");
 
@@ -1532,13 +1586,13 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
 
     std::map<int64_t, std::map<NODE_id, REF_getter<bc_node>>> result;
 
-    for(auto &x: an)
+    for(auto &x: nnn)
     {
-        if(!x->isEnabled())
+        if(!x.second->isEnabled())
             continue;
-        m->all_nodes_enabled.push_back(x->getName());
-        m->prev_stakes[x->getName()]=x->get_full_stake();
-        std::string seed=x->getName().container;
+        m->all_nodes_enabled.push_back(x.first);
+        m->prev_stakes[x.second->getName()]=x.second->get_full_stake();
+        std::string seed=x.first.container;
         if(prev_block.valid())
         {
             seed+=prev_block->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.container;
@@ -1548,10 +1602,10 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
         auto h=blake2b_hash(seed);
         if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
         auto w=read_uint64((uint8_t*)h.container.data());
-        auto fs=x->get_full_stake();
+        auto fs=x.second->get_full_stake();
         if(fs)
-            w/=x->get_full_stake();
-        result[w].insert_or_assign(x->getName(),x);
+            w/=fs;
+        result[w].insert_or_assign(x.first,x.second);
     }
     for(auto& x:result)
     {
@@ -1607,12 +1661,12 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
     if (vne_committe.empty())
         throw CommonError("getMetaFull: no committee (even relaxed)");
     
-    std::string com;
-    for(auto &z : m->vne)
-    {
-        com+=z.name.container+ " ";
-    }
-    logNode("vne %s",com.c_str());
+    // std::string com;
+    // for(auto &z : m->vne)
+    // {
+    //     com+=z.name.container+ " ";
+    // }
+    // logNode("vne %s",com.c_str());
 
     m->tree_committe=buildTree(vne_committe);
 
@@ -1682,6 +1736,37 @@ bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_i
     return false;
 }
 
+bool Node::Service::HelloREQ(const MsgData::HelloREQ* r, const NODE_id & src_node, const route_t& route)
+{
+    REF_getter<MsgData::HelloRSP> rsp=new MsgData::HelloRSP;
+    if(prev_block.valid())
+        rsp->prev_block=prev_block->getBuffer();   
+
+    pass_NodeMsgRSP(rsp.get(), route);
+    return true;
+}
+bool Node::Service::HelloRSP(const MsgData::HelloRSP* r, const NODE_id & src_node, const route_t& route)
+{
+    logNode("HelloRSP");
+    if(r->prev_block.size())
+    {
+        REF_getter<MsgData::BlockAccepted2REQ> ba2=new MsgData::BlockAccepted2REQ;
+        inBuffer in(r->prev_block);
+        ba2->unpack2(in);
+        if(!verify_block_all(ba2))
+        {
+            logNode("if(!verify_block_all(ba2))");
+            return false;
+        }
+        hello_certs[ba2->blockAcceptedREQ->blockInfo->heart_beat->new_epoch].push_back({src_node,ba2});
+
+        if(ba2->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1!=prev_root_hash_Z())
+            sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(ALARM_START_SYNC,NULL,NULL,0.5,this));
+
+    }
+    return true;
+    
+}
 
 
 void Node::Service::logNode(const char *fmt, ...)

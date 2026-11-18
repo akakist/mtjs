@@ -11,7 +11,7 @@
 #include <vector>
 #include "md/md_BlockDiffValidateREQ.h"
 
-bool Node::Service::GetTransactionRSP(const MsgData::GetTxRSP *r, const NODE_id &src_node, const route_t &route)
+bool Node::Service::GetTxRSP(const MsgData::GetTxRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;
     MUTEX_INSPECTOR;

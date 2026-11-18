@@ -40,7 +40,7 @@ JSIValue ContractContext::call_contract_method(Cellable* root,const std::string&
                              CallStack* call_stack,
                               ContractHost* host, Rollback* roll,
                              const CONTRACT_id& caller, FeesSnapshot* fees,
-                             std::set<REF_getter<data_base>> * deleted_granules)
+                             std::set<REF_getter<data_base>> * deleted_granules, int64_t block_timestamp)
 {
     MUTEX_INSPECTOR;
     if (call_stack->call_stack.size() >= (size_t)MAX_CALL_DEPTH)
@@ -69,6 +69,7 @@ JSIValue ContractContext::call_contract_method(Cellable* root,const std::string&
     call_ctx.fees = fees;
     call_ctx.deleted_granules = deleted_granules;
     call_ctx.root = root;
+    call_ctx.block_timestamp=block_timestamp;
 
     void* saved = JSI_GetContextOpaque(ctx);
     JSI_SetContextOpaque(ctx, &call_ctx);
@@ -159,6 +160,7 @@ JSIValue ContractContext::call_contract_view(Cellable* root,const std::string& v
     call_ctx.fees = nullptr;                // без газа
     call_ctx.deleted_granules = nullptr;
     call_ctx.root = root;
+    call_ctx.block_timestamp=0; /// TODO - fix
 
     ViewInterrupt vi;
     vi.deadline_ns = now_ns() + timeout_sec * 1000000000LL;

@@ -14,10 +14,10 @@ struct CNode_prod: public CNode
     REF_getter<bc_granule> data=nullptr;
     REF_getter<bc_activity> act=nullptr;
     Rollback *roll=nullptr;
-    void set(const std::string &s)
+    void set(const std::string &s, int64_t block_timestamp)
     {
         data->container=s;
-        data->setDirty(roll);
+        data->setDirty(roll, block_timestamp);
     }
     void touch(time_t t)
     {
@@ -31,13 +31,13 @@ struct CNode_prod: public CNode
     {
         return act->ttl;
     }
-    void update_time(time_t t, Rollback* r)
+    void update_time(int64_t t, Rollback* r)
     {
         act->update_time(t,r);
     }
-    void setDirty(Rollback* r)
+    void setDirty(Rollback* r, int64_t block_timestamp)
     {
-        data->setDirty(r);
+        data->setDirty(r,block_timestamp);
     }
 
 
@@ -62,45 +62,45 @@ struct NodeGranuleIO : GranuleIO {
 
     std::optional<std::string> createGranule(Cellable* root,const CONTRACT_id& contract, const CONTRACT_DATA_id& key,
                                              const std::string& value,
-                                             int64_t create_time, int64_t ttl,
+                                             int64_t block_timestamp, int64_t ttl,
                                              Rollback* roll) override {
         MUTEX_INSPECTOR;                                            
         {
             auto d = cells::getContractDataNoCreateConst(root,db.get(),contract, key);
             if (d.valid()) return std::string("create: leaf already exists");
         }
-        auto dd = cells::getContractDataOrCreate(root,db.get(),contract, key, roll, ttl, create_time);
+        auto dd = cells::getContractDataOrCreate(root,db.get(),contract, key, roll, ttl, block_timestamp);
         if (!dd.valid()) return std::string("create failed");
         {  dd->container = value; }
         {
-            auto actd = cells::getActivityOrCreate(root, db.get(), dd->getDbId(),{},ttl,create_time,roll);
+            auto actd = cells::getActivityOrCreate(root, db.get(), dd->getDbId(),{},ttl,block_timestamp,roll);
             if(!actd.valid())
                 throw CommonError("if(!act.valid())");
-            actd->update_time(create_time, roll);
+            actd->update_time(block_timestamp, roll);
             return std::nullopt;
         }
     }
 
     std::optional<std::string> setGranule(Cellable* root,const CONTRACT_id& contract, const CONTRACT_DATA_id& key,
                                         const std::string& value,
-                                        int64_t now, 
+                                        int64_t block_timestamp, 
                                         Rollback* roll) override {
         MUTEX_INSPECTOR;                                            
         auto d = cells::getContractDataNoCreate(root,db.get(),contract, key);
         if (!d.valid()) return std::string("granule not exists");
-        d->setDirty(roll);
+        d->setDirty(roll, block_timestamp);
         d->container = value;   // <-- ОБНОВИТЬ ЗНАЧЕНИЕ
         auto actd=cells::getActivityNoCreate(root,db.get(),d->getDbId());
-        actd->update_time(now,roll);
+        actd->update_time(block_timestamp,roll);
 
         return std::nullopt;
     }
-    std::optional<std::string> addContractBalance(Cellable* root, const CONTRACT_id& c, int64_t delta, Rollback* roll) override {
+    std::optional<std::string> addContractBalance(Cellable* root, const CONTRACT_id& c, int64_t delta, Rollback* roll, int64_t block_timestamp) override {
         MUTEX_INSPECTOR;                                            
-        auto b = cells::getContractBalanceOrCreate(root, db.get(), c, roll);
+        auto b = cells::getContractBalanceOrCreate(root, db.get(), c, roll, block_timestamp);
         if (!b.valid()) return std::string("balance create failed");
         b->addAmount(delta);
-        b->setDirty(roll);   // ← ОБЯЗАТЕЛЬНО (diff + calc_tree_hash)
+        b->setDirty(roll,block_timestamp);   // ← ОБЯЗАТЕЛЬНО (diff + calc_tree_hash)
         DBG(logErr2("addContractBalance: contract=%s delta=%lld amount=%lld", c.container.c_str(), (long long)delta, (long long)b->getAmount()));
         return std::nullopt;
     }
@@ -129,7 +129,7 @@ struct NodeGranuleIO : GranuleIO {
         return actd->ttl;
     }
     REF_getter<CNode> createCNode(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd,
-                                                     int64_t create_time, int64_t ttl,
+                                                     int64_t block_timestamp, int64_t ttl,
                                                      Rollback* r)
     {
         auto dbid= blake2b_hash(cells::getContractDataKey(c,cd));
@@ -137,14 +137,14 @@ struct NodeGranuleIO : GranuleIO {
         if(d.valid())
             throw CommonError("if(d.valid())#4763@#"); /// error data already exists
         REF_getter<CNode_prod> ret=new CNode_prod;
-        ret->data=cells::getContractDataOrCreate(root,db.get(),c,cd,r,ttl,create_time);
+        ret->data=cells::getContractDataOrCreate(root,db.get(),c,cd,r,ttl,block_timestamp);
         if(!ret->data.valid())
             throw CommonError("if(!ret->data.valid()) @@@#$$");
-        ret->data->setDirty(r);
-        ret->act=cells::getActivityOrCreate(root,db.get(),dbid.container,{},ttl,create_time,r);
+        ret->data->setDirty(r, block_timestamp);
+        ret->act=cells::getActivityOrCreate(root,db.get(),dbid.container,{},ttl,block_timestamp,r);
         if(!ret->act.valid())
             throw CommonError("if(!act.valid()) @#886");
-        ret->act->setDirty(r);
+        ret->act->setDirty(r, block_timestamp);
 
         return ret.get();
     }

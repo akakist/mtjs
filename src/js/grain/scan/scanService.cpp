@@ -38,8 +38,8 @@ bool Scan::Service::ClientMsg(const bcEvent::ClientMsg *e)
         auto* pp = (MsgData::ScanREQ*)b.get();
         REF_getter<MsgData::ScanRSP> rsp = new MsgData::ScanRSP;
         // буфер 10 сек: scan_expired должен быть консервативным,
-        // gc перепроверит на момент блока (t.block_timestamp)
-        // `gc` перепроверит на t.block_timestamp — `-10` не нужен (clock skew нода/лидер)
+        // gc перепроверит на момент блока (t.b->validateBlockREQ->block_timestamp)
+        // `gc` перепроверит на t.b->validateBlockREQ->block_timestamp — `-10` не нужен (clock skew нода/лидер)
         int64_t now = pp->now > 0 ? pp->now : (int64_t)time(NULL);
         int64_t max_sec = pp->max_sec > 0 ? pp->max_sec : 5;
 

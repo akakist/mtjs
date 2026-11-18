@@ -8,7 +8,7 @@ struct bc_node: public data_base
 {
 
 
-    bc_node(Cellable *p):data_base(hsh::bc_node,p,0,0) {
+    bc_node(Cellable *p):data_base(hsh::bc_node,p) {
     }
 private:
     NODE_id name_;
@@ -45,12 +45,12 @@ public:
         enabled=_enabled;
         missed_rounds=0;
     }
-    bool isEnabled()
+    bool isEnabled() const
     {
         
         return enabled;
     }
-    NodeElement getElement()
+    NodeElement getElement() const
     {
         NodeElement n;
         
@@ -63,12 +63,12 @@ public:
         }
         return n;
     }
-    std::string get_ed_pk()
+    std::string get_ed_pk() const
     {
         
         return ed_pk;
     }
-    std::string get_ip()
+    std::string get_ip() const
     {
         
         return ip;
@@ -83,12 +83,12 @@ public:
         
         return owner_address;
     }
-    std::string ip_port()
+    std::string ip_port() const
     {
         
         return ip;
     }
-    NODE_id getName()
+    NODE_id getName() const
     {
         
         return name_;

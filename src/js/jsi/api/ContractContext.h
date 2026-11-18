@@ -56,7 +56,7 @@ struct ContractContext : public Refcountable {
                              CallStack* call_stack,
                               ContractHost* host, Rollback* roll,
                              const CONTRACT_id& caller, FeesSnapshot* fees,
-                             std::set<REF_getter<data_base>> * deleted_granules);
+                             std::set<REF_getter<data_base>> * deleted_granule, int64_t block_timestamp);
 
     // view: msg НЕТ, газа НЕТ, roll НЕТ (read-only)
     // view: msg НЕТ, газа НЕТ, roll НЕТ (read-only). timeout_sec — лимит времени.

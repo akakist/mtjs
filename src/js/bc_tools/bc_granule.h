@@ -4,7 +4,7 @@
 struct bc_granule:  public data_base
 {
 
-    bc_granule(Cellable *p):data_base(hsh::bc_granule,p, 0,0) {}
+    bc_granule(Cellable *p):data_base(hsh::bc_granule,p) {}
     std::string container;
     size_t size() const
     {
