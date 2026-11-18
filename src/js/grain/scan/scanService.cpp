@@ -40,7 +40,10 @@ bool Scan::Service::ClientMsg(const bcEvent::ClientMsg *e)
         // буфер 10 сек: scan_expired должен быть консервативным,
         // gc перепроверит на момент блока (t.b->validateBlockREQ->block_timestamp)
         // `gc` перепроверит на t.b->validateBlockREQ->block_timestamp — `-10` не нужен (clock skew нода/лидер)
-        int64_t now = pp->now > 0 ? pp->now : (int64_t)time(NULL);
+        // ВАЖНО: _update_time у активности — это block_timestamp в микросекундах.
+        // time(NULL) даёт секунды, и сравнение _update_time + ttl < now никогда
+        // не выполнялось (сканер всегда возвращал пустой список).
+        int64_t now = pp->now > 0 ? pp->now : (int64_t)iUtils->getNow();
         int64_t max_sec = pp->max_sec > 0 ? pp->max_sec : 5;
 
         auto db = dynamic_cast<CDatabaseRocksdb*>(db_state.get());

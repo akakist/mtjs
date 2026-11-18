@@ -14,7 +14,7 @@ struct CNode: public Refcountable
     virtual void set(const std::string &s, int64_t block_timestamp) =0;
     virtual std::string get() =0;
     virtual void touch(time_t t)=0;
-    virtual int ttl()=0;
+    virtual int64_t ttl()=0;
     virtual void update_time(time_t t, Rollback* r)=0;
     virtual void setDirty(Rollback* r, int64_t block_timestamp)=0;
     virtual ~CNode() = default;

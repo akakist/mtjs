@@ -27,9 +27,9 @@ struct CNode_prod: public CNode
     {
         return data->container;
     }
-    int ttl()
+    int64_t ttl()
     {
-        return act->ttl;
+        return act->ttl / 1000000;   // внутри мкс, наружу секунды
     }
     void update_time(int64_t t, Rollback* r)
     {

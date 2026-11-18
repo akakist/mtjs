@@ -7,7 +7,7 @@ struct bc_activity: public data_base
     std::string name_;   // имя контракта (ссылка на bc_contract)
     std::set<std::string> dbid;
     int64_t _update_time=0;
-    int ttl=0;
+    int64_t ttl=0;   // микросекунды (снаружи TTL задаётся в секундах)
     void update_time(int64_t t, Rollback* roll)
     {
         if(t>_update_time)

@@ -679,7 +679,7 @@ REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
     if (cc->data.valid()) {
         auto act = dynamic_cast<bc_activity*>(cc->data.get());
         act->_update_time = block_timestamp;
-        act->ttl = ttl;
+        act->ttl = (int64_t)ttl * 1000000;   // снаружи секунды, внутри мкс
         act->setDirty(roll, block_timestamp);
         return act;
     }
@@ -687,7 +687,7 @@ REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
     act->dbid=additional;
     act->dbid.insert(granule_dbid);
     act->_update_time = block_timestamp;
-    act->ttl = ttl;
+    act->ttl = (int64_t)ttl * 1000000;   // снаружи секунды, внутри мкс
     cc->data = act.get();
     cc->payload_ctor_idx = hsh::bc_activity;
     cc->data->setDirty(roll,block_timestamp);

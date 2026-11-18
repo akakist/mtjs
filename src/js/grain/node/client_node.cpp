@@ -75,6 +75,16 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         logNode("if(!cli.node_leader->equals(r->blockAcceptedREQ->blockInfo->heart_beat))");
         return true;
     }
+    // База блока должна совпадать с нашим root. equals сверяет хартбиты между
+    // собой, а не с локальным деревом, поэтому без этой проверки диффы ложились
+    // на чужую базу и root никогда не сходился.
+    if(r->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1!=prev_root_hash_Z())
+    {
+        logNode("BlockDiffValidateREQ: stale base remote %s local %s — ignore",
+                r->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str(),
+                prev_root_hash_Z().str().c_str());
+        return true;
+    }    
     std::vector<blst_cpp::PublicKey> agg_pk;
     for (auto &z : r->blockAcceptedREQ->node_validators)
     {
@@ -147,7 +157,15 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
     if(r->blockAcceptedREQ->blockInfo->new_root_hash1!=new_root_hash)
     {
-        logNode("@@ BlockDiffValidateREQ not matched root hash remote %s local %s",r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str(),new_root_hash.str().c_str());
+        logNode("@@ BlockDiffValidateREQ not matched root hash remote %s local %s",
+                r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str(),new_root_hash.str().c_str());
+        // Диффы уже применены к root — без отката узел остаётся с затёртым деревом
+        // и дальше расходится навсегда. Возвращаем все тронутые ячейки.
+        for(auto &z: roll.data)
+        {
+            inBuffer in(z.second);
+            z.first->unpack_mx(in);
+        }
         return true;
     }
     REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
@@ -272,7 +290,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         stake_n+=n->get_full_stake();
         agg_pk_n.push_back(n->get_bls_pk());
     }
-    logNode("diff validators %s", iUtils->join(" ",vals).c_str());
+    // logNode("diff validators %s", iUtils->join(" ",vals).c_str());
     int64_t full_stake=0;
     auto ls=cells::getAllNodes(root.get(), db_state.get());
     for(auto &z: ls)
