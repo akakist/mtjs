@@ -107,7 +107,7 @@ static jsiMsg read_msg_json(const json& j) {
     m.sender         = get_str("sender");
     m.value          = get_i64("value");
     m.gasLimit       = get_i64("gasLimit");
-    m.blockTimestamp = get_i64("blockTimestamp");
+    m.blockTimestamp = TIME_mks{get_i64("blockTimestamp")};
     m.blockHeight    = get_i64("blockHeight");
     m.nonce          = get_i64("nonce");
     m.chainId        = get_i64("chainId");
@@ -323,14 +323,14 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
 
             CallContext call_ctx;
             call_ctx.contract = cc.get();
-            call_ctx.in_view = is_view;
+            call_ctx.mode = is_view ? ExecContext::Mode::TxView : ExecContext::Mode::Tx;
             call_ctx.depth = 0;
             call_ctx.call_stack = new CallStack;
             call_ctx.host = host;
             int64_t test_value = tx.msg.value;
             call_ctx.value_ptr = &test_value;
             call_ctx.deleted_granules=& deleted_granules;
-            call_ctx.block_timestamp=0;
+            call_ctx.block_timestamp=tx.msg.blockTimestamp;
 
             void* saved_opaque = JSI_GetContextOpaque(cc->ctx);
             JSI_SetContextOpaque(cc->ctx, &call_ctx);
@@ -339,12 +339,12 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             CONTRACT_id caller;
             JSIValue result;
             if (is_view) {
-                result = cc->call_contract_view(NULL,cmd.method, cmd.params,
-                                                call_ctx.call_stack, host, 5);
+                result = cc->call_view(NULL,cmd.method, cmd.params, &msg_src,
+                                                call_ctx.call_stack, host, 5, call_ctx.block_timestamp);
             } else {
-                result = cc->call_contract_method(NULL, cmd.method, cmd.params, &msg_src,
+                result = cc->call_method(NULL, cmd.method, cmd.params, &msg_src,
                                                   call_ctx.call_stack, host, NULL,
-                                                  caller, &fees, &deleted_granules,0);
+                                                  caller, &fees, &deleted_granules,TIME_mks{});
             }
             JSI_SetContextOpaque(cc->ctx, saved_opaque);
             

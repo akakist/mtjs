@@ -367,7 +367,7 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
     MUTEX_INSPECTOR;
     if (e->tid == TIMER_STALE_CLEANUP) {
         MUTEX_INSPECTOR;
-        cleanup_stale(iUtils->getNow());
+        cleanup_stale(iUtils->getNow().v);
         return true;
     }
     if(e->tid == TIMER_PERIODIC_CLOCK)
@@ -424,7 +424,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         {
             REF_getter<MsgData::HeartBeatREQ> h=new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                         epoch_current(),
-                        this_node_name, iUtils->getNow(), 0);
+                        this_node_name, iUtils->getNow().v, 0);
             auto mf=getMetaFull();
             do_request_for_transactions(h.get(),mf);
         }
@@ -719,10 +719,10 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
         case msgid::GetTxREQ:
             return GetTxREQ(static_cast<const MsgData::GetTxREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::ValidateBlockREQ:
-            // last_activity_time=iUtils->getNow();
+            // last_activity_time=iUtils->getNow().v;
             return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::BlockAccepted2REQ:
-            // last_activity_time=iUtils->getNow();
+            // last_activity_time=iUtils->getNow().v;
             return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
         // case msgid::ConfirmLeaderREQ:
         //     return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
@@ -812,7 +812,7 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
       mode_(m)
 {
     MUTEX_INSPECTOR;
-    node_start_timestamp=iUtils->getNow();
+    node_start_timestamp=iUtils->getNow().v;
 
     if (mode_ == Lite) {
         // Lite: без сети, без ключей. Только uplink + локальный кеш.
@@ -933,7 +933,7 @@ void Node::Service::do_request_for_transactions(MsgData::HeartBeatREQ* hb, const
     if(!n.valid())
         throw CommonError("if(!n) @330944");
     rt->ip=n->get_ip();
-    // li.request_for_transactions_time = iUtils->getNow();
+    // li.request_for_transactions_time = iUtils->getNow().v;
 
     broadcast_MsgEvent_via_broadcaster(rt.get(),meta->tree_all_nodes);
 }
@@ -1220,7 +1220,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 
                 CallStack call_stack;
 
-                // внешний CallContext — чтобы call_contract_method докладывал emits в него (parent->emits)
+                // внешний CallContext — чтобы call_method докладывал emits в него (parent->emits)
                 CallContext ext_ctx;
                 ext_ctx.contract = cc.get();
                 ext_ctx.host = contractHost.get();
@@ -1232,7 +1232,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 
                 NodeMsgSource src(&t);
                 CONTRACT_id caller;
-                JSIValue result = cc->call_contract_method(root.get(), method_str, params_json, &src, 
+                JSIValue result = cc->call_method(root.get(), method_str, params_json, &src, 
                                                            &call_stack, contractHost.get(), t.roll, caller, & b.fees, deleted_granules,b.validateBlockREQ->block_timestamp);
 
                 JSI_SetContextOpaque(cc->ctx, prev_ctx);
@@ -1499,8 +1499,8 @@ REF_getter<bc_node> Node::Service::current_leader()
 
     int64_t lastBlockTime=0;
     if(prev_block.valid())
-        lastBlockTime=prev_block->blockAcceptedREQ->blockInfo->block_timestamp;
-    const auto now=iUtils->getNow();
+        lastBlockTime=prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v;
+    const auto now=iUtils->getNow().v;
     if(now<lastBlockTime)
         return nullptr;   // часы ушли назад относительно блока — слот не определён
 
@@ -1711,7 +1711,7 @@ void Node::Service::logNode(const char *fmt, ...)
     {
         va_list ap;
         va_start(ap, fmt);
-        fprintf(stdout, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z().str().c_str(), ep);
+        fprintf(stdout, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow().v) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z().str().c_str(), ep);
         vfprintf(stdout, fmt, ap);
         fprintf(stdout, "\n");
         va_end(ap);
@@ -1723,7 +1723,7 @@ void Node::Service::logNode(const char *fmt, ...)
         FILE *f = fopen(pn.c_str(), "a");
         if (f)
         {
-            fprintf(f, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow()) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z().str().c_str(), ep);
+            fprintf(f, "%lf [Node] [%s] [%s] [%ld] ", double(iUtils->getNow().v) / 1000000., this_node_name.container.c_str(), prev_root_hash_Z().str().c_str(), ep);
             vfprintf(f, fmt, ap);
             fprintf(f, "\n");
             fclose(f);

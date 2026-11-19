@@ -14,7 +14,7 @@
 #include "QUORUM.h"   // GAS_STEP
 
 using json = nlohmann::json;
-CallContext* require_ctx__1(JSIContext* ctx) ;
+ExecContext* require_ctx__1(JSIContext* ctx) ;
 
 
 void delete_prop_str(JSIContext* ctx, JSIValueConst obj, const char* name) {
@@ -30,7 +30,7 @@ CallContext* get_call_context(JSIContext* ctx) {
     return (CallContext*)JSI_GetContextOpaque(ctx);
 }
 
-CallContext* require_ctx__1(JSIContext* ctx) {
+ExecContext* require_ctx__1(JSIContext* ctx) {
     auto* c = (CallContext*)JSI_GetContextOpaque(ctx);
     if (!c) {
         JSI_ThrowTypeError(ctx, "no call context");
@@ -39,7 +39,7 @@ CallContext* require_ctx__1(JSIContext* ctx) {
     return c;
 }
 
-CallContext* require_readonly_ctx(JSIContext* ctx) {
+ExecContext* require_readonly_ctx(JSIContext* ctx) {
     auto* c = require_ctx__1(ctx);
     if (!c) {
         JSI_ThrowTypeError(ctx, "no call context");
@@ -48,81 +48,80 @@ CallContext* require_readonly_ctx(JSIContext* ctx) {
     return c;
 }
 
-CallContext* require_writable_ctx(JSIContext* ctx, bool need_msg_source) {
+
+TxContext* require_tx_ctx(JSIContext* ctx, bool need_msg_source) {
     auto* c = require_ctx__1(ctx);
-    if (!c) {
-        JSI_ThrowTypeError(ctx, "no call context");
-        return nullptr;
-    }
-    if (c->in_view) {
-        JSI_ThrowTypeError(ctx, "operation not allowed in view");
+    if (!c) return nullptr;
+    if (c->mode != ExecContext::Mode::Tx) {
+        JSI_ThrowTypeError(ctx, "operation not allowed in %s",
+                           c->mode == ExecContext::Mode::Query ? "query" : "view");
         return nullptr;
     }
     if (need_msg_source && !c->msg_source) {
         JSI_ThrowTypeError(ctx, "no msg source");
         return nullptr;
     }
-    return c;
+    return static_cast<TxContext*>(c);
 }
 
 // ---------- msg getters: читают из root t_params ----------
 static JSIValue msg_sender(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-  CallContext* c = require_writable_ctx(ctx); if (!c) return JSI_EXCEPTION;
+  CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
     if (!c->msg_source) return JSI_NewString(ctx, "");
     auto s = c->msg_source->get_sender();
     return JSI_NewStringLen(ctx, s.data(), s.size());
 }
 static JSIValue msg_value(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* c = require_writable_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
     return JSI_NewInt64(ctx, c->msg_source ? c->msg_source->get_value() : 0);
 }
 static JSIValue msg_gasLimit(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* c = require_writable_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
     return JSI_NewInt64(ctx, c->msg_source? c->msg_source->get_gasLimit() : 0);
 }
 static JSIValue msg_gasUsed(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* c = require_writable_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
     return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_gasUsed() : 0);
 }
 static JSIValue msg_blockTimestamp(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* c = require_writable_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
     return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_blockTimestamp() : 0);
 }
 static JSIValue msg_blockHeight(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* c = require_writable_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
     return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_blockHeight() : 0);
 }
 static JSIValue msg_nonce(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* c = require_writable_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
     return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_nonce() : 0);
 }
 static JSIValue msg_chainId(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* c = require_writable_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
     return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_chainId() : 0);
 }
 static JSIValue msg_txHash(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* c = require_writable_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
     if (!c->msg_source) return JSI_NewString(ctx, "");
     auto hex = base16::encode(c->msg_source->get_txHash());
     return JSI_NewStringLen(ctx, hex.data(), hex.size());
 }
 static JSIValue msg_txIndex(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* c = require_writable_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
     return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_txIndex() : 0);
 }
 static JSIValue msg_caller(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* c = require_readonly_ctx(ctx); if (!c) return JSI_EXCEPTION;
+    ExecContext* c = require_readonly_ctx(ctx); if (!c) return JSI_EXCEPTION;
     return JSI_NewStringLen(ctx, c->caller.container.data(), c->caller.container.size());
 }
 
@@ -176,6 +175,23 @@ JSIValue jsi_registerMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueCo
     catch (...) { return JSI_ThrowInternalError(ctx, "registerMethod: unknown C++ exception"); }
 }
 
+JSIValue jsi_registerQuery(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
+    MUTEX_INSPECTOR;
+    try {
+        if (argc < 2 || !JSI_IsString(argv[0]) || !JSI_IsFunction(ctx, argv[1]))
+            return JSI_ThrowTypeError(ctx, "registerQuery(name, fn)");
+        ContractContext* cc = (ContractContext*)JSI_GetContextOpaque(ctx);
+        if (!cc) return JSI_ThrowTypeError(ctx, "no contract context");
+        JSIScope<20,20> scope(ctx);
+        auto name = scope.toStdString(argv[0]);
+        if (name.empty()) return JSI_EXCEPTION;
+        cc->queries[name] = JSIValueGuard(ctx, JSI_DupValue(ctx, argv[1]));
+        return JSI_UNDEFINED;
+    } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
+    catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "registerQuery: %s", e.what()); }
+    catch (...) { return JSI_ThrowInternalError(ctx, "registerQuery: unknown C++ exception"); }
+}
+
 JSIValue jsi_registerView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     MUTEX_INSPECTOR;
     try {
@@ -200,13 +216,11 @@ JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueCon
             return JSI_ThrowTypeError(ctx, "createGranule(key, value, ttl)");
         if (JSI_IsUndefined(argv[1]))
             return JSI_ThrowTypeError(ctx, "createGranule: undefined not allowed");
-        CallContext* call = require_writable_ctx(ctx);
+        CallContext* call = require_tx_ctx(ctx);
         if (!call)
             return JSI_ThrowTypeError(ctx, "no call context");
-        if (call->in_view)
-            return JSI_ThrowTypeError(ctx, "createGranule is not allowed in view");
         // ▼▼▼
-        if (!call->in_view && call->msg_source)
+        if (call->msg_source)
             call->msg_source->consume_gas(call->fees->gas_per_call + call->fees->gas_per_hostcall);
         // ▲▲▲            
         ContractContext* cc = call->contract;
@@ -239,7 +253,7 @@ JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueCon
             return JSI_ThrowTypeError(ctx, "createGranule(%s%s): value too large",
                                       cc->name.container.c_str(), key.c_str());
         int64_t now = call->msg_source->get_blockTimestamp();
-        if (auto err = io->createGranule(call->root, cc->name, cid, s, now, ttl, call->roll))
+        if (auto err = io->createGranule(call->root, cc->name, cid, s, TIME_mks{now}, TTL_sec{ttl}, call->roll))
             return JSI_ThrowTypeError(ctx, "createGranule(%s%s): %s",
                                       cc->name.container.c_str(), key.c_str(), err->c_str());
 
@@ -264,13 +278,11 @@ JSIValue jsi_setGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
             return JSI_ThrowTypeError(ctx, "setGranule(key, value)");
         if (JSI_IsUndefined(argv[1]))
             return JSI_ThrowTypeError(ctx, "setGranule: undefined not allowed");
-        CallContext* call = require_writable_ctx(ctx);
+        CallContext* call = require_tx_ctx(ctx);
         if (!call)
             return JSI_ThrowTypeError(ctx, "no call context");
-        if (call->in_view)
-            return JSI_ThrowTypeError(ctx, "setGranule is not allowed in view");
         // ▼▼▼
-        if (!call->in_view && call->msg_source)
+        if (call->msg_source)
             call->msg_source->consume_gas(call->fees->gas_per_call + call->fees->gas_per_hostcall);
         // ▲▲▲            
         ContractContext* cc = call->contract;
@@ -298,7 +310,7 @@ JSIValue jsi_setGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
             return JSI_ThrowTypeError(ctx, "setGranule(%s%s): value too large",
                                       cc->name.container.c_str(), key.c_str());
         int64_t now = call->msg_source->get_blockTimestamp();
-        if (auto err = io->setGranule(call->root, cc->name, cid, s, now, call->roll))
+        if (auto err = io->setGranule(call->root, cc->name, cid, s, TIME_mks{now}, call->roll))
             return JSI_ThrowTypeError(ctx, "setGranule(%s%s): %s",
                                       cc->name.container.c_str(), key.c_str(), err->c_str());
 
@@ -320,7 +332,7 @@ JSIValue jsi_getGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
             return JSI_ThrowTypeError(ctx, "getGranule(key)");
         }
          
-        CallContext* call = require_readonly_ctx(ctx);
+        ExecContext* call = require_readonly_ctx(ctx);
         if (!call){
             return JSI_ThrowTypeError(ctx, "no call context");
         } 
@@ -349,9 +361,8 @@ JSIValue jsi_consumeValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueCons
     MUTEX_INSPECTOR;
     try {
         if (argc < 1 || !JSI_IsNumber(argv[0])) return JSI_ThrowTypeError(ctx, "consumeValue(amount)");
-        CallContext* call = require_writable_ctx(ctx);
+        CallContext* call = require_tx_ctx(ctx);
         if (!call) return JSI_ThrowTypeError(ctx, "no call context");
-        if (call->in_view) return JSI_ThrowTypeError(ctx, "consumeValue is not allowed in view");
         if (!call->msg_source) return JSI_ThrowTypeError(ctx, "consumeValue: no value context");
         if (!call->host || !call->host->granules.valid() || !call->contract)
             return JSI_ThrowTypeError(ctx, "consumeValue: no contract/granules context");
@@ -381,9 +392,8 @@ JSIValue jsi_refundValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst
     MUTEX_INSPECTOR;
     try {
         if (argc < 1 || !JSI_IsNumber(argv[0])) return JSI_ThrowTypeError(ctx, "refundValue(amount)");
-        CallContext* call = require_writable_ctx(ctx);
+        CallContext* call = require_tx_ctx(ctx);
         if (!call) return JSI_ThrowTypeError(ctx, "no call context");
-        if (call->in_view) return JSI_ThrowTypeError(ctx, "refundValue is not allowed in view");
         // ▼▼▼
         if (call->msg_source)
             call->msg_source->consume_gas(call->fees->gas_per_call + call->fees->gas_per_hostcall);
@@ -415,7 +425,7 @@ JSIValue jsi_refundValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst
 
 JSIValue jsi_remainingValue(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*) {
     MUTEX_INSPECTOR;
-    CallContext* call = require_writable_ctx(ctx);
+    CallContext* call = require_tx_ctx(ctx);
     if (!call) return JSI_ThrowTypeError(ctx, "no call context");
     if (!call->msg_source) return JSI_NewInt64(ctx, 0);
     return JSI_NewInt64(ctx, call->msg_source->get_value());
@@ -436,11 +446,10 @@ JSIValue jsi_emit(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv)
      MUTEX_INSPECTOR;
    try {
         if (argc < 2 || !JSI_IsString(argv[0])) return JSI_ThrowTypeError(ctx, "emit(name, value)");
-        CallContext* call = require_writable_ctx(ctx);
+        CallContext* call = require_tx_ctx(ctx);
         if (!call) return JSI_ThrowTypeError(ctx, "no call context");
-        if (call->in_view) return JSI_ThrowTypeError(ctx, "emit is not allowed in view");
         // ▼▼▼
-        if (!call->in_view && call->msg_source)
+        if (call->msg_source)
             call->msg_source->consume_gas(call->fees->gas_per_call + call->fees->gas_per_hostcall);
         // ▲▲▲        
         ContractContext* cc = call->contract;
@@ -461,8 +470,8 @@ JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
     try {
         if (argc < 3 || !JSI_IsString(argv[0]) || !JSI_IsString(argv[1]))
             return JSI_ThrowTypeError(ctx, "callMethod(contract, method, params)");
-        CallContext* call = require_writable_ctx(ctx);
-        if (!call) return JSI_EXCEPTION;   // exception уже выставлен (in_view / no ctx / no msg_source)
+        CallContext* call = require_tx_ctx(ctx);
+        if (!call) return JSI_EXCEPTION;   // exception уже выставлен (no ctx / не тот режим / no msg_source)
         if (!call->call_stack || !call->host)
             return JSI_ThrowTypeError(ctx, "callMethod outside of a call");
         // ▼▼▼
@@ -478,7 +487,7 @@ JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
         json params = json_from_jsi(ctx, argv[2]);
         void* prev = JSI_GetContextOpaque(cc->ctx);      // ContractContext* (или nullptr)
         JSI_SetContextOpaque(cc->ctx, call);             // CallContext* caller
-        JSIValue r = cc->call_contract_method(call->root, method_name, params, call->msg_source, 
+        JSIValue r = cc->call_method(call->root, method_name, params, call->msg_source, 
                                                call->call_stack, call->host, call->roll, call->contract->name,call->fees,call->deleted_granules, call->block_timestamp);
         JSI_SetContextOpaque(cc->ctx, prev);             // восстановить
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
@@ -490,16 +499,70 @@ JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
     catch (...) { return JSI_ThrowInternalError(ctx, "callMethod: unknown C++ exception"); }
 }
 
+QueryContext* require_query_ctx(JSIContext* ctx) {
+    auto* c = require_ctx__1(ctx);
+    if (!c) return nullptr;
+    if (c->mode != ExecContext::Mode::Query) {
+        JSI_ThrowTypeError(ctx, "only available in query");
+        return nullptr;
+    }
+    return static_cast<QueryContext*>(c);
+}
+
+// ---------- время: only-in-query ----------
+static JSIValue query_now(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
+    MUTEX_INSPECTOR;
+    QueryContext* c = require_query_ctx(ctx);
+    if (!c) return JSI_EXCEPTION;
+    return JSI_NewInt64(ctx, c->now.v);
+}
+
+static JSIValue query_blockTimestamp(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
+    MUTEX_INSPECTOR;
+    QueryContext* c = require_query_ctx(ctx);
+    if (!c) return JSI_EXCEPTION;
+    return JSI_NewInt64(ctx, c->block_timestamp.v);
+}
+
+JSIValue jsi_callQuery(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
+    MUTEX_INSPECTOR;
+    try {
+        if (argc < 3 || !JSI_IsString(argv[0]) || !JSI_IsString(argv[1]))
+            return JSI_ThrowTypeError(ctx, "callQuery(contract, query, params)");
+        QueryContext* call = require_query_ctx(ctx);
+        if (!call || !call->call_stack || !call->host)
+            return JSI_ThrowTypeError(ctx, "callQuery outside of a query");
+        JSIScope<20,20> scope(ctx);
+        CONTRACT_id contract_name; contract_name.container = scope.toStdString(argv[0]);
+        auto query_name = scope.toStdString(argv[1]);
+        if (contract_name.container.empty() || query_name.empty()) return JSI_EXCEPTION;
+        auto cc = call->host->get_contract(call->root, contract_name);
+        if (!cc.valid()) return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.container.c_str());
+        json params = json_from_jsi(ctx, argv[2]);
+        void* prev = JSI_GetContextOpaque(cc->ctx);
+        JSI_SetContextOpaque(cc->ctx, call);
+        JSIValue r = cc->call_query(call->root, query_name, params, call->call_stack, call->host,
+                                             call->block_timestamp, call->now);
+        JSI_SetContextOpaque(cc->ctx, prev);
+        if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
+        JSIValue r_caller = convert_value(cc->ctx, ctx, r);
+        JSI_FreeValue(cc->ctx, r);
+        return r_caller;
+    } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
+    catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "callQuery: %s", e.what()); }
+    catch (...) { return JSI_ThrowInternalError(ctx, "callQuery: unknown C++ exception"); }
+}
+
 JSIValue jsi_callView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     MUTEX_INSPECTOR;
     try {
         if (argc < 4 || !JSI_IsString(argv[0]) || !JSI_IsString(argv[1]))
             return JSI_ThrowTypeError(ctx, "callView(contract, view, params, timeout_sec)");
-        CallContext* call = require_readonly_ctx(ctx);
+        ExecContext* call = require_readonly_ctx(ctx);
         if (!call || !call->call_stack || !call->host)
             return JSI_ThrowTypeError(ctx, "callView outside of a call");
-        if (call->in_view)
-            return JSI_ThrowTypeError(ctx, "callView is not allowed in view");
+        if (call->mode == ExecContext::Mode::Query)
+            return JSI_ThrowTypeError(ctx, "callView is not allowed in query");
         JSIScope<20,20> scope(ctx);
         CONTRACT_id contract_name; contract_name.container = scope.toStdString(argv[0]);
         auto view_name = scope.toStdString(argv[1]);
@@ -515,7 +578,7 @@ JSIValue jsi_callView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* a
         json params = json_from_jsi(ctx, argv[2]);
         void* prev = JSI_GetContextOpaque(cc->ctx);
         JSI_SetContextOpaque(cc->ctx, call);
-        JSIValue r = cc->call_contract_view(call->root, view_name, params, call->call_stack, call->host, timeout_sec);
+        JSIValue r = cc->call_view(call->root, view_name, params, call->msg_source, call->call_stack, call->host, timeout_sec, call->block_timestamp);
         JSI_SetContextOpaque(cc->ctx, prev);
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
         JSIValue r_caller = convert_value(cc->ctx, ctx, r);
@@ -531,11 +594,10 @@ JSIValue jsi_deleteGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueCon
     try {
         if (argc < 1 || !JSI_IsString(argv[0]))
             return JSI_ThrowTypeError(ctx, "deleteGranule(key)");
-        CallContext* call = require_writable_ctx(ctx);
+        CallContext* call = require_tx_ctx(ctx);
         if (!call) return JSI_ThrowTypeError(ctx, "no call context");
-        if (call->in_view) return JSI_ThrowTypeError(ctx, "deleteGranule is not allowed in view");
         // ▼▼▼
-        if (!call->in_view && call->msg_source)
+        if (call->msg_source)
             call->msg_source->consume_gas(call->fees->gas_per_call + call->fees->gas_per_hostcall);
         // ▲▲▲        
         ContractContext* cc = call->contract;
@@ -559,6 +621,7 @@ void register_api(JSIContext* ctx) {
     JSIValue global = JSI_GetGlobalObject(ctx);
     JSI_SetPropertyStr(ctx, global, "registerMethod", JSI_NewCFunction(ctx, jsi_registerMethod, "registerMethod", 2));
     JSI_SetPropertyStr(ctx, global, "registerView",   JSI_NewCFunction(ctx, jsi_registerView,   "registerView", 2));
+    JSI_SetPropertyStr(ctx, global, "registerQuery",  JSI_NewCFunction(ctx, jsi_registerQuery,  "registerQuery", 2));
     JSI_SetPropertyStr(ctx, global, "createGranule",  JSI_NewCFunction(ctx, jsi_createGranule,  "createGranule", 3));
     JSI_SetPropertyStr(ctx, global, "setGranule",     JSI_NewCFunction(ctx, jsi_setGranule,     "setGranule", 2));
     JSI_SetPropertyStr(ctx, global, "getGranule",     JSI_NewCFunction(ctx, jsi_getGranule,     "getGranule", 1));
@@ -569,6 +632,17 @@ void register_api(JSIContext* ctx) {
     JSI_SetPropertyStr(ctx, global, "remainingValue", JSI_NewCFunction(ctx, jsi_remainingValue, "remainingValue", 0));
     JSI_SetPropertyStr(ctx, global, "deleteGranule",  JSI_NewCFunction(ctx, jsi_deleteGranule, "deleteGranule", 1));
     JSI_SetPropertyStr(ctx, global, "callView",       JSI_NewCFunction(ctx, jsi_callView,       "callView", 4));
+    JSI_SetPropertyStr(ctx, global, "callQuery",      JSI_NewCFunction(ctx, jsi_callQuery,      "callQuery", 3));
+    // now и blockTimestamp — только в query; для остальных режимов бросают
+    {
+        auto def_get = [&](const char* name, JSIValue (*fn)(JSIContext*, JSIValueConst, int, JSIValueConst*)) {
+            JSIValue getter = JSI_NewCFunction(ctx, fn, name, 0);
+            JSI_DefinePropertyGetSet(ctx, global, JSI_NewAtom(ctx, name), getter, JSI_UNDEFINED,
+                                     JSI_PROP_ENUMERABLE | JSI_PROP_CONFIGURABLE);
+        };
+        def_get("now", query_now);
+        def_get("blockTimestamp", query_blockTimestamp);
+    }
     JSI_FreeValue(ctx, global);
     register_storage_api(ctx);
 }

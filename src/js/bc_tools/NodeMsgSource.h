@@ -7,7 +7,7 @@ struct NodeMsgSource : IMsgSource {
     int64_t get_value() const override { return (int64_t)t->value; }
     int64_t get_gasLimit() const override { return (int64_t)t->gasLimitGas; }
     int64_t get_gasUsed() const override { return (int64_t)t->gasUsed; }
-    int64_t get_blockTimestamp() const override { return (int64_t)t->b->validateBlockREQ->block_timestamp; }
+    int64_t get_blockTimestamp() const override { return t->b->validateBlockREQ->block_timestamp.v; }
     int64_t get_blockHeight() const override { return (int64_t)t->b->validateBlockREQ->heart_beat->new_epoch; }
     int64_t get_nonce() const override { return (int64_t)t->nonce; }
     int64_t get_chainId() const override { return (int64_t)t->chain_id; }

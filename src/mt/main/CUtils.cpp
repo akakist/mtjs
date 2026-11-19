@@ -650,7 +650,7 @@ int64_t CUtils::geb_params_int64_t(std::deque<std::string> &tokens, const std::s
 }
 
 
-int64_t CUtils::getNow()
+TIME_mks CUtils::getNow()
 {
 
     uint64_t now;
@@ -667,7 +667,7 @@ int64_t CUtils::getNow()
 
     now=_1;
     now+=_2;
-    return now;
+    return TIME_mks{(int64_t)now};
 #else
     timeb tb;
     ftime(&tb);

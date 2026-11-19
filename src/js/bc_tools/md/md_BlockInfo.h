@@ -38,7 +38,7 @@ namespace MsgData
         THASH_id diffs_hash;
         THASH_id att_data_hash;
         REF_getter<HeartBeatREQ> heart_beat;
-        int64_t block_timestamp;
+        TIME_mks block_timestamp;
 
 
         void update(Blake2bHasher& h) const
@@ -50,7 +50,7 @@ namespace MsgData
             h.update(att_data_hash.container);
            
             heart_beat->update(h);
-            h.update(std::to_string(block_timestamp));
+            h.update(std::to_string(block_timestamp.v));
         }
 
         void pack(outBuffer& b) const final

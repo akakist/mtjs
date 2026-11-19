@@ -18,7 +18,7 @@ namespace MsgData
 
         REF_getter<MsgData::HeartBeatREQ>  heart_beat;
         std::vector<REF_getter<MsgData::TX> > transaction_bodies;
-        int64_t block_timestamp;
+        TIME_mks block_timestamp;
         void update(Blake2bHasher& h) const
         {
             heart_beat->update(h);
@@ -27,7 +27,7 @@ namespace MsgData
                 
                 h.update(z->tx_body);
             }
-            h.update(std::to_string(block_timestamp));
+            h.update(std::to_string(block_timestamp.v));
         }
 
         void pack(outBuffer& b) const final

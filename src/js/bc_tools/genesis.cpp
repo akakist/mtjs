@@ -46,6 +46,11 @@ void init_genesis(Cellable* root, IDatabase* db)
 
     logErr2("RUN GENESIS");
 
+    // Нулевой момент времени: у генезиса ещё нет времени блока.
+    // Именованная переменная читается лучше, чем TIME_mks{} в аргументах.
+    TIME_mks time0;
+    time0.v = 0;
+
     const char* env_path = getenv("MTJS_GENESIS_PATH");
     std::string path = env_path ? env_path : "genesis.json";
     std::ifstream f(path);
@@ -58,12 +63,12 @@ void init_genesis(Cellable* root, IDatabase* db)
     int64_t genesis_time = j.value("genesis_time", (int64_t)time(NULL));
     // ▲▲▲
 
-    auto nl=cells::getNodeListOrCreate(root,db,NULL,0);
-    nl->setDirty(NULL,0);
-    auto votes=cells::getVotesOrCreate(root,db,NULL,0);
-    votes->setDirty(NULL,0);
+    auto nl=cells::getNodeListOrCreate(root,db,NULL,time0);
+    nl->setDirty(NULL,time0);
+    auto votes=cells::getVotesOrCreate(root,db,NULL,time0);
+    votes->setDirty(NULL,time0);
 
-    auto st2 = cells::getStateOrCreate(root,db,NULL,0);
+    auto st2 = cells::getStateOrCreate(root,db,NULL,time0);
     st2->chain_id      = j.value("chain_id", (int64_t)1);
     st2->genesis_time  = j.value("genesis_time", (int64_t)time(NULL));
     st2->total_supply  = i128(0);
@@ -73,9 +78,9 @@ void init_genesis(Cellable* root, IDatabase* db)
     st2->contract_count = 0;
     st2->tx_count      = 0;
     st2->block_height  = 0;
-    st2->setDirty(NULL,0);
+    st2->setDirty(NULL,time0);
 
-    auto v = cells::getValuesOrCreate(root, db, NULL,0);
+    auto v = cells::getValuesOrCreate(root, db, NULL,time0);
     if (j.contains("params") && j["params"].is_object()) {
         for (auto& [k, val] : j["params"].items()) {
             if (!val.is_number_integer())
@@ -93,14 +98,14 @@ void init_genesis(Cellable* root, IDatabase* db)
             v->emitters_bin.insert(addr);
         }
     }
-    v->setDirty(NULL,0);
+    v->setDirty(NULL,time0);
 
     if (j.contains("users") && j["users"].is_array()) {
         for (auto& u : j["users"]) {
             std::string label = user_label(u);
             ADDRESS_id addr = resolve_user(u);
 
-            auto ua = cells::getAddressStateOrCreate(root, db,addr, NULL,0);
+            auto ua = cells::getAddressStateOrCreate(root, db,addr, NULL,time0);
             int64_t bal = 0;
             if (u.contains("balance") && u["balance"].is_string())
                 bal = std::stoll(u["balance"].get<std::string>());
@@ -123,16 +128,16 @@ void init_genesis(Cellable* root, IDatabase* db)
                     if (!id) throw CommonError("genesis: users.%s addKey failed", label.c_str());
                 }
             }
-            ua->setDirty(NULL,0);
+            ua->setDirty(NULL,time0);
 
             // ▼▼▼ INSERT: activity для адреса (ttl = 0, вечный)
-            cells::getActivityOrCreate(root, db, ua->getDbId(), {}, 0, genesis_time, NULL);
+            cells::getActivityOrCreate(root, db, ua->getDbId(), {}, TTL_sec{}, TIME_mks{genesis_time}, NULL);
             // ▲▲▲
 
             st2->total_supply += i128(bal);
         }
     }
-    st2->setDirty(NULL,0);
+    st2->setDirty(NULL,time0);
 
     if (j.contains("nodes") && j["nodes"].is_array()) {
         for (auto& n : j["nodes"]) {
@@ -146,7 +151,7 @@ void init_genesis(Cellable* root, IDatabase* db)
                 throw CommonError("genesis: node.%s owner required", name.container.c_str());
             ADDRESS_id owner = resolve_addr(n["owner"].get<std::string>());
 
-            auto nn = cells::addNode(root,db,name, NULL,0);
+            auto nn = cells::addNode(root,db,name, NULL,time0);
 
             blst_cpp::PublicKey bls_pk;
             if (!n.contains("bls_pk") || !n["bls_pk"].is_string())
@@ -166,16 +171,16 @@ void init_genesis(Cellable* root, IDatabase* db)
             if (n.contains("stake") && n["stake"].is_string())
                 stake = std::stoll(n["stake"].get<std::string>());
             nn->add_stake(owner, stake);
-            nn->setDirty(NULL,0);
+            nn->setDirty(NULL,time0);
 
             // ▼▼▼ INSERT: activity для ноды (ttl = 0, вечный)
-            cells::getActivityOrCreate(root, db, nn->getDbId(), {}, 0, genesis_time, NULL);
+            cells::getActivityOrCreate(root, db, nn->getDbId(), {}, TTL_sec{}, TIME_mks{genesis_time}, NULL);
             // ▲▲▲
 
             st2->total_stake += i128(stake);
         }
     }
-    st2->setDirty(NULL,0);
+    st2->setDirty(NULL,time0);
     _db_to_save dbz;
     proceed_merkle_on_transaction_pool_hashers(root,dbz);
     db->write_granules_batch(dbz);

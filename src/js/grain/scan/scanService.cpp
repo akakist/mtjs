@@ -43,7 +43,7 @@ bool Scan::Service::ClientMsg(const bcEvent::ClientMsg *e)
         // ВАЖНО: _update_time у активности — это block_timestamp в микросекундах.
         // time(NULL) даёт секунды, и сравнение _update_time + ttl < now никогда
         // не выполнялось (сканер всегда возвращал пустой список).
-        int64_t now = pp->now > 0 ? pp->now : (int64_t)iUtils->getNow();
+        TIME_mks now{pp->now > 0 ? pp->now : iUtils->getNow().v};
         int64_t max_sec = pp->max_sec > 0 ? pp->max_sec : 5;
 
         auto db = dynamic_cast<CDatabaseRocksdb*>(db_state.get());
@@ -53,14 +53,14 @@ bool Scan::Service::ClientMsg(const bcEvent::ClientMsg *e)
             return true;
         }
 
-        auto t0 = iUtils->getNow();
+        auto t0 = iUtils->getNow().v;
         std::unique_ptr<rocksdb::Iterator> it(db->db_ptr->NewIterator(rocksdb::ReadOptions()));
         if (pp->from.container.empty()) it->SeekToFirst();
         else it->Seek(pp->from.container);
 
         int64_t scanned = 0;
         while (it->Valid()) {
-            if (iUtils->getNow() - t0 > max_sec * 1000000LL) break;
+            if (iUtils->getNow().v - t0 > max_sec * 1000000LL) break;
             auto key = it->key().ToString();
             if (key.size() == 32) {
                 scanned++;
@@ -73,7 +73,7 @@ bool Scan::Service::ClientMsg(const bcEvent::ClientMsg *e)
                     switch (c.payload_ctor_idx) {
                     case hsh::bc_activity: {
                         auto* act = dynamic_cast<bc_activity*>(c.data.get());
-                        if (act && act->ttl > 0 && act->_update_time + act->ttl < now)
+                        if (act && act->ttl.positive() && act->_update_time + act->ttl < now)
                             expired = true;
                         break;
                     }

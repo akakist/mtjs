@@ -41,7 +41,7 @@
 #include "ContractHost.h"
 #include "cells.h"
 
-std::set<NODE_id> getValidators(int64_t block_timestamp, IDatabase* db);
+std::set<NODE_id> getValidators(TIME_mks block_timestamp, IDatabase* db);
 
 // #define HB_TIME_WINDOW 2
 #define HB_SEND_TIMEOUT 4
@@ -178,6 +178,13 @@ namespace Node
 
         /// Синк идёт: гейт для всех обработчиков консенсуса.
         std::atomic<bool> sync_in_progress{false};
+        // следующий запрос синка — с since=0 (полное дерево).
+        // Нужен, когда слияние по дельте не сходится: у клиента не хватает
+        // старых ячеек, и сервер их больше не пришлёт (фильтр > since).
+        std::atomic<bool> sync_full{false};
+        // дерево собирается с нуля (полный синк): старые/удалённые листья
+        // не должны попасть в новое дерево.
+        std::atomic<bool> sync_fresh_root{false};
         /// Продлить/снять watchdog синка (перевзводится на каждой активности).
         void sync_watchdog_arm();
         void sync_watchdog_stop();
@@ -283,7 +290,7 @@ namespace Node
         std::optional<std::string> execute_remove_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId);
 
         std::optional<std::string> gc_activity_apply(
-                const REF_getter<Cellable>& cc, int64_t now, t_params& t, b_params& b, _db_to_save& dbd,
+                const REF_getter<Cellable>& cc, TIME_mks now, t_params& t, b_params& b, _db_to_save& dbd,
                 int& applied_granule, int& applied_contract, int& applied_node, int& applied_address);
 
 
@@ -304,7 +311,7 @@ namespace Node
         /// последние NO_LEADER_FRAME_MKS слота, пустой vne, либо нет prev_block.
         REF_getter<bc_node> current_leader();
         void resetBlockExpired(const NODE_id &n);
-        void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, int64_t block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
+        void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
 
 
     };

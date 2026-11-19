@@ -50,10 +50,16 @@ std::pair<std::string,std::string> splice(const std::string& id)
 //     }
 // }
 
-void Node::Service::collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, int64_t block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route)
+void Node::Service::collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route)
 {
     
-    if(c->m_id.size()==28 && c->last_block_timestamp > block_timestamp)
+    auto eligible = [&](const Cellable* x) {
+        // since=0 -> полный синк: включаем и генезисные ячейки (timestamp 0),
+        // иначе они не попадут в пересборку и root не сойдётся.
+        if (block_timestamp.v == 0) return x->last_block_timestamp.v >= 0;
+        return x->last_block_timestamp > block_timestamp;
+    };
+    if(c->m_id.size()==28 && eligible(c))
     {
         dbdump.push_back({c->getDbId(),c->getBuffer_mx()});
         cnt++;
@@ -69,7 +75,7 @@ void Node::Service::collect_granules_since_blocktimestamp(Cellable *c, IDatabase
             logNode("[collect_granules] getLeafNoCreate NULL for %s (stale local root)",base16::encode(x.first).c_str());
             continue;
         }
-        if(cc->last_block_timestamp > block_timestamp)
+        if(eligible(cc.get()))
             collect_granules_since_blocktimestamp(cc.get(),db,block_timestamp,dbdump,cnt,route);
     }
     if(dbdump.size() > 10)
@@ -103,12 +109,11 @@ bool Node::Service::syncGetGranulesREQ(const bcEvent::syncGetGranulesREQ*e)
 
     // ── anti-replay ───────────────────────────────────────────────────────────
     // Подпись уже проверена. current_time — свой, монотонный, счётчик запросов
-    // (iUtils->getNow(), микросекунды). Повтор того же REQ отклоняется по
+    // (iUtils->getNow().v, микросекунды). Повтор того же REQ отклоняется по
     // монотонности, вне окна — по свежести, а размер запрашиваемой дельты
     // ограничен, чтобы реплей/мусорный since не заставлял отдавать весь чейн.
-    const int64_t now=iUtils->getNow();
+    const int64_t now=iUtils->getNow().v;
     static constexpr int64_t SYNC_REQ_TTL_MKS   = 30LL*1000*1000;   // 30 s
-    static constexpr int64_t MAX_SYNC_DELTA_MKS = 3600LL*1000*1000; // 1 h
 
     if(e->current_time<=0 || e->current_time>now+SYNC_REQ_TTL_MKS/2)
     {
@@ -136,15 +141,13 @@ bool Node::Service::syncGetGranulesREQ(const bcEvent::syncGetGranulesREQ*e)
         logNode("[syncGetGranulesREQ] since_block_timestamp in the future");
         return true;
     }
-    if(e->since_block_timestamp>0 && e->current_time-e->since_block_timestamp>MAX_SYNC_DELTA_MKS)
-    {
-        logNode("[syncGetGranulesREQ] delta too big: %lld mks",
-                (long long)(e->current_time-e->since_block_timestamp));
-        return true;
-    }
+    // Анти-реплей уже обеспечен: TTL запроса (30 s) + монотонный current_time на узел.
+    // Ограничение "delta" здесь только мешало догонять после долгого простоя:
+    // узел, отставший больше чем на час, получал отказ вечно.
+    // Размер ответа и так ограничен пачками (см. collect_granules_since_blocktimestamp).
 
     int64_t cnt=0;
-    collect_granules_since_blocktimestamp(root.get(),db_state.get(),e->since_block_timestamp,ret,cnt,e->route);
+    collect_granules_since_blocktimestamp(root.get(),db_state.get(),TIME_mks{e->since_block_timestamp},ret,cnt,e->route);
 
     // prev_block отдаём вместе с финальной пачкой: без него клиент не может
     // обновить prev_root_hash_Z()/epoch_current()/current_leader().
@@ -164,12 +167,20 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
     // getByPathNoCreate()
 
     // auto newroot=getRoot(db_state.get(),prev_block);
+    if (sync_fresh_root)
+    {
+        // Полная пересборка: удалённые у сервера листья не должны унаследоваться.
+        // Пустой root — как при первом запуске (getRoot с пустой БД).
+        root = new Cellable(NULL, "");
+        sync_fresh_root = false;
+        logNode("sync: full rebuild from empty root");
+    }
     for(auto& z: m->v)
     {
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
         THASH_id h;
         h.container=z.first;
-        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, NULL,z.second,false,0);
+        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, NULL,z.second,false,TIME_mks{});
         leaf->setDirty(NULL,leaf->parent->last_block_timestamp);
         logNode("sync: %s",base16::encode(z.first).c_str());
     }
@@ -182,9 +193,12 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
         auto roothash=proceed_merkle_on_transaction_pool_hashers(root.get(),db);
         if(m->root_hash!=roothash)
         {
-            // sync_in_progress остаётся true: дерево неполное, нужен повтор
-            // (ретрай/watchdog — отдельная задача)
-            logNode("sync: root hash not matched %s %s", m->root_hash.str().c_str(),roothash.str().c_str());
+            // Слияние по дельте не сошлось: у клиента нет части старых ячеек,
+            // а сервер по фильтру >since их уже не отдаст. Следующий запрос — с since=0.
+            // sync_in_progress остаётся true: дерево неполное, нужен повтор.
+            logNode("sync: root hash not matched %s %s (next request: full resync)",
+                    m->root_hash.str().c_str(),roothash.str().c_str());
+            sync_full=true;
             return true;
         }
 
@@ -235,6 +249,7 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
         }
 
         sync_watchdog_stop();
+        sync_full=false;
         sync_in_progress=false;   // последним: до этого момента состояние неконсистентно
     }
 

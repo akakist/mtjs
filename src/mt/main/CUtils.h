@@ -1,5 +1,6 @@
 #pragma once
 #ifndef _WIN32
+#include "time_types.h"
 #include <dlfcn.h>
 #include <IUtils.h>
 #include <CapsId.h>
@@ -69,7 +70,7 @@ public:
     int geb_params_int(std::deque<std::string> &tokens, const std::string& name);
     int64_t geb_params_int64_t(std::deque<std::string> &tokens, const std::string& name);
 
-    int64_t getNow();
+    TIME_mks getNow();
     std::string getPercent(const real &numerator, const real &denumerator);
 
 

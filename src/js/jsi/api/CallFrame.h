@@ -4,5 +4,6 @@ struct CallFrame : public Refcountable {
     CallFrame() : Refcountable("CallFrame") {}
     REF_getter<ContractContext> contract;
     std::string method;
-    bool in_view = false;
+    enum class Mode { Method, View, Query };
+    Mode mode = Mode::Method;
 };

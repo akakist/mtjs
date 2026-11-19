@@ -138,8 +138,8 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
             return true;
         }
 
-        if(src_node==br->blockAcceptedREQ->blockInfo->heart_beat->node_leader)
-            logNode("validators %s",iUtils->join(" ",nnn).c_str());
+        // if(src_node==br->blockAcceptedREQ->blockInfo->heart_beat->node_leader)
+        //     logNode("validators %s",iUtils->join(" ",nnn).c_str());
 
 
 
@@ -241,7 +241,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 
 
 
-        logNode("validators %s",iUtils->join(" ",nnn).c_str());
+        // logNode("validators %s",iUtils->join(" ",nnn).c_str());
 
 
         // std::string nodelist;

@@ -22,6 +22,7 @@ struct ContractContext : public Refcountable {
     CONTRACT_id name;
     std::map<std::string, JSIValueGuard> methods;
     std::map<std::string, JSIValueGuard> views;
+    std::map<std::string, JSIValueGuard> queries;   // reader-only: видят now, не видят msg
 
     ContractContext() : Refcountable("ContractContext") {}
     ContractContext(const ContractContext&) = delete;
@@ -33,7 +34,7 @@ struct ContractContext : public Refcountable {
         // root=nullptr;
     }
     ~ContractContext() {
-        methods.clear(); views.clear();
+        methods.clear(); views.clear(); queries.clear();
         if (ctx) { JSI_FreeContext(ctx); ctx = nullptr; }
         if (rt) { JSI_FreeRuntime(rt); rt = nullptr; }
     }
@@ -50,21 +51,30 @@ struct ContractContext : public Refcountable {
     }
 
     // method: msg есть, газ есть, roll есть
-    JSIValue call_contract_method(Cellable* root, const std::string& method_name,
+    JSIValue call_method(Cellable* root, const std::string& method_name,
                              const nlohmann::json& params,
                              IMsgSource* msg_source,
                              CallStack* call_stack,
                               ContractHost* host, Rollback* roll,
                              const CONTRACT_id& caller, FeesSnapshot* fees,
-                             std::set<REF_getter<data_base>> * deleted_granule, int64_t block_timestamp);
+                             std::set<REF_getter<data_base>> * deleted_granule, TIME_mks block_timestamp);
 
     // view: msg НЕТ, газа НЕТ, roll НЕТ (read-only)
     // view: msg НЕТ, газа НЕТ, roll НЕТ (read-only). timeout_sec — лимит времени.
-    JSIValue call_contract_view(Cellable* root,const std::string& view_name,
+    JSIValue call_view(Cellable* root,const std::string& view_name,
+                             const nlohmann::json& params,
+                             IMsgSource* msg_source,
+                             CallStack* call_stack,
+                              ContractHost* host,
+                             int64_t timeout_sec = 5,
+                             TIME_mks block_timestamp = TIME_mks{});
+    // query: reader-only, без газа, now сэмплируется на входе
+    JSIValue call_query(Cellable* root, const std::string& query_name,
                              const nlohmann::json& params,
                              CallStack* call_stack,
                               ContractHost* host,
-                             int64_t timeout_sec = 5);
+                             TIME_mks block_timestamp,
+                             TIME_mks now);
 };
 
 

@@ -91,7 +91,7 @@ static REF_getter<JSI_Granule> do_get_granule(JSIContext* ctx, JSI_Granule* pare
         if (err) *err = "granule not found: " + key.container;
         return nullptr;
     }
-    g->__ttl = g->cnode->ttl();
+    g->__ttl = g->cnode->ttl().v;
     return g;
 }
 
@@ -99,7 +99,7 @@ static REF_getter<JSI_Granule> do_get_granule(JSIContext* ctx, JSI_Granule* pare
 // do_get_or_create_granule (write: get, иначе create с ttl)
 // ============================================================
 static REF_getter<JSI_Granule> do_get_or_create_granule(JSIContext* ctx, JSI_Granule* parent,
-                                                        const std::string& name, int64_t ttl,
+                                                        const std::string& name, TTL_sec ttl,
                                                         std::string* err)
 {
     auto* call = call_ctx(ctx);
@@ -116,18 +116,18 @@ static REF_getter<JSI_Granule> do_get_or_create_granule(JSIContext* ctx, JSI_Gra
     auto existing = io->getCNode(call->root, call->contract->name, key);
     if (existing.valid()) {
         g->cnode = existing;
-        g->__ttl = existing->ttl();
+        g->__ttl = existing->ttl().v;
         return g;
     }
     // 2) create
     g->cnode = io->createCNode(call->root, call->contract->name, key,
-                               (time_t)call->msg_source->get_blockTimestamp(),
-                               (int)ttl, call->roll);
+                               TIME_mks{call->msg_source->get_blockTimestamp()},
+                               ttl, call->roll);
     if (!g->cnode.valid()) {
         if (err) *err = "create granule failed: " + key.container;
         return nullptr;
     }
-    g->__ttl = ttl;
+    g->__ttl = ttl.v;
     g->do_update_time(call->msg_source->get_blockTimestamp());
     g->setDirtyD();
     return g;
@@ -147,13 +147,13 @@ static JSIValue jsg_get_granule(JSIContext* ctx, JSIValueConst this_val, int arg
     std::string err;
 
     if (argc == 2) {
-        auto* c = require_writable_ctx(ctx);
+        auto* c = require_tx_ctx(ctx);
         if (!c) return JSI_EXCEPTION;
         int64_t ttl = 0;
         if (JSI_ToInt64(ctx, &ttl, argv[1]) != 0) return JSI_ThrowTypeError(ctx, "ttl must be int64");
         if (ttl <= 0) return JSI_ThrowTypeError(ctx, "ttl must be > 0");
         if (ttl > MAX_GRANULE_TTL) return JSI_ThrowTypeError(ctx, "ttl > MAX_TTL");
-        auto ch = do_get_or_create_granule(ctx, self.get(), name, ttl, &err);
+        auto ch = do_get_or_create_granule(ctx, self.get(), name, TTL_sec{ttl}, &err);
         if (!ch.valid()) return JSI_ThrowTypeError(ctx, "get_granule: %s", err.c_str());
         self->children.insert({ch->name, ch});
         return JSI_granule_new(ctx, ch, /*writable=*/true);
@@ -201,7 +201,7 @@ static JSIValue jsg_set(JSIContext* ctx, JSIValueConst this_val, int argc, JSIVa
     if (argc != 1) return JSI_ThrowTypeError(ctx, "set(value)");
     if (!is_writable(ctx, this_val))
         return JSI_ThrowTypeError(ctx, "set is not allowed (read-only storage)");
-    auto* c = require_writable_ctx(ctx);
+    auto* c = require_tx_ctx(ctx);
     if (!c) return JSI_EXCEPTION;
     auto self = JSI_granule_get(ctx, this_val);
     if (!self.valid()) return JSI_ThrowTypeError(ctx, "invalid this");
@@ -221,7 +221,7 @@ static JSIValue jsg_del(JSIContext* ctx, JSIValueConst this_val, int argc, JSIVa
     if (argc != 0) return JSI_ThrowTypeError(ctx, "del()");
     if (!is_writable(ctx, this_val))
         return JSI_ThrowTypeError(ctx, "del is not allowed (read-only storage)");
-    auto* c = require_writable_ctx(ctx, /*need_msg_source=*/false);
+    auto* c = require_tx_ctx(ctx, /*need_msg_source=*/false);
     if (!c) return JSI_EXCEPTION;
     auto self = JSI_granule_get(ctx, this_val);
     if (!self.valid()) return JSI_ThrowTypeError(ctx, "invalid this");
@@ -244,13 +244,13 @@ static JSIValue JSI_global_get_granule(JSIContext* ctx, JSIValueConst, int argc,
     std::string err;
 
     if (argc == 2) {
-        auto* c = require_writable_ctx(ctx);
+        auto* c = require_tx_ctx(ctx);
         if (!c) return JSI_EXCEPTION;
         int64_t ttl = 0;
         if (JSI_ToInt64(ctx, &ttl, argv[1]) != 0) return JSI_ThrowTypeError(ctx, "ttl must be int64");
         if (ttl <= 0) return JSI_ThrowTypeError(ctx, "ttl must be > 0");
         if (ttl > MAX_GRANULE_TTL) return JSI_ThrowTypeError(ctx, "ttl > MAX_TTL");
-        auto ch = do_get_or_create_granule(ctx, nullptr, path, ttl, &err);
+        auto ch = do_get_or_create_granule(ctx, nullptr, path, TTL_sec{ttl}, &err);
         if (!ch.valid()) return JSI_ThrowInternalError(ctx, "get_granule: %s", err.c_str());
         c->JSI_Granule_children.insert({path, ch});
         return JSI_granule_new(ctx, ch, /*writable=*/true);
@@ -295,13 +295,13 @@ static JSIValue JSI_global_get(JSIContext* ctx, JSIValueConst, int argc, JSIValu
     std::string err;
 
     if (argc == 2) {
-        auto* c = require_writable_ctx(ctx);
+        auto* c = require_tx_ctx(ctx);
         if (!c) return JSI_EXCEPTION;
         int64_t ttl = 0;
         if (JSI_ToInt64(ctx, &ttl, argv[1]) != 0) return JSI_ThrowTypeError(ctx, "ttl must be int64");
         if (ttl <= 0) return JSI_ThrowTypeError(ctx, "ttl must be > 0");
         if (ttl > MAX_GRANULE_TTL) return JSI_ThrowTypeError(ctx, "ttl > MAX_TTL");
-        auto ch = do_get_or_create_granule(ctx, nullptr, name, ttl, &err);
+        auto ch = do_get_or_create_granule(ctx, nullptr, name, TTL_sec{ttl}, &err);
         if (!ch.valid()) return JSI_ThrowInternalError(ctx, "get: %s", err.c_str());
         c->JSI_Granule_children.insert({name, ch});
         return JSI_granule_new(ctx, ch, /*writable=*/true);
@@ -343,13 +343,13 @@ static JSIValue jsg_get(JSIContext* ctx, JSIValueConst this_val, int argc, JSIVa
     std::string err;
 
     if (argc == 2) {
-        auto* c = require_writable_ctx(ctx);
+        auto* c = require_tx_ctx(ctx);
         if (!c) return JSI_EXCEPTION;
         int64_t ttl = 0;
         if (JSI_ToInt64(ctx, &ttl, argv[1]) != 0) return JSI_ThrowTypeError(ctx, "ttl must be int64");
         if (ttl <= 0) return JSI_ThrowTypeError(ctx, "ttl must be > 0");
         if (ttl > MAX_GRANULE_TTL) return JSI_ThrowTypeError(ctx, "ttl > MAX_TTL");
-        auto ch = do_get_or_create_granule(ctx, self.get(), name, ttl, &err);
+        auto ch = do_get_or_create_granule(ctx, self.get(), name, TTL_sec{ttl}, &err);
         if (!ch.valid()) return JSI_ThrowInternalError(ctx, "get: %s", err.c_str());
         self->children.insert({ch->name, ch});
         return JSI_granule_new(ctx, ch, /*writable=*/true);

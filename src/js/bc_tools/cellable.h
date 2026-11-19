@@ -24,7 +24,7 @@ struct data_base : public Refcountable
     ~data_base()
     {
     }
-    void setDirty(Rollback* roll, int64_t block_timestamp);
+    void setDirty(Rollback* roll, TIME_mks block_timestamp);
     ;
     size_t size_() const
     {
@@ -78,7 +78,7 @@ struct Cellable: public Refcountable
     /// @brief  не изменяется, выставляется только в конструкторе
     const std::string m_id;
 
-    int64_t last_block_timestamp=0;
+    TIME_mks last_block_timestamp;   // момент последнего изменения ячейки
 
     std::map<std::string,THASH_id > children_hashes_mx;
     std::map<std::string, REF_getter<Cellable>> children_ptrs_mx;
@@ -106,7 +106,7 @@ public:
         }
         return sz;
     }
-    void setDirty__(Rollback* r, int64_t block_timestamp)
+    void setDirty__(Rollback* r, TIME_mks block_timestamp)
     {
         {
             if(r)
@@ -123,7 +123,6 @@ public:
             parent->setDirty__(r, block_timestamp);
         }
     }
-
 
     std::string getDbId() const;
     void clear(const std::string &id)
@@ -242,4 +241,4 @@ public:
 };
 
 
-void deleteGranule(data_base* g, Rollback* roll,_db_to_save &db_dump, int64_t block_timestamp);
+void deleteGranule(data_base* g, Rollback* roll,_db_to_save &db_dump, TIME_mks block_timestamp);

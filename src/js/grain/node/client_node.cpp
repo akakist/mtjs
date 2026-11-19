@@ -338,7 +338,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
             stale.push_back({blake2b_hash(old_body).container, old_body});
     }
 
-    int64_t now = (int64_t)iUtils->getNow();
+    int64_t now = iUtils->getNow().v;
     for (auto& z : stale)
         stale_cache[z.first] = { z.second, now };
 
@@ -404,13 +404,15 @@ bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node
     if(r->hb->prev_root_hash_1!=prev_root_hash_Z()
         && (!prev_block.valid() || r->hb->new_epoch > prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch+1))
     {
-        // since=0 — базы нет (свежий узел без prev_block): просим дерево целиком
-        const int64_t since = prev_block.valid()
-            ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp : 0;
-        logNode("request sync since=%lld epoch_req=%lld local_epoch=%lld prev_block=%s",
+        // since=0 — базы нет (свежий узел без prev_block) либо предыдущее
+        // слияние по дельте не сошлось (sync_full): просим дерево целиком
+        const int64_t since = (prev_block.valid() && !sync_full)
+            ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v : 0;
+        if (sync_full) sync_fresh_root = true;   // собираем дерево с нуля
+        logNode("request sync since=%lld epoch_req=%lld local_epoch=%lld prev_block=%s full=%d",
                 (long long)since,(long long)r->hb->new_epoch,(long long)epoch_current(),
-                prev_block.valid()?"yes":"no");
-        REF_getter<bcEvent::syncGetGranulesREQ> e=new bcEvent::syncGetGranulesREQ(since,this_node_name,iUtils->getNow(),ListenerBase::serviceId);
+                prev_block.valid()?"yes":"no",(int)sync_full);
+        REF_getter<bcEvent::syncGetGranulesREQ> e=new bcEvent::syncGetGranulesREQ(since,this_node_name,iUtils->getNow().v,ListenerBase::serviceId);
         e->sign(my_sk_ed);
         sendEvent(r->ip,ServiceEnum::Node,e.get());
         sync_in_progress=true;
@@ -490,17 +492,17 @@ void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, 
                 logNode("disable node");
                 z->setEnabled(false);
             }
-            z->setDirty(NULL, block_timestamp);
+            z->setDirty(NULL, TIME_mks{block_timestamp});
         }
         else
         {
             z->missed_rounds=0;
             z->answered_rounds++;
-            z->setDirty(NULL, block_timestamp);
+            z->setDirty(NULL, TIME_mks{block_timestamp});
         }
         auto act = cells::getActivityNoCreate(root.get(), db_state.get(), z->getDbId());
         if (act.valid()) {
-            act->update_time(block_timestamp, NULL);
+            act->update_time(TIME_mks{block_timestamp}, NULL);
         }        
     }
 }
@@ -614,7 +616,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         diff_hash.container=dh.final();
 
 
-        REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo(new_root_hash,tx_hash,diff_hash,t.att_data->getHash(),r->heart_beat, r->block_timestamp);
+        REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo(new_root_hash,tx_hash,diff_hash,t.att_data->getHash(),r->heart_beat, r->block_timestamp.v);
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
 
         rsp->blockInfo = blockInfo;

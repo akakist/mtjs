@@ -237,8 +237,8 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 auto act = cells::getActivityNoCreate(root.get(), db_state.get(), c->getDbId());
                 if(!act.valid())
                     throw CommonError("if(!act.valid())");
-                rsp->ttl = act->ttl;   // ← activity.ttl (маркер), не bc_contract.ttl (0)
-                rsp->update_time = act->_update_time;
+                rsp->ttl = to_sec(act->ttl).v;   // наружу секунды   // ← activity.ttl (маркер), не bc_contract.ttl (0)
+                rsp->update_time = act->_update_time.v;
             } else {
                 rsp->setError(msgcode::NOT_FOUND, "contract not found");
             }
@@ -302,7 +302,8 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 if (params_ok) {
                     CallStack cs;
                     CONTRACT_id caller;           // внешний вызов → пустой caller
-                    JSIValue r = cc->call_contract_view(root.get(), pp->view, params, &cs, contractHost.get(), pp->timeout_sec);
+                    JSIValue r = cc->call_view(root.get(), pp->view, params, nullptr, &cs, contractHost.get(), pp->timeout_sec,
+                        prev_block.valid() ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp : TIME_mks{});
                     if (JSI_IsException(r)) {
                         std::string emsg;
                         JSIValue exc = JSI_GetException(cc->ctx);

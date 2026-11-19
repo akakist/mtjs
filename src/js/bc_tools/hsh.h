@@ -15,6 +15,7 @@ namespace hsh
         bc_contract_balance,
         bc_state,
         bc_activity,
+        bc_deleted,   // тумбстоун: время удаления = last_block_timestamp
         HSH_END
     };
 }

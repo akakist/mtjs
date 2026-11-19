@@ -88,7 +88,7 @@ namespace cells {
 // ============================================================
 // replaceLeaf / getByPath / getByDbId
 // ============================================================
-    REF_getter<Cellable> getLeafOrCreate(Cellable* _cur, IDatabase* db, const std::string& id, Rollback* roll, bool checkHash, int64_t block_timestamp)
+    REF_getter<Cellable> getLeafOrCreate(Cellable* _cur, IDatabase* db, const std::string& id, Rollback* roll, bool checkHash, TIME_mks block_timestamp)
     {
         MUTEX_INSPECTOR;
         auto cur = _cur;
@@ -174,7 +174,7 @@ REF_getter<Cellable> getLeafNoCreate(Cellable* _cur, IDatabase* db, const std::s
     return cc;
 }
 
-REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, Rollback* roll, bool checkHash, int64_t block_timestamp)
+REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, Rollback* roll, bool checkHash, TIME_mks block_timestamp)
 {
     auto cur = root;
     for (auto& z : v)
@@ -190,7 +190,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
 }
 
 
-REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::deque<std::string>& v, Rollback* roll, bool checkHash, int64_t block_timestamp)
+REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::deque<std::string>& v, Rollback* roll, bool checkHash, TIME_mks block_timestamp)
 {
     auto cur = root;
     for (auto& z : v)
@@ -224,7 +224,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         return getByPathNoCreate(root, db, getPathFromHash(h),checkHash);
     }
 
-    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& h, Rollback* roll, const std::string& buffer, bool checkHash, int64_t block_timestamp)
+    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& h, Rollback* roll, const std::string& buffer, bool checkHash, TIME_mks block_timestamp)
     {
         MUTEX_INSPECTOR;
         auto cc = getByPathOrCreate(root, db, getPathFromHash(h), roll, checkHash, block_timestamp);
@@ -244,7 +244,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
 // ============================================================
 // address state
 // ============================================================
-    REF_getter<bc_address_state> getAddressStateOrCreate(Cellable* root, IDatabase* db, const ADDRESS_id& addr, Rollback* roll, int64_t block_timestamp)
+    REF_getter<bc_address_state> getAddressStateOrCreate(Cellable* root, IDatabase* db, const ADDRESS_id& addr, Rollback* roll, TIME_mks block_timestamp)
     {
         MUTEX_INSPECTOR;
         auto cc = getByPathOrCreate(root, db, getAddressStatePath(addr), roll,true,block_timestamp);
@@ -293,7 +293,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
 // ============================================================
 // contract / contract data / contract balance
 // ============================================================
-    REF_getter<bc_contract> getContractOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll, int64_t block_timestamp)
+    REF_getter<bc_contract> getContractOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll, TIME_mks block_timestamp)
     {
         MUTEX_INSPECTOR;
         auto cc = getByPathOrCreate(root, db, getContractPath(name), roll,true,block_timestamp);
@@ -330,7 +330,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         return dynamic_cast<const bc_contract*>(cc->data.get());
     }
 
-    REF_getter<bc_granule> getContractDataOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& name, Rollback* roll, int ttl, time_t block_timestamp)
+    REF_getter<bc_granule> getContractDataOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& name, Rollback* roll, TTL_sec ttl, TIME_mks block_timestamp)
     {
         MUTEX_INSPECTOR;
         auto cc = getByPathOrCreate(root, db, getContractDataPath(con, name), roll, true, block_timestamp);
@@ -373,7 +373,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         return dynamic_cast<const bc_granule*>(cc->data.get());
     }
 
-    REF_getter<bc_contract_balance> getContractBalanceOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& contract, Rollback* roll, int64_t block_timestamp)
+    REF_getter<bc_contract_balance> getContractBalanceOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& contract, Rollback* roll, TIME_mks block_timestamp)
     {
         MUTEX_INSPECTOR;
         auto cc = getByPathOrCreate(root, db, getContractBalancePath(contract), roll, true, block_timestamp);
@@ -449,7 +449,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         return dynamic_cast<const bc_nodelist*>(n.get());
     }
 
-    REF_getter<bc_nodelist> getNodeListOrCreate(Cellable* root, IDatabase* db, Rollback* roll, int64_t blocktimestamp)
+    REF_getter<bc_nodelist> getNodeListOrCreate(Cellable* root, IDatabase* db, Rollback* roll, TIME_mks blocktimestamp)
     {
         MUTEX_INSPECTOR;
         auto cc = getByPathOrCreate(root, db, getPath("NODE LIST"), roll, true, blocktimestamp);
@@ -465,7 +465,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         return u;
     }
 
-    REF_getter<bc_node> addNode(Cellable* root, IDatabase* db, const NODE_id& name, Rollback* roll, int64_t block_timestamp)
+    REF_getter<bc_node> addNode(Cellable* root, IDatabase* db, const NODE_id& name, Rollback* roll, TIME_mks block_timestamp)
     {
         MUTEX_INSPECTOR;
         auto nl = getNodeListNoCreate(root, db);
@@ -513,7 +513,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
 // ============================================================
 // values / votes / state
 // ============================================================
-    REF_getter<bc_values> getValuesOrCreate(Cellable* root, IDatabase* db, Rollback* roll, int64_t blocktimestamp)
+    REF_getter<bc_values> getValuesOrCreate(Cellable* root, IDatabase* db, Rollback* roll, TIME_mks blocktimestamp)
     {
         MUTEX_INSPECTOR;
         auto l = getByPathOrCreate(root, db, getPath("VALUES"), roll, true, blocktimestamp);
@@ -550,7 +550,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         return dynamic_cast<const bc_values*>(v.get());
     }
 
-    REF_getter<bc_votes> getVotesOrCreate(Cellable* root, IDatabase* db, Rollback* roll, int64_t blocktimestamp)
+    REF_getter<bc_votes> getVotesOrCreate(Cellable* root, IDatabase* db, Rollback* roll, TIME_mks blocktimestamp)
     {
         MUTEX_INSPECTOR;
         auto l = getByPathOrCreate(root, db, getPath("VOTES"), roll, true,blocktimestamp);
@@ -586,7 +586,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         return dynamic_cast<const bc_votes*>(v.get());
     }
 
-    REF_getter<bc_state> getStateOrCreate(Cellable* root, IDatabase* db, Rollback* roll, int64_t blocktimestamp)
+    REF_getter<bc_state> getStateOrCreate(Cellable* root, IDatabase* db, Rollback* roll, TIME_mks blocktimestamp)
     {
         MUTEX_INSPECTOR;
         auto l = getByPathOrCreate(root, db, getStatePath(), roll, true,blocktimestamp);
@@ -626,7 +626,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         return getPath("CONTRACT_ACTIVITY_" + name.container);
     }
 
-    REF_getter<bc_activity> getContractActivityOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll, int64_t blocktimestamp)
+    REF_getter<bc_activity> getContractActivityOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll, TIME_mks blocktimestamp)
     {
         auto cc = getByPathOrCreate(root, db, getContractActivityPath(name), roll, true,blocktimestamp);
         if (!cc.valid()) throw CommonError("if(!cc.valid())");
@@ -673,21 +673,21 @@ REF_getter<bc_activity> getActivityNoCreate(Cellable* root, IDatabase* db, const
 
 REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
                                       const std::string& granule_dbid, const std::set<std::string> & additional,
-                                      int ttl, int64_t block_timestamp, Rollback* roll) {
+                                      TTL_sec ttl, TIME_mks block_timestamp, Rollback* roll) {
     auto cc = getByPathOrCreate(root, db, getActivityPath(granule_dbid), roll, true, block_timestamp);
     if (!cc.valid()) throw CommonError("if(!cc.valid())");
     if (cc->data.valid()) {
         auto act = dynamic_cast<bc_activity*>(cc->data.get());
-        act->_update_time = block_timestamp;
-        act->ttl = (int64_t)ttl * 1000000;   // снаружи секунды, внутри мкс
+        act->_update_time = TIME_mks{block_timestamp};
+        act->ttl = to_mks(ttl);
         act->setDirty(roll, block_timestamp);
         return act;
     }
     REF_getter<bc_activity> act = new bc_activity(cc.get());
     act->dbid=additional;
     act->dbid.insert(granule_dbid);
-    act->_update_time = block_timestamp;
-    act->ttl = (int64_t)ttl * 1000000;   // снаружи секунды, внутри мкс
+    act->_update_time = TIME_mks{block_timestamp};
+    act->ttl = to_mks(ttl);
     cc->data = act.get();
     cc->payload_ctor_idx = hsh::bc_activity;
     cc->data->setDirty(roll,block_timestamp);
@@ -696,7 +696,7 @@ REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
 
     void touchActivity(Cellable* root, IDatabase* db,
                     const std::string& granule_dbid,
-                    Rollback* roll, int64_t block_timestamp) {
+                    Rollback* roll, TIME_mks block_timestamp) {
         auto act = getActivityNoCreate(root, db, granule_dbid);
         if (!act.valid()) return;
         act->update_time(block_timestamp, roll);

@@ -14,12 +14,12 @@ struct CNode_prod: public CNode
     REF_getter<bc_granule> data=nullptr;
     REF_getter<bc_activity> act=nullptr;
     Rollback *roll=nullptr;
-    void set(const std::string &s, int64_t block_timestamp)
+    void set(const std::string &s, TIME_mks block_timestamp)
     {
         data->container=s;
         data->setDirty(roll, block_timestamp);
     }
-    void touch(time_t t)
+    void touch(TIME_mks t)
     {
         act->update_time(t,roll);
     }
@@ -27,15 +27,15 @@ struct CNode_prod: public CNode
     {
         return data->container;
     }
-    int64_t ttl()
+    TTL_sec ttl()
     {
-        return act->ttl / 1000000;   // внутри мкс, наружу секунды
+        return to_sec(act->ttl);   // внутри мкс, наружу секунды
     }
-    void update_time(int64_t t, Rollback* r)
+    void update_time(TIME_mks t, Rollback* r)
     {
         act->update_time(t,r);
     }
-    void setDirty(Rollback* r, int64_t block_timestamp)
+    void setDirty(Rollback* r, TIME_mks block_timestamp)
     {
         data->setDirty(r,block_timestamp);
     }
@@ -62,7 +62,7 @@ struct NodeGranuleIO : GranuleIO {
 
     std::optional<std::string> createGranule(Cellable* root,const CONTRACT_id& contract, const CONTRACT_DATA_id& key,
                                              const std::string& value,
-                                             int64_t block_timestamp, int64_t ttl,
+                                             TIME_mks block_timestamp, TTL_sec ttl,
                                              Rollback* roll) override {
         MUTEX_INSPECTOR;                                            
         {
@@ -76,14 +76,14 @@ struct NodeGranuleIO : GranuleIO {
             auto actd = cells::getActivityOrCreate(root, db.get(), dd->getDbId(),{},ttl,block_timestamp,roll);
             if(!actd.valid())
                 throw CommonError("if(!act.valid())");
-            actd->update_time(block_timestamp, roll);
+            actd->update_time(TIME_mks{block_timestamp}, roll);
             return std::nullopt;
         }
     }
 
     std::optional<std::string> setGranule(Cellable* root,const CONTRACT_id& contract, const CONTRACT_DATA_id& key,
                                         const std::string& value,
-                                        int64_t block_timestamp, 
+                                        TIME_mks block_timestamp, 
                                         Rollback* roll) override {
         MUTEX_INSPECTOR;                                            
         auto d = cells::getContractDataNoCreate(root,db.get(),contract, key);
@@ -91,11 +91,11 @@ struct NodeGranuleIO : GranuleIO {
         d->setDirty(roll, block_timestamp);
         d->container = value;   // <-- ОБНОВИТЬ ЗНАЧЕНИЕ
         auto actd=cells::getActivityNoCreate(root,db.get(),d->getDbId());
-        actd->update_time(block_timestamp,roll);
+        actd->update_time(TIME_mks{block_timestamp},roll);
 
         return std::nullopt;
     }
-    std::optional<std::string> addContractBalance(Cellable* root, const CONTRACT_id& c, int64_t delta, Rollback* roll, int64_t block_timestamp) override {
+    std::optional<std::string> addContractBalance(Cellable* root, const CONTRACT_id& c, int64_t delta, Rollback* roll, TIME_mks block_timestamp) override {
         MUTEX_INSPECTOR;                                            
         auto b = cells::getContractBalanceOrCreate(root, db.get(), c, roll, block_timestamp);
         if (!b.valid()) return std::string("balance create failed");
@@ -126,10 +126,10 @@ struct NodeGranuleIO : GranuleIO {
         auto d = cells::getContractDataNoCreateConst(root, db.get(), contract, key);
         if (!d.valid()) return 0;
         auto actd=cells::getActivityNoCreate(root,db.get(),d->getDbId());
-        return actd->ttl;
+        return to_sec(actd->ttl).v;   // наружу секунды
     }
     REF_getter<CNode> createCNode(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd,
-                                                     int64_t block_timestamp, int64_t ttl,
+                                                     TIME_mks block_timestamp, TTL_sec ttl,
                                                      Rollback* r)
     {
         auto dbid= blake2b_hash(cells::getContractDataKey(c,cd));
@@ -161,7 +161,7 @@ struct NodeGranuleIO : GranuleIO {
 
         return ret.get();
     }
-    void update_contract_time(Cellable* root,const CONTRACT_id& c, time_t t, Rollback* r)
+    void update_contract_time(Cellable* root,const CONTRACT_id& c, TIME_mks t, Rollback* r)
     {
         auto k=cells::getContractKey(c);
         auto act=cells::getActivityNoCreate(root,db.get(),blake2b_hash(k).container);

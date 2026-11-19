@@ -15,7 +15,7 @@ struct TestGranuleIO : GranuleIO {
         out = it->second;
         return true;
     }
-    std::optional<std::string> addContractBalance(Cellable*,const CONTRACT_id& c, int64_t delta, Rollback* roll, int64_t blocktimestamp) override {
+    std::optional<std::string> addContractBalance(Cellable*,const CONTRACT_id& c, int64_t delta, Rollback* roll, TIME_mks blocktimestamp) override {
         balances[c.container] += delta;
         return std::nullopt;
     }
@@ -43,34 +43,34 @@ struct TestGranuleIO : GranuleIO {
         return data.find(c.container+d.container) != data.end();
     }
     std::optional<std::string> createGranule(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d, const std::string& value,
-                int64_t create_time, int64_t ttl, Rollback* roll) override {
+                TIME_mks create_time, TTL_sec ttl, Rollback* roll) override {
         if (data.find(c.container+d.container) != data.end())
         {
             printf("create: already exists");
             return std::string("already exists");
 
         }
-        data[c.container+d.container] = Granule{ value, create_time, ttl };
+        data[c.container+d.container] = Granule{ value, create_time.v, to_mks(ttl).v };
         return std::nullopt;
     }
     std::optional<std::string> setGranule(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d,
                                         const std::string& value,
-                                        int64_t now, 
+                                        TIME_mks now, 
                                         Rollback* roll) override {
         auto it = data.find(c.container + d.container);
         if (it == data.end()) return std::string("not found");
         it->second.value = value;
-        it->second.create_time = now;
+        it->second.create_time = now.v;
         return std::nullopt;
     }
     int64_t getGranuleTTL(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
         auto it = data.find(c.container + d.container);
         if (it == data.end()) return 0;
-        return it->second.ttl;
+        return to_sec(TTL_mks{it->second.ttl}).v;   // наружу секунды
     }
     REF_getter<CNode> createCNode(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd,
-                                                     int64_t create_time, int64_t ttl,
-                                                     Rollback* r)
+                                                     TIME_mks create_time, TTL_sec ttl,
+                                                     Rollback* r) override
     {
         return nullptr;
     }
@@ -78,7 +78,7 @@ struct TestGranuleIO : GranuleIO {
     {
         return nullptr;
     }
-    void update_contract_time(Cellable*,const CONTRACT_id& c, time_t t, Rollback* roll)
+    void update_contract_time(Cellable*,const CONTRACT_id& c, TIME_mks t, Rollback* roll) override
     {
         
     }
@@ -112,7 +112,7 @@ struct TestMsgSource : IMsgSource {
     int64_t get_value() const override { return m.value; }
     int64_t get_gasLimit() const override { return m.gasLimit; }
     int64_t get_gasUsed() const override { return m.gasUsed; }
-    int64_t get_blockTimestamp() const override { return m.blockTimestamp; }
+    int64_t get_blockTimestamp() const override { return m.blockTimestamp.v; }
     int64_t get_blockHeight() const override { return m.blockHeight; }
     int64_t get_nonce() const override { return m.nonce; }
     int64_t get_chainId() const override { return m.chainId; }

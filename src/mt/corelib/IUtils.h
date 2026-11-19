@@ -3,6 +3,7 @@
 class IUtils;
 extern IUtils * iUtils;
 
+#include "time_types.h"
 #include <vector>
 #include <string>
 #include <map>
@@ -128,7 +129,7 @@ public:
     virtual int64_t geb_params_int64_t(std::deque<std::string> &tokens, const std::string& name)=0;
 
     /// get Time in microseconds (1/million part of second)
-    virtual int64_t getNow()=0;
+    virtual TIME_mks getNow()=0;
 
     virtual std::string getPercent(const real& numerator, const real& denumerator)=0;
 

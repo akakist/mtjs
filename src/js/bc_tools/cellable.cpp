@@ -38,6 +38,10 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     
     +[](Cellable *p) -> data_base * { return new bc_contract_balance(p); }, 
 
+    // bc_deleted: тумбстоун, данных нет. unpack_mx не вызывает конструктор,
+    // потому что у такой ячейки valid=false.
+    +[](Cellable *p) -> data_base * { (void)p; return nullptr; },
+
     +[](Cellable *p) -> data_base * { return new bc_state(p); }, 
     +[](Cellable *p) -> data_base * { return new bc_activity(p); }, 
 };
@@ -124,7 +128,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     }
     is_dirty = false;
 }
-void data_base::setDirty(Rollback* roll, int64_t block_timestamp)
+void data_base::setDirty(Rollback* roll, TIME_mks block_timestamp)
 {
     MUTEX_INSPECTOR;
 
@@ -133,29 +137,19 @@ void data_base::setDirty(Rollback* roll, int64_t block_timestamp)
 #include "cells.h"
 
 
-void deleteGranule(data_base* g, Rollback* roll, _db_to_save &db_dump, int64_t block_timestamp)
+void deleteGranule(data_base* g, Rollback* roll, _db_to_save &db_dump, TIME_mks block_timestamp)
 {
-    auto cell = g->parent;
+    // Тумбстоун без отдельных полей:
+    //  - тип ячейки становится bc_deleted (данных нет, data = nullptr);
+    //  - время удаления хранится в last_block_timestamp (его выставляет setDirty__);
+    //  - структура дерева не меняется, поэтому удаление выразимо в дельта-синке;
+    //  - физически такая ячейка вычищается компакцией по last_block_timestamp.
+    auto cell = g ? g->parent : nullptr;
     if (!cell) return;
-    cell->setDirty__(roll,block_timestamp);
+    if (cell->payload_ctor_idx == hsh::bc_deleted) return;   // идемпотентно
 
-    while (cell) {
-        auto pred = cell->parent;
-        if (!pred) return;
-
-        // 1. Помечаем cell (уровень N) на удаление из БД
-        db_dump.del(cell->getDbId());
-
-        // 2. Удаляем ссылку на cell из родителя (уровень N-1)
-        auto id = cell->m_id;
-        pred->children_hashes_mx.erase(id);
-        pred->children_ptrs_mx.erase(id);
-
-        // 3. Если у родителя (pred) остались другие дети — останавливаемся.
-        //    Иначе — родитель стал пустым листом, удаляем его на следующей итерации.
-        if (pred->children_hashes_mx.size())
-            return;
-
-        cell = pred;
-    }
+    cell->setDirty__(roll, block_timestamp);   // в roll сохранится старый буфер
+    cell->payload_ctor_idx = hsh::bc_deleted;
+    cell->data = nullptr;
+    db_dump.add(cell->getDbId(), cell->getBuffer_mx());
 }

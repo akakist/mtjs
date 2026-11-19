@@ -58,35 +58,35 @@ namespace cells {
 // ============================================================
 // path / cell traversal
 // ============================================================
-    REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, Rollback* roll, bool checkHash, int64_t block_timestamp);
-    REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::deque<std::string>& v, Rollback* roll, bool checkHash, int64_t block_timestamp);
+    REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, Rollback* roll, bool checkHash, TIME_mks block_timestamp);
+    REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std::deque<std::string>& v, Rollback* roll, bool checkHash, TIME_mks block_timestamp);
     REF_getter<Cellable> getByPathNoCreate(Cellable* root, IDatabase* db, const std::vector<std::string>& v, bool checkHash);
 
     REF_getter<Cellable> getByDbIdNoCreate(Cellable* root, IDatabase* db, const THASH_id& h, bool checkHash);
 
-    REF_getter<Cellable> getLeafOrCreate(Cellable* cur, IDatabase* db, const std::string& id, Rollback* roll, bool checkHash, int64_t block_timestamp);
+    REF_getter<Cellable> getLeafOrCreate(Cellable* cur, IDatabase* db, const std::string& id, Rollback* roll, bool checkHash, TIME_mks block_timestamp);
     REF_getter<Cellable> getLeafNoCreate(Cellable* cur, IDatabase* db, const std::string& id, bool checkHash);
-    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& name, Rollback* roll, const std::string& buffer, bool checkHash, int64_t block_timestamp);
+    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& name, Rollback* roll, const std::string& buffer, bool checkHash, TIME_mks block_timestamp);
 
 // ============================================================
 // address state
 // ============================================================
-    REF_getter<bc_address_state> getAddressStateOrCreate(Cellable* root, IDatabase* db, const ADDRESS_id& addr, Rollback* roll, int64_t blocktimestamp);
+    REF_getter<bc_address_state> getAddressStateOrCreate(Cellable* root, IDatabase* db, const ADDRESS_id& addr, Rollback* roll, TIME_mks blocktimestamp);
     REF_getter<bc_address_state> getAddressStateNoCreate(Cellable* root, IDatabase* db, const ADDRESS_id& addr);
     REF_getter<const bc_address_state> getAddressStateNoCreateConst(Cellable* root, IDatabase* db, const ADDRESS_id& addr);
 
 // ============================================================
 // contract / contract data / contract balance
 // ============================================================
-    REF_getter<bc_contract> getContractOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll, int64_t block_timestamp);
+    REF_getter<bc_contract> getContractOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name, Rollback* roll, TIME_mks block_timestamp);
     REF_getter<bc_contract> getContractNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& name);
     REF_getter<const bc_contract> getContractNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& name);
 
-    REF_getter<bc_granule> getContractDataOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key, Rollback* roll, int ttl, time_t create_time);
+    REF_getter<bc_granule> getContractDataOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key, Rollback* roll, TTL_sec ttl, TIME_mks create_time);
     REF_getter<bc_granule> getContractDataNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key);
     REF_getter<const bc_granule> getContractDataNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& con, const CONTRACT_DATA_id& key);
 
-    REF_getter<bc_contract_balance> getContractBalanceOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& contract, Rollback* roll, int64_t block_timestamp);
+    REF_getter<bc_contract_balance> getContractBalanceOrCreate(Cellable* root, IDatabase* db, const CONTRACT_id& contract, Rollback* roll, TIME_mks block_timestamp);
     REF_getter<bc_contract_balance> getContractBalanceNoCreate(Cellable* root, IDatabase* db, const CONTRACT_id& contract);
     REF_getter<const bc_contract_balance> getContractBalanceNoCreateConst(Cellable* root, IDatabase* db, const CONTRACT_id& contract);
 
@@ -95,9 +95,9 @@ namespace cells {
 // ============================================================
     REF_getter<bc_node> getNodeNoCreate(Cellable* root, IDatabase* db, const NODE_id& name);
     REF_getter<const bc_node> getNodeNoCreateConst(Cellable* root, IDatabase* db, const NODE_id& name);
-    REF_getter<bc_node> addNode(Cellable* root, IDatabase* db, const NODE_id& name, Rollback* roll, int64_t block_timestamp);
+    REF_getter<bc_node> addNode(Cellable* root, IDatabase* db, const NODE_id& name, Rollback* roll, TIME_mks block_timestamp);
 
-    REF_getter<bc_nodelist> getNodeListOrCreate(Cellable* root, IDatabase* db, Rollback* roll, int64_t blocktimestamp);
+    REF_getter<bc_nodelist> getNodeListOrCreate(Cellable* root, IDatabase* db, Rollback* roll, TIME_mks blocktimestamp);
     REF_getter<bc_nodelist> getNodeListNoCreate(Cellable* root, IDatabase* db);
     REF_getter<const bc_nodelist> getNodeListNoCreateConst(Cellable* root, IDatabase* db);
 
@@ -106,15 +106,15 @@ namespace cells {
 // ============================================================
 // values / votes / state
 // ============================================================
-    REF_getter<bc_values> getValuesOrCreate(Cellable* root, IDatabase* db, Rollback* roll, int64_t blocktimestamp);
+    REF_getter<bc_values> getValuesOrCreate(Cellable* root, IDatabase* db, Rollback* roll, TIME_mks blocktimestamp);
     REF_getter<bc_values> getValuesNoCreate(Cellable* root, IDatabase* db);
     REF_getter<const bc_values> getValuesNoCreateConst(Cellable* root, IDatabase* db);
 
-    REF_getter<bc_votes> getVotesOrCreate(Cellable* root, IDatabase* db, Rollback* roll, int64_t blocktimestamp);
+    REF_getter<bc_votes> getVotesOrCreate(Cellable* root, IDatabase* db, Rollback* roll, TIME_mks blocktimestamp);
     REF_getter<bc_votes> getVotesNoCreate(Cellable* root, IDatabase* db);
     REF_getter<const bc_votes> getVotesNoCreateConst(Cellable* root, IDatabase* db);
 
-    REF_getter<bc_state> getStateOrCreate(Cellable* root, IDatabase* db, Rollback* roll, int64_t blocktimestamp);
+    REF_getter<bc_state> getStateOrCreate(Cellable* root, IDatabase* db, Rollback* roll, TIME_mks blocktimestamp);
     REF_getter<bc_state> getStateNoCreate(Cellable* root, IDatabase* db);
     REF_getter<const bc_state> getStateNoCreateConst(Cellable* root, IDatabase* db);
 
@@ -126,11 +126,11 @@ namespace cells {
 
     REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
                                         const std::string& granule_dbid, const std::set<std::string> &additional,
-                                        int ttl, int64_t blocktimestamp, Rollback* roll);
+                                        TTL_sec ttl, TIME_mks blocktimestamp, Rollback* roll);
 
     void touchActivity(Cellable* root, IDatabase* db,
                     const std::string& granule_dbid,
-                    Rollback* roll, int64_t block_timestamp);
+                    Rollback* roll, TIME_mks block_timestamp);
 
 
 

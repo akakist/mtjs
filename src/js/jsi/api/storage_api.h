@@ -45,13 +45,13 @@ struct JSI_Granule : public Refcountable {
         update_time(t);
         auto ttl = cnode->ttl();
         auto* p = parent;
-        while (p) { p->update_time(t + ttl); p = p->parent; }
+        while (p) { p->update_time(t + ttl.v); p = p->parent; }
     }
     void setDirtyD() { dirtyD = true; }
 
-    void flush(Rollback* roll, int64_t block_timestamp) {
+    void flush(Rollback* roll, TIME_mks block_timestamp) {
         if (_deleted) return;   // удаление — через deleted_granules (jsg_del)
-        if (__update_time) cnode->update_time(__update_time, roll);
+        if (__update_time) cnode->update_time(TIME_mks{__update_time}, roll);
         if (dirtyD) cnode->setDirty(roll,block_timestamp);
         for (auto& z : children) z.second->flush(roll,block_timestamp);
     }

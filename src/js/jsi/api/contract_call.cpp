@@ -13,20 +13,25 @@
 using json = nlohmann::json;
 JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& /*m*/) ;
 
-#include <chrono>
 #include "contract_constants.h"
 
 namespace {
-    struct ViewInterrupt { int64_t deadline_ns; };
-    int64_t now_ns() {
-        return std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count();
-    }
+    struct ViewInterrupt {
+        IMsgSource* gas = nullptr;                  // txView: газ из values
+        int64_t ticks_left = MTJS_VIEW_MAX_TICKS;   // без газа (query/reader): локальный лимит
+        int64_t per_tick = 1;                       // газ за один tick
+    };
+
     int view_interrupt_handler(JSIRuntime* rt, void* opaque) {
         (void)rt;
         ViewInterrupt* vi = (ViewInterrupt*)opaque;
         if (!vi) return 0;
-        if (now_ns() > vi->deadline_ns) return 1;   // прервать (InternalError: interrupted)
+        if (vi->gas) {
+            vi->gas->consume_gas(vi->per_tick);
+            if (vi->gas->get_gasUsed() > vi->gas->get_gasLimit()) return 1;   // газ кончился
+            return 0;
+        }
+        if (--vi->ticks_left <= 0) return 1;        // локальный лимит исчерпан
         return 0;
     }
 }
@@ -34,13 +39,13 @@ namespace {
 // ============================================================
 // method: msg есть, газ есть, roll есть
 // ============================================================
-JSIValue ContractContext::call_contract_method(Cellable* root,const std::string& method_name,
+JSIValue ContractContext::call_method(Cellable* root,const std::string& method_name,
                              const json& params,
                              IMsgSource* msg_source,
                              CallStack* call_stack,
                               ContractHost* host, Rollback* roll,
                              const CONTRACT_id& caller, FeesSnapshot* fees,
-                             std::set<REF_getter<data_base>> * deleted_granules, int64_t block_timestamp)
+                             std::set<REF_getter<data_base>> * deleted_granules, TIME_mks block_timestamp)
 {
     MUTEX_INSPECTOR;
     if (call_stack->call_stack.size() >= (size_t)MAX_CALL_DEPTH)
@@ -54,12 +59,11 @@ JSIValue ContractContext::call_contract_method(Cellable* root,const std::string&
     REF_getter<CallFrame> frame = new CallFrame;
     frame->contract = this;
     frame->method = method_name;
-    frame->in_view = false;
+    frame->mode = CallFrame::Mode::Method;
     call_stack->call_stack.push_back(frame);
 
     CallContext call_ctx;
     call_ctx.contract = this;
-    call_ctx.in_view = false;
     call_ctx.msg_source = msg_source;
     call_ctx.depth = (int)call_stack->call_stack.size() - 1;
     call_ctx.call_stack = call_stack;
@@ -69,7 +73,7 @@ JSIValue ContractContext::call_contract_method(Cellable* root,const std::string&
     call_ctx.fees = fees;
     call_ctx.deleted_granules = deleted_granules;
     call_ctx.root = root;
-    call_ctx.block_timestamp=block_timestamp;
+    call_ctx.block_timestamp=TIME_mks{block_timestamp};
 
     void* saved = JSI_GetContextOpaque(ctx);
     JSI_SetContextOpaque(ctx, &call_ctx);
@@ -122,11 +126,74 @@ JSIValue ContractContext::call_contract_method(Cellable* root,const std::string&
 // ============================================================
 // view: msg НЕТ, газа НЕТ, roll НЕТ (read-only)
 // ============================================================
-JSIValue ContractContext::call_contract_view(Cellable* root,const std::string& view_name,
+// ============================================================
+// query: reader-only, без газа, now сэмплируется на входе и наследуется вложенными
+// ============================================================
+JSIValue ContractContext::call_query(Cellable* root, const std::string& query_name,
                              const json& params,
                              CallStack* call_stack,
                              ContractHost* host,
-                             int64_t timeout_sec)
+                             TIME_mks block_timestamp,
+                             TIME_mks now)
+{
+    MUTEX_INSPECTOR;
+    if (call_stack->call_stack.size() >= (size_t)MAX_CALL_DEPTH)
+        return JSI_ThrowTypeError(ctx, "call stack too deep (%zu >= %d)", call_stack->call_stack.size(), MAX_CALL_DEPTH);
+
+    auto it = queries.find(query_name);
+    if (it == queries.end())
+        return JSI_ThrowTypeError(ctx, "query not found: %s", query_name.c_str());
+    JSIValueConst fn = it->second.get();
+
+    REF_getter<CallFrame> frame = new CallFrame;
+    frame->contract = this;
+    frame->method = query_name;
+    frame->mode = CallFrame::Mode::Query;
+    call_stack->call_stack.push_back(frame);
+
+    QueryContext call_ctx;
+    call_ctx.mode = ExecContext::Mode::Query;
+    call_ctx.contract = this;
+    call_ctx.msg_source = nullptr;              // в query нет msg
+    call_ctx.depth = (int)call_stack->call_stack.size() - 1;
+    call_ctx.call_stack = call_stack;
+    call_ctx.host = host;
+    call_ctx.root = root;
+    call_ctx.block_timestamp = block_timestamp;
+    call_ctx.now = now;                         // сэмпл один раз, вложенные видят то же время
+
+    ViewInterrupt vi;                           // газа нет -> работает tik-бюджет
+    vi.gas = nullptr;
+
+    void* saved = JSI_GetContextOpaque(ctx);
+    JSI_SetContextOpaque(ctx, &call_ctx);
+    JSI_SetInterruptHandler(rt, view_interrupt_handler, &vi);
+    JSI_UpdateStackTop(rt);
+
+    JSIValue params_js = json_to_jsi(ctx, params);
+    if (JSI_IsException(params_js)) {
+        JSI_SetInterruptHandler(rt, nullptr, nullptr);
+        JSI_SetContextOpaque(ctx, saved);
+        call_stack->call_stack.pop_back();
+        return params_js;
+    }
+
+    JSIValue r = JSI_Call(ctx, fn, JSI_UNDEFINED, 1, &params_js);
+
+    JSI_SetInterruptHandler(rt, nullptr, nullptr);
+    JSI_SetContextOpaque(ctx, saved);
+    JSI_FreeValue(ctx, params_js);
+    call_stack->call_stack.pop_back();
+    return r;
+}
+
+JSIValue ContractContext::call_view(Cellable* root,const std::string& view_name,
+                             const json& params,
+                             IMsgSource* msg_source,
+                             CallStack* call_stack,
+                             ContractHost* host,
+                             int64_t timeout_sec,
+                             TIME_mks block_timestamp)
 {
     MUTEX_INSPECTOR;
     if (call_stack->call_stack.size() >= (size_t)MAX_CALL_DEPTH)
@@ -145,25 +212,23 @@ JSIValue ContractContext::call_contract_view(Cellable* root,const std::string& v
     REF_getter<CallFrame> frame = new CallFrame;
     frame->contract = this;
     frame->method = view_name;
-    frame->in_view = true;
+    frame->mode = CallFrame::Mode::View;
     call_stack->call_stack.push_back(frame);
 
-    CallContext call_ctx;
+    TxViewContext call_ctx;
+    call_ctx.mode = ExecContext::Mode::TxView;
     call_ctx.contract = this;
-    call_ctx.in_view = true;
-    call_ctx.msg_source = nullptr;          // view БЕЗ msg
+    call_ctx.msg_source = msg_source;       // msg родителя: те же поля, что в методе
     call_ctx.depth = (int)call_stack->call_stack.size() - 1;
     call_ctx.call_stack = call_stack;
     call_ctx.host = host;
-    call_ctx.roll = nullptr;                // view read-only
     call_ctx.caller = CONTRACT_id{};        // view не читает caller
-    call_ctx.fees = nullptr;                // без газа
-    call_ctx.deleted_granules = nullptr;
     call_ctx.root = root;
-    call_ctx.block_timestamp=0; /// TODO - fix
+    call_ctx.block_timestamp=block_timestamp;   // время чейна передаёт вызывающий
 
     ViewInterrupt vi;
-    vi.deadline_ns = now_ns() + timeout_sec * 1000000000LL;
+    vi.gas = call_ctx.msg_source;                // тот же источник, что у метода: газ из values
+    (void)timeout_sec;                           // legacy: лимит теперь по газу
 
     void* saved = JSI_GetContextOpaque(ctx);
     JSI_SetContextOpaque(ctx, &call_ctx);
@@ -186,9 +251,6 @@ JSIValue ContractContext::call_contract_view(Cellable* root,const std::string& v
     JSI_FreeValue(ctx, params_js);
     call_stack->call_stack.pop_back();
 
-    if (saved) {
-        auto* parent = (CallContext*)saved;
-        parent->emits.insert(parent->emits.end(), call_ctx.emits.begin(), call_ctx.emits.end());
-    }
+    // view не эмитит: пробрасывать нечего
     return r;
 }
