@@ -1051,6 +1051,16 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         u->setDirty(NULL, b.validateBlockREQ->block_timestamp);
     }
     calc_fee_rewards_nodes(b, lc);
+    // Отключаем ноды, не ответившие на прошлый блок (missed_rounds > missed_rounds_max).
+    // Детерминировано: тот же вход prev_block->node_validators на всех нодах.
+    // Вызов ДО финального merkle, чтобы enabled/missed_rounds попали в root-хеш блока.
+    {
+        std::set<NODE_id> prev_validators;
+        if (prev_block.valid())
+            prev_validators = std::set<NODE_id>(prev_block->blockAcceptedREQ->node_validators.begin(),
+                                                prev_block->blockAcceptedREQ->node_validators.end());
+        fix_missed_rounds(prev_validators, NULL, b.validateBlockREQ->block_timestamp);
+    }
     auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
     return rh;
 }

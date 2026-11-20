@@ -595,10 +595,12 @@ void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, 
             z->answered_rounds++;
             z->setDirty(NULL, TIME_mks{block_timestamp});
         }
-        auto act = cells::getActivityNoCreate(root.get(), db_state.get(), z->getDbId(),roll, block_timestamp);
-        if (act.valid()) {
+        // touch активности узла (TTL). getActivityNoCreate (write) бросает при
+        // отсутствии активности — поэтому сначала const-проверка.
+        if (cells::getActivityNoCreateConst(root.get(), db_state.get(), z->getDbId()).valid()) {
+            auto act = cells::getActivityNoCreate(root.get(), db_state.get(), z->getDbId(), roll, block_timestamp);
             act->update_time(TIME_mks{block_timestamp}, NULL);
-        }        
+        }
     }
     if (getenv("MTJS_TREE_DUMP"))
         logNode("[TRACE fix_missed_rounds] leave");
