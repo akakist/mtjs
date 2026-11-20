@@ -6,7 +6,7 @@ namespace MsgData
 {
     struct GetValuesRSP: public Base, public rsp_status
     {
-        GetValuesRSP():Base(msgid::GetValuesRSP) {}
+        GetValuesRSP():Base(msgid::GetValuesRSP) { setError(msgcode::NOT_FOUND, "not found"); }
         std::map<std::string, int64_t> fees;
         void update(Blake2bHasher& h) const
         {

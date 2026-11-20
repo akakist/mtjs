@@ -9,7 +9,7 @@ namespace MsgData
 {
     struct GetNodeInfoRSP: public Base, public rsp_status
     {
-        GetNodeInfoRSP():Base(msgid::GetNodeInfoRSP) {}
+        GetNodeInfoRSP():Base(msgid::GetNodeInfoRSP) { setError(msgcode::NOT_FOUND, "not found"); }
         NODE_id name;
         ADDRESS_id owner;
         std::string ed_pk;

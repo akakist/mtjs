@@ -174,8 +174,46 @@ async function getAbonement() {
 function getNextBlock(nodeaddr, to) {
     return mtjs.get_block(nodeaddr, to);
 }
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+// get_block отдаёт ТОЛЬКО следующий блок после подписки и допускает один вызов
+// одновременно ("another get_block is already waiting"). Поэтому заводим ОДИН
+// долгоживущий коллектор на весь тест (rolling-буфер), а t1/t2 лишь ищут в нём.
+class Node2Watcher {
+    constructor() {
+        this.blocks = [];
+        this.stop = false;
+    }
+    start() {
+        (async () => {
+            while (!this.stop) {
+                try {
+                    this.blocks.push(await mtjs.get_block(node2, 5));
+                    if (this.blocks.length > 600)
+                        this.blocks.shift();
+                }
+                catch (e) {
+                    await sleep(100); // таймаут/ошибка — пробуем дальше
+                }
+            }
+        })();
+    }
+    stopCollecting() { this.stop = true; }
+    async waitFor(hash, txHash, to = 15) {
+        const t0 = Date.now();
+        while (Date.now() - t0 < to * 1000) {
+            const b = this.blocks.find(x => x.block_hash === hash || x.tx_hashes.indexOf(txHash) >= 0);
+            if (b)
+                return b;
+            await sleep(200);
+        }
+        return null;
+    }
+}
+let node2Watcher;
 async function main() {
     await loadKeys();
+    node2Watcher = new Node2Watcher();
+    node2Watcher.start(); // ДО всех tx — иначе пропустим блоки
     console.log("=== GYM 2NODES (n1 " + node1 + ", n2 " + node2 + ") ===");
     await ensureRootFunded(50000000n);
     let src = "";
@@ -209,40 +247,38 @@ async function main() {
     }
     {
         console.log("\n[t1] ok TX (issuePass 1): block_hash same on :2301/:2302");
-        const p2 = getNextBlock(node2, 10);
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
             { contract: "gym", method: "issuePass", params: { visits: 1 } },
         ]);
         check(block.status(rsp.tx_hash) === "ok", "issuePass 1 ok on :2301");
         const bh1 = block.block_hash;
         console.log("  :2301 block_hash=" + bh1.slice(0, 16));
-        try {
-            const b2 = await p2;
+        const b2 = await node2Watcher.waitFor(bh1, rsp.tx_hash);
+        if (!b2) {
+            check(false, "get_block :2302 (t1): block с tx не появился за 15s");
+        }
+        else {
             console.log("  :2302 block_hash=" + b2.block_hash.slice(0, 16));
             check(b2.block_hash === bh1, ":2302 block_hash == :2301 block_hash");
-        }
-        catch (e) {
-            check(false, "get_block :2302 (t1): " + errStr(e));
         }
     }
     {
         console.log("\n[t2] err TX (createEntry no visits): block_hash same on :2301/:2302");
         const visits0 = await getAbonement();
         const M = visits0 + 1;
-        const p2 = getNextBlock(node2, 10);
         const { rsp, block } = await submitAndWaitErr(rootSk, rootAddr, [
             { contract: "gym", method: "createEntry", params: { M: M, ttl: 300 } },
         ]);
         check(block.status(rsp.tx_hash) === "err", "createEntry M>visits err on :2301");
         const bh1 = block.block_hash;
         console.log("  :2301 block_hash=" + bh1.slice(0, 16));
-        try {
-            const b2 = await p2;
+        const b2 = await node2Watcher.waitFor(bh1, rsp.tx_hash);
+        if (!b2) {
+            check(false, "get_block :2302 (t2): block с tx не появился за 15s");
+        }
+        else {
             console.log("  :2302 block_hash=" + b2.block_hash.slice(0, 16));
             check(b2.block_hash === bh1, ":2302 block_hash == :2301 block_hash (err TX deterministic)");
-        }
-        catch (e) {
-            check(false, "get_block :2302 (t2): " + errStr(e));
         }
     }
     console.log("\n=== RESULT: " + pass + " passed, " + fail + " failed ===");

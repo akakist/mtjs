@@ -5,7 +5,7 @@ namespace MsgData
 {
     struct GetContractDataRSP: public Base, public rsp_status
     {
-        GetContractDataRSP():Base(msgid::GetContractDataRSP) {}
+        GetContractDataRSP():Base(msgid::GetContractDataRSP) { setError(msgcode::NOT_FOUND, "not found"); }
         std::string contract;
         std::string key;
         std::string value;

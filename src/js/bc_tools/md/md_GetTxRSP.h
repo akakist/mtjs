@@ -14,7 +14,7 @@ namespace MsgData
         }
         GetTxRSP():Base(msgid::GetTxRSP)
         {
-
+            setError(msgcode::NOT_FOUND, "not found");
         }
         GetTxRSP(inBuffer &in):Base(msgid::GetTxRSP)
         {

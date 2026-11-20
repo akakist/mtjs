@@ -86,7 +86,7 @@ async function ensureGym(src: string) {
 }
 async function ensureInit() {
     const r = await mtjs.get_contract_data(node, "gym", "admin", 3);
-    if (r.found) { check(true, "gym already init (admin found)"); return; }
+    if (r.found) { console.log("  — gym уже инициализирован (skip)"); return; }
     const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
         { contract: "gym", method: "init", params: { admin: rootAddr } },
     ]);
@@ -106,7 +106,7 @@ async function main() {
             ], 0, 20000);
             check(block.status(rsp.tx_hash) === "ok", "mint root 100M ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
         } else {
-            check(true, "root funded >= 50M");
+            console.log("  — root уже профинансирован (>= 50M), mint не нужен");
         }
     }
 

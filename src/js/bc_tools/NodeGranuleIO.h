@@ -99,8 +99,8 @@ struct NodeGranuleIO : GranuleIO {
         MUTEX_INSPECTOR;                                            
         auto b = cells::getContractBalanceOrCreate(root, db.get(), c, roll, block_timestamp);
         if (!b.valid()) return std::string("balance create failed");
-        b->addAmount(delta);
-        b->setDirty(roll,block_timestamp);   // ← ОБЯЗАТЕЛЬНО (diff + calc_tree_hash)
+        b->setDirty(roll,block_timestamp);
+        b->addAmount(delta);   // ← ОБЯЗАТЕЛЬНО (diff + calc_tree_hash)
         DBG(logErr2("addContractBalance: contract=%s delta=%lld amount=%lld", c.container.c_str(), (long long)delta, (long long)b->getAmount()));
         return std::nullopt;
     }

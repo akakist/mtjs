@@ -90,7 +90,7 @@ static JSIValue msg_gasUsed(JSIContext* ctx, JSIValueConst, int, JSIValueConst*)
 static JSIValue msg_blockTimestamp(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
     CallContext* c = require_tx_ctx(ctx); if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->msg_source ? (int64_t)c->msg_source->get_blockTimestamp() : 0);
+    return JSI_NewInt64(ctx, c->msg_source ? (int64_t)(c->msg_source->get_blockTimestamp() / 1000000) : 0);
 }
 static JSIValue msg_blockHeight(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
@@ -514,14 +514,14 @@ static JSIValue query_now(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
     QueryContext* c = require_query_ctx(ctx);
     if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->now.v);
+    return JSI_NewInt64(ctx, c->now.v / 1000000);      // снаружи секунды
 }
 
 static JSIValue query_blockTimestamp(JSIContext* ctx, JSIValueConst, int, JSIValueConst*) {
     MUTEX_INSPECTOR;
     QueryContext* c = require_query_ctx(ctx);
     if (!c) return JSI_EXCEPTION;
-    return JSI_NewInt64(ctx, c->block_timestamp.v);
+    return JSI_NewInt64(ctx, c->block_timestamp.v / 1000000);   // снаружи секунды
 }
 
 JSIValue jsi_callQuery(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {

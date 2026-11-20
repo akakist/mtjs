@@ -5,7 +5,7 @@ namespace MsgData
 {
     struct CallViewRSP: public Base, public rsp_status
     {
-        CallViewRSP():Base(msgid::CallViewRSP) {}
+        CallViewRSP():Base(msgid::CallViewRSP) { setError(msgcode::NOT_FOUND, "not found"); }
         bool error = false;        // view бросил исключение
         std::string result_json;   // JSON-строка результата (или errstr)
         void update(Blake2bHasher& h) const

@@ -101,7 +101,7 @@ const rootAddr = mtjs.addr_from_name("root");
 async function ensureRootFunded(minBalance: bigint) {
     const bal = await getBalance(rootAddr);
     console.log("  root balance:", bal.toString(), "min:", minBalance.toString());
-    if (bal >= minBalance) { check(true, "root funded >= " + minBalance.toString()); return; }
+    if (bal >= minBalance) { console.log("  — root профинансирован >= " + minBalance.toString() + " (skip mint)"); return; }
     if (bal < 200000n) { check(false, "root balance too low for mint"); return; }
     const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
         { contract: "root", method: "mint", params: { amount: "100000000" } },

@@ -33,11 +33,14 @@ async function ensureContract(name: string, srcPath: string) {
     const ui = await mtjs.get_user_nonce(node, rootAddr, 3);
     const nonce = ui.nonce;
     const method = c.found ? "contract_update" : "contract_deploy";
-    const req = { tx: [{ contract: "root", method, params: { name, src } }],
+    // ttl обязателен и для deploy, и для update
+    const req = { tx: [{ contract: "root", method, params: { name, src, ttl: 100000 } }],
                   nonce, value: 0, gasLimit: 100000, priority: 0, sender: rootAddr, key_id: 0 };
     const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce, () => {});
     if (rsp.err) throw new Error(method + ": " + rsp.err_str);
     await mtjs.tx_wait_block(node, rsp.tx_hash, 10);
+    const c2 = await mtjs.get_contract(node, name, 3);
+    if (!c2.found) throw new Error(method + " failed: contract not found after tx");
 }
 
 async function main() {

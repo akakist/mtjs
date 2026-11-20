@@ -322,6 +322,10 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
 {
     MUTEX_INSPECTOR;
 
+    // Компакция исполняется в рамках блока: удаления, собранные в этом блоке,
+    // применяются после успешной записи. Новый блок — список сбрасывается.
+    local_deletes.clear();
+
     if (!db_state.valid()) {
         logNode("do_start_block: db_state invalid");
         return;
@@ -941,6 +945,8 @@ void Node::Service::do_request_for_transactions(MsgData::HeartBeatREQ* hb, const
 THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
 {
     MUTEX_INSPECTOR;
+    if (getenv("MTJS_TREE_DUMP"))
+        logNode("[TRACE execute_block] begin txs=%zu", (size_t)b.validateBlockREQ->transaction_bodies.size());
     // logNode("[execute_block] sender %s",b.)
     {
         auto st = cells::getStateNoCreate(root.get(), db_state.get());
@@ -952,6 +958,12 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         st->setDirty(NULL,b.validateBlockREQ->block_timestamp);
     }
     DBG(logNode("execute_block: tx_count=%zu", (size_t)b.validateBlockREQ->transaction_bodies.size()));
+    // Nonce повышаем после всех tx: внутри цикла u взят до execute_transaction,
+    // а откат (unpack_mx) заменяет data-объект — и incNonce уходит в отвязанный объект.
+    std::vector<ADDRESS_id> nonce_bumps;
+    // nonce из блока применяется после цикла, поэтому в пределах блока
+    // второй tx того же сендера должен видеть уже учтённый nonce.
+    std::map<ADDRESS_id,int64_t> pending_nonce;
     for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
     {
         MUTEX_INSPECTOR;
@@ -997,9 +1009,9 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
                 int64_t nonce;
                 auto err=tt->getNonce(nonce);
                 if(err) throw CommonError(*err);
-                if (u->getNonce() != nonce)
+                if (u->getNonce() + pending_nonce[senderAddress] != nonce)
                 {
-                    logNode("invalid nonce, expected %lld got %lld", u->getNonce(), nonce);
+                    logNode("invalid nonce, expected %lld got %lld", u->getNonce() + pending_nonce[senderAddress], nonce);
                     t_err = "invalid nonce";
 
                 }
@@ -1012,9 +1024,13 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
                         logNode("if(!lc->heart_beat.valid()) AA");
                     // t_params t;
                     // t.senderAddress=senderAddress;
+                    if (getenv("MTJS_TREE_DUMP"))
+                        logNode("[TRACE tx-begin] tx=%s", base16::encode(tt->getHash().container).substr(0,12).c_str());
                     t_err=execute_transaction(tt->getHash(),  b, senderAddress, tt, epoch_current());
-                    u->incNonce();
-                    u->setDirty(NULL,b.validateBlockREQ->block_timestamp);
+                    if (getenv("MTJS_TREE_DUMP"))
+                        logNode("[TRACE tx-end] tx=%s err=%d", base16::encode(tt->getHash().container).substr(0,12).c_str(), (int)(t_err ? 1 : 0));
+                    nonce_bumps.push_back(senderAddress);
+                    pending_nonce[senderAddress]++;
                     // logNode("execute_block: after tx att_blockRoot_children=%d", (int)b.att_data->blockRoot.children.size());
 
                 }
@@ -1026,9 +1042,16 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
             b.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());
     }
 
-    auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
+    // Фаза block-level изменений — вне tx: nonce, затем награды.
+    for (auto& a : nonce_bumps)
+    {
+        auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), a);
+        if (!u.valid()) { logNode("execute_block: nonce bump: address not found"); continue; }
+        u->incNonce();
+        u->setDirty(NULL, b.validateBlockREQ->block_timestamp);
+    }
     calc_fee_rewards_nodes(b, lc);
-    rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
+    auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
     return rh;
 }
 void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData::HeartBeatREQ> &lc)
@@ -1195,6 +1218,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 else if (meth == "contract_update") err = execute_contract_update(params, b,t, index);
                 else if (meth == "vote") err = execute_vote(params, b,t, index);
                 else if (meth == "gc") err = execute_gc(params, b,t, index, db_to_save_Z);
+                else if (meth == "compact") err = execute_compact(params, b, t, index);
                 else if (meth == "create_address")      err = execute_create_address(params, b, t, index);
                 else if (meth == "add_address_key")     err = execute_add_address_key(params, b, t, index);
                 else if (meth == "remove_address_key")  err = execute_remove_address_key(params, b, t, index);                
@@ -1417,8 +1441,8 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
                 (long long)t.gasUsed, (int)t.roll->size(), (long long)t.gasUsed,
                 (long long)spent,
                 (long long)bal0, (long long)bal1, msg.c_str());
-        #endif
-        return msg;
+#endif
+                return msg;
     };
     // std::set<REF_getter<data_base>> deteled_granules;
     err = execute_tx_commands(b, t, j_tx, &deleted_granules);
@@ -1454,6 +1478,13 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {  bal1 = uu->balance; }
 
     root->calc_tree_hash(db_dump);
+    if (getenv("MTJS_TREE_DUMP")) {
+        for (auto& z : db_dump.cells)
+            logNode("[TRACE tx-diff] tx=%s id=%s h=%s",
+                    base16::encode(tx_id.container).substr(0,12).c_str(),
+                    base16::encode(z.first).substr(0,16).c_str(),
+                    base16::encode(blake2b_hash(z.second).container).substr(0,16).c_str());
+    }
     db_to_save_Z.add(db_dump);
 #ifdef DEBUG
     logNode("[t] tx=%s value=%lld gasLimitTokens=%lld priority=%lld gasLimit_gas=%lld gpt=%lld "
@@ -1496,6 +1527,7 @@ REF_getter<bc_node> Node::Service::current_leader()
     auto mf=getMetaFull();
     if(!mf.valid() || mf->vne.empty())
         return nullptr;
+    const auto& leaders = mf->committee_vne.empty() ? mf->vne : mf->committee_vne;
 
     int64_t lastBlockTime=0;
     if(prev_block.valid())
@@ -1509,7 +1541,7 @@ REF_getter<bc_node> Node::Service::current_leader()
     if(since%SLOT_MKS>=SLOT_MKS-NO_LEADER_FRAME_MKS)
         return nullptr;
 
-    const NODE_id& name=mf->vne[(since/SLOT_MKS)%mf->vne.size()].name;
+    const NODE_id& name=leaders[(since/SLOT_MKS)%leaders.size()].name;
     return cells::getNodeNoCreate(root.get(),db_state.get(),name);
 }
 REF_getter<BlockMetaFull> Node::Service::getMetaFull()
@@ -1538,10 +1570,6 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
         if(!n.valid())
             return nullptr;
         nnn[z]=n;
-        if(n->isEnabled())
-        {
-            live_nodes++;
-        }
     }
 
     auto v=cells::getValuesNoCreateConst(root.get(),db_state.get());
@@ -1549,6 +1577,15 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
         return nullptr;
 
     auto validators_percent=v->getValue("validator_count_percent");
+    auto minstake=v->getValue("validator_min_stake");
+
+    // Валидаторами (и лидерами) могут быть только включённые ноды со стейком >= minstake.
+    // Иначе нода, созданная через node_create (нулевой стейк, никогда не запускается),
+    // попадает в ротацию лидера — мёртвые слоты — и раздувает validator_count.
+    for (auto& x : nnn)
+        if (x.second->isEnabled() && x.second->get_full_stake() > 0
+            && x.second->get_full_stake() >= minstake)
+            live_nodes++;
 
     size_t validator_count=(live_nodes * validators_percent)/100;
 
@@ -1557,6 +1594,12 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
     for(auto &x: nnn)
     {
         if(!x.second->isEnabled())
+            continue;
+        // Нода без стейка — не валидатор: не должна попадать в ротацию лидера,
+        // иначе созданная через node_create «фантомная» нода даёт мёртвые слоты.
+        if(x.second->get_full_stake() <= 0)
+            continue;
+        if(x.second->get_full_stake() < minstake)
             continue;
         m->all_nodes_enabled.push_back(x.first);
         m->prev_stakes[x.second->getName()]=x.second->get_full_stake();
@@ -1585,11 +1628,12 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
     }
     m->tree_all_nodes=buildTree(m->vne);
 
-    if(validator_count>=m->vne.size())
-        throw CommonError("if(validator_count>=vne.size())");
+    if(m->vne.empty())
+        throw CommonError("vne is empty");
+    if(validator_count>m->vne.size())
+        validator_count=m->vne.size();      // не выходим за пределы vne
     std::vector<NodeElement> vne_committe;
 
-    auto minstake=v->getValue("validator_min_stake");
     auto answered_min=v->getValue("answered_committee_min");
 
     // Попытка 1: строгий фильтр (answered > answered_min && stake >= minstake)
@@ -1637,6 +1681,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
     // logNode("vne %s",com.c_str());
 
     m->tree_committe=buildTree(vne_committe);
+    m->committee_vne=vne_committe;
 
     return m;
 }

@@ -120,7 +120,7 @@ async function main() {
     const info0 = await mtjs.get_address_info(node, bobAddr, 3).catch(() => ({ found: false }));
     const bob_exists = info0.found === true;
     if (bob_exists)
-        check(true, "bob already exists (skip t1)");
+        console.log("  — bob уже существует (skip t1)");
     // t1: create_address bob ok
     if (!bob_exists) {
         console.log("\n[t1] create_address(bob, [{ed25519, bobPk}]) → ok");

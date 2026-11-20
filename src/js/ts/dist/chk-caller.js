@@ -122,7 +122,7 @@ async function ensureRootFunded(minBalance) {
     const bal = await getBalance(rootAddr);
     console.log("  root balance:", bal.toString(), "min:", minBalance.toString());
     if (bal >= minBalance) {
-        check(true, "root funded >= " + minBalance.toString());
+        console.log("  — root профинансирован >= " + minBalance.toString() + " (skip mint)");
         return;
     }
     if (bal < 200000n) {

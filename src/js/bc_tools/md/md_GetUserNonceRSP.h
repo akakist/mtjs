@@ -9,6 +9,7 @@ namespace MsgData
 
         GetUserNonceRSP():Base(msgid::GetUserNonceRSP)
         {
+            setError(msgcode::NOT_FOUND, "not found");
         }
         int64_t balance;
         int64_t nonce;

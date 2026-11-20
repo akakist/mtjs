@@ -2,9 +2,21 @@
 import * as std from "std";
 
 const node = "127.0.0.1:2301";
-const sk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk");
-const pk = std.getenv("k_root_ed_pk");
-if (!sk || !pk) throw new Error("no sk/pk");
+// Ключ root берём из того же keys_test.json, с которым поднимали genesis.
+// Env-переменные (u_root_ed_sk/k_root_ed_pk) — только как fallback.
+const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
+let sk = "";
+let pk = "";
+async function loadKeys() {
+    sk = std.getenv("u_root_ed_sk") || std.getenv("k_root_ed_sk") || "";
+    pk = std.getenv("k_root_ed_pk") || "";
+    if (sk && pk) return;
+    const keys = JSON.parse(await mtjs.fs.readFile(KEYS_PATH));
+    const r = keys.users?.root?.keys?.[0];
+    if (!r?.sk) throw new Error(KEYS_PATH + ": no users.root.keys[0].sk");
+    sk = r.sk;
+    pk = r.pk || "";
+}
 
 function check(cond: boolean, msg: string) {
     if (cond) { console.log("  ✅", msg); }
@@ -17,6 +29,7 @@ function errStr(e: any): string {
 }
 
 async function main() {
+    await loadKeys();
     console.log("[t5] get_block (next block)");
     const addr = mtjs.addr_from_name("root");
     const ui = await mtjs.get_user_nonce(node, addr, 3);
@@ -25,8 +38,8 @@ async function main() {
     const p = mtjs.get_block(node, 10);
 
     const tx = [{ contract: "root", method: "mint", params: { amount: "1" } }];
-    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk!, nonce.toString(), () => {});
+    const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0, sender: addr, key_id: 0 };
+    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
     console.log("  submit:", rsp.err, rsp.err_str);
     if (rsp.err) { check(false, "submit failed"); return; }
 

@@ -98,15 +98,19 @@ async function main() {
         check(src.length > 0, "ttl_test src read");
         const c = await mtjs.get_contract(node, "ttl_test", 3);
         const method = c.found ? "contract_update" : "contract_deploy";
-        await submitAndWait([{ contract: "root", method, params: { name: "ttl_test", src } }]);
-        check(true, "ttl_test " + method + " ok");
+        // ttl обязателен и для deploy, и для update
+        const { rsp, block } = await submitAndWait([
+            { contract: "root", method, params: { name: "ttl_test", src, ttl: 100000 } },
+        ]);
+        check(block.status(rsp.tx_hash) === "ok",
+              "ttl_test " + method + " ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
     }
     // cleanup
     {
         const g = await mtjs.get_contract_data(node, "ttl_test", "x", 3);
         if (g.found) {
-            await submitAndWait([{ contract: "ttl_test", method: "deleteX", params: {} }]);
-            check(true, "cleanup deleteX");
+            const { rsp, block } = await submitAndWait([{ contract: "ttl_test", method: "deleteX", params: {} }]);
+            check(block.status(rsp.tx_hash) === "ok", "cleanup deleteX ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
         }
     }
 
@@ -115,7 +119,7 @@ async function main() {
         console.log("\n[t1] lite_set_uplink(" + HTTP_FULL + ")");
         mtjs.lite_set_uplink(HTTP_FULL);
         await new Promise(r => setTimeout(r, 500));
-        check(true, "lite_set_uplink sent");
+        console.log("  — lite_set_uplink sent (работоспособность проверяют t2/t3)");
     }
 
     // t2: createX → HTTP /granule?addr=<dbId>&hash=<hash>

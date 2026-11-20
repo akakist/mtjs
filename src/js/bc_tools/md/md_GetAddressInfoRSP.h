@@ -14,7 +14,7 @@ inline outBuffer& operator<<(outBuffer& o, const KeyInfo& k) { k.pack(o); return
 inline inBuffer&  operator>>(inBuffer& in, KeyInfo& k) { k.unpack(in); return in; }
 
 struct GetAddressInfoRSP: public Base, public rsp_status  {
-    GetAddressInfoRSP():Base(msgid::GetAddressInfoRSP) {}
+    GetAddressInfoRSP():Base(msgid::GetAddressInfoRSP) { setError(msgcode::NOT_FOUND, "not found"); }
     int64_t balance = 0;
     int64_t nonce = 0;
     std::vector<KeyInfo> keys;

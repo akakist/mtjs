@@ -25,7 +25,7 @@ struct IDatabase: public Refcountable
 
     virtual int getGranule(const std::string& k, std::string* v)=0;
     virtual int write_granules_batch(const _db_to_save &v)=0;
-    virtual int deleteGranule(const std::string& k) = 0;
+    virtual int eraseGranule(const std::string& k) = 0;   // физическое удаление (только компакция)
 
     IDatabase():Refcountable("Idatabse") {}
 };

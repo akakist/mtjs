@@ -38,11 +38,8 @@ std::optional<std::string> Node::Service::execute_mint(yyjson_val *params, b_par
     {
         return "mint: sender not found";
     }
-    {
-        
-        u->balance+=amount;
-    }
     t.markDirty(u.get());
+    u->balance+=amount;
     cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
 
 
@@ -50,8 +47,8 @@ std::optional<std::string> Node::Service::execute_mint(yyjson_val *params, b_par
     {
         auto st = cells::getStateNoCreate(root.get(), db_state.get());
         if (!st.valid()) return "state create failed";
-        {  st->total_supply += i128(amount); }
         t.markDirty(st.get());
+        {  st->total_supply += i128(amount); }
     }
     // ▲▲▲
     b.emit_command(t.tx_id, seqId,"mint",R"({"to":"%s","amount":"%s"})",
@@ -85,11 +82,8 @@ std::optional<std::string> Node::Service::execute_transfer(yyjson_val *params, b
     if (amount > t.value) return "amount>t.value";
 
     t.value -= amount;
-    {
-        
-        to->balance += amount;
-    }
     t.markDirty(to.get());
+    to->balance += amount;
     cells::getActivityNoCreate(root.get(),db_state.get(),to->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
 
     b.emit_command(t.tx_id, seqId, "transfer",
@@ -127,6 +121,7 @@ std::optional<std::string> Node::Service::execute_node_update(yyjson_val *params
     err=yy_get_string(params,"ip",ip);
     if(err) return err;
 
+    t.markDirty(nn.get());
     {
         nn->set_ip(ip);
         b.emit_command(t.tx_id, seqId, "node_change_ip",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
@@ -176,8 +171,8 @@ std::optional<std::string> Node::Service::execute_node_create(yyjson_val *params
     n->init(name, t.senderAddress, bls, base16::decode(pk_ed), ip);
 
     // ▼▼▼ INSERT: обратный индекс owner -> owned_nodes
-    us->owned_nodes.insert(name);
     t.markDirty(us.get());
+    us->owned_nodes.insert(name);
     cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
     
 
@@ -213,20 +208,21 @@ std::optional<std::string> Node::Service::execute_node_stake(yyjson_val *params,
     if(!n.valid()) return "node not found";
     if(t.value<amount) return "Insufficient funds";
     t.value-=amount;
+    t.markDirty(n.get());
     n->add_stake(t.senderAddress, amount);
 
     // ▼▼▼ INSERT: обратный индекс staker -> staked_in
+    t.markDirty(us.get());
     us->staked_in.insert(node);
     cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
-    t.markDirty(us.get());
     // ▲▲▲
 
     t.gasUsed += b.fees.gas_node_stake;
     {
         auto st = cells::getStateNoCreate(root.get(), db_state.get());
         if (!st.valid()) return "if (!st.valid())";
-        st->total_stake += i128(amount);
         t.markDirty(st.get());
+        st->total_stake += i128(amount);
     }
 
     b.emit_command(t.tx_id, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
@@ -260,10 +256,12 @@ std::optional<std::string> Node::Service::execute_unstake_node(yyjson_val *param
     auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),t.senderAddress);
     if (!u.valid()) return "if(!u.valid())";
     t.value+=amount;
+    t.markDirty(n.get());
     n->sub_stake(t.senderAddress, amount);
 
     // ▼▼▼ INSERT: если весь stake выведен — staked_in.erase
     if (n->get_user_stake(t.senderAddress) == 0) {
+        t.markDirty(u.get());
         u->staked_in.erase(node);
     }
     auto actu=cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId());
@@ -311,8 +309,8 @@ std::optional<std::string> Node::Service::execute_node_enable(yyjson_val *params
     if(n->isEnabled())
         return "node already enabled";
 
-    n->setEnabled(1);
     t.markDirty(n.get());
+    n->setEnabled(1);
     cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
 
     t.gasUsed+=b.fees.gas_node_enable;
@@ -344,8 +342,8 @@ std::optional<std::string> Node::Service::execute_node_disable(yyjson_val *param
     if(!n->isEnabled())
         return "node already disabled";
 
-    n->setEnabled(0);
     t.markDirty(n.get());
+    n->setEnabled(0);
     cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
     
 
@@ -396,12 +394,12 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     err = yy_get_string(params, "src", src);
     if (err) return err;
 
+    t.markDirty(n.get());
     {
         n->src = src;
         n->owners.clear();
         n->owners.insert(t.senderAddress);   // создатель — owner
     }
-    t.markDirty(n.get());
 
     auto ab = cells::getContractBalanceOrCreate(root.get(), db_state.get(), cn, t.roll,t.b->validateBlockREQ->block_timestamp);
     if (!ab.valid())
@@ -447,12 +445,12 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     {
         auto st = cells::getStateNoCreate(root.get(), db_state.get());
         if (!st.valid()) return "state create failed";
-        st->contract_count++;
         t.markDirty(st.get());
+        st->contract_count++;
     }
 
-    us->contracts.insert(cn);
     t.markDirty(us.get());
+    us->contracts.insert(cn);
     cells::getActivityNoCreate(root.get(), db_state.get(), us->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
 
     b.emit_command(t.tx_id, seqId, "contract_deploy",
@@ -559,7 +557,8 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
             z.param = param;
             z.value = std::stoull(value);
             z.create_time = block_ts.v;
-            z.ttl = (int64_t)ttl;
+            // ttl снаружи в секундах (как в контрактах/тестах), внутри — мкс
+            z.ttl = to_mks(TTL_sec{(int64_t)ttl}).v;
             z.nodes.insert(node);
         } else {
             int64_t elapsed = block_ts.v - it->second.create_time;
@@ -596,9 +595,9 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
                 if (param == "validator_min_stake")
                     vv->values["validator_min_stake_activated"] = 1;   // активация sybil (getMetaFull — TBD)
             }
-            votes->votes.erase(vhash);
             t.markDirty(votes.get());
             t.markDirty(vv.get());
+            votes->votes.erase(vhash);
             b.emit_command(t.tx_id, seqId, "vote_applied",
                 R"({"param":"%s","value":"%s"})", param.c_str(), value.c_str());
         }
@@ -608,6 +607,84 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
         R"({"node":"%s","param":"%s","value":"%s"})",
         node.container.c_str(), param.c_str(), value.c_str());
 
+    return std::nullopt;
+}
+
+// ============================================================
+// компакция: физически удаляет тумбстоуны старше cutoff.
+// Post-order, порядок детей фиксирован (std::map), поэтому набор
+// удаляемого одинаков у всех нод. Удаления из RocksDB — локальные,
+// применяются после записи блока (в diff не идут).
+// ============================================================
+void Node::Service::prune_tombstones(Cellable* node, IDatabase* db, TIME_mks cutoff,
+                             int64_t& remaining, std::vector<std::string>& out,
+                             TIME_mks block_ts, Rollback* roll)
+{
+    if (!node) return;
+    std::vector<std::string> keys;
+    keys.reserve(node->children_hashes_mx.size());
+    for (auto& kv : node->children_hashes_mx) keys.push_back(kv.first);
+
+    for (auto& k : keys) {
+        if (remaining <= 0) return;
+        auto ch = cells::getLeafNoCreate(node, db, k, true);
+        if (!ch.valid()) continue;
+
+        prune_tombstones(ch.get(), db, cutoff, remaining, out, block_ts, roll);
+
+        bool remove = false;
+        if (ch->payload_ctor_idx == hsh::bc_deleted && ch->last_block_timestamp <= cutoff)
+            remove = true;                                   // старый тумбстоун
+        else if (ch->children_hashes_mx.empty() && !ch->data.valid())
+            remove = true;                                   // пустой родитель
+
+        if (remove) {
+            out.push_back(ch->getDbId());
+            node->children_hashes_mx.erase(k);
+            node->children_ptrs_mx.erase(k);
+            node->setDirty__(roll, block_ts);
+            remaining--;
+        }
+    }
+}
+
+std::optional<std::string> Node::Service::execute_compact(yyjson_val* params, b_params& b, t_params& t, int seqId)
+{
+    // Порог считаем внутри tx от block_timestamp: клиент присылает только
+    // ретеншен, а само время удаления берётся из блока — у всех нод одно.
+    int64_t retention = 0;
+    if (auto e = yy_get_int64_t(params, "retention", retention)) return e;
+    if (retention <= 0) return "compact: retention must be > 0 (мкс)";
+
+    int64_t max_items = 1000;
+    if (auto e = yy_get_int64_t(params, "max_items", max_items)) return e;
+    if (max_items <= 0) return "compact: max_items must be > 0";
+
+    TIME_mks block_ts = t.b->validateBlockREQ->block_timestamp;
+    TIME_mks cutoff{block_ts.v - retention};
+    if (cutoff.v <= 0) return "compact: cutoff <= 0 (retention больше времени чейна?)";
+
+    auto st = cells::getStateNoCreate(root.get(), db_state.get());
+    if (!st.valid()) return "compact: no state";
+
+    std::vector<std::string> dels;
+    int64_t remaining = max_items;
+    prune_tombstones(root.get(), db_state.get(), cutoff, remaining, dels, block_ts, t.roll);
+
+    for (auto& id : dels) local_deletes.push_back(id);
+
+    bool complete = (remaining > 0);          // обошли всё до cutoff
+    if (complete) st->compact_before_ts = cutoff;
+    t.markDirty(st.get());
+    st->state_gen++;
+
+    logNode("execute_compact: cutoff=%lld deleted=%d complete=%d gen=%lld",
+            (long long)cutoff.v, (int)dels.size(), (int)complete, (long long)st->state_gen);
+    // статистика наружу: ручной инструмент по ней решает, нужен ли ещё батч
+    b.emit_command(t.tx_id, 0, "compact",
+                   R"({"deleted":%d,"complete":%d,"gen":%lld,"cutoff":%lld})",
+                   (int)dels.size(), (int)complete, (long long)st->state_gen,
+                   (long long)cutoff.v);
     return std::nullopt;
 }
 
@@ -718,8 +795,8 @@ std::optional<std::string> Node::Service::execute_remove_address_key(yyjson_val*
     if (!u->hasKeyId((uint64_t)key_id)) return "key_id not found";
     if (u->sizeKeys() <= 1) return "cannot remove last key";
 
-    u->removeKey((uint64_t)key_id);
     t.markDirty(u.get());
+    u->removeKey((uint64_t)key_id);
     b.emit_command(t.tx_id, seqId, "remove_address_key",
         R"({"addr":"%s","key_id":%lld})", addr_hex.c_str(), (long long)key_id);
     return std::nullopt;
@@ -766,11 +843,11 @@ std::optional<std::string> Node::Service::execute_create_address(yyjson_val* par
 
     auto u = cells::getAddressStateOrCreate(root.get(), db_state.get(),addr, t.roll,t.b->validateBlockREQ->block_timestamp);
     if (!u.valid()) return "create failed";
+    t.markDirty(u.get());
     for (auto& k : parsed) {
         auto id = u->addKey(k.type, k.kb);
         if (!id) return "addKey failed";
     }
-    t.markDirty(u.get());
     cells::getActivityOrCreate(root.get(),db_state.get(),u->getDbId(),{},TTL_sec{ttl},t.b->validateBlockREQ->block_timestamp,t.roll)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
 
     t.gasUsed += b.fees.gas_create_address;
@@ -834,9 +911,9 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             for (auto& [user_addr, stake] : n->getStakes()) {
                 auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), user_addr);
                 if (u.valid()) {
+                    t.markDirty(u.get());
                     u->balance += stake;
                     u->staked_in.erase(name);
-                    t.markDirty(u.get());
                     cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId())
                         ->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
                 }
@@ -847,8 +924,8 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             // 2. Удалить из bc_nodelist
             auto nl = cells::getNodeListNoCreate(root.get(), db_state.get());
             if (nl.valid()) {
-                nl->remove(name);
                 t.markDirty(nl.get());
+                nl->remove(name);
             }
 
             // 3. Удалить bc_node
@@ -870,8 +947,8 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             int64_t burned = u->balance;
             auto st = cells::getStateNoCreate(root.get(), db_state.get());
             if (st.valid() && burned > 0) {
-                st->total_supply -= i128(burned);
                 t.markDirty(st.get());
+                st->total_supply -= i128(burned);
             }
 
             deleteGranule(u, t.roll, dbd, t.b->validateBlockREQ->block_timestamp);
@@ -891,8 +968,8 @@ std::optional<std::string> Node::Service::gc_activity_apply(
                 auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), owner_addr);
                 if (u.valid()) {
                     CONTRACT_id cn; cn.container = name;
-                    u->contracts.erase(cn);
                     t.markDirty(u.get());
+                    u->contracts.erase(cn);
                     cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId())
                         ->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
                 }
@@ -910,8 +987,8 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             if (bal) {
                 auto st = cells::getStateNoCreate(root.get(), db_state.get());
                 if (st.valid() && bal->getAmount() > 0) {
-                    st->total_supply -= i128(bal->getAmount());
                     t.markDirty(st.get());
+                    st->total_supply -= i128(bal->getAmount());
                 }
             }
             deleteGranule(g->data.get(), t.roll, dbd,t.b->validateBlockREQ->block_timestamp);

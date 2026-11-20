@@ -14,22 +14,27 @@ struct bc_state: public data_base {
     int64_t block_height = 0;  // 8
     int64_t genesis_time = 0;  // 8
     int64_t chain_id = 0;      // 8
-    // size() = size_() + 16+16 + 8*7 = ~88
+    // компакция: удаления физически чистятся только по этому порогу
+    TIME_mks compact_before_ts; // 8: всё, что bc_deleted и старше — можно удалять
+    int64_t  state_gen = 0;     // 8: счётчик компакционных tx
+    // size() = size_() + 16+16 + 8*9 = ~104
     size_t size() const {
-        return size_() + sizeof(i128)*2 + sizeof(int64_t)*7;
+        return size_() + sizeof(i128)*2 + sizeof(int64_t)*9;
     }
     void pack(outBuffer& o) const final {
         data_base::pack(o);
         o<<1;
         o<<total_supply<<total_stake
          <<account_count<<node_count<<contract_count
-         <<tx_count<<block_height<<genesis_time<<chain_id;
+         <<tx_count<<block_height<<genesis_time<<chain_id
+         <<compact_before_ts<<state_gen;
     }
     void unpack(inBuffer& o) final {
         data_base::unpack(o);
         auto v=o.get_PN();
         o>>total_supply>>total_stake
          >>account_count>>node_count>>contract_count
-         >>tx_count>>block_height>>genesis_time>>chain_id;
+         >>tx_count>>block_height>>genesis_time>>chain_id
+         >>compact_before_ts>>state_gen;
     }
 };

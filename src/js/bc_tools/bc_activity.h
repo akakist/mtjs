@@ -13,8 +13,12 @@ struct bc_activity: public data_base
     {
         if(t>_update_time)
         {
-            _update_time=t;
+            // setDirty ДО мутации: setDirty__ снимает снапшот для отката,
+            // и он должен захватить СТАРОЕ значение _update_time. Иначе при
+            // откате восстановится полу-мутированное состояние (upd новый,
+            // last_block_timestamp старый) и root у лидера разойдётся.
             setDirty(roll, t);
+            _update_time=t;
         }
     }
     size_t size() const { return size_() + name_.size(); }

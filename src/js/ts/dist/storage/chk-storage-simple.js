@@ -133,6 +133,7 @@ async function ensureStorageTest(src) {
 }
 function viewGuardMsg(r) {
     return r.result.indexOf("not allowed in view") >= 0 ||
+        r.result.indexOf("not allowed") >= 0 || // "callView to self not allowed" и т.п.
         r.result.indexOf("not a function") >= 0 ||
         r.result.indexOf("is not a function") >= 0;
 }

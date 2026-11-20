@@ -41,7 +41,7 @@ bool Node::Service::BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateRE
         THASH_id h;
         h.container=z.first;
         auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, NULL,z.second,false,r->blockAcceptedREQ->blockInfo->block_timestamp);
-        leaf->setDirty(NULL,r->blockAcceptedREQ->blockInfo->block_timestamp);
+        if (leaf.valid()) leaf->setDirty(NULL,r->blockAcceptedREQ->blockInfo->block_timestamp);
     }
 
 
@@ -50,6 +50,40 @@ bool Node::Service::BlockDiffValidateREQ_sync(const MsgData::BlockDiffValidateRE
     return true;
 }
 #endif
+
+// Диагностика: дамп дерева (дети + их хеши + ts + dirty) для сравнения
+// состояний лидера и валидатора. Включается MTJS_TREE_DUMP=1.
+void Node::Service::dump_tree(Cellable* c, IDatabase* db, const char* tag, int depth, int maxdepth)
+{
+    if (!c || depth > maxdepth) return;
+    std::string buf = c->getBuffer_mx();
+    auto h = blake2b_hash(buf);
+    std::string ch;
+    for (auto& kv : c->children_hashes_mx)
+        ch += base16::encode(kv.first).substr(0,8) + "=" +
+              base16::encode(kv.second.container).substr(0,8) + " ";
+    std::string raw;
+    if (buf.size() <= 512) raw = " raw=" + base16::encode(buf);
+    logNode("[TREE %s] %*s%s h=%s ts=%lld dirty=%d data=%d ch=[%s]%s",
+            tag, depth*2, "",
+            base16::encode(c->getDbId()).substr(0,12).c_str(),
+            base16::encode(h.container).substr(0,12).c_str(),
+            (long long)c->last_block_timestamp.v,
+            (int)c->is_dirty, (int)c->data.valid(), ch.c_str(), raw.c_str());
+    for (auto& kv : c->children_hashes_mx)
+    {
+        // Сначала in-memory (children_ptrs_mx): изменённые в текущем блоке
+        // ячейки ещё не в БД. Только если указателя нет — грузим из БД.
+        REF_getter<Cellable> child;
+        auto itp = c->children_ptrs_mx.find(kv.first);
+        if (itp != c->children_ptrs_mx.end()) child = itp->second;
+        else child = cells::getLeafNoCreate(c, db, kv.first, false);
+        if (child.valid()) dump_tree(child.get(), db, tag, depth+1, maxdepth);
+        else logNode("[TREE %s] %*s(child %s not loadable)", tag, (depth+1)*2, "",
+                     base16::encode(kv.first).substr(0,8).c_str());
+    }
+}
+
 bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
@@ -130,6 +164,15 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     }
 
     Rollback roll;
+
+    // Порог компакции ДО применения диффов: если в этом блоке он вырос,
+    // валидатор обязан применить то же правило чистки, что и лидер.
+    TIME_mks old_cutoff;
+    {
+        auto st0 = cells::getStateNoCreate(root.get(), db_state.get());
+        if (st0.valid()) old_cutoff = st0->compact_before_ts;
+    }
+
     // _db_to_save db_dump;
 /// применяем диффы
     for(auto& z: r->deleted)
@@ -150,24 +193,61 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         THASH_id h;
         h.container=z.first;
         auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second,true,r->blockAcceptedREQ->blockInfo->block_timestamp);
-        leaf->setDirty(&roll,r->blockAcceptedREQ->blockInfo->block_timestamp);
+        if (leaf.valid()) leaf->setDirty(&roll,r->blockAcceptedREQ->blockInfo->block_timestamp);
     }
 
 
-    auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
+    // Компакция: если лидер в этом блоке поднял compact_before_ts,
+    // каждый валидатор физически чистит тумбстоуны у себя — иначе root не сойдётся.
+    {
+        auto st = cells::getStateNoCreate(root.get(), db_state.get());
+        if (st.valid() && st->compact_before_ts > old_cutoff)
+        {
+            int64_t unlimited = INT64_MAX;
+            std::vector<std::string> pruned;
+            prune_tombstones(root.get(), db_state.get(), st->compact_before_ts,
+                             unlimited, pruned,
+                             r->blockAcceptedREQ->blockInfo->block_timestamp, &roll);
+            for (auto& id : pruned) local_deletes.push_back(id);
+            logNode("BlockDiffValidateREQ: prune by compact_before_ts=%lld removed=%d",
+                    (long long)st->compact_before_ts.v, (int)pruned.size());
+        }
+    }
+
+    // Считаем root в ЛОКАЛЬНЫЙ буфер: при несовпадении нельзя оставлять
+    // в общем db_to_save_Z ячейки отравленного дерева — иначе они уедут
+    // в БД следующим коммитом.
+    _db_to_save db_local;
+    auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(root,db_local);
     if(r->blockAcceptedREQ->blockInfo->new_root_hash1!=new_root_hash)
     {
         logNode("@@ BlockDiffValidateREQ not matched root hash remote %s local %s",
                 r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str(),new_root_hash.str().c_str());
+        if (getenv("MTJS_TREE_DUMP")) {
+            logNode("[TREE validator] epoch=%d local=%s remote=%s",
+                    (int)r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
+                    new_root_hash.str().c_str(),
+                    r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
+            dump_tree(root.get(), db_state.get(), "validator", 0, 6);
+        }
+        {
+            std::string dbg;
+            for (auto& z : r->diffs)
+                dbg += base16::encode(z.first).substr(0,12) + ":" +
+                       base16::encode(blake2b_hash(z.second).container).substr(0,12) + " ";
+            logNode("[DIAG validator diff] n=%zu %s", r->diffs.size(), dbg.c_str());
+        }
         // Диффы уже применены к root — без отката узел остаётся с затёртым деревом
         // и дальше расходится навсегда. Возвращаем все тронутые ячейки.
         for(auto &z: roll.data)
         {
             inBuffer in(z.second);
             z.first->unpack_mx(in);
+            z.first->children_ptrs_mx.clear();   // указатели перечитаются из хешей
         }
         return true;
     }
+    db_to_save_Z.add(db_local);   // только после успешной сверки
     REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
     bdvrs->node_validator=this_node_name;
     bdvrs->sig34.sign(my_sk_bls,r->blockAcceptedREQ->getHash().container);
@@ -332,11 +412,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         if (db_state->getGranule(z.first, &old_body) == 0 && !old_body.empty() && old_body != z.second)
             stale.push_back({blake2b_hash(old_body).container, old_body});
     }
-    for (auto& z : db_to_save_Z.deleted) {
-        std::string old_body;
-        if (db_state->getGranule(z, &old_body) == 0 && !old_body.empty())
-            stale.push_back({blake2b_hash(old_body).container, old_body});
-    }
 
     int64_t now = iUtils->getNow().v;
     for (auto& z : stale)
@@ -344,6 +419,19 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 
 
     db_state->write_granules_batch(db_to_save_Z);
+    if (!local_deletes.empty()) {
+        int skipped = 0;
+        for (auto& id : local_deletes) {
+            // Ячейку могли пересоздать в этом же блоке (удаление -> создание):
+            // если она есть в батче, удалять её из БД нельзя — иначе живая
+            // запись пропадёт и получим "hash not matched".
+            if (db_to_save_Z.cells.count(id)) { skipped++; continue; }
+            db_state->eraseGranule(id);
+        }
+        logNode("compact: physically deleted %d cells (skipped rewritten: %d)",
+                (int)local_deletes.size() - skipped, skipped);
+        local_deletes.clear();
+    }
     db_to_save_Z.clear();
 
         sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
@@ -409,6 +497,10 @@ bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node
         const int64_t since = (prev_block.valid() && !sync_full)
             ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v : 0;
         if (sync_full) sync_fresh_root = true;   // собираем дерево с нуля
+        {
+            auto st = cells::getStateNoCreate(root.get(), db_state.get());
+            sync_old_cutoff = st.valid() ? st->compact_before_ts : TIME_mks{};
+        }
         logNode("request sync since=%lld epoch_req=%lld local_epoch=%lld prev_block=%s full=%d",
                 (long long)since,(long long)r->hb->new_epoch,(long long)epoch_current(),
                 prev_block.valid()?"yes":"no",(int)sync_full);
@@ -470,6 +562,8 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
 }
 void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, time_t block_timestamp)
 {
+    if (getenv("MTJS_TREE_DUMP"))
+        logNode("[TRACE fix_missed_rounds] enter validators=%zu", node_validators.size());
     auto ls=cells::getAllNodes(root.get(), db_state.get());
     auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
     auto round_limit=v->getValue("missed_rounds_max");
@@ -505,6 +599,8 @@ void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, 
             act->update_time(TIME_mks{block_timestamp}, NULL);
         }        
     }
+    if (getenv("MTJS_TREE_DUMP"))
+        logNode("[TRACE fix_missed_rounds] leave");
 }
 
 int get_global_refcount();
@@ -578,6 +674,10 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             .gas_create_address   = v->getValue("gas_create_address"),
         };
         auto new_root_hash = execute_block(t, r->heart_beat);
+        if (getenv("MTJS_TREE_DUMP") && !r->transaction_bodies.empty()) {
+            logNode("[TREE leader] epoch=%d root=%s", (int)r->heart_beat->new_epoch, new_root_hash.str().c_str());
+            dump_tree(root.get(), db_state.get(), "leader", 0, 6);
+        }
                 
         std::map<std::string, std::string> diffs;
         for(auto& z:db_to_save_Z.cells)
@@ -588,9 +688,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             }
             
         }
-        std::set<std::string> deleted;
-        for (auto& z : db_to_save_Z.deleted) if (z.size() == 32) deleted.insert(z);
-
         std::vector<THASH_id> tx_hashes;
         THASH_id tx_hash;
         Blake2bHasher th;
@@ -609,10 +706,6 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
             dh.update(z.first);
             dh.update(z.second);
         }
-        for(auto& z: deleted)
-        {
-            dh.update(z);
-        }
         diff_hash.container=dh.final();
 
 
@@ -620,8 +713,14 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
 
         rsp->blockInfo = blockInfo;
+        {
+            std::string dbg;
+            for (auto& z : diffs)
+                dbg += base16::encode(z.first).substr(0,12) + ":" +
+                       base16::encode(blake2b_hash(z.second).container).substr(0,12) + " ";
+            logNode("[DIAG leader diff] n=%zu %s", diffs.size(), dbg.c_str());
+        }
         rsp->diffs=diffs;
-        rsp->deleted=deleted;
         rsp->tx_hashes=tx_hashes;
         rsp->att_data = t.att_data;
 

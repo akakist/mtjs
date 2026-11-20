@@ -185,6 +185,10 @@ namespace Node
         // дерево собирается с нуля (полный синк): старые/удалённые листья
         // не должны попасть в новое дерево.
         std::atomic<bool> sync_fresh_root{false};
+        // compact_before_ts на момент старта синка. По нему на финальной пачке
+        // понимаем, нужно ли применять правило компакции (порог мог приехать
+        // в промежуточной пачке, и тогда локальное значение уже новое).
+        TIME_mks sync_old_cutoff;
         /// Продлить/снять watchdog синка (перевзводится на каждой активности).
         void sync_watchdog_arm();
         void sync_watchdog_stop();
@@ -285,6 +289,17 @@ namespace Node
         std::optional<std::string> execute_contract_update(yyjson_val *params, b_params &,t_params &t,  int seqId);
         std::optional<std::string> execute_vote(yyjson_val *params, b_params &,t_params &t,  int seqId);
         std::optional<std::string> execute_gc(yyjson_val* params, b_params& b, t_params& t, int seqId, _db_to_save& dbd);
+        // компакция: физически удаляет тумбстоуны bc_deleted с ts <= cutoff.
+        // Удаления локальные (в diff не идут) — применяются после коммита блока.
+        std::optional<std::string> execute_compact(yyjson_val* params, b_params& b, t_params& t, int seqId);
+        std::vector<std::string> local_deletes;   // id, удаляемые из RocksDB после коммита
+        // deterministic post-order prune: удаляет bc_deleted с ts <= cutoff и пустые узлы.
+        // Один и тот же обход используется исполнением компакции и догоном синка.
+        // диагностика: дамп дерева (MTJS_TREE_DUMP=1)
+        void dump_tree(Cellable* c, IDatabase* db, const char* tag, int depth, int maxdepth);
+        void prune_tombstones(Cellable* node, IDatabase* db, TIME_mks cutoff,
+                              int64_t& remaining, std::vector<std::string>& out,
+                              TIME_mks block_ts, Rollback* roll);
         std::optional<std::string> execute_create_address(yyjson_val* params, b_params& b, t_params& t, int seqId);
         std::optional<std::string> execute_add_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId);
         std::optional<std::string> execute_remove_address_key(yyjson_val* params, b_params& b, t_params& t, int seqId);

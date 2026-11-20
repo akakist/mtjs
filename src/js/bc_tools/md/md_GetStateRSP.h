@@ -7,7 +7,7 @@ namespace MsgData
 {
     struct GetStateRSP: public Base, public rsp_status
     {
-        GetStateRSP():Base(msgid::GetStateRSP) {}
+        GetStateRSP():Base(msgid::GetStateRSP) { setError(msgcode::NOT_FOUND, "not found"); }
         std::string total_supply;   // i128::str()
         std::string total_stake;    // i128::str()
         int64_t account_count = 0;

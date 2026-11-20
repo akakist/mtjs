@@ -24,6 +24,9 @@ struct BlockMetaFull: public Refcountable
     }
     std::vector<NODE_id> all_nodes_enabled;
     std::vector<NodeElement> vne;
+    // Валидаторы (комитет) в детерминированном порядке — из них выбирается лидер.
+    // Лидер вне комитета не соберёт кворум и даст мёртвый слот.
+    std::vector<NodeElement> committee_vne;
 
     TreeNode tree_all_nodes;
     TreeNode tree_committe;

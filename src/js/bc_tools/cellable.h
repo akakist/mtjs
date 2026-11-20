@@ -195,18 +195,23 @@ public:
     virtual void unpack_mx(inBuffer& in)
     {
         int v=in.get_PN();
+        (void)v;   // версии не используем: пока нет прода, формат один
         in>>payload_ctor_idx;
         in>>last_block_timestamp;
         {
             in>>children_hashes_mx;
             bool valid;
             in>>valid;
+            // Тумбстоун/пустая ячейка: данных нет. Чистим data, иначе у ячейки,
+            // которая раньше была гранулой, останется старый объект и буфер разойдётся.
+            if(!valid) data = nullptr;
             if(valid)
             {
                 if(payload_ctor_idx<hsh::HSH_END)
                 {
                     data=db_constructors[payload_ctor_idx](this);
-                    data->unpack(in);
+                    if(data.get())
+                        data->unpack(in);
                 }
                 else
                 {

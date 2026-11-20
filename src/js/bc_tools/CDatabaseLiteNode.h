@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <string>
+#include <filesystem>
 #include "base16.h"
 #include "commonError.h"
 #include "blake2bHasher.h"
@@ -23,6 +24,12 @@ struct CDatabaseLiteNode : public IDatabase {
 
     CDatabaseLiteNode(const std::string& _db_name, const std::string& _addr)
         : db_name(_db_name), node_http_addr(_addr) {
+        // RocksDB не создаёт родительские директории — делаем это сами
+        {
+            std::error_code ec;
+            auto parent = std::filesystem::path(db_name).parent_path();
+            if (!parent.empty()) std::filesystem::create_directories(parent, ec);
+        }
         // RocksDB open (как раньше)
         rocksdb::Options options;
         options.create_if_missing = true;
@@ -53,11 +60,10 @@ struct CDatabaseLiteNode : public IDatabase {
     }
     int write_granules_batch(const _db_to_save &v) override {
         rocksdb::WriteBatch b;
-        for (auto& k : v.deleted) b.Delete(k);
         for (auto& [k, d] : v.cells) b.Put(k, d);
         return db_ptr->Write(rocksdb::WriteOptions(), &b).ok() ? 0 : 1;
     }
-    int deleteGranule(const std::string& k) override {
+    int eraseGranule(const std::string& k) override {
         return db_ptr->Delete(rocksdb::WriteOptions(), k).ok() ? 0 : 1;
     }
 };

@@ -12,6 +12,11 @@ struct CDatabaseRocksdb: public IDatabase
 
     CDatabaseRocksdb(const std::string& _db_name):db_name(_db_name)
     {
+        {
+            std::error_code ec;
+            auto parent = std::filesystem::path(db_name).parent_path();
+            if (!parent.empty()) std::filesystem::create_directories(parent, ec);
+        }
 
         rocksdb::Options options;
         options.create_if_missing = true;
@@ -110,10 +115,6 @@ int write_granules_batch(const _db_to_save &v)
         return true;
     };
 
-    for (const auto& key : v.deleted) {
-        batch.Delete(key);
-        if (++n % CHUNK == 0 && !flush()) return 1;
-    }
     for (const auto& [key, data] : v.cells) {
         batch.Put(key, data);
         if (++n % CHUNK == 0 && !flush()) return 1;
@@ -155,7 +156,7 @@ int write_granules_batch(const _db_to_save &v)
         }
         return 0;
     }
-    int deleteGranule(const std::string& k) override {
+    int eraseGranule(const std::string& k) override {
         auto s = db_ptr->Delete(rocksdb::WriteOptions(), k);
         return s.ok() ? 0 : 1;
     }    

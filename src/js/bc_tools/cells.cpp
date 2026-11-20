@@ -235,9 +235,10 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
             inBuffer in(buffer);
             cc->unpack_mx(in);
         }
-        if (!cc->data.valid())
-            throw CommonError("if(!cc->data.valid())");
-        cc->data->setDirty(roll,block_timestamp);
+        if (cc->data.valid())
+            cc->data->setDirty(roll, block_timestamp);
+        else
+            cc->setDirty__(roll, block_timestamp);   // тумбстоун: данных нет, но ячейка изменилась
         return cc->data;
     }
 
@@ -251,7 +252,10 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         if (!cc.valid())
             return NULL;
         if (cc->data.valid())
-            return dynamic_cast<bc_address_state*>(cc->data.get());
+        {
+            if (auto* p = dynamic_cast<bc_address_state*>(cc->data.get())) return p;
+            cc->data = nullptr;   // тип не bc_address_state — пересоздаём
+        }
 
         REF_getter<bc_address_state> u = new bc_address_state(cc.get());
         cc->data = u.get();
@@ -336,8 +340,15 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         auto cc = getByPathOrCreate(root, db, getContractDataPath(con, name), roll, true, block_timestamp);
         if (!cc.valid())
             throw CommonError("if(!cc.valid())");
-        if (cc->data.valid())
-            throw CommonError("if(cc->data.valid())");
+
+        // Ячейка уже есть:
+        //  - если это гранула — пересоздавать нечего, отдаём как есть;
+        //  - если тип другой (тумбстоун bc_deleted или чужая ячейка) —
+        //    пересоздаём: освобождаем старое, тип и время вернём ниже.
+        if (cc->data.valid() && cc->payload_ctor_idx == hsh::bc_granule)
+            return dynamic_cast<bc_granule*>(cc->data.get());
+        cc->data = nullptr;
+
         REF_getter<bc_granule> bc = new bc_granule(cc.get());
         auto dbid=blake2b_hash(getContractDataKey(con,name));
 
@@ -347,6 +358,23 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         // bc->update_time(create_time);
         cc->data = bc.get();
         cc->payload_ctor_idx = hsh::bc_granule;
+
+        // Ячейка могла быть тумбстоуном (её удаляли и создают заново).
+        // После создания она обязана вернуться в нормальное состояние:
+        //   - тип снова bc_granule (иначе её примет за удалённую компакция);
+        //   - время — момент создания, а не удаления.
+        // Если это не так — это баг, лучше упасть здесь, чем получить
+        // странное состояние в дереве.
+        if (cc->payload_ctor_idx != hsh::bc_granule)
+            throw CommonError("create granule: payload type not normalized (idx=%u)",
+                              (unsigned)cc->payload_ctor_idx);
+        if (cc->last_block_timestamp.v < block_timestamp.v)
+            cc->last_block_timestamp = block_timestamp;   // дата создания
+        if (cc->last_block_timestamp.v != block_timestamp.v)
+            throw CommonError("create granule: timestamp not set (have=%lld want=%lld)",
+                              (long long)cc->last_block_timestamp.v,
+                              (long long)block_timestamp.v);
+
         cc->data->setDirty(roll,block_timestamp);
         return bc;
     }
@@ -380,7 +408,10 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         if (!cc.valid())
             throw CommonError("if(!cc.valid())");
         if (cc->data.valid())
-            return dynamic_cast<bc_contract_balance*>(cc->data.get());
+        {
+            if (auto* p = dynamic_cast<bc_contract_balance*>(cc->data.get())) return p;
+            cc->data = nullptr;   // тип не bc_contract_balance — пересоздаём
+        }
         REF_getter<bc_contract_balance> bc = new bc_contract_balance(cc.get());
         cc->data = bc.get();
         cc->payload_ctor_idx = hsh::bc_contract_balance;
@@ -457,7 +488,8 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
             return NULL;
         if (cc->data.valid())
         {
-            return dynamic_cast<bc_nodelist*>(cc->data.get());
+            if (auto* p = dynamic_cast<bc_nodelist*>(cc->data.get())) return p;
+            cc->data = nullptr;   // тип не bc_nodelist — пересоздаём
         }
         REF_getter<bc_nodelist> u = new bc_nodelist(cc.get());
         cc->data = u.get();
@@ -521,8 +553,8 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
             throw CommonError("if(!l.valid())");
         if (l->data.valid())
         {
-            auto* p = dynamic_cast<bc_values*>(l->data.get());
-            return p;
+            if (auto* p = dynamic_cast<bc_values*>(l->data.get())) return p;
+            l->data = nullptr;   // тип не bc_values — пересоздаём
         }
         REF_getter<bc_values> v = new bc_values(l.get());
         l->data = v.get();
@@ -558,7 +590,8 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
             throw CommonError("if(!l.valid())");
         if (l->data.valid())
         {
-            return dynamic_cast<bc_votes*>(l->data.get());
+            if (auto* p = dynamic_cast<bc_votes*>(l->data.get())) return p;
+            l->data = nullptr;   // тип не bc_votes — пересоздаём
         }
         REF_getter<bc_votes> v = new bc_votes(l.get());
         l->data = v.get();
@@ -593,7 +626,10 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         if (!l.valid())
             throw CommonError("if(!l.valid())");
         if (l->data.valid())
-            return dynamic_cast<bc_state*>(l->data.get());
+        {
+            if (auto* p = dynamic_cast<bc_state*>(l->data.get())) return p;
+            l->data = nullptr;   // тип не bc_state — пересоздаём
+        }
         REF_getter<bc_state> v = new bc_state(l.get());
         l->data = v.get();
         l->payload_ctor_idx = hsh::bc_state;
@@ -630,7 +666,11 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
     {
         auto cc = getByPathOrCreate(root, db, getContractActivityPath(name), roll, true,blocktimestamp);
         if (!cc.valid()) throw CommonError("if(!cc.valid())");
-        if (cc->data.valid()) return dynamic_cast<bc_activity*>(cc->data.get());
+        if (cc->data.valid())
+        {
+            if (auto* p = dynamic_cast<bc_activity*>(cc->data.get())) return p;
+            cc->data = nullptr;   // тип не bc_activity — пересоздаём
+        }
         REF_getter<bc_activity> bc = new bc_activity(cc.get());
         bc->name_ = name.container;
         cc->data = bc.get();
@@ -678,10 +718,14 @@ REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
     if (!cc.valid()) throw CommonError("if(!cc.valid())");
     if (cc->data.valid()) {
         auto act = dynamic_cast<bc_activity*>(cc->data.get());
-        act->_update_time = TIME_mks{block_timestamp};
-        act->ttl = to_mks(ttl);
-        act->setDirty(roll, block_timestamp);
-        return act;
+        if (act) {
+            act->setDirty(roll, block_timestamp);   // снапшот ДО мутации
+            act->_update_time = block_timestamp;
+            act->ttl = to_mks(ttl);
+            return act;
+        }
+        // Тип не bc_activity (например, тумбстоун или чужая ячейка) — пересоздаём.
+        cc->data = nullptr;
     }
     REF_getter<bc_activity> act = new bc_activity(cc.get());
     act->dbid=additional;

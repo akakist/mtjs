@@ -38,13 +38,26 @@ std::vector<data_base *(*)(Cellable *)> db_constructors = {
     
     +[](Cellable *p) -> data_base * { return new bc_contract_balance(p); }, 
 
-    // bc_deleted: тумбстоун, данных нет. unpack_mx не вызывает конструктор,
-    // потому что у такой ячейки valid=false.
-    +[](Cellable *p) -> data_base * { (void)p; return nullptr; },
-
     +[](Cellable *p) -> data_base * { return new bc_state(p); }, 
     +[](Cellable *p) -> data_base * { return new bc_activity(p); }, 
+
+    // bc_deleted: тумбстоун, данных нет. unpack_mx не вызывает конструктор,
+    // потому что у такой ячейки valid=false. ВАЖНО: порядок обязан совпадать
+    // с hsh::hashers, поэтому заглушка строго последняя.
+    +[](Cellable *p) -> data_base * { (void)p; return nullptr; },
 };
+
+// Защита от сдвига таблицы: число конструкторов обязано совпадать с HSH_END
+// (и порядок — с enum, это проверить нельзя, но размер ловит половину ошибок).
+namespace {
+struct DbCtorsCheck {
+    DbCtorsCheck() {
+        if (db_constructors.size() != (size_t)hsh::HSH_END)
+            throw CommonError("db_constructors size %zu != HSH_END %d",
+                              db_constructors.size(), (int)hsh::HSH_END);
+    }
+} db_ctors_check;
+}
 
 
 std::string Cellable::getDbId() const
@@ -131,7 +144,11 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
 void data_base::setDirty(Rollback* roll, TIME_mks block_timestamp)
 {
     MUTEX_INSPECTOR;
-
+    if (getenv("MTJS_TREE_DUMP") && parent)
+        logErr2("[TRACE setDirty] id=%s ts=%lld roll=%d h_before=%s",
+                base16::encode(parent->getDbId()).substr(0,16).c_str(),
+                (long long)block_timestamp.v, (int)(roll != nullptr),
+                base16::encode(blake2b_hash(parent->getBuffer_mx()).container).substr(0,16).c_str());
     parent->setDirty__(roll,block_timestamp);
 }
 #include "cells.h"

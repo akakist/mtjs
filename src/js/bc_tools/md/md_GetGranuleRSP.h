@@ -6,7 +6,12 @@ namespace MsgData
 {
     struct GetGranuleRSP: public Base, public rsp_status
     {
-        GetGranuleRSP():Base(msgid::GetGranuleRSP) {}
+        GetGranuleRSP():Base(msgid::GetGranuleRSP)
+        {
+            // По умолчанию — "не найдено": незаполненный RSP не должен
+            // выглядеть как found=true (errcode 0) с пустым body.
+            setError(msgcode::NOT_FOUND, "granule not found");
+        }
         bool stale = false;     // true — из stale_cache (этап 2)
         std::string body;       // тело гранулы (бинарный)
         void update(Blake2bHasher& h) const

@@ -39,7 +39,10 @@ bool Node::Service::GetTxRSP(const MsgData::GetTxRSP *r, const NODE_id &src_node
 
     if (bt.is_GetTransactionRSP_m_quorum(h,root.get(), db_state.get()))
     {
-        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTxRSP, toRef(h.container), r->hb.get(),0.05, this));
+        double to=0.05;
+        if(transaction_pool_of_leader.empty())
+            to=1.;
+        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTxRSP, toRef(h.container), r->hb.get(),to, this));
     }
     XPASS;
     return true;

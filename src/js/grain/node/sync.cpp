@@ -181,7 +181,7 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
         THASH_id h;
         h.container=z.first;
         auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, NULL,z.second,false,TIME_mks{});
-        leaf->setDirty(NULL,leaf->parent->last_block_timestamp);
+        if (leaf.valid()) leaf->setDirty(NULL,leaf->parent->last_block_timestamp);
         logNode("sync: %s",base16::encode(z.first).c_str());
     }
     
@@ -189,6 +189,22 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
         return true;
     else
     {
+        // Догон обязан применить то же правило компакции, что и сеть:
+        // иначе физически удалённые у сервера тумбстоуны останутся у клиента.
+        std::vector<std::string> pruned;
+        {
+            auto st = cells::getStateNoCreate(root.get(), db_state.get());
+            if (st.valid() && st->compact_before_ts > sync_old_cutoff) {
+                int64_t unlimited = INT64_MAX;
+                prune_tombstones(root.get(), db_state.get(), st->compact_before_ts,
+                                 unlimited, pruned,
+                                 st->compact_before_ts, nullptr);
+                logNode("sync: prune by compact_before_ts=%lld removed=%d",
+                        (long long)st->compact_before_ts.v, (int)pruned.size());
+                sync_old_cutoff = st->compact_before_ts;
+            }
+        }
+
         _db_to_save db;
         auto roothash=proceed_merkle_on_transaction_pool_hashers(root.get(),db);
         if(m->root_hash!=roothash)
@@ -233,6 +249,10 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
             db.add("...last_block...",m->prev_block);   // иначе после рестарта поднимется старый блок
 
         db_state->write_granules_batch(db);
+        for (auto& id : pruned) {
+            if (db.cells.count(id)) continue;   // пересоздана в этой же дельте
+            db_state->eraseGranule(id);        // локальная чистка БД
+        }
 
         if(new_pb.valid())
         {

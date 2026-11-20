@@ -65,11 +65,38 @@ struct t_params
     int64_t  tx_index        = 0;   // TBD
 
     void markDirty(data_base *p) { p->setDirty(roll, b->validateBlockREQ->block_timestamp); dirty_1.add(p); }
+    // Держим ссылки на ячейки, убранные из дерева при откате, чтобы
+    // не оставить висячих указателей у тех, кто ещё держит data_base*.
+    std::vector<REF_getter<Cellable>> keepalive;
+
     void rollback()
     {
         for(auto &z: roll->data) {
             inBuffer in(z.second);
             {  z.first->unpack_mx(in); }
+            if (getenv("MTJS_TREE_DUMP"))
+                logErr2("[TRACE rollback] id=%s ts=%lld h=%s",
+                        base16::encode(z.first->getDbId()).substr(0,16).c_str(),
+                        (long long)z.first->last_block_timestamp.v,
+                        base16::encode(blake2b_hash(z.first->getBuffer_mx()).container).substr(0,16).c_str());
+
+            // unpack_mx восстановил children_hashes_mx. Указатели на детей,
+            // которых в восстановленных хешах нет (созданы в упавшей tx),
+            // убираем — иначе calc_tree_hash вернёт их обратно в хеши.
+            // Остальные указатели не трогаем: сохранённое состояние остаётся рабочим.
+            for (auto it = z.first->children_ptrs_mx.begin();
+                 it != z.first->children_ptrs_mx.end(); )
+            {
+                if (!z.first->children_hashes_mx.count(it->first))
+                {
+                    keepalive.push_back(it->second);   // чтобы не оставить dangling
+                    it = z.first->children_ptrs_mx.erase(it);
+                }
+                else
+                    ++it;
+            }
+
+            z.first->setDirty__(nullptr, z.first->last_block_timestamp);
         }
     }
 };
