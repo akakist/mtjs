@@ -52,6 +52,9 @@ bool BroadcasterTree::Service::on_alarm(const timerEvent::TickAlarm *e)
 
         logErr2("TIMER_BROADCAST_ACK_TIMEDOUT %s", c->dstNodeName.container.c_str());
 
+        // Уведомить node-сервис: нода не ответила -> исключить из рассылки.
+        sendEvent(c->dst_service, new bcEvent::NodeNotRespondedREQ(c->dstNodeName, ListenerBase::serviceId));
+
         make_broadcast_message_to_tree(c->dst_service,c->node_signer,c->node_start_timestamp,c->seqId2,c->payload_signature,  c->payload, c->bt, c->route);
 
         return true;

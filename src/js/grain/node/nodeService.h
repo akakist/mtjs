@@ -326,6 +326,8 @@ namespace Node
         /// последние NO_LEADER_FRAME_MKS слота, пустой vne, либо нет prev_block.
         REF_getter<const bc_node> current_leader();
         void resetBlockExpired(const NODE_id &n);
+        bool on_NodeNotResponded(const bcEvent::NodeNotRespondedREQ *e);
+        std::set<NODE_id> unresponsive_nodes;   // локально: не ответившие (исключаем из дерева рассылки)
         void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
 
 

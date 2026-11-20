@@ -532,6 +532,8 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             return NodeMsgREQ((const bcEvent::NodeMsgREQ *)e.get());
         case bcEventEnum::NodeMsgRSP:
             return NodeMsgRSP((const bcEvent::NodeMsgRSP *)e.get());
+        case bcEventEnum::NodeNotRespondedREQ:
+            return on_NodeNotResponded((const bcEvent::NodeNotRespondedREQ *)e.get());
         case bcEventEnum::PutTxREQ:
             return PutTxREQ((const bcEvent::PutTxREQ *)e.get());
         case timerEventEnum::TickTimer:
@@ -679,6 +681,12 @@ bool Node::Service::on_CommandEntered(const telnetEvent::CommandEntered *e)
 Node::Service::~Service()
 {
 
+}
+
+bool Node::Service::on_NodeNotResponded(const bcEvent::NodeNotRespondedREQ *e)
+{
+    unresponsive_nodes.insert(e->node);
+    return true;
 }
 
 bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
@@ -1639,7 +1647,18 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
             m->vne.push_back(z.second->getElement());
         }
     }
-    m->tree_all_nodes=buildTree(m->vne);
+    {
+        std::vector<NodeElement> vne_bcast = m->vne;
+        if (!unresponsive_nodes.empty()) {
+            vne_bcast.clear();
+            for (auto& n : m->vne)
+                if (!unresponsive_nodes.count(n.name))
+                    vne_bcast.push_back(n);
+            if (vne_bcast.empty())
+                vne_bcast = m->vne;   // все unresponsive — buildTree требует непустой
+        }
+        m->tree_all_nodes = buildTree(vne_bcast);
+    }
 
     if(m->vne.empty())
         throw CommonError("vne is empty");
@@ -1693,7 +1712,18 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
     // }
     // logNode("vne %s",com.c_str());
 
-    m->tree_committe=buildTree(vne_committe);
+    {
+        std::vector<NodeElement> comm_bcast = vne_committe;
+        if (!unresponsive_nodes.empty()) {
+            comm_bcast.clear();
+            for (auto& n : vne_committe)
+                if (!unresponsive_nodes.count(n.name))
+                    comm_bcast.push_back(n);
+            if (comm_bcast.empty())
+                comm_bcast = vne_committe;
+        }
+        m->tree_committe = buildTree(comm_bcast);
+    }
     m->committee_vne=vne_committe;
 
     return m;

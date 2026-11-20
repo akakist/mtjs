@@ -28,6 +28,7 @@ namespace bcEventEnum
     const EVENT_id AddTxRSP(ghash("@g_AddTxRSP"));
     const EVENT_id NodeMsgREQ(ghash("@g_NodeMsgREQ"));
     const EVENT_id NodeMsgRSP(ghash("@g_NodeMsgRSP"));
+    const EVENT_id NodeNotRespondedREQ(ghash("@g_NodeNotRespondedREQ"));
     const EVENT_id ClientMsg(ghash("@g_bcClientMsg"));
     const EVENT_id ClientMsgReply(ghash("@g_bcClientMsgReply"));
     const EVENT_id ClientTxSubscribeREQ(ghash("@g_ClientTxSubscribeREQ"));
@@ -301,6 +302,16 @@ namespace bcEvent
 
         NODE_id this_node_name;
         REF_getter<IDatabase> db;
+    };
+
+    // Локальное уведомление BroadcasterTree -> Node: нода не ответила (ACK timeout).
+    class NodeNotRespondedREQ : public Event::NoPacked
+    {
+    public:
+        static Base* construct(const route_t &r) { return NULL; }
+        NodeNotRespondedREQ(const NODE_id &_node, const route_t &r)
+            : NoPacked(bcEventEnum::NodeNotRespondedREQ, r), node(_node) {}
+        NODE_id node;
     };
 
     class BroadcastMessage : public Event::NoPacked
