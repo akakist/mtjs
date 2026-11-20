@@ -328,6 +328,7 @@ namespace Node
         void resetBlockExpired(const NODE_id &n);
         bool on_NodeNotResponded(const bcEvent::NodeNotRespondedREQ *e);
         std::set<NODE_id> unresponsive_nodes;   // локально: не ответившие (исключаем из дерева рассылки)
+        int64_t unresponsive_recheck_epoch = -1;   // последний epoch, когда пересматривали unresponsive
         void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
 
 

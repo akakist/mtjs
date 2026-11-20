@@ -1568,6 +1568,17 @@ REF_getter<const bc_node> Node::Service::current_leader()
 REF_getter<BlockMetaFull> Node::Service::getMetaFull()
 {
     MUTEX_INSPECTOR;
+    // Периодически пересматриваем unresponsive: нода могла вернуться после sync.
+    // Без этого исключение одностороннее — вернувшаяся нода не получит броадкаст
+    // и не сможет доказать, что жива.
+    {
+        int64_t e = epoch_current();
+        if (unresponsive_recheck_epoch < 0 || e - unresponsive_recheck_epoch >= 10)
+        {
+            unresponsive_nodes.clear();
+            unresponsive_recheck_epoch = e;
+        }
+    }
     // int round=hb->round;
     auto b=prev_root_hash_Z();
     // auto round=ti_ / HB_TIME_WINDOW;
