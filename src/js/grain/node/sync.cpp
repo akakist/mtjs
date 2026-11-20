@@ -193,7 +193,7 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
         // иначе физически удалённые у сервера тумбстоуны останутся у клиента.
         std::vector<std::string> pruned;
         {
-            auto st = cells::getStateNoCreate(root.get(), db_state.get());
+            auto st = cells::getStateNoCreateConst(root.get(), db_state.get());
             if (st.valid() && st->compact_before_ts > sync_old_cutoff) {
                 int64_t unlimited = INT64_MAX;
                 prune_tombstones(root.get(), db_state.get(), st->compact_before_ts,

@@ -169,7 +169,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     // валидатор обязан применить то же правило чистки, что и лидер.
     TIME_mks old_cutoff;
     {
-        auto st0 = cells::getStateNoCreate(root.get(), db_state.get());
+        auto st0 = cells::getStateNoCreateConst(root.get(), db_state.get());
         if (st0.valid()) old_cutoff = st0->compact_before_ts;
     }
 
@@ -180,10 +180,11 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         if(z.size()!=32) throw CommonError("if(z.first.size()!=32)");
             THASH_id h;
             h.container=z;
-            auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h, true);
+            auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h, true, &roll, r->blockAcceptedREQ->blockInfo->block_timestamp);
             if (!cc.valid()) { logNode("deleted: cell not found %s", base16::encode(z).c_str()); continue; }
             if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            
-            cc->setDirty__(&roll,r->blockAcceptedREQ->blockInfo->block_timestamp);
+            // WriteGuard gcc(cc, &roll,r->blockAcceptedREQ->blockInfo->block_timestamp,false);
+            cc->markDirty(r->blockAcceptedREQ->blockInfo->block_timestamp);
             deleteGranule(cc->data.get(),&roll,db_to_save_Z,r->blockAcceptedREQ->blockInfo->block_timestamp);
     }
     // for(auto &z: db_dump)
@@ -200,7 +201,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     // Компакция: если лидер в этом блоке поднял compact_before_ts,
     // каждый валидатор физически чистит тумбстоуны у себя — иначе root не сойдётся.
     {
-        auto st = cells::getStateNoCreate(root.get(), db_state.get());
+        auto st = cells::getStateNoCreateConst(root.get(), db_state.get());
         if (st.valid() && st->compact_before_ts > old_cutoff)
         {
             int64_t unlimited = INT64_MAX;
@@ -230,7 +231,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
                     r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
             dump_tree(root.get(), db_state.get(), "validator", 0, 6);
         }
-        {
+        if (getenv("MTJS_TREE_DUMP")) {
             std::string dbg;
             for (auto& z : r->diffs)
                 dbg += base16::encode(z.first).substr(0,12) + ":" +
@@ -372,7 +373,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     }
     // logNode("diff validators %s", iUtils->join(" ",vals).c_str());
     int64_t full_stake=0;
-    auto ls=cells::getAllNodes(root.get(), db_state.get());
+    auto ls=cells::getAllNodesConst(root.get(), db_state.get());
     for(auto &z: ls)
     {
         if(!z->isEnabled()) continue;
@@ -498,7 +499,7 @@ bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node
             ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v : 0;
         if (sync_full) sync_fresh_root = true;   // собираем дерево с нуля
         {
-            auto st = cells::getStateNoCreate(root.get(), db_state.get());
+            auto st = cells::getStateNoCreateConst(root.get(), db_state.get());
             sync_old_cutoff = st.valid() ? st->compact_before_ts : TIME_mks{};
         }
         logNode("request sync since=%lld epoch_req=%lld local_epoch=%lld prev_block=%s full=%d",
@@ -560,11 +561,11 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
     passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
 }
-void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, time_t block_timestamp)
+void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, Rollback* roll, TIME_mks block_timestamp)
 {
     if (getenv("MTJS_TREE_DUMP"))
         logNode("[TRACE fix_missed_rounds] enter validators=%zu", node_validators.size());
-    auto ls=cells::getAllNodes(root.get(), db_state.get());
+    auto ls=cells::getAllNodes(root.get(), db_state.get(), roll, block_timestamp);
     auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
     auto round_limit=v->getValue("missed_rounds_max");
     for(auto &z: ls)
@@ -594,7 +595,7 @@ void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, 
             z->answered_rounds++;
             z->setDirty(NULL, TIME_mks{block_timestamp});
         }
-        auto act = cells::getActivityNoCreate(root.get(), db_state.get(), z->getDbId());
+        auto act = cells::getActivityNoCreate(root.get(), db_state.get(), z->getDbId(),roll, block_timestamp);
         if (act.valid()) {
             act->update_time(TIME_mks{block_timestamp}, NULL);
         }        
@@ -713,7 +714,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
 
         rsp->blockInfo = blockInfo;
-        {
+        if (getenv("MTJS_TREE_DUMP")) {
             std::string dbg;
             for (auto& z : diffs)
                 dbg += base16::encode(z.first).substr(0,12) + ":" +

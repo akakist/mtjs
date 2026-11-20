@@ -53,7 +53,6 @@ struct t_params
     int64_t gasLimitGas = 0;
     int64_t value = 0;
     Rollback *roll = NULL;
-    Dirty dirty_1;
     b_params* b;
     std::set<REF_getter<data_base>> *deleted_granules;
     // FeesSnapshot fees;
@@ -64,7 +63,6 @@ struct t_params
     int64_t  chain_id        = 0;   // из TX
     int64_t  tx_index        = 0;   // TBD
 
-    void markDirty(data_base *p) { p->setDirty(roll, b->validateBlockREQ->block_timestamp); dirty_1.add(p); }
     // Держим ссылки на ячейки, убранные из дерева при откате, чтобы
     // не оставить висячих указателей у тех, кто ещё держит data_base*.
     std::vector<REF_getter<Cellable>> keepalive;
@@ -96,7 +94,7 @@ struct t_params
                     ++it;
             }
 
-            z.first->setDirty__(nullptr, z.first->last_block_timestamp);
+            z.first->markDirty(z.first->last_block_timestamp);
         }
     }
 };

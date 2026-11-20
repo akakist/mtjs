@@ -42,6 +42,23 @@ struct CNode_prod: public CNode
 
 
 };
+struct CNodeConst_prod: public CNodeConst
+{
+    CNodeConst_prod(const REF_getter<const bc_granule>& _data, const REF_getter<const bc_activity>& _act): data(_data),act(_act){}
+    REF_getter<const bc_granule> data=nullptr;
+    REF_getter<const bc_activity> act=nullptr;
+    std::string get() const override
+    {
+        return data->container;
+    }
+    TTL_sec ttl() const override
+    {
+        return to_sec(act->ttl);   // внутри мкс, наружу секунды
+    }
+
+
+};
+
 struct NodeGranuleIO : GranuleIO {
     NodeGranuleIO(const REF_getter<IDatabase> &_db) : db(_db) {}
     REF_getter<IDatabase> db;
@@ -69,11 +86,11 @@ struct NodeGranuleIO : GranuleIO {
             auto d = cells::getContractDataNoCreateConst(root,db.get(),contract, key);
             if (d.valid()) return std::string("create: leaf already exists");
         }
-        auto dd = cells::getContractDataOrCreate(root,db.get(),contract, key, roll, ttl, block_timestamp);
+        auto dd = cells::getContractDataOrCreate(root,db.get(),contract, key, ttl, roll, block_timestamp);
         if (!dd.valid()) return std::string("create failed");
         {  dd->container = value; }
         {
-            auto actd = cells::getActivityOrCreate(root, db.get(), dd->getDbId(),{},ttl,block_timestamp,roll);
+            auto actd = cells::getActivityOrCreate(root, db.get(), dd->getDbId(),{},ttl,roll,block_timestamp);
             if(!actd.valid())
                 throw CommonError("if(!act.valid())");
             actd->update_time(TIME_mks{block_timestamp}, roll);
@@ -86,11 +103,11 @@ struct NodeGranuleIO : GranuleIO {
                                         TIME_mks block_timestamp, 
                                         Rollback* roll) override {
         MUTEX_INSPECTOR;                                            
-        auto d = cells::getContractDataNoCreate(root,db.get(),contract, key);
+        auto d = cells::getContractDataNoCreate(root,db.get(),contract, key, roll, block_timestamp);
         if (!d.valid()) return std::string("granule not exists");
         d->setDirty(roll, block_timestamp);
         d->container = value;   // <-- ОБНОВИТЬ ЗНАЧЕНИЕ
-        auto actd=cells::getActivityNoCreate(root,db.get(),d->getDbId());
+        auto actd=cells::getActivityNoCreate(root,db.get(),d->getDbId(), roll, block_timestamp);
         actd->update_time(TIME_mks{block_timestamp},roll);
 
         return std::nullopt;
@@ -116,7 +133,7 @@ struct NodeGranuleIO : GranuleIO {
                                              Rollback* roll,
                                              std::set<REF_getter<data_base>>* deleted_granules) override {
         MUTEX_INSPECTOR;                                            
-        auto d = cells::getContractDataNoCreate(root,db.get(), contract, key);
+        auto d = cells::getContractDataNoCreateConst(root,db.get(), contract, key);
         if (!d.valid()) return std::string("granule not exists");
         deleted_granules->insert(d.get());
         return std::nullopt;
@@ -125,7 +142,8 @@ struct NodeGranuleIO : GranuleIO {
         MUTEX_INSPECTOR;                                            
         auto d = cells::getContractDataNoCreateConst(root, db.get(), contract, key);
         if (!d.valid()) return 0;
-        auto actd=cells::getActivityNoCreate(root,db.get(),d->getDbId());
+        auto actd=cells::getActivityNoCreateConst(root,db.get(),d->getDbId());
+        if (!actd.valid()) return 0;   // активность удалена/GC — ttl неизвестен
         return to_sec(actd->ttl).v;   // наружу секунды
     }
     REF_getter<CNode> createCNode(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd,
@@ -133,38 +151,55 @@ struct NodeGranuleIO : GranuleIO {
                                                      Rollback* r)
     {
         auto dbid= blake2b_hash(cells::getContractDataKey(c,cd));
-        auto d=cells::getContractDataNoCreate(root,db.get(),c,cd);
+        auto d=cells::getContractDataNoCreate(root,db.get(),c,cd,r,block_timestamp);
         if(d.valid())
             throw CommonError("if(d.valid())#4763@#"); /// error data already exists
         REF_getter<CNode_prod> ret=new CNode_prod;
-        ret->data=cells::getContractDataOrCreate(root,db.get(),c,cd,r,ttl,block_timestamp);
+        ret->data=cells::getContractDataOrCreate(root,db.get(),c,cd,ttl,r,block_timestamp);
         if(!ret->data.valid())
             throw CommonError("if(!ret->data.valid()) @@@#$$");
         ret->data->setDirty(r, block_timestamp);
-        ret->act=cells::getActivityOrCreate(root,db.get(),dbid.container,{},ttl,block_timestamp,r);
+        ret->act=cells::getActivityOrCreate(root,db.get(),dbid.container,{},ttl,r,block_timestamp);
         if(!ret->act.valid())
             throw CommonError("if(!act.valid()) @#886");
         ret->act->setDirty(r, block_timestamp);
 
         return ret.get();
     }
-    REF_getter<CNode> getCNode(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd)
+    REF_getter<CNode> getCNode(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd, TIME_mks t, Rollback* r)
     {
         auto dbid= blake2b_hash(cells::getContractDataKey(c,cd));
         REF_getter<CNode_prod> ret=new CNode_prod;
-        ret->data=cells::getContractDataNoCreate(root,db.get(),c,cd);
+        ret->data=cells::getContractDataNoCreate(root,db.get(),c,cd,r,t);
         if(!ret->data.valid())
             return nullptr; /// error not already exists
-        ret->act=cells::getActivityNoCreate(root,db.get(),dbid.container);
+        ret->act=cells::getActivityNoCreate(root,db.get(),dbid.container,r,t);
         if(!ret->act.valid())
             throw CommonError("if(!act.valid()) @#886");
+
+        return ret.get();
+    }
+    REF_getter<const CNodeConst> getCNodeConst(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd)
+    {
+        auto dbid= blake2b_hash(cells::getContractDataKey(c,cd));
+        auto data = cells::getContractDataNoCreateConst(root,db.get(),c,cd);
+        auto act  = cells::getActivityNoCreateConst(root,db.get(),dbid.container);
+        if (!data.valid() || !act.valid())
+            return nullptr;   // гранула/активность удалена (тумбстоун) — «не найдено»
+        REF_getter<const CNodeConst_prod> ret=new CNodeConst_prod(data,act);
+        // ret->data=cells::getContractDataNoCreateConst(root,db.get(),c,cd);
+        // if(!ret->data.valid())
+        //     return nullptr; /// error not already exists
+        // ret->act=cells::getActivityNoCreateConst(root,db.get(),dbid.container,r,t);
+        // if(!ret->act.valid())
+        //     throw CommonError("if(!act.valid()) @#886");
 
         return ret.get();
     }
     void update_contract_time(Cellable* root,const CONTRACT_id& c, TIME_mks t, Rollback* r)
     {
         auto k=cells::getContractKey(c);
-        auto act=cells::getActivityNoCreate(root,db.get(),blake2b_hash(k).container);
+        auto act=cells::getActivityNoCreate(root,db.get(),blake2b_hash(k).container,r,t);
         if(!act.valid())
             throw CommonError("if(!act.valid())");
         act->update_time(t,r);

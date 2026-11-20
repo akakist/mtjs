@@ -33,21 +33,19 @@ std::optional<std::string> Node::Service::execute_mint(yyjson_val *params, b_par
     if(err) return err;
 
 
-    auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),t.senderAddress);
+    auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),t.senderAddress,t.roll,b.validateBlockREQ->block_timestamp);
     if (!u.valid())
     {
         return "mint: sender not found";
     }
-    t.markDirty(u.get());
     u->balance+=amount;
-    cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
 
 
  // ▼▼▼ INSERT: bc_state total_supply
     {
-        auto st = cells::getStateNoCreate(root.get(), db_state.get());
+        auto st = cells::getStateNoCreate(root.get(), db_state.get(),t.roll,b.validateBlockREQ->block_timestamp);
         if (!st.valid()) return "state create failed";
-        t.markDirty(st.get());
         {  st->total_supply += i128(amount); }
     }
     // ▲▲▲
@@ -76,15 +74,14 @@ std::optional<std::string> Node::Service::execute_transfer(yyjson_val *params, b
     if (!u.valid()) return "sender userstate invalid";
     if (to_addr == t.senderAddress) return "cannot transfer to self";
 
-    auto to = cells::getAddressStateNoCreate(root.get(), db_state.get(),to_addr);
+    auto to = cells::getAddressStateNoCreate(root.get(), db_state.get(),to_addr,t.roll,b.validateBlockREQ->block_timestamp);
     if (!to.valid()) return "execute_transfer: to address not found "+to_addr.str();
 
     if (amount > t.value) return "amount>t.value";
 
     t.value -= amount;
-    t.markDirty(to.get());
     to->balance += amount;
-    cells::getActivityNoCreate(root.get(),db_state.get(),to->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),to->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
 
     b.emit_command(t.tx_id, seqId, "transfer",
         R"({"from":"%s","to":"%s","amount":"%s"})",
@@ -106,7 +103,7 @@ std::optional<std::string> Node::Service::execute_node_update(yyjson_val *params
 
 
 
-    auto nn = cells::getNodeNoCreate(root.get(),db_state.get(), name);
+    auto nn = cells::getNodeNoCreate(root.get(),db_state.get(), name, t.roll,b.validateBlockREQ->block_timestamp);
     if (!nn.valid())
         return "Node not found";
     if(nn->get_owner()!=t.senderAddress)
@@ -121,15 +118,13 @@ std::optional<std::string> Node::Service::execute_node_update(yyjson_val *params
     err=yy_get_string(params,"ip",ip);
     if(err) return err;
 
-    t.markDirty(nn.get());
     {
         nn->set_ip(ip);
         b.emit_command(t.tx_id, seqId, "node_change_ip",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
 
     }
 
-    t.markDirty(nn.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),nn->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),nn->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
 
 
     t.gasUsed+=b.fees.gas_node_update;
@@ -153,7 +148,7 @@ std::optional<std::string> Node::Service::execute_node_create(yyjson_val *params
     auto nn = cells::getNodeNoCreateConst(root.get(),db_state.get(),name);
     if (nn.valid()) return "Node already registered with name";
 
-    auto us = cells::getAddressStateNoCreate(root.get(), db_state.get(),t.senderAddress);
+    auto us = cells::getAddressStateNoCreate(root.get(), db_state.get(),t.senderAddress, t.roll,b.validateBlockREQ->block_timestamp);
     if (!us.valid()) return "if(!us.valid())";
 
     auto n = cells::addNode(root.get(),db_state.get(),name, t.roll, t.b->validateBlockREQ->block_timestamp);
@@ -171,15 +166,13 @@ std::optional<std::string> Node::Service::execute_node_create(yyjson_val *params
     n->init(name, t.senderAddress, bls, base16::decode(pk_ed), ip);
 
     // ▼▼▼ INSERT: обратный индекс owner -> owned_nodes
-    t.markDirty(us.get());
     us->owned_nodes.insert(name);
-    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId(), t.roll,b.validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
     
 
     // ▲▲▲
 
-    t.markDirty(n.get());
-    cells::getActivityOrCreate(root.get(),db_state.get(),n->getDbId(),{},TTL_sec{ttl},t.b->validateBlockREQ->block_timestamp,t.roll)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+    cells::getActivityOrCreate(root.get(),db_state.get(),n->getDbId(),{},TTL_sec{ttl},t.roll, t.b->validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
     t.gasUsed+=b.fees.gas_node_create;
 
     b.emit_command(t.tx_id, seqId, "node_create",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
@@ -201,27 +194,24 @@ std::optional<std::string> Node::Service::execute_node_stake(yyjson_val *params,
     err=yy_get_string(params,"node",node.container);
     if(err) return err;
 
-    auto us = cells::getAddressStateNoCreate(root.get(), db_state.get(),t.senderAddress);
+    auto us = cells::getAddressStateNoCreate(root.get(), db_state.get(),t.senderAddress,t.roll,t.b->validateBlockREQ->block_timestamp);
     if (!us.valid()) return "if(!us.valid())";
 
-    auto n=cells::getNodeNoCreate(root.get(),db_state.get(),node);
+    auto n=cells::getNodeNoCreate(root.get(),db_state.get(),node,t.roll,t.b->validateBlockREQ->block_timestamp);
     if(!n.valid()) return "node not found";
     if(t.value<amount) return "Insufficient funds";
     t.value-=amount;
-    t.markDirty(n.get());
     n->add_stake(t.senderAddress, amount);
 
     // ▼▼▼ INSERT: обратный индекс staker -> staked_in
-    t.markDirty(us.get());
     us->staked_in.insert(node);
-    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
     // ▲▲▲
 
     t.gasUsed += b.fees.gas_node_stake;
     {
-        auto st = cells::getStateNoCreate(root.get(), db_state.get());
+        auto st = cells::getStateNoCreate(root.get(), db_state.get(),t.roll,t.b->validateBlockREQ->block_timestamp);
         if (!st.valid()) return "if (!st.valid())";
-        t.markDirty(st.get());
         st->total_stake += i128(amount);
     }
 
@@ -229,8 +219,7 @@ std::optional<std::string> Node::Service::execute_node_stake(yyjson_val *params,
                    node.container.c_str(),
                    std::to_string(amount).c_str(),
                    base16::encode(t.senderAddress.addr).c_str());
-    t.markDirty(n.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
 
     return std::nullopt;
 }
@@ -247,38 +236,33 @@ std::optional<std::string> Node::Service::execute_unstake_node(yyjson_val *param
     err=yy_get_string(params,"node",node.container);
     if(err) return err;
 
-    auto n = cells::getNodeNoCreate(root.get(),db_state.get(),node);
+    auto n = cells::getNodeNoCreate(root.get(),db_state.get(),node, t.roll,b.validateBlockREQ->block_timestamp);
     if (!n.valid()) return "nodes not registered";
     auto stake=n->get_user_stake(t.senderAddress);
     if (stake == 0) return "no_stake_found";
     if (stake < amount) return "insufficient stake in node";
 
-    auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),t.senderAddress);
+    auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),t.senderAddress, t.roll,b.validateBlockREQ->block_timestamp);
     if (!u.valid()) return "if(!u.valid())";
     t.value+=amount;
-    t.markDirty(n.get());
     n->sub_stake(t.senderAddress, amount);
 
     // ▼▼▼ INSERT: если весь stake выведен — staked_in.erase
     if (n->get_user_stake(t.senderAddress) == 0) {
-        t.markDirty(u.get());
         u->staked_in.erase(node);
     }
-    auto actu=cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId());
+    auto actu=cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId(), t.roll,b.validateBlockREQ->block_timestamp);
     actu->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
-    auto actn=cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId());
+    auto actn=cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId(), t.roll,b.validateBlockREQ->block_timestamp);
     actn->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
 
-    t.markDirty(u.get());
 
-    t.markDirty(n.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
-    cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId(), t.roll,b.validateBlockREQ->block_timestamp)->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),u->getDbId(), t.roll,b.validateBlockREQ->block_timestamp)->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
     {
-        auto st = cells::getStateNoCreate(root.get(), db_state.get());
+        auto st = cells::getStateNoCreate(root.get(), db_state.get(), t.roll,b.validateBlockREQ->block_timestamp);
         if (!st.valid()) return "state create failed";
         st->total_stake -= i128(amount);
-        t.markDirty(st.get());
     }
 
     b.emit_command(t.tx_id, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
@@ -297,7 +281,7 @@ std::optional<std::string> Node::Service::execute_node_enable(yyjson_val *params
     auto err=yy_get_string(params,"node",node.container);
     if(err)return err;
 
-    auto n = cells::getNodeNoCreate(root.get(),db_state.get(),node);
+    auto n = cells::getNodeNoCreate(root.get(),db_state.get(),node,t.roll,b.validateBlockREQ->block_timestamp);
     if (!n.valid())
     {
         return "node not found";
@@ -309,9 +293,8 @@ std::optional<std::string> Node::Service::execute_node_enable(yyjson_val *params
     if(n->isEnabled())
         return "node already enabled";
 
-    t.markDirty(n.get());
     n->setEnabled(1);
-    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId(), t.roll,b.validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
 
     t.gasUsed+=b.fees.gas_node_enable;
 
@@ -330,7 +313,7 @@ std::optional<std::string> Node::Service::execute_node_disable(yyjson_val *param
     auto err=yy_get_string(params,"node",node.container);
     if(err)return err;
 
-    auto n = cells::getNodeNoCreate(root.get(),db_state.get(),node);
+    auto n = cells::getNodeNoCreate(root.get(),db_state.get(),node,t.roll,b.validateBlockREQ->block_timestamp);
     if (!n.valid())
     {
         return "node not found";
@@ -342,9 +325,8 @@ std::optional<std::string> Node::Service::execute_node_disable(yyjson_val *param
     if(!n->isEnabled())
         return "node already disabled";
 
-    t.markDirty(n.get());
     n->setEnabled(0);
-    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
     
 
     t.gasUsed+=b.fees.gas_node_disable;
@@ -378,7 +360,7 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     if (nn.valid())
         return "Contract already registered with name";
 
-    auto us = cells::getAddressStateNoCreate(root.get(), db_state.get(), t.senderAddress);
+    auto us = cells::getAddressStateNoCreate(root.get(), db_state.get(), t.senderAddress,t.roll,b.validateBlockREQ->block_timestamp);
     if (!us.valid())
         return "if(!us.valid())";
 
@@ -394,7 +376,6 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     err = yy_get_string(params, "src", src);
     if (err) return err;
 
-    t.markDirty(n.get());
     {
         n->src = src;
         n->owners.clear();
@@ -410,15 +391,14 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     CONTRACT_DATA_id rootKey;
     rootKey.container = "";
     auto rootGranule = cells::getContractDataOrCreate(root.get(), db_state.get(), cn, rootKey,
-                                                      t.roll, TTL_sec{ttl}, t.b->validateBlockREQ->block_timestamp);
+                                                       TTL_sec{ttl}, t.roll, t.b->validateBlockREQ->block_timestamp);
     if (!rootGranule.valid())
         return "contract_deploy: root granule create failed";
     rootGranule->container = "";   // пустой value
-    t.markDirty(rootGranule.get());
 
     // activity для корневой гранулы (delete_list = root_granule)
     auto rootAct = cells::getActivityOrCreate(root.get(), db_state.get(), rootGranule->getDbId(),
-                                              {}, TTL_sec{ttl}, t.b->validateBlockREQ->block_timestamp, t.roll);
+                                              {}, TTL_sec{ttl}, t.roll, t.b->validateBlockREQ->block_timestamp);
     if (rootAct.valid()) {
         rootAct->dbid = { base16::encode(rootGranule->getDbId()) };
         rootAct->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
@@ -426,7 +406,7 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     // ▲▲▲
 
     // activity контракта (delete_list = contract + balance + root_granule)
-    auto act = cells::getActivityOrCreate(root.get(), db_state.get(), n->getDbId(), {}, TTL_sec{ttl}, t.b->validateBlockREQ->block_timestamp, t.roll);
+    auto act = cells::getActivityOrCreate(root.get(), db_state.get(), n->getDbId(), {}, TTL_sec{ttl}, t.roll, t.b->validateBlockREQ->block_timestamp);
     if (act.valid()) {
         act->dbid = {
             n->getDbId(),           // contract
@@ -443,15 +423,13 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
 
     // bc_state contract_count++
     {
-        auto st = cells::getStateNoCreate(root.get(), db_state.get());
+        auto st = cells::getStateNoCreate(root.get(), db_state.get(),t.roll,b.validateBlockREQ->block_timestamp);
         if (!st.valid()) return "state create failed";
-        t.markDirty(st.get());
         st->contract_count++;
     }
 
-    t.markDirty(us.get());
     us->contracts.insert(cn);
-    cells::getActivityNoCreate(root.get(), db_state.get(), us->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+    cells::getActivityNoCreate(root.get(), db_state.get(), us->getDbId(),t.roll,t.b->validateBlockREQ->block_timestamp)->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
 
     b.emit_command(t.tx_id, seqId, "contract_deploy",
         R"({"name":"%s","owner":"%s","ttl":"%lld"})",
@@ -470,7 +448,7 @@ std::optional<std::string> Node::Service::execute_contract_update(yyjson_val *pa
     if(err)
         return err;
 
-    auto n = cells::getContractNoCreate(root.get(),db_state.get(),cn);
+    auto n = cells::getContractNoCreate(root.get(),db_state.get(),cn, t.roll,b.validateBlockREQ->block_timestamp);
     if (!n.valid())
         return "contract not exists";
 
@@ -489,9 +467,8 @@ std::optional<std::string> Node::Service::execute_contract_update(yyjson_val *pa
         
         n->src=src;
     }
-    t.markDirty(n.get());
-    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
-    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId())->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),us->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
+    cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
 
 
     b.emit_command(t.tx_id, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",cn.container.c_str(),base16::encode(t.senderAddress.addr).c_str());
@@ -506,7 +483,7 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
 {
     MUTEX_INSPECTOR;
     auto v = cells::getValuesNoCreateConst(root.get(),db_state.get());
-    auto votes = cells::getVotesNoCreate(root.get(),db_state.get());
+    auto votes = cells::getVotesNoCreate(root.get(),db_state.get(),t.roll,b.validateBlockREQ->block_timestamp);
 
     NODE_id node;
     auto err = yy_get_string(params, "node", node.container);
@@ -570,7 +547,6 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
                 {
                     votes->votes.erase(vhash);
                 }
-                t.markDirty(votes.get());
 
                 return std::nullopt;
             }
@@ -578,7 +554,6 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
         }
 
         auto voted = votes->votes[vhash].nodes;
-        t.markDirty(votes.get());
 
         int64_t stake = 0;
         for (auto& z : voted) {
@@ -588,15 +563,13 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
             stake += nn->get_full_stake();
         }
         if ((stake * 100) / b.meta->fullStake() > QUORUM) {
-            auto vv = cells::getValuesNoCreate(root.get(),db_state.get());
+            auto vv = cells::getValuesNoCreate(root.get(),db_state.get(),t.roll,t.b->validateBlockREQ->block_timestamp);
             {
                 
                 vv->values[param] = std::stoull(value);
                 if (param == "validator_min_stake")
                     vv->values["validator_min_stake_activated"] = 1;   // активация sybil (getMetaFull — TBD)
             }
-            t.markDirty(votes.get());
-            t.markDirty(vv.get());
             votes->votes.erase(vhash);
             b.emit_command(t.tx_id, seqId, "vote_applied",
                 R"({"param":"%s","value":"%s"})", param.c_str(), value.c_str());
@@ -642,7 +615,7 @@ void Node::Service::prune_tombstones(Cellable* node, IDatabase* db, TIME_mks cut
             out.push_back(ch->getDbId());
             node->children_hashes_mx.erase(k);
             node->children_ptrs_mx.erase(k);
-            node->setDirty__(roll, block_ts);
+            node->markDirty(block_ts);
             remaining--;
         }
     }
@@ -664,7 +637,7 @@ std::optional<std::string> Node::Service::execute_compact(yyjson_val* params, b_
     TIME_mks cutoff{block_ts.v - retention};
     if (cutoff.v <= 0) return "compact: cutoff <= 0 (retention больше времени чейна?)";
 
-    auto st = cells::getStateNoCreate(root.get(), db_state.get());
+    auto st = cells::getStateNoCreate(root.get(), db_state.get(),t.roll,t.b->validateBlockREQ->block_timestamp);
     if (!st.valid()) return "compact: no state";
 
     std::vector<std::string> dels;
@@ -675,7 +648,6 @@ std::optional<std::string> Node::Service::execute_compact(yyjson_val* params, b_
 
     bool complete = (remaining > 0);          // обошли всё до cutoff
     if (complete) st->compact_before_ts = cutoff;
-    t.markDirty(st.get());
     st->state_gen++;
 
     logNode("execute_compact: cutoff=%lld deleted=%d complete=%d gen=%lld",
@@ -713,7 +685,7 @@ std::optional<std::string> Node::Service::execute_gc(
         THASH_id h; h.container = base16::decode(hex);
         if (h.container.size() != 32) { skipped++; continue; }
 
-        auto cc = cells::getByDbIdNoCreate(root.get(), db_state.get(), h, true);
+        auto cc = cells::getByDbIdNoCreate(root.get(), db_state.get(), h, true, t.roll, b.validateBlockREQ->block_timestamp);
         if (!cc.valid() || !cc->data.valid()) { skipped++; continue; }
 
         logNode("execute_gc: dbid=%s payload_ctor_idx=%d", hex.c_str(), (int)cc->payload_ctor_idx);
@@ -750,7 +722,7 @@ std::optional<std::string> Node::Service::execute_add_address_key(yyjson_val* pa
     if (auto e = yy_get_string(params, "sig", sig_hex)) return e;
 
     ADDRESS_id addr; addr.addr = base16::decode(addr_hex);
-    auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),addr);
+    auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),addr,t.roll,t.b->validateBlockREQ->block_timestamp);
     if (!u.valid()) return "execute_add_address_key: address not found";
 
     // подпись уже проверена ключом из состояния этого же адреса в AddTxREQ,
@@ -771,7 +743,6 @@ std::optional<std::string> Node::Service::execute_add_address_key(yyjson_val* pa
 
     auto id = u->addKey((uint8_t)type, kb);
     if (!id) return "too many keys (max 5)";
-    t.markDirty(u.get());
     b.emit_command(t.tx_id, seqId, "add_address_key",
         R"({"addr":"%s","key_id":%llu})", addr_hex.c_str(), (unsigned long long)*id);
     return std::nullopt;
@@ -784,7 +755,7 @@ std::optional<std::string> Node::Service::execute_remove_address_key(yyjson_val*
     if (auto e = yy_get_int64_t(params, "key_id", key_id)) return e;
 
     ADDRESS_id addr; addr.addr = base16::decode(addr_hex);
-    auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),addr);
+    auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),addr,t.roll,t.b->validateBlockREQ->block_timestamp);
     if (!u.valid()) return (std::string)"execute_remove_address_key: address not found "+addr.str();
 
     // подпись уже проверена ключом из состояния этого же адреса в AddTxREQ,
@@ -795,7 +766,6 @@ std::optional<std::string> Node::Service::execute_remove_address_key(yyjson_val*
     if (!u->hasKeyId((uint64_t)key_id)) return "key_id not found";
     if (u->sizeKeys() <= 1) return "cannot remove last key";
 
-    t.markDirty(u.get());
     u->removeKey((uint64_t)key_id);
     b.emit_command(t.tx_id, seqId, "remove_address_key",
         R"({"addr":"%s","key_id":%lld})", addr_hex.c_str(), (long long)key_id);
@@ -816,7 +786,7 @@ std::optional<std::string> Node::Service::execute_create_address(yyjson_val* par
 
     ADDRESS_id addr; addr.addr = addr_bin;
 
-    auto existing = cells::getAddressStateNoCreate(root.get(), db_state.get(),addr);
+    auto existing = cells::getAddressStateNoCreateConst(root.get(), db_state.get(),addr);
     if (existing.valid()) return "address already exists";
 
     yyjson_val* keys_arr = yyjson_obj_get(params, "keys");
@@ -843,12 +813,11 @@ std::optional<std::string> Node::Service::execute_create_address(yyjson_val* par
 
     auto u = cells::getAddressStateOrCreate(root.get(), db_state.get(),addr, t.roll,t.b->validateBlockREQ->block_timestamp);
     if (!u.valid()) return "create failed";
-    t.markDirty(u.get());
     for (auto& k : parsed) {
         auto id = u->addKey(k.type, k.kb);
         if (!id) return "addKey failed";
     }
-    cells::getActivityOrCreate(root.get(),db_state.get(),u->getDbId(),{},TTL_sec{ttl},t.b->validateBlockREQ->block_timestamp,t.roll)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
+    cells::getActivityOrCreate(root.get(),db_state.get(),u->getDbId(),{},TTL_sec{ttl},t.roll,t.b->validateBlockREQ->block_timestamp)->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp},t.roll);
 
     t.gasUsed += b.fees.gas_create_address;
     b.emit_command(t.tx_id, seqId, "create_address",
@@ -864,7 +833,7 @@ std::optional<std::string> Node::Service::execute_create_address(yyjson_val* par
 // std::optional<std::string> Node::Service::gc_activity_apply(
 //     const REF_getter<Cellable>& cc, TIME_mks now, t_params& t, b_params& b, _db_to_save& dbd)
 std::optional<std::string> Node::Service::gc_activity_apply(
-        const REF_getter<Cellable>& cc, TIME_mks now, t_params& t, b_params& b, _db_to_save& dbd,
+        const REF_getter<Cellable>& cc, TIME_mks now, t_params& ttt, b_params& bbb, _db_to_save& dbd,
         int& applied_granule, int& applied_contract, int& applied_node, int& applied_address)
 {
     if (!cc->data.valid()) return "no data";
@@ -874,14 +843,13 @@ std::optional<std::string> Node::Service::gc_activity_apply(
     if (act->_update_time + act->ttl >= now) return "not expired";
 
     for (auto& dbid : act->dbid) {
-        THASH_id h;
-        h.container = dbid;   // ← bin (32 байта), не hex (64)
-        if (h.container.size() != 32) {
+        THASH_id h_;
+        h_.container = dbid;   // ← bin (32 байта), не hex (64)
+        if (h_.container.size() != 32) {
             logNode("gc: dbid '%s' bad size (skip)", dbid.c_str());
             continue;
         }
-
-        auto g = cells::getByDbIdNoCreate(root.get(), db_state.get(), h,true);
+        auto g = cells::getByDbIdNoCreateConst(root.get(), db_state.get(), h_,true);
         if (!g.valid() || !g->data.valid()) {
             logNode("gc: dbid %s not found (skip)", dbid.c_str());
             continue;
@@ -892,7 +860,7 @@ std::optional<std::string> Node::Service::gc_activity_apply(
         switch (g->payload_ctor_idx) {
         case hsh::bc_granule:
             applied_granule++;
-            deleteGranule(g->data.get(), t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
+            deleteGranule(g->data.get(), ttt.roll, dbd,ttt.b->validateBlockREQ->block_timestamp);
             break;
 
         case hsh::bc_node: {
@@ -906,33 +874,29 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             auto name = n->getName();
 
             // 1. Вернуть stakes стейкерам
-            auto st = cells::getStateNoCreate(root.get(), db_state.get());
+            auto st = cells::getStateNoCreate(root.get(), db_state.get(), ttt.roll,bbb.validateBlockREQ->block_timestamp);
             if (!st.valid()) break;
             for (auto& [user_addr, stake] : n->getStakes()) {
-                auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), user_addr);
+                auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), user_addr,ttt.roll,ttt.b->validateBlockREQ->block_timestamp);
                 if (u.valid()) {
-                    t.markDirty(u.get());
                     u->balance += stake;
                     u->staked_in.erase(name);
-                    cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId())
-                        ->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+                    cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId(),ttt.roll,ttt.b->validateBlockREQ->block_timestamp)
+                        ->update_time(ttt.b->validateBlockREQ->block_timestamp, ttt.roll);
                 }
                 st->total_stake -= i128(stake);
             }
-            t.markDirty(st.get());
 
             // 2. Удалить из bc_nodelist
-            auto nl = cells::getNodeListNoCreate(root.get(), db_state.get());
+            auto nl = cells::getNodeListNoCreate(root.get(), db_state.get(),ttt.roll,ttt.b->validateBlockREQ->block_timestamp);
             if (nl.valid()) {
-                t.markDirty(nl.get());
                 nl->remove(name);
             }
 
             // 3. Удалить bc_node
-            n->setDirty(t.roll,t.b->validateBlockREQ->block_timestamp);
-            deleteGranule(n, t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
+            deleteGranule(n, ttt.roll, dbd,ttt.b->validateBlockREQ->block_timestamp);
 
-            b.emit_command(t.tx_id, 0, "gc_node",
+            bbb.emit_command(ttt.tx_id, 0, "gc_node",
                 R"({"name":"%s","stake_returned":true})", name.container.c_str());
             break;
         }
@@ -945,14 +909,14 @@ std::optional<std::string> Node::Service::gc_activity_apply(
 
             applied_address++;
             int64_t burned = u->balance;
-            auto st = cells::getStateNoCreate(root.get(), db_state.get());
+            auto st = cells::getStateNoCreate(root.get(), db_state.get(), ttt.roll, bbb.validateBlockREQ->block_timestamp);
             if (st.valid() && burned > 0) {
-                t.markDirty(st.get());
+                // t.markDirty(st.get());
                 st->total_supply -= i128(burned);
             }
 
-            deleteGranule(u, t.roll, dbd, t.b->validateBlockREQ->block_timestamp);
-            b.emit_command(t.tx_id, 0, "gc_address_deleted",
+            deleteGranule(u, ttt.roll, dbd, ttt.b->validateBlockREQ->block_timestamp);
+            bbb.emit_command(ttt.tx_id, 0, "gc_address_deleted",
                 R"({"addr":"%s","burned":"%lld"})",
                 base16::encode(g->getDbId()).c_str(), (long long)burned);
             break;
@@ -965,19 +929,19 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             auto name = c->name_;
 
             for (auto& owner_addr : c->owners) {
-                auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), owner_addr);
+                auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), owner_addr, ttt.roll,ttt.b->validateBlockREQ->block_timestamp);
                 if (u.valid()) {
                     CONTRACT_id cn; cn.container = name;
-                    t.markDirty(u.get());
+                    // t.markDirty(u.get());
                     u->contracts.erase(cn);
-                    cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId())
-                        ->update_time(TIME_mks{t.b->validateBlockREQ->block_timestamp}, t.roll);
+                    // cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId())
+                    //     ->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
                 }
             }
             c->owners.clear();
 
-            deleteGranule(c, t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
-            b.emit_command(t.tx_id, 0, "gc_contract_deleted",
+            deleteGranule(c, ttt.roll, dbd,ttt.b->validateBlockREQ->block_timestamp);
+            bbb.emit_command(ttt.tx_id, 0, "gc_contract_deleted",
                 R"({"name":"%s"})", name.c_str());
             break;
         }
@@ -985,21 +949,20 @@ std::optional<std::string> Node::Service::gc_activity_apply(
         case hsh::bc_contract_balance: {
             auto* bal = dynamic_cast<bc_contract_balance*>(g->data.get());
             if (bal) {
-                auto st = cells::getStateNoCreate(root.get(), db_state.get());
+                auto st = cells::getStateNoCreate(root.get(), db_state.get(),ttt.roll,ttt.b->validateBlockREQ->block_timestamp);
                 if (st.valid() && bal->getAmount() > 0) {
-                    t.markDirty(st.get());
                     st->total_supply -= i128(bal->getAmount());
                 }
             }
-            deleteGranule(g->data.get(), t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
+            deleteGranule(g->data.get(), ttt.roll, dbd,ttt.b->validateBlockREQ->block_timestamp);
             break;
         }
 
         default:
-            deleteGranule(g->data.get(), t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
+            deleteGranule(g->data.get(), ttt.roll, dbd,ttt.b->validateBlockREQ->block_timestamp);
             break;
         }
     }
-    deleteGranule(act, t.roll, dbd,t.b->validateBlockREQ->block_timestamp);
+    deleteGranule(act, ttt.roll, dbd,ttt.b->validateBlockREQ->block_timestamp);
     return std::nullopt;
 }

@@ -13,11 +13,8 @@ struct bc_activity: public data_base
     {
         if(t>_update_time)
         {
-            // setDirty ДО мутации: setDirty__ снимает снапшот для отката,
-            // и он должен захватить СТАРОЕ значение _update_time. Иначе при
-            // откате восстановится полу-мутированное состояние (upd новый,
-            // last_block_timestamp старый) и root у лидера разойдётся.
-            setDirty(roll, t);
+            // снапшот и markDirty уже сделаны аксессором (getActivityNoCreate/
+            // getActivityOrCreate) при получении — здесь только мутация.
             _update_time=t;
         }
     }

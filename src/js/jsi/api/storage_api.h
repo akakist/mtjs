@@ -11,7 +11,20 @@
 #include "GranuleIO.h"
 
 // ============================================================
-// JSI_Granule — базовый (read-only): get_granule, exists, get
+// JSI_GranuleConst — read-only: только get/ttl/exists.
+// Нет set/del/flush/update_time — компилятор не даёт писать.
+// ============================================================
+struct JSI_GranuleConst : public Refcountable {
+    std::string path;   // полный путь (read-only гранула эфемерна: без parent/children)
+    REF_getter<const CNodeConst> cnode = nullptr;
+
+    JSI_GranuleConst(const std::string& p)
+        : Refcountable("JSI_GranuleConst"), path(p) {}
+    virtual ~JSI_GranuleConst() = default;
+};
+
+// ============================================================
+// JSI_Granule — writable (method): set/del/get_granule(ttl), flush
 // ============================================================
 struct JSI_Granule : public Refcountable {
     JSI_Granule* parent = nullptr;
@@ -50,19 +63,13 @@ struct JSI_Granule : public Refcountable {
     void setDirtyD() { dirtyD = true; }
 
     void flush(Rollback* roll, TIME_mks block_timestamp) {
-        if (_deleted) return;   // удаление — через deleted_granules (jsg_del)
+        if (_deleted) return;
         if (__update_time) cnode->update_time(TIME_mks{__update_time}, roll);
-        if (dirtyD) cnode->setDirty(roll,block_timestamp);
-        for (auto& z : children) z.second->flush(roll,block_timestamp);
+        if (dirtyD) cnode->setDirty(roll, block_timestamp);
+        for (auto& z : children) z.second->flush(roll, block_timestamp);
     }
 };
 
-// ============================================================
-// JSI_GranuleWritable — write (method): + get_granule(name,ttl), set, del
-// ============================================================
-struct JSI_GranuleWritable : public JSI_Granule {
-    JSI_GranuleWritable(const std::string& nm, JSI_Granule* par)
-        : JSI_Granule(nm, par) {}
-};
+using JSI_GranuleWritable = JSI_Granule;   // совместимость
 
 void register_storage_api(JSIContext* ctx);

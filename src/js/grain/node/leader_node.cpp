@@ -180,7 +180,7 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
         return true;
     }
-    auto nnn=cells::getNodeNoCreate(root.get(), db_state.get(),r->node_validator);
+    auto nnn=cells::getNodeNoCreateConst(root.get(), db_state.get(),r->node_validator);
     if(!nnn.valid())
         throw CommonError("if(!nnn.valid())");
     if (!r->verify(nnn->get_bls_pk()))

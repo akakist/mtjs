@@ -41,15 +41,15 @@ void init_genesis(Cellable* root, IDatabase* db)
     MUTEX_INSPECTOR;
     if(!root)
         throw CommonError("[init_genesis] if(!root)");
-    auto st = cells::getStateNoCreate(root, db);
+    TIME_mks time0;
+    time0.v = 0;
+    auto st = cells::getStateNoCreate(root, db, NULL, time0);
     if (st.valid()) return;
 
     logErr2("RUN GENESIS");
 
     // Нулевой момент времени: у генезиса ещё нет времени блока.
     // Именованная переменная читается лучше, чем TIME_mks{} в аргументах.
-    TIME_mks time0;
-    time0.v = 0;
 
     const char* env_path = getenv("MTJS_GENESIS_PATH");
     std::string path = env_path ? env_path : "genesis.json";
@@ -60,7 +60,8 @@ void init_genesis(Cellable* root, IDatabase* db)
     catch (const std::exception& e) { throw CommonError("genesis: parse %s: %s", path.c_str(), e.what()); }
 
     // ▼▼▼ INSERT: genesis_time (для activity)
-    int64_t genesis_time = j.value("genesis_time", (int64_t)time(NULL));
+    TIME_mks genesis_time; 
+    genesis_time.v = j.value("genesis_time", (int64_t)time(NULL));
     // ▲▲▲
 
     auto nl=cells::getNodeListOrCreate(root,db,NULL,time0);
@@ -131,7 +132,7 @@ void init_genesis(Cellable* root, IDatabase* db)
             ua->setDirty(NULL,time0);
 
             // ▼▼▼ INSERT: activity для адреса (ttl = 0, вечный)
-            cells::getActivityOrCreate(root, db, ua->getDbId(), {}, TTL_sec{}, TIME_mks{genesis_time}, NULL);
+            cells::getActivityOrCreate(root, db, ua->getDbId(), {}, TTL_sec{}, NULL, time0);
             // ▲▲▲
 
             st2->total_supply += i128(bal);
@@ -144,7 +145,7 @@ void init_genesis(Cellable* root, IDatabase* db)
             if (!n.contains("name") || !n["name"].is_string())
                 throw CommonError("genesis: node.name required");
             NODE_id name; name.container = n["name"].get<std::string>();
-            if (cells::getNodeNoCreate(root,db, name).valid())
+            if (cells::getNodeNoCreateConst(root,db, name).valid())
                 throw CommonError("genesis: duplicate node %s", name.container.c_str());
 
             if (!n.contains("owner") || !n["owner"].is_string())
@@ -174,7 +175,7 @@ void init_genesis(Cellable* root, IDatabase* db)
             nn->setDirty(NULL,time0);
 
             // ▼▼▼ INSERT: activity для ноды (ttl = 0, вечный)
-            cells::getActivityOrCreate(root, db, nn->getDbId(), {}, TTL_sec{}, TIME_mks{genesis_time}, NULL);
+            cells::getActivityOrCreate(root, db, nn->getDbId(), {}, TTL_sec{}, NULL, time0);
             // ▲▲▲
 
             st2->total_stake += i128(stake);

@@ -9,7 +9,7 @@ namespace MsgData
         CONTRACT_id contract;
         std::string view;          // имя view
         std::string params_json;   // JSON-строка (nlohmann — на стороне GrainReader)
-        int64_t timeout_sec = 5;
+        time_t timeout_sec = 5;
         void update(Blake2bHasher& h) const
         {
             h.update(contract.container);

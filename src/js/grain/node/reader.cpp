@@ -122,7 +122,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             auto pp = (MsgData::GetAddressInfoREQ*)b.get();
             REF_getter<MsgData::GetAddressInfoRSP> rsp = new MsgData::GetAddressInfoRSP;
             // rsp->addr = pp->addr;
-            auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), pp->addr);   // normalize — в getPath
+            auto u = cells::getAddressStateNoCreateConst(root.get(), db_state.get(), pp->addr);   // normalize — в getPath
             if (u.valid()) {
                 rsp->setOk();
                 rsp->balance = u->balance;
@@ -147,7 +147,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             // logNode("msgid::GetUserNonceREQ");
             auto pp=(MsgData::GetUserNonceREQ*) b.get();
             // ▼▼▼ NoCreate — не создаём адрес (спам RPC)
-            auto u = cells::getAddressStateNoCreate(root.get(),db_state.get(), pp->user_address);
+            auto u = cells::getAddressStateNoCreateConst(root.get(),db_state.get(), pp->user_address);
 #ifdef DEBUG
             logErr2("case msgid::GetUserNonceREQ: pp->user_address %s",pp->user_address.str().c_str());
 #endif
@@ -175,7 +175,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
         {
             auto pp=(MsgData::GetNodeInfoREQ*) b.get();
             REF_getter<MsgData::GetNodeInfoRSP> rsp = new MsgData::GetNodeInfoRSP;
-            auto n = cells::getNodeNoCreate(root.get(),db_state.get(), pp->node_name);
+            auto n = cells::getNodeNoCreateConst(root.get(),db_state.get(), pp->node_name);
             if (n.valid()) {
                 rsp->setOk();
                 rsp->name = n->getName();
@@ -198,7 +198,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
         case msgid::GetValuesREQ:
         {
             REF_getter<MsgData::GetValuesRSP> rsp = new MsgData::GetValuesRSP;
-            auto v = cells::getValuesNoCreate(root.get(),db_state.get());
+            auto v = cells::getValuesNoCreateConst(root.get(),db_state.get());
             if (v.valid()) {
                 rsp->setOk();
                 rsp->fees = v->values;
@@ -214,7 +214,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             REF_getter<MsgData::GetContractDataRSP> rsp = new MsgData::GetContractDataRSP;
             rsp->contract = pp->contract.container;
             rsp->key = pp->key.container;
-            auto d = cells::getContractDataNoCreate(root.get(),db_state.get(), pp->contract, pp->key);
+            auto d = cells::getContractDataNoCreateConst(root.get(),db_state.get(), pp->contract, pp->key);
             if (d.valid()) {
                 rsp->setOk();
                 rsp->value = d->container;
@@ -234,7 +234,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 rsp->setOk();
                 rsp->owners = c->owners;
                 rsp->src = c->src;
-                auto act = cells::getActivityNoCreate(root.get(), db_state.get(), c->getDbId());
+                auto act = cells::getActivityNoCreateConst(root.get(), db_state.get(), c->getDbId());
                 if(!act.valid())
                     throw CommonError("if(!act.valid())");
                 rsp->ttl = to_sec(act->ttl).v;   // наружу секунды   // ← activity.ttl (маркер), не bc_contract.ttl (0)
@@ -302,7 +302,9 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 if (params_ok) {
                     CallStack cs;
                     CONTRACT_id caller;           // внешний вызов → пустой caller
-                    JSIValue r = cc->call_view(root.get(), pp->view, params, nullptr, &cs, contractHost.get(), pp->timeout_sec,
+                    TIME_sec ts;
+                    ts.v=pp->timeout_sec;
+                    JSIValue r = cc->call_query(root.get(), pp->view, params, &cs, contractHost.get(), to_mks(ts),
                         prev_block.valid() ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp : TIME_mks{});
                     if (JSI_IsException(r)) {
                         std::string emsg;

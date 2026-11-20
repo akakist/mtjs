@@ -79,6 +79,9 @@ struct TTL_sec
 inline TTL_mks to_mks(TTL_sec d) { return TTL_mks(d.v * 1000000); }
 inline TTL_sec to_sec(TTL_mks d) { return TTL_sec(d.v / 1000000); }
 
+inline TIME_mks to_mks(TIME_sec d) { return TIME_mks(d.v * 1000000); }
+inline TIME_sec to_sec(TIME_mks d) { return TIME_sec(d.v / 1000000); }
+
 /// Время + длительность = время (единственная разрешённая арифметика).
 inline TIME_mks operator+(TIME_mks t, TTL_mks d) { return TIME_mks(t.v + d.v); }
 inline TIME_mks operator-(TIME_mks t, TTL_mks d) { return TIME_mks(t.v - d.v); }

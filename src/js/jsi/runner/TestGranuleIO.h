@@ -74,7 +74,11 @@ struct TestGranuleIO : GranuleIO {
     {
         return nullptr;
     }
-    REF_getter<CNode> getCNode(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd)
+    REF_getter<CNode> getCNode(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd, TIME_mks t, Rollback* r) override
+    {
+        return nullptr;
+    }
+    REF_getter<const CNodeConst> getCNodeConst(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd) override
     {
         return nullptr;
     }

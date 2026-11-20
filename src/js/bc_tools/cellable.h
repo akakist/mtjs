@@ -25,6 +25,7 @@ struct data_base : public Refcountable
     {
     }
     void setDirty(Rollback* roll, TIME_mks block_timestamp);
+    void snapshot(Rollback* roll);
     ;
     size_t size_() const
     {
@@ -49,15 +50,6 @@ struct data_base : public Refcountable
     }
 
 };
-struct Dirty
-{
-    std::set<REF_getter<data_base>> data;
-    void add(data_base* d)
-    {
-        data.insert(d);
-    }
-};
-
 extern std::vector< data_base* (*)(Cellable*)> db_constructors;
 
 struct Cellable: public Refcountable
@@ -106,23 +98,43 @@ public:
         }
         return sz;
     }
-    void setDirty__(Rollback* r, TIME_mks block_timestamp)
+    void snapshot_1_only(Rollback* r)
     {
-        {
-            if(r)
-            {
-                if(!r->data.count(this))
-                    r->data[this]=getBuffer_mx();
-            }
-            is_dirty=true;
-            if(block_timestamp > last_block_timestamp)
-                last_block_timestamp = block_timestamp;
-        }
-        if(parent)
-        {
-            parent->setDirty__(r, block_timestamp);
-        }
+        if (r && !r->data.count(this))
+            r->data[this] = getBuffer_mx();
     }
+    // 1) Снапшот для отката — СТРОГО до мутации. Идемпотентно (первый вызов).
+    void snapshot(Rollback* r, const std::set<REF_getter<Cellable>>& exclude)
+    {
+        if (r && !r->data.count(this) && !exclude.count(this))
+            r->data[this] = getBuffer_mx();
+        if(parent)
+            parent->snapshot(r,exclude);
+    }
+    // 2) Пометить dirty + поднять ts + прокинуть родителям. Рекурсия идёт через
+    //    setDirty__ — иначе у предков не снимется снапшот, а их children_hashes
+    //    тоже меняются при пересчёте и должны откатываться.
+    void markDirty_1_only(TIME_mks block_timestamp)
+    {
+        is_dirty = true;
+        if (block_timestamp > last_block_timestamp)
+            last_block_timestamp = block_timestamp;
+
+    }
+    void markDirty(TIME_mks block_timestamp)
+    {
+        is_dirty = true;
+        if (block_timestamp > last_block_timestamp)
+            last_block_timestamp = block_timestamp;
+        if (parent)
+            parent->markDirty(block_timestamp);
+    }
+    // Обратносовместимая обёртка: snapshot (до мутации) + markDirty.
+    // void setDirty__(Rollback* r, TIME_mks block_timestamp)
+    // {
+    //     snapshot(r);
+    //     markDirty(r, block_timestamp);
+    // }
 
     std::string getDbId() const;
     void clear(const std::string &id)
@@ -243,6 +255,30 @@ public:
     void calc_tree_hash(_db_to_save &db_dump);
     void get_dirty_leaves(_db_to_save &db_dump);
 
+};
+
+// RAII guard для записи в ячейку: конструктор делает snapshot (если не новая),
+// деструктор — markDirty. Через const-геттер писать нельзя, поэтому единственный
+// путь к мутации идёт через guard и снапшот не забывается.
+template <class T>
+class WriteGuard
+{
+    REF_getter<T> keep;   // держим data_base живым, пока guard жив
+    T* p;
+    Rollback* roll;
+    TIME_mks ts;
+public:
+    WriteGuard(const REF_getter<T>& x, Rollback* r, TIME_mks t, bool is_new = false)
+        : keep(x), p(keep.get()), roll(r), ts(t)
+    {
+        if (!is_new && roll)
+            p->snapshot(roll);   // data_base::snapshot -> parent->snapshot
+    }
+    T* operator->() { return p; }
+    T& operator*() { return *p; }
+    ~WriteGuard() { p->parent->markDirty(ts); }
+    WriteGuard(const WriteGuard&) = delete;
+    WriteGuard& operator=(const WriteGuard&) = delete;
 };
 
 

@@ -202,7 +202,9 @@ JSIValue jsi_registerView(JSIContext* ctx, JSIValueConst, int argc, JSIValueCons
         JSIScope<20,20> scope(ctx);
         auto name = scope.toStdString(argv[0]);
         if (name.empty()) return JSI_EXCEPTION;
+        // view читается и из tx (call_view -> views), и из reader (call_query -> queries)
         cc->views[name] = JSIValueGuard(ctx, JSI_DupValue(ctx, argv[1]));
+        cc->queries[name] = JSIValueGuard(ctx, JSI_DupValue(ctx, argv[1]));
         return JSI_UNDEFINED;
     } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
     catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "registerView: %s", e.what()); }

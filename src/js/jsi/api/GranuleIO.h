@@ -20,6 +20,13 @@ struct CNode: public Refcountable
     virtual void setDirty(Rollback* r, TIME_mks block_timestamp)=0;
     virtual ~CNode() = default;
 };
+struct CNodeConst: public Refcountable
+{
+    CNodeConst(): Refcountable("CNodeConst"){}
+    virtual std::string get() const =0;
+    virtual TTL_sec ttl() const =0;
+    virtual ~CNodeConst() = default;
+};
 struct GranuleIO : public Refcountable {
     GranuleIO() : Refcountable("GranuleIO") {}
     virtual ~GranuleIO() = default;
@@ -39,7 +46,8 @@ struct GranuleIO : public Refcountable {
     virtual REF_getter<CNode> createCNode(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd,
                                                      TIME_mks create_time, TTL_sec ttl,
                                                      Rollback* r) = 0;
-    virtual REF_getter<CNode> getCNode(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd) = 0;
+    virtual REF_getter<CNode> getCNode(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd, TIME_mks t, Rollback* r) = 0;
+    virtual REF_getter<const CNodeConst> getCNodeConst(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd) = 0;
                                                          
 
     virtual bool getContractBalance(Cellable*,const CONTRACT_id& c, int64_t& out) = 0;

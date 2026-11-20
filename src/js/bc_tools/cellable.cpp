@@ -141,6 +141,16 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     }
     is_dirty = false;
 }
+void data_base::snapshot(Rollback* roll)
+{
+    MUTEX_INSPECTOR;
+    if (parent)
+    {
+        std::set<REF_getter<Cellable>> empty;
+        parent->snapshot(roll, empty);
+    }
+}
+
 void data_base::setDirty(Rollback* roll, TIME_mks block_timestamp)
 {
     MUTEX_INSPECTOR;
@@ -149,7 +159,9 @@ void data_base::setDirty(Rollback* roll, TIME_mks block_timestamp)
                 base16::encode(parent->getDbId()).substr(0,16).c_str(),
                 (long long)block_timestamp.v, (int)(roll != nullptr),
                 base16::encode(blake2b_hash(parent->getBuffer_mx()).container).substr(0,16).c_str());
-    parent->setDirty__(roll,block_timestamp);
+    // снапшот уже сделан аксессором; здесь только dirty + прокинуть вверх
+    if (parent)
+        parent->markDirty(block_timestamp);
 }
 #include "cells.h"
 
@@ -165,7 +177,7 @@ void deleteGranule(data_base* g, Rollback* roll, _db_to_save &db_dump, TIME_mks 
     if (!cell) return;
     if (cell->payload_ctor_idx == hsh::bc_deleted) return;   // идемпотентно
 
-    cell->setDirty__(roll, block_timestamp);   // в roll сохранится старый буфер
+    cell->markDirty(block_timestamp);   // в roll сохранится старый буфер
     cell->payload_ctor_idx = hsh::bc_deleted;
     cell->data = nullptr;
     db_dump.add(cell->getDbId(), cell->getBuffer_mx());

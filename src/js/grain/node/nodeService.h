@@ -139,7 +139,7 @@ namespace Node
 
         bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight, const REF_getter<BlockMetaFull>& meta);
 
-        void fix_missed_rounds(const std::set<NODE_id>& node_validators, time_t block_timestamp);
+        void fix_missed_rounds(const std::set<NODE_id>& node_validators, Rollback* roll, TIME_mks block_timestamp);
 
 
 
@@ -324,7 +324,7 @@ namespace Node
         bool on_LiteSetUplinkREQ(const bcEvent::LiteSetUplinkREQ* e);
         /// Лидер текущего слота. nullptr — лидера нет:
         /// последние NO_LEADER_FRAME_MKS слота, пустой vne, либо нет prev_block.
-        REF_getter<bc_node> current_leader();
+        REF_getter<const bc_node> current_leader();
         void resetBlockExpired(const NODE_id &n);
         void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
 
