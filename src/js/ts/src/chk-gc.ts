@@ -205,15 +205,6 @@ async function main() {
             ]);
             check(block.status(rsp.tx_hash) === "ok", "ttl_test " + method + " ok");
         }
-        // cleanup x
-        {
-            const g = await mtjs.get_contract_data(node, "ttl_test", "x", 3);
-            if (g.found) {
-                await submitAndWait(rootSk, rootAddr, [
-                    { contract: "ttl_test", method: "deleteX", params: {} },
-                ]);
-            }
-        }
         // createX ttl=2
         {
             const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
@@ -243,27 +234,12 @@ async function main() {
     // [t3] y ttl=2 expired, z ttl=100000 живёт
     // ============================================================
     {
-        console.log("\n[t3] y ttl=2 (expired), z ttl=100000 (живёт)");
-        for (const k of ["y", "z"]) {
-            const g = await mtjs.get_contract_data(node, "ttl_test", k, 3);
-            if (g.found) {
-                const m = "delete" + k.toUpperCase();
-                await submitAndWait(rootSk, rootAddr, [
-                    { contract: "ttl_test", method: m, params: {} },
-                ]);
-            }
-        }
+        console.log("\n[t3] y ttl=2 (expired)");
         {
             const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
                 { contract: "ttl_test", method: "createY", params: { ttl: 2 } },
             ]);
             check(block.status(rsp.tx_hash) === "ok", "createY ttl=2 ok");
-        }
-        {
-            const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-                { contract: "ttl_test", method: "createZ", params: { ttl: 100000 } },
-            ]);
-            check(block.status(rsp.tx_hash) === "ok", "createZ ttl=100000 ok");
         }
         const t3 = await gcUntil(async () => {
             const gy = await mtjs.get_contract_data(node, "ttl_test", "y", 3);
@@ -273,17 +249,7 @@ async function main() {
         check(t3.granule >= 1, "gc_granule >= 1 (y, got " + t3.granule + ")");
         await new Promise(r => setTimeout(r, 300));
         const gy = await mtjs.get_contract_data(node, "ttl_test", "y", 3);
-        const gz = await mtjs.get_contract_data(node, "ttl_test", "z", 3);
         check(gy.found === false, "y deleted (ttl=2, found=false)");
-        check(gz.found === true, "z NOT deleted (ttl=100000, found=true)");
-        {
-            const g = await mtjs.get_contract_data(node, "ttl_test", "z", 3);
-            if (g.found) {
-                await submitAndWait(rootSk, rootAddr, [
-                    { contract: "ttl_test", method: "deleteZ", params: {} },
-                ]);
-            }
-        }
     }
 
     console.log("\n=== RESULT: " + pass + " passed, " + fail + " failed ===");

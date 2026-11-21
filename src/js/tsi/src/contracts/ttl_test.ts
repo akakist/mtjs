@@ -18,17 +18,3 @@ registerMethod("setX", function(p: { v: number }, m: JsiMsg) {
     setGranule("x", { v: Number(p.v) });
 });
 
-registerMethod("deleteX", function(p: {}, m: JsiMsg) {
-    if (!getGranule("x")) throw new Error("x not exists");
-    deleteGranule("x");
-});
-
-registerMethod("deleteY", function(p: {}, m: JsiMsg) {
-    if (!getGranule("y")) throw new Error("y not exists");
-    deleteGranule("y");
-});
-
-registerMethod("deleteZ", function(p: {}, m: JsiMsg) {
-    if (!getGranule("z")) throw new Error("z not exists");
-    deleteGranule("z");
-});

@@ -32,13 +32,6 @@ struct TestGranuleIO : GranuleIO {
         out = it->second.value;
         return true;
     }
-    std::optional<std::string> deleteGranule(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d,
-                                            Rollback* roll, std::set<REF_getter<data_base>> * deleted_granules)  override {
-        auto it = data.find(c.container + d.container);
-        if (it == data.end()) return std::string("not found");
-        data.erase(it);   // сразу (rollback — saved/restore)
-        return std::nullopt;
-    }    
     bool existsGranule(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& d) override {
         return data.find(c.container+d.container) != data.end();
     }

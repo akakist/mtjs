@@ -1,17 +1,18 @@
 #!/usr/local/bin/mtjs
-// chk-resurrect.ts — удаление гранулы (тумбстоун) и повторное создание на том же месте,
+// chk-resurrect.ts — удаление гранулы по TTL (тумбстоун) и повторное создание на том же месте,
 // плюс компакция: живая гранула не должна удаляться, тумбстоун — должен.
+// (Контракт больше не может явно удалять гранулу — только TTL.)
 import * as std from "std";
 const node = "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 const SRC = `"use strict";
 registerMethod("createX", function (p, m) {
     if (getGranule("x")) throw new Error("x exists");
-    createGranule("x", { v: p.v }, 100000);
+    createGranule("x", { v: p.v }, p.ttl || 100000);
 });
-registerMethod("deleteX", function (p, m) {
-    if (!getGranule("x")) throw new Error("x not exists");
-    deleteGranule("x");
+registerMethod("createY", function (p, m) {
+    if (getGranule("y")) throw new Error("y exists");
+    createGranule("y", { v: p.v }, p.ttl || 100000);
 });
 `;
 let rootSk = "";
@@ -119,8 +120,8 @@ function hasEmit(em, name) {
         }
     return null;
 }
-async function xState() {
-    const g = await mtjs.get_contract_data(node, "resurrect_test", "x", 3);
+async function granuleState(key) {
+    const g = await mtjs.get_contract_data(node, "resurrect_test", key, 3);
     if (!g.found)
         return { found: false };
     let v = null;
@@ -130,11 +131,11 @@ async function xState() {
     catch (_) { }
     return { found: true, v };
 }
-async function waitX(wantFound, to = 15) {
+async function waitGone(key, to = 15) {
     const t0 = Date.now();
     while (Date.now() - t0 < to * 1000) {
         try {
-            if ((await xState()).found === wantFound)
+            if (!(await granuleState(key)).found)
                 return true;
         }
         catch (e) { }
@@ -143,6 +144,14 @@ async function waitX(wantFound, to = 15) {
     return false;
 }
 const rootAddr = mtjs.addr_from_name("root");
+async function gcDelete() {
+    // TTL (1с) истёк → scan_expired → root.gc удаляет гранулу (тумбстоун)
+    await new Promise(r => setTimeout(() => r(), 1500));
+    const r = await mtjs.scan_expired(node, "", 5);
+    if (r.dbids && r.dbids.length > 0) {
+        await submitAndWait([{ contract: "root", method: "gc", params: { items: r.dbids } }], 0, 200000);
+    }
+}
 async function compact(label) {
     const { rsp, block } = await submitAndWait([
         { contract: "root", method: "compact", params: { retention: "1", max_items: 1000 } },
@@ -179,21 +188,15 @@ async function main() {
         ]);
         check(block.status(rsp.tx_hash) === "ok", "contract_deploy (errstr=" + block.errstr(rsp.tx_hash) + ")");
     }
-    if ((await xState()).found) {
-        await submitAndWait([{ contract: "resurrect_test", method: "deleteX", params: {} }]);
-    }
     {
-        console.log("\n[t1] create(v=1) → deleteX → create(v=2)");
-        const { rsp: r1, block: b1 } = await submitAndWait([{ contract: "resurrect_test", method: "createX", params: { v: 1 } }]);
+        console.log("\n[t1] create(v=1, ttl=1) → TTL → create(v=2)");
+        const { rsp: r1, block: b1 } = await submitAndWait([{ contract: "resurrect_test", method: "createX", params: { v: 1, ttl: 1 } }]);
         check(b1.status(r1.tx_hash) === "ok", "create v=1 ok (errstr=" + b1.errstr(r1.tx_hash) + ")");
-        check(await waitX(true), "x exists");
-        const { rsp: r2, block: b2 } = await submitAndWait([{ contract: "resurrect_test", method: "deleteX", params: {} }]);
-        check(b2.status(r2.tx_hash) === "ok", "deleteX ok (errstr=" + b2.errstr(r2.tx_hash) + ")");
-        check(await waitX(false), "x deleted (found=false)");
-        const { rsp: r3, block: b3 } = await submitAndWait([{ contract: "resurrect_test", method: "createX", params: { v: 2 } }]);
-        check(b3.status(r3.tx_hash) === "ok", "create заново ok (errstr=" + b3.errstr(r3.tx_hash) + ")");
-        check(await waitX(true), "x снова существует");
-        const st = await xState();
+        await gcDelete();
+        check(await waitGone("x"), "x deleted по TTL (found=false)");
+        const { rsp: r2, block: b2 } = await submitAndWait([{ contract: "resurrect_test", method: "createX", params: { v: 2 } }]);
+        check(b2.status(r2.tx_hash) === "ok", "create заново ok (errstr=" + b2.errstr(r2.tx_hash) + ")");
+        const st = await granuleState("x");
         check(!!st.v && st.v.v === 2, "значение новое (v=" + (st.v ? st.v.v : "?") + ", ждали 2)");
     }
     {
@@ -201,22 +204,24 @@ async function main() {
         const { st } = await compact("compact");
         check(st === "ok", "compact status ok");
         await new Promise(r => setTimeout(() => r(), 300));
-        const s = await xState();
+        const s = await granuleState("x");
         check(s.found, "x жив после компакции");
         check(!!s.v && s.v.v === 2, "значение всё ещё 2");
     }
     {
-        console.log("\n[t3] удалить → компакция → x отсутствует, блоки идут");
-        const { rsp: r1, block: b1 } = await submitAndWait([{ contract: "resurrect_test", method: "deleteX", params: {} }]);
-        check(b1.status(r1.tx_hash) === "ok", "deleteX ok");
-        check(await waitX(false), "x deleted");
+        console.log("\n[t3] TTL-удаление → компакция → y отсутствует, блоки идут");
+        const { rsp: r1, block: b1 } = await submitAndWait([{ contract: "resurrect_test", method: "createY", params: { v: 1, ttl: 1 } }]);
+        check(b1.status(r1.tx_hash) === "ok", "createY ok");
+        await gcDelete();
+        check(await waitGone("y"), "y deleted по TTL");
         const { st } = await compact("compact");
         check(st === "ok", "compact status ok");
         await new Promise(r => setTimeout(() => r(), 300));
-        check(!(await xState()).found, "x отсутствует после чистки тумбстоуна");
-        const { rsp: r2, block: b2 } = await submitAndWait([{ contract: "resurrect_test", method: "createX", params: { v: 3 } }]);
-        check(b2.status(r2.tx_hash) === "ok", "сеть жива: create(v=3) ok");
-        check(await waitX(true), "x снова создан");
+        check(!(await granuleState("y")).found, "y отсутствует после чистки тумбстоуна");
+        const { rsp: r2, block: b2 } = await submitAndWait([{ contract: "resurrect_test", method: "createY", params: { v: 3 } }]);
+        check(b2.status(r2.tx_hash) === "ok", "сеть жива: createY(v=3) ok");
+        const s3 = await granuleState("y");
+        check(s3.found && s3.v && s3.v.v === 3, "y снова создан");
     }
     console.log("\n=== RESULT: " + pass + " passed, " + fail + " failed ===");
     console.log(fail === 0 ? GREEN + "DONE" + RESET : RED + "FAIL" + RESET);

@@ -19,18 +19,3 @@ registerMethod("setX", function (p, m) {
         throw new Error("x not exists");
     setGranule("x", { v: Number(p.v) });
 });
-registerMethod("deleteX", function (p, m) {
-    if (!getGranule("x"))
-        throw new Error("x not exists");
-    deleteGranule("x");
-});
-registerMethod("deleteY", function (p, m) {
-    if (!getGranule("y"))
-        throw new Error("y not exists");
-    deleteGranule("y");
-});
-registerMethod("deleteZ", function (p, m) {
-    if (!getGranule("z"))
-        throw new Error("z not exists");
-    deleteGranule("z");
-});

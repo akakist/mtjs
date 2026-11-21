@@ -127,15 +127,6 @@ struct NodeGranuleIO : GranuleIO {
         DBG(logErr2("getContractBalance: contract=%s amount=%lld", c.container.c_str(), (long long)out));
         return true;
     }
-    std::optional<std::string> deleteGranule(Cellable* root, const CONTRACT_id& contract, const CONTRACT_DATA_id& key,
-                                             Rollback* roll,
-                                             std::set<REF_getter<data_base>>* deleted_granules) override {
-        MUTEX_INSPECTOR;                                            
-        auto d = cells::getContractDataNoCreateConst(root,db.get(), contract, key);
-        if (!d.valid()) return std::string("granule not exists");
-        deleted_granules->insert(d.get());
-        return std::nullopt;
-    }
     int64_t getGranuleTTL(Cellable* root, const CONTRACT_id& contract, const CONTRACT_DATA_id& key) override {
         MUTEX_INSPECTOR;                                            
         auto d = cells::getContractDataNoCreateConst(root, db.get(), contract, key);

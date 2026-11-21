@@ -93,15 +93,13 @@ declare function registerMethod(name: string, fn: (params: any, msg: JsiMsg) => 
 declare function registerView(name: string, fn: (params: any) => any): void;
 
 // ============================================================
-// Старый API (плоские ключи): getGranule/createGranule/setGranule/deleteGranule
+// Старый API (плоские ключи): getGranule/createGranule/setGranule
 // ============================================================
 declare function getGranule(key: string): JsiGranule | undefined;
 
 declare function createGranule(key: string, value: any, ttl: number): void;
 
 declare function setGranule(key: string, value: any): void;
-
-declare function deleteGranule(key: string): void;
 
 // ============================================================
 // Новый API (иерархия): create_granule/get_granule

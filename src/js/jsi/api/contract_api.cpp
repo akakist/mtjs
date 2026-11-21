@@ -591,33 +591,6 @@ JSIValue jsi_callView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* a
     catch (...) { return JSI_ThrowInternalError(ctx, "callView: unknown C++ exception"); }
 }
 
-JSIValue jsi_deleteGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
-    MUTEX_INSPECTOR;
-    try {
-        if (argc < 1 || !JSI_IsString(argv[0]))
-            return JSI_ThrowTypeError(ctx, "deleteGranule(key)");
-        CallContext* call = require_tx_ctx(ctx);
-        if (!call) return JSI_ThrowTypeError(ctx, "no call context");
-        // ▼▼▼
-        if (call->msg_source)
-            call->msg_source->consume_gas(call->fees->gas_per_call + call->fees->gas_per_hostcall);
-        // ▲▲▲        
-        ContractContext* cc = call->contract;
-        GranuleIO* io = call->host->granules.get();
-        JSIScope<20,20> scope(ctx);
-        auto key = scope.toStdString(argv[0]);
-        if (key.empty()) return JSI_EXCEPTION;
-        CONTRACT_DATA_id cid; cid.container = key;
-        std::string value;
-        if (!io->getGranule(call->root, cc->name, cid, value))
-            return JSI_ThrowTypeError(ctx, "deleteGranule: not found: %s", key.c_str());
-        if (auto err = io->deleteGranule(call->root, cc->name, cid, call->roll, call->deleted_granules))
-            return JSI_ThrowTypeError(ctx, "deleteGranule: %s", err->c_str());
-        return JSI_UNDEFINED;
-    } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
-    catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "deleteGranule: %s", e.what()); }
-    catch (...) { return JSI_ThrowInternalError(ctx, "deleteGranule: unknown C++ exception"); }
-}
 void register_api(JSIContext* ctx) {
     MUTEX_INSPECTOR;
     JSIValue global = JSI_GetGlobalObject(ctx);
@@ -632,7 +605,6 @@ void register_api(JSIContext* ctx) {
     JSI_SetPropertyStr(ctx, global, "consumeValue",   JSI_NewCFunction(ctx, jsi_consumeValue,   "consumeValue", 1));
     JSI_SetPropertyStr(ctx, global, "refundValue",    JSI_NewCFunction(ctx, jsi_refundValue,    "refundValue", 1));
     JSI_SetPropertyStr(ctx, global, "remainingValue", JSI_NewCFunction(ctx, jsi_remainingValue, "remainingValue", 0));
-    JSI_SetPropertyStr(ctx, global, "deleteGranule",  JSI_NewCFunction(ctx, jsi_deleteGranule, "deleteGranule", 1));
     JSI_SetPropertyStr(ctx, global, "callView",       JSI_NewCFunction(ctx, jsi_callView,       "callView", 4));
     JSI_SetPropertyStr(ctx, global, "callQuery",      JSI_NewCFunction(ctx, jsi_callQuery,      "callQuery", 3));
     // now и blockTimestamp — только в query; для остальных режимов бросают

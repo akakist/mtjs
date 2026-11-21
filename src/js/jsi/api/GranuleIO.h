@@ -53,10 +53,6 @@ struct GranuleIO : public Refcountable {
     virtual bool getContractBalance(Cellable*,const CONTRACT_id& c, int64_t& out) = 0;
     virtual std::optional<std::string> addContractBalance(Cellable*,const CONTRACT_id& c, int64_t delta, Rollback* roll, TIME_mks block_timestamp) = 0;
 
-    virtual std::optional<std::string> deleteGranule(Cellable*,const CONTRACT_id& contract, const CONTRACT_DATA_id& key,
-                                                     Rollback* roll,
-                                                     std::set<REF_getter<data_base>>* deleted_granules) = 0;
-
     virtual int64_t getGranuleTTL(Cellable*,const CONTRACT_id& c, const CONTRACT_DATA_id& cd) = 0;
     virtual void update_contract_time(Cellable*,const CONTRACT_id& c, TIME_mks t, Rollback* roll) =0;
 };

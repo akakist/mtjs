@@ -119,14 +119,6 @@ async function main() {
         ]);
         check(block.status(rsp.tx_hash) === "ok", "ttl_test " + method + " ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
     }
-    // cleanup
-    {
-        const g = await mtjs.get_contract_data(node, "ttl_test", "x", 3);
-        if (g.found) {
-            const { rsp, block } = await submitAndWait([{ contract: "ttl_test", method: "deleteX", params: {} }]);
-            check(block.status(rsp.tx_hash) === "ok", "cleanup deleteX ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
-        }
-    }
     // t1: lite_set_uplink → full node
     {
         console.log("\n[t1] lite_set_uplink(" + HTTP_FULL + ")");

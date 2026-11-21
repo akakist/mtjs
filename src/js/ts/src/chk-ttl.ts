@@ -98,17 +98,6 @@ function txErr(b: Block, h: string): string {
     return b.errstr(h) || "";
 }
 
-async function cleanupGranule(method: string, key: string) {
-    const g = await mtjs.get_contract_data(node, "ttl_test", key, 3);
-    if (g.found) {
-        const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-            { contract: "ttl_test", method: method, params: {} },
-        ]);
-        check(block.status(rsp.tx_hash) === "ok",
-              "cleanup " + method + " (errstr=" + txErr(block, rsp.tx_hash) + ")");
-    }
-}
-
 async function main() {
     await loadKeys();
     console.log("=== TTL TEST (node " + node + ") ===");
@@ -140,8 +129,6 @@ async function main() {
         ]);
         check(block.status(rsp.tx_hash) === "ok", "contract_deploy (errstr=" + txErr(block, rsp.tx_hash) + ")");
     }
-
-    await cleanupGranule("deleteX", "x");
 
     {
         console.log("\n[t1] createGranule ttl=86400 (1 день) — ok");
@@ -185,16 +172,6 @@ async function main() {
             const v = JSON.parse(g.value);
             check(v.v === 2, "x.v == 2 (got " + v.v + ")");
         }
-    }
-
-    {
-        console.log("\n[t5] deleteGranule x — ok");
-        const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-            { contract: "ttl_test", method: "deleteX", params: {} },
-        ]);
-        check(block.status(rsp.tx_hash) === "ok", "deleteX ok (errstr=" + txErr(block, rsp.tx_hash) + ")");
-        const g = await mtjs.get_contract_data(node, "ttl_test", "x", 3);
-        check(g.found === false, "x deleted (found=false)");
     }
 
     {
