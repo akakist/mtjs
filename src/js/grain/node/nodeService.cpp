@@ -551,7 +551,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         {
 
             auto mf=getMetaFull();
-            TreeNode all_tree = filter_tree(mf->vne, bt.alive);
+            TreeNode all_tree = mf->tree_all_nodes;  // полный vne — чтобы дифф подписывали все живые по активности
             broadcast_MsgEvent_via_broadcaster(r, all_tree);
             bt.BlockDiffValidateRSP_m[h].clear();
 
@@ -570,7 +570,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         auto h=r->blockAcceptedREQ->blockInfo->getHash();
         if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
         {
-            TreeNode all_tree = filter_tree(mf->vne, bt.alive);
+            TreeNode all_tree = mf->tree_all_nodes;  // полный vne — чтобы дифф подписывали все живые по активности
             broadcast_MsgEvent_via_broadcaster(r, all_tree);
             bt.ValidateBlockRSP_m[h].clear();
 
@@ -767,7 +767,7 @@ Node::Service::~Service()
 
 bool Node::Service::on_NodeNotResponded(const bcEvent::NodeNotRespondedREQ *e)
 {
-    unresponsive_nodes.insert(e->node);
+    // локальный unresponsive-кэш убран: живость ведётся по last_seen_epoch (дифф-подпись)
     return true;
 }
 
@@ -1157,7 +1157,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         if (prev_block.valid()) {
             std::set<NODE_id> prev_validators(prev_block->node_diff_validators.begin(),
                                               prev_block->node_diff_validators.end());
-            fix_missed_rounds(prev_validators, NULL, b.validateBlockREQ->block_timestamp);
+            mark_activity(prev_validators, NULL, b.validateBlockREQ->block_timestamp, b.validateBlockREQ->heart_beat->new_epoch);
         }
     }
     auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
@@ -1656,17 +1656,6 @@ REF_getter<const bc_node> Node::Service::current_leader()
 REF_getter<BlockMetaFull> Node::Service::getMetaFull()
 {
     MUTEX_INSPECTOR;
-    // Периодически пересматриваем unresponsive: нода могла вернуться после sync.
-    // Без этого исключение одностороннее — вернувшаяся нода не получит броадкаст
-    // и не сможет доказать, что жива.
-    {
-        int64_t e = epoch_current();
-        if (unresponsive_recheck_epoch < 0 || e - unresponsive_recheck_epoch >= 10)
-        {
-            unresponsive_nodes.clear();
-            unresponsive_recheck_epoch = e;
-        }
-    }
     // int round=hb->round;
     auto b=prev_root_hash_Z();
     // auto round=ti_ / HB_TIME_WINDOW;
@@ -1699,11 +1688,16 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
     auto validators_percent=v->getValue("validator_count_percent");
     auto minstake=v->getValue("validator_min_stake");
 
-    // Валидаторами (и лидерами) могут быть только включённые ноды со стейком >= minstake.
-    // Иначе нода, созданная через node_create (нулевой стейк, никогда не запускается),
-    // попадает в ротацию лидера — мёртвые слоты — и раздувает validator_count.
+    // Валидаторами (и лидерами) могут быть только активные ноды со стейком >= minstake.
+    // Активность = подпись диффа в пределах TTL (last_seen не протух).
+    // живость — по эпохе (детерминированно): нода в vne, если подписывала дифф в пределах TTL
+    const int64_t NODE_TTL_BLOCKS = 30;
+    int64_t cur_epoch = epoch_current();
+    auto node_active = [&](const bc_node* n) -> bool {
+        return (cur_epoch - n->last_seen_epoch) <= NODE_TTL_BLOCKS;
+    };
     for (auto& x : nnn)
-        if (x.second->isEnabled() && x.second->get_full_stake() > 0
+        if (node_active(x.second.get()) && x.second->get_full_stake() > 0
             && x.second->get_full_stake() >= minstake)
             live_nodes++;
 
@@ -1713,7 +1707,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
 
     for(auto &x: nnn)
     {
-        if(!x.second->isEnabled())
+        if(!node_active(x.second.get()))
             continue;
         // Нода без стейка — не валидатор: не должна попадать в ротацию лидера,
         // иначе созданная через node_create «фантомная» нода даёт мёртвые слоты.
@@ -1747,16 +1741,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
         }
     }
     {
-        std::vector<NodeElement> vne_bcast = m->vne;
-        if (!unresponsive_nodes.empty()) {
-            vne_bcast.clear();
-            for (auto& n : m->vne)
-                if (!unresponsive_nodes.count(n.name))
-                    vne_bcast.push_back(n);
-            if (vne_bcast.empty())
-                vne_bcast = m->vne;   // все unresponsive — buildTree требует непустой
-        }
-        m->tree_all_nodes = buildTree(vne_bcast);
+        m->tree_all_nodes = buildTree(m->vne);
     }
 
     if(m->vne.empty())
@@ -1773,7 +1758,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
         auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(),m->vne[i].name);
         if (!n.valid())
             continue;
-        if (n->answered_rounds <= answered_min)
+        if (n->last_seen_epoch <= answered_min)
             continue;
         if(m->vne[i].stake_A>=minstake)
         {
@@ -1812,16 +1797,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
     // logNode("vne %s",com.c_str());
 
     {
-        std::vector<NodeElement> comm_bcast = vne_committe;
-        if (!unresponsive_nodes.empty()) {
-            comm_bcast.clear();
-            for (auto& n : vne_committe)
-                if (!unresponsive_nodes.count(n.name))
-                    comm_bcast.push_back(n);
-            if (comm_bcast.empty())
-                comm_bcast = vne_committe;
-        }
-        m->tree_committe = buildTree(comm_bcast);
+        m->tree_committe = buildTree(vne_committe);
     }
     m->committee_vne=vne_committe;
 

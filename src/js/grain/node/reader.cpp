@@ -185,7 +185,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 rsp->ip = n->get_ip();
                 rsp->enabled = n->isEnabled();
                 rsp->missed_rounds = n->missed_rounds;
-                rsp->answered_rounds = n->answered_rounds;
+                rsp->last_seen_epoch = n->last_seen_epoch;
                 rsp->full_stake = n->get_full_stake();
                 rsp->stakes = n->getStakes();
             }

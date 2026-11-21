@@ -570,47 +570,16 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
     passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
 }
-void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, Rollback* roll, TIME_mks block_timestamp)
+void Node::Service::mark_activity(const std::set<NODE_id>& node_validators, Rollback* roll, TIME_mks block_timestamp, int64_t epoch)
 {
-    if (getenv("MTJS_TREE_DUMP"))
-        logNode("[TRACE fix_missed_rounds] enter validators=%zu", node_validators.size());
+    // живость помечаем ТОЛЬКО у реально подписавших прошлый блок (по эпохе).
+    // Пинг — субъективен (цензурируется), поэтому в vne его не учитываем.
     auto ls=cells::getAllNodes(root.get(), db_state.get(), roll, block_timestamp);
-    auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
-    auto round_limit=v->getValue("missed_rounds_max");
     for(auto &z: ls)
     {
-        if(!z->isEnabled())
-            continue;
-        if(!node_validators.count(z->getName()))
-        {
-            int missed=0;
-            {
-                
-                z->missed_rounds++;
-                z->answered_rounds = 0;
-                missed=z->missed_rounds;
-                logNode("missed ++");
-            }
-            if(missed>round_limit)
-            {
-                logNode("disable node");
-                z->setEnabled(false);
-            }
-        }
-        else
-        {
-            z->missed_rounds=0;
-            z->answered_rounds++;
-        }
-        // touch активности узла (TTL). getActivityNoCreate (write) бросает при
-        // отсутствии активности — поэтому сначала const-проверка.
-        if (cells::getActivityNoCreateConst(root.get(), db_state.get(), z->getDbId()).valid()) {
-            auto act = cells::getActivityNoCreate(root.get(), db_state.get(), z->getDbId(), roll, block_timestamp);
-            act->update_time(TIME_mks{block_timestamp}, NULL);
-        }
+        if(node_validators.count(z->getName()))
+            z->last_seen_epoch = epoch;
     }
-    if (getenv("MTJS_TREE_DUMP"))
-        logNode("[TRACE fix_missed_rounds] leave");
 }
 
 int get_global_refcount();

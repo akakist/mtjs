@@ -20,7 +20,7 @@ private:
     bool enabled=true;
 public:
     int missed_rounds=0;
-    int64_t answered_rounds=0;   // ← новое: серия ответов подряд (fix_missed_rounds)
+    int64_t last_seen_epoch=0;    // эпоха последней подписи диффа (живость)
     size_t size() const
     {
         
@@ -36,7 +36,7 @@ public:
             r+=sizeof(int64_t);
         }
         r+=sizeof(missed_rounds);
-        r+=sizeof(answered_rounds);
+        r+=sizeof(last_seen_epoch);
         return r;
     }
     void setEnabled(bool _enabled)
@@ -150,14 +150,14 @@ public:
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<enabled<<missed_rounds<<answered_rounds;
+        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<enabled<<missed_rounds<<last_seen_epoch;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>enabled>>missed_rounds>>answered_rounds;
+        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>enabled>>missed_rounds>>last_seen_epoch;
     }
 
 };
