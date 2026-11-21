@@ -78,9 +78,9 @@ void Cellable::get_dirty_leaves(_db_to_save &db_dump)
     if (!is_dirty)
         return;
     bool has_children=false;
-    has_children=children_ptrs_mx.size()>0;
+    has_children=children_ptrs.size()>0;
 
-    for (auto &zz : children_ptrs_mx)
+    for (auto &zz : children_ptrs)
     {
         MUTEX_INSPECTOR;
         auto cid = zz.first;
@@ -107,7 +107,7 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
     if (!is_dirty)
         return;
 
-    for (auto &zz : children_ptrs_mx)
+    for (auto &zz : children_ptrs)
     {
         MUTEX_INSPECTOR;
         auto cid = zz.first;
@@ -118,11 +118,11 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
             c->calc_tree_hash(db_dump);
             auto child_buf = c->getBuffer_mx();
             auto ch = blake2b_hash(child_buf);
-            if (ch != children_hashes_mx[cid])
+            if (ch != children_hashes[cid])
             {
                 MUTEX_INSPECTOR;
                 db_dump.add(c->getDbId(), child_buf);
-                children_hashes_mx[cid] = ch;
+                children_hashes[cid] = ch;
                 {
                     //DEBUG KALL
                     if (c->payload_ctor_idx == hsh::bc_contract_balance) {
@@ -151,18 +151,18 @@ void data_base::snapshot(Rollback* roll)
     }
 }
 
-void data_base::setDirty(Rollback* roll, TIME_mks block_timestamp)
-{
-    MUTEX_INSPECTOR;
-    if (getenv("MTJS_TREE_DUMP") && parent)
-        logErr2("[TRACE setDirty] id=%s ts=%lld roll=%d h_before=%s",
-                base16::encode(parent->getDbId()).substr(0,16).c_str(),
-                (long long)block_timestamp.v, (int)(roll != nullptr),
-                base16::encode(blake2b_hash(parent->getBuffer_mx()).container).substr(0,16).c_str());
-    // снапшот уже сделан аксессором; здесь только dirty + прокинуть вверх
-    if (parent)
-        parent->markDirty(block_timestamp);
-}
+// void data_base::setDirty(Rollback* roll, TIME_mks block_timestamp)
+// {
+//     MUTEX_INSPECTOR;
+//     if (getenv("MTJS_TREE_DUMP") && parent)
+//         logErr2("[TRACE setDirty] id=%s ts=%lld roll=%d h_before=%s",
+//                 base16::encode(parent->getDbId()).substr(0,16).c_str(),
+//                 (long long)block_timestamp.v, (int)(roll != nullptr),
+//                 base16::encode(blake2b_hash(parent->getBuffer_mx()).container).substr(0,16).c_str());
+//     // снапшот уже сделан аксессором; здесь только dirty + прокинуть вверх
+//     if (parent)
+//         parent->markDirty(block_timestamp);
+// }
 #include "cells.h"
 
 

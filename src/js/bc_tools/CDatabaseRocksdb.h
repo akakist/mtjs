@@ -97,13 +97,13 @@ options.max_background_flushes = 4;                // было 2
 
     std::string db_name;
 
-    std::string getDbName()
+    std::string getDbName() override
     {
         return db_name;
     }
 
 
-int write_granules_batch(const _db_to_save &v)
+int write_granules_batch(const _db_to_save &v) override
 {
     const size_t CHUNK = 10000;
 
@@ -150,7 +150,7 @@ int write_granules_batch(const _db_to_save &v)
         return 0;
     }
 
-    int getGranule(const std::string& k, std::string* v)
+    int getGranule(const std::string& k, std::string* v) override
     {
 
         rocksdb::Status status = db_ptr->Get(rocksdb::ReadOptions(), k, v);

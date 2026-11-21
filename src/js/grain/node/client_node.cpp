@@ -59,7 +59,7 @@ void Node::Service::dump_tree(Cellable* c, IDatabase* db, const char* tag, int d
     std::string buf = c->getBuffer_mx();
     auto h = blake2b_hash(buf);
     std::string ch;
-    for (auto& kv : c->children_hashes_mx)
+    for (auto& kv : c->children_hashes)
         ch += base16::encode(kv.first).substr(0,8) + "=" +
               base16::encode(kv.second.container).substr(0,8) + " ";
     std::string raw;
@@ -70,13 +70,13 @@ void Node::Service::dump_tree(Cellable* c, IDatabase* db, const char* tag, int d
             base16::encode(h.container).substr(0,12).c_str(),
             (long long)c->last_block_timestamp.v,
             (int)c->is_dirty, (int)c->data.valid(), ch.c_str(), raw.c_str());
-    for (auto& kv : c->children_hashes_mx)
+    for (auto& kv : c->children_hashes)
     {
         // Сначала in-memory (children_ptrs_mx): изменённые в текущем блоке
         // ячейки ещё не в БД. Только если указателя нет — грузим из БД.
         REF_getter<Cellable> child;
-        auto itp = c->children_ptrs_mx.find(kv.first);
-        if (itp != c->children_ptrs_mx.end()) child = itp->second;
+        auto itp = c->children_ptrs.find(kv.first);
+        if (itp != c->children_ptrs.end()) child = itp->second;
         else child = cells::getLeafNoCreate(c, db, kv.first, false);
         if (child.valid()) dump_tree(child.get(), db, tag, depth+1, maxdepth);
         else logNode("[TREE %s] %*s(child %s not loadable)", tag, (depth+1)*2, "",
@@ -193,8 +193,8 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
         THASH_id h;
         h.container=z.first;
-        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second,true,r->blockAcceptedREQ->blockInfo->block_timestamp);
-        if (leaf.valid()) leaf->setDirty(&roll,r->blockAcceptedREQ->blockInfo->block_timestamp);
+        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second,true);
+        // if (leaf.valid()) leaf->parent->markDirty(r->blockAcceptedREQ->blockInfo->block_timestamp);
     }
 
 
@@ -244,7 +244,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         {
             inBuffer in(z.second);
             z.first->unpack_mx(in);
-            z.first->children_ptrs_mx.clear();   // указатели перечитаются из хешей
+            z.first->children_ptrs.clear();   // указатели перечитаются из хешей
         }
         return true;
     }
@@ -596,13 +596,11 @@ void Node::Service::fix_missed_rounds(const std::set<NODE_id>& node_validators, 
                 logNode("disable node");
                 z->setEnabled(false);
             }
-            z->setDirty(NULL, TIME_mks{block_timestamp});
         }
         else
         {
             z->missed_rounds=0;
             z->answered_rounds++;
-            z->setDirty(NULL, TIME_mks{block_timestamp});
         }
         // touch активности узла (TTL). getActivityNoCreate (write) бросает при
         // отсутствии активности — поэтому сначала const-проверка.

@@ -82,13 +82,13 @@ struct t_params
             // которых в восстановленных хешах нет (созданы в упавшей tx),
             // убираем — иначе calc_tree_hash вернёт их обратно в хеши.
             // Остальные указатели не трогаем: сохранённое состояние остаётся рабочим.
-            for (auto it = z.first->children_ptrs_mx.begin();
-                 it != z.first->children_ptrs_mx.end(); )
+            for (auto it = z.first->children_ptrs.begin();
+                 it != z.first->children_ptrs.end(); )
             {
-                if (!z.first->children_hashes_mx.count(it->first))
+                if (!z.first->children_hashes.count(it->first))
                 {
                     keepalive.push_back(it->second);   // чтобы не оставить dangling
-                    it = z.first->children_ptrs_mx.erase(it);
+                    it = z.first->children_ptrs.erase(it);
                 }
                 else
                     ++it;

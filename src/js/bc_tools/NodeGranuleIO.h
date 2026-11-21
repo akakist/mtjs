@@ -17,7 +17,7 @@ struct CNode_prod: public CNode
     void set(const std::string &s, TIME_mks block_timestamp)
     {
         data->container=s;
-        data->setDirty(roll, block_timestamp);
+        // data->setDirty(roll, block_timestamp);
     }
     void touch(TIME_mks t)
     {
@@ -35,10 +35,10 @@ struct CNode_prod: public CNode
     {
         act->update_time(t,r);
     }
-    void setDirty(Rollback* r, TIME_mks block_timestamp)
-    {
-        data->setDirty(r,block_timestamp);
-    }
+    // void setDirty(Rollback* r, TIME_mks block_timestamp)
+    // {
+    //     data->setDirty(r,block_timestamp);
+    // }
 
 
 };
@@ -105,7 +105,6 @@ struct NodeGranuleIO : GranuleIO {
         MUTEX_INSPECTOR;                                            
         auto d = cells::getContractDataNoCreate(root,db.get(),contract, key, roll, block_timestamp);
         if (!d.valid()) return std::string("granule not exists");
-        d->setDirty(roll, block_timestamp);
         d->container = value;   // <-- ОБНОВИТЬ ЗНАЧЕНИЕ
         auto actd=cells::getActivityNoCreate(root,db.get(),d->getDbId(), roll, block_timestamp);
         actd->update_time(TIME_mks{block_timestamp},roll);
@@ -116,7 +115,6 @@ struct NodeGranuleIO : GranuleIO {
         MUTEX_INSPECTOR;                                            
         auto b = cells::getContractBalanceOrCreate(root, db.get(), c, roll, block_timestamp);
         if (!b.valid()) return std::string("balance create failed");
-        b->setDirty(roll,block_timestamp);
         b->addAmount(delta);   // ← ОБЯЗАТЕЛЬНО (diff + calc_tree_hash)
         DBG(logErr2("addContractBalance: contract=%s delta=%lld amount=%lld", c.container.c_str(), (long long)delta, (long long)b->getAmount()));
         return std::nullopt;
@@ -148,7 +146,7 @@ struct NodeGranuleIO : GranuleIO {
     }
     REF_getter<CNode> createCNode(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd,
                                                      TIME_mks block_timestamp, TTL_sec ttl,
-                                                     Rollback* r)
+                                                     Rollback* r) override
     {
         auto dbid= blake2b_hash(cells::getContractDataKey(c,cd));
         auto d=cells::getContractDataNoCreate(root,db.get(),c,cd,r,block_timestamp);
@@ -158,15 +156,13 @@ struct NodeGranuleIO : GranuleIO {
         ret->data=cells::getContractDataOrCreate(root,db.get(),c,cd,ttl,r,block_timestamp);
         if(!ret->data.valid())
             throw CommonError("if(!ret->data.valid()) @@@#$$");
-        ret->data->setDirty(r, block_timestamp);
         ret->act=cells::getActivityOrCreate(root,db.get(),dbid.container,{},ttl,r,block_timestamp);
         if(!ret->act.valid())
             throw CommonError("if(!act.valid()) @#886");
-        ret->act->setDirty(r, block_timestamp);
 
         return ret.get();
     }
-    REF_getter<CNode> getCNode(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd, TIME_mks t, Rollback* r)
+    REF_getter<CNode> getCNode(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd, TIME_mks t, Rollback* r) override
     {
         auto dbid= blake2b_hash(cells::getContractDataKey(c,cd));
         REF_getter<CNode_prod> ret=new CNode_prod;
@@ -179,7 +175,7 @@ struct NodeGranuleIO : GranuleIO {
 
         return ret.get();
     }
-    REF_getter<const CNodeConst> getCNodeConst(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd)
+    REF_getter<const CNodeConst> getCNodeConst(Cellable* root,const CONTRACT_id& c, const CONTRACT_DATA_id& cd) override
     {
         auto dbid= blake2b_hash(cells::getContractDataKey(c,cd));
         auto data = cells::getContractDataNoCreateConst(root,db.get(),c,cd);
@@ -196,7 +192,7 @@ struct NodeGranuleIO : GranuleIO {
 
         return ret.get();
     }
-    void update_contract_time(Cellable* root,const CONTRACT_id& c, TIME_mks t, Rollback* r)
+    void update_contract_time(Cellable* root,const CONTRACT_id& c, TIME_mks t, Rollback* r) override
     {
         auto k=cells::getContractKey(c);
         auto act=cells::getActivityNoCreate(root,db.get(),blake2b_hash(k).container,r,t);

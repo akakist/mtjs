@@ -385,7 +385,6 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     auto ab = cells::getContractBalanceOrCreate(root.get(), db_state.get(), cn, t.roll,t.b->validateBlockREQ->block_timestamp);
     if (!ab.valid())
         throw CommonError("if(!ab.valid())");
-    ab->setDirty(t.roll,t.b->validateBlockREQ->block_timestamp);
 
     // ▼▼▼ корневая гранула контракта (dataId="")
     CONTRACT_DATA_id rootKey;
@@ -595,8 +594,8 @@ void Node::Service::prune_tombstones(Cellable* node, IDatabase* db, TIME_mks cut
 {
     if (!node) return;
     std::vector<std::string> keys;
-    keys.reserve(node->children_hashes_mx.size());
-    for (auto& kv : node->children_hashes_mx) keys.push_back(kv.first);
+    keys.reserve(node->children_hashes.size());
+    for (auto& kv : node->children_hashes) keys.push_back(kv.first);
 
     for (auto& k : keys) {
         if (remaining <= 0) return;
@@ -608,13 +607,13 @@ void Node::Service::prune_tombstones(Cellable* node, IDatabase* db, TIME_mks cut
         bool remove = false;
         if (ch->payload_ctor_idx == hsh::bc_deleted && ch->last_block_timestamp <= cutoff)
             remove = true;                                   // старый тумбстоун
-        else if (ch->children_hashes_mx.empty() && !ch->data.valid())
+        else if (ch->children_hashes.empty() && !ch->data.valid())
             remove = true;                                   // пустой родитель
 
         if (remove) {
             out.push_back(ch->getDbId());
-            node->children_hashes_mx.erase(k);
-            node->children_ptrs_mx.erase(k);
+            node->children_hashes.erase(k);
+            node->children_ptrs.erase(k);
             node->markDirty(block_ts);
             remaining--;
         }

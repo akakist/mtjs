@@ -17,7 +17,7 @@ struct CNode: public Refcountable
     virtual void touch(TIME_mks t)=0;
     virtual TTL_sec ttl()=0;
     virtual void update_time(TIME_mks t, Rollback* r)=0;
-    virtual void setDirty(Rollback* r, TIME_mks block_timestamp)=0;
+    // virtual void setDirty(Rollback* r, TIME_mks block_timestamp)=0;
     virtual ~CNode() = default;
 };
 struct CNodeConst: public Refcountable

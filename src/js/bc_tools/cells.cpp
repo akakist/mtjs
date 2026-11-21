@@ -94,8 +94,8 @@ namespace cells {
         auto cur = _cur;
         // cur->snapshot_1_only(roll);
         // cur->markDirty_1_only(block_timestamp);
-        auto it = cur->children_hashes_mx.find(id);
-        if (it != cur->children_hashes_mx.end())
+        auto it = cur->children_hashes.find(id);
+        if (it != cur->children_hashes.end())
         {
             auto r = getLeafNoCreate(cur, db, id, checkHash);
             if (!r.valid()) {
@@ -113,12 +113,12 @@ namespace cells {
         // снапшот родителя ДО мутации children_hashes_mx: иначе в откат
         // попадёт родитель УЖЕ с этим ребёнком (пустой хеш) и ребёнок не вырежется.
         cur->snapshot(roll, created);
-        cur->children_hashes_mx[id].container = "";
-        auto it2 = cur->children_ptrs_mx.find(id);
-        if (it2 != cur->children_ptrs_mx.end())
+        cur->children_hashes[id].container = "";
+        auto it2 = cur->children_ptrs.find(id);
+        if (it2 != cur->children_ptrs.end())
             throw CommonError("if(it!=children_ptrs.end())");
         REF_getter<Cellable> c = new Cellable(cur, id);
-        cur->children_ptrs_mx.insert({id, c});
+        cur->children_ptrs.insert({id, c});
         // новая ячейка: снапшот родителя уже сделан выше, пустой ребёнок в roll
         // не нужен — отсутствие ребёнка при откате даёт именно родительский снапшот.
         // c->markDirty(block_timestamp);
@@ -131,14 +131,14 @@ REF_getter<Cellable> getLeafNoCreate(Cellable* _cur, IDatabase* db,  const std::
 {
     MUTEX_INSPECTOR;
     auto cur = _cur;
-    auto ip = cur->children_ptrs_mx.find(id);
-    if (ip != cur->children_ptrs_mx.end())
+    auto ip = cur->children_ptrs.find(id);
+    if (ip != cur->children_ptrs.end())
     {
         // ip->second->snapshot_1_only()
         return ip->second;
     }
-    auto it = cur->children_hashes_mx.find(id);
-    if (it == cur->children_hashes_mx.end())
+    auto it = cur->children_hashes.find(id);
+    if (it == cur->children_hashes.end())
     {
         return NULL;
     }
@@ -179,7 +179,7 @@ REF_getter<Cellable> getLeafNoCreate(Cellable* _cur, IDatabase* db,  const std::
                 cc->unpack_mx(in);
         }
     }
-    cur->children_ptrs_mx.insert({id, cc});
+    cur->children_ptrs.insert({id, cc});
     return cc;
 }
 
@@ -260,10 +260,12 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         return getByPathNoCreateConst(root, db, getPathFromHash(h), checkHash);
     }
 
-    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& h, Rollback* roll, const std::string& buffer, bool checkHash, TIME_mks block_timestamp)
+    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& h, Rollback* roll, const std::string& buffer, bool checkHash)
     {
         MUTEX_INSPECTOR;
-        auto cc = getByPathOrCreate(root, db, getPathFromHash(h), checkHash, roll, block_timestamp);
+        TIME_mks tt;
+        tt.v=0;
+        auto cc = getByPathOrCreate(root, db, getPathFromHash(h), checkHash, roll, tt);
         if (!cc.valid())
             throw CommonError("if (!cc.valid()) 4");
         {
@@ -271,10 +273,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
             inBuffer in(buffer);
             cc->unpack_mx(in);
         }
-        if (cc->data.valid())
-            cc->data->setDirty(roll, block_timestamp);
-        else
-            cc->markDirty(block_timestamp);   // тумбстоун: данных нет, но ячейка изменилась
+        cc->markDirty(cc->last_block_timestamp);   // тумбстоун: данных нет, но ячейка изменилась
         return cc->data;
     }
 
@@ -301,7 +300,6 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
                 
                 st->account_count++;
             }
-            st->setDirty(roll,block_timestamp);
         }
         return u;
     }
@@ -343,7 +341,6 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         REF_getter<bc_contract> bc = new bc_contract(cc.get());
         cc->data = bc.get();
         cc->payload_ctor_idx = hsh::bc_contract;
-        cc->data->setDirty(roll,block_timestamp);
         return bc;
     }
 
@@ -410,7 +407,6 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
                               (long long)cc->last_block_timestamp.v,
                               (long long)block_timestamp.v);
 
-        cc->data->setDirty(roll,block_timestamp);
         return bc;
     }
 
@@ -448,7 +444,6 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         REF_getter<bc_contract_balance> bc = new bc_contract_balance(cc.get());
         cc->data = bc.get();
         cc->payload_ctor_idx = hsh::bc_contract_balance;
-        cc->data->setDirty(roll,block_timestamp);
         return bc;
     }
 
@@ -541,8 +536,7 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         if (nl->count(name))
             throw CommonError("if(!nl->list.count(name))");
         nl->insert(name);
-        nl->setDirty(roll,block_timestamp);
-
+ 
         auto cc = getByPathOrCreate(root, db, getNodePath(name), true, roll, block_timestamp);
         if (cc->data.valid())
             throw CommonError("if(cc->data.valid())");
@@ -558,7 +552,6 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
                 
                 st->node_count++;
             }
-            st->setDirty(roll,block_timestamp);
         }
         return n;
     }
@@ -724,7 +717,6 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
         bc->name_ = name.container;
         cc->data = bc.get();
         cc->payload_ctor_idx = hsh::bc_activity;
-        cc->data->setDirty(roll,blocktimestamp);
         return bc;
     }
 
@@ -780,8 +772,6 @@ REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
     if (!cc.valid()) throw CommonError("if(!cc.valid())");
     if (cc->data.valid() && cc->payload_ctor_idx == hsh::bc_activity) {
         auto act = dynamic_cast<bc_activity*>(cc->data.get());
-        act->setDirty(roll, block_timestamp);   // markDirty (снапшот уже в аксессоре)
-        act->_update_time = block_timestamp;
         act->ttl = to_mks(ttl);
         return act;
     }
@@ -793,7 +783,6 @@ REF_getter<bc_activity> getActivityOrCreate(Cellable* root, IDatabase* db,
     act->ttl = to_mks(ttl);
     cc->data = act.get();
     cc->payload_ctor_idx = hsh::bc_activity;
-    cc->data->setDirty(roll,block_timestamp);
     return act;
 }
 
