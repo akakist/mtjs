@@ -810,7 +810,6 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JS_SetPropertyStr(ctx, obj, "bls_pk", JS_NewString(ctx, rs->bls_pk.c_str()));
         JS_SetPropertyStr(ctx, obj, "ip", JS_NewString(ctx, rs->ip.c_str()));
         JS_SetPropertyStr(ctx, obj, "enabled", JS_NewBool(ctx, rs->enabled));
-        JS_SetPropertyStr(ctx, obj, "missed_rounds", JS_NewInt64(ctx, rs->missed_rounds));
         JS_SetPropertyStr(ctx, obj, "last_seen_epoch", JS_NewInt64(ctx, rs->last_seen_epoch));
         JS_SetPropertyStr(ctx, obj, "full_stake", JS_NewString(ctx, std::to_string(rs->full_stake).c_str()));
         JSValue stakes_obj = JS_NewObject(ctx);

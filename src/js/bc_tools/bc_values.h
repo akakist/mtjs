@@ -27,7 +27,6 @@ struct bc_values: public data_base
         /// another params
         values["validator_count_percent"] = 50;
         values["validator_min_stake"] = 50;
-        values["missed_rounds_max"] = 100 ;
         values["answered_committee_min"] = 10 ; 
         values["ttl_cache"] = 20 ; /// time to live contract cache and state cache in height
         

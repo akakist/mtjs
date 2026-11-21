@@ -287,7 +287,6 @@ int main(int argc, char** argv) {
         {"gas_create_address", 1000},
         {"validator_count_percent", 50},
         {"validator_min_stake", 50},
-        {"missed_rounds_max", 100},
         {"answered_committee_min", 10},
         {"ttl_cache", 20},
     };

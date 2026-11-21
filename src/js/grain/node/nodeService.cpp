@@ -1697,7 +1697,8 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
         return (cur_epoch - n->last_seen_epoch) <= NODE_TTL_BLOCKS;
     };
     for (auto& x : nnn)
-        if (node_active(x.second.get()) && x.second->get_full_stake() > 0
+        if (x.second->isEnabled() && node_active(x.second.get())
+            && x.second->get_full_stake() > 0
             && x.second->get_full_stake() >= minstake)
             live_nodes++;
 
@@ -1707,7 +1708,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
 
     for(auto &x: nnn)
     {
-        if(!node_active(x.second.get()))
+        if(!x.second->isEnabled() || !node_active(x.second.get()))
             continue;
         // Нода без стейка — не валидатор: не должна попадать в ротацию лидера,
         // иначе созданная через node_create «фантомная» нода даёт мёртвые слоты.

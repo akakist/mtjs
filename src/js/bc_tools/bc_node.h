@@ -19,7 +19,6 @@ private:
     std::map<ADDRESS_id /*user*/, int64_t> stakes;
     bool enabled=true;
 public:
-    int missed_rounds=0;
     int64_t last_seen_epoch=0;    // эпоха последней подписи диффа (живость)
     size_t size() const
     {
@@ -35,7 +34,6 @@ public:
             r+=z.first.addr.size();
             r+=sizeof(int64_t);
         }
-        r+=sizeof(missed_rounds);
         r+=sizeof(last_seen_epoch);
         return r;
     }
@@ -43,7 +41,6 @@ public:
     {
         
         enabled=_enabled;
-        missed_rounds=0;
     }
     bool isEnabled() const
     {
@@ -150,14 +147,14 @@ public:
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<enabled<<missed_rounds<<last_seen_epoch;
+        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<enabled<<last_seen_epoch;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>enabled>>missed_rounds>>last_seen_epoch;
+        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>enabled>>last_seen_epoch;
     }
 
 };
