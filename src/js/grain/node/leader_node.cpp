@@ -18,8 +18,8 @@ bool Node::Service::PingRSP(const MsgData::PingRSP *r, const NODE_id &src_node, 
     bt.PingRSP_m[h].insert_or_assign(src_node, r);
     if (bt.is_PingRSP_m_quorum(h, root.get(), db_state.get()))
     {
-        // живой сет собран (67% всего стейка) — перепроверяем оба кворума
-        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTxRSP, toRef(h.container), r->hb.get(), 0.05, this));
+        // кворум набран — короткое окно для поздних понгов (каждый понг ресетит аларм)
+        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_PingRSP, toRef(h.container), r->hb.get(), 0.05, this));
     }
     return true;
 }

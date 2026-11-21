@@ -67,6 +67,7 @@ namespace Node
     {
         TIMER_PERIODIC_CLOCK,
         TIMER_GetTxRSP,
+        TIMER_PingRSP,
         TIMER_GetTxFromLeader,
         ALARM_SYNC_WATCHDOG,
         TIMER_REPORT_MEM,
@@ -112,7 +113,7 @@ namespace Node
         bool ClientMsg(const bcEvent::ClientMsg *e);
 
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
-        bool PutTxREQ(const bcEvent::PutTxREQ* e);
+        bool ForwardTxREQ(const bcEvent::ForwardTxREQ* e);
 
 
         // bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
@@ -171,7 +172,7 @@ namespace Node
             std::set<NODE_id> alive;   // ответившие на GetTxREQ (живой сет) — фильтр рассылки блока
             int64_t last_tx_request_us = 0;   // троттлинг пинга GetTxREQ (раз в 0.5с)
             bool ping_sent = false;   // пинг высылается один раз на блок
-            int64_t last_ping_us = 0;   // ретрай пинга раз в 0.5с пока нет кворума
+            bool ping_done = false;   // пинг-стадия завершена (alive финализирован)
 
         };
         _db_to_save db_to_save_Z;

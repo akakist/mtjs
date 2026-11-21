@@ -41,7 +41,7 @@ namespace bcEventEnum
     const EVENT_id SendToChildAck(ghash("@g_SendToChildAck"));
     const EVENT_id StreamBlock(ghash("@g_StreamBlock"));
     const EVENT_id HeartBeatREQ(ghash("@g_HeartBeatREQ"));
-    const EVENT_id PutTxREQ(ghash("@g_PutTransactionREQ"));
+    const EVENT_id ForwardTxREQ(ghash("@g_ForwardTxREQ"));
     const EVENT_id GetUserNonceREQ(ghash("@g_GetUserNonceREQ"));
     const EVENT_id GetUserNonceRSP(ghash("@g_GetUserNonceRSP"));
     const EVENT_id WriteGranules(ghash("@g_WriteGranules"));
@@ -437,18 +437,31 @@ namespace bcEvent
         std::map<std::string,std::string> diffs;
         REF_getter<MsgData::attachment_data> att_data;
     };
-    class PutTxREQ : public Event::NoPacked
+    // прямой push tx на лидера (пересылка по сети, PACKED)
+    class ForwardTxREQ : public Event::Base
     {
 
     public:
         static Base *construct(const route_t &r)
         {
-            return NULL;
+            return new ForwardTxREQ(r);
         }
-        PutTxREQ(const REF_getter<MsgData::TX> & _tx, const route_t &r)
-            : NoPacked(bcEventEnum::PutTxREQ, r), tx(_tx) {}
+        ForwardTxREQ(const REF_getter<MsgData::TX> & _tx, const route_t &r)
+            : Base(bcEventEnum::ForwardTxREQ, r), tx(_tx) {}
 
-        const REF_getter<MsgData::TX> tx;
+        REF_getter<MsgData::TX> tx;
+
+        ForwardTxREQ(const route_t &r)
+            : Base(bcEventEnum::ForwardTxREQ, r) {}
+
+        void unpack(inBuffer &o)
+        {
+            o>>tx;
+        }
+        void pack(outBuffer &o) const
+        {
+            o<<tx;
+        }
     };
     class AddTxREQ : public Event::Base
     {

@@ -29,7 +29,7 @@ inline std::set<EVENT_id> getEvents_nodeService()
 	out.insert(bcEventEnum::LiteSetUplinkREQ);
 	out.insert(bcEventEnum::NodeMsgREQ);
 	out.insert(bcEventEnum::NodeMsgRSP);
-	out.insert(bcEventEnum::PutTxREQ);
+	out.insert(bcEventEnum::ForwardTxREQ);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(bcEventEnum::StreamBlock);
 	out.insert(bcEventEnum::syncGetGranulesREQ);
@@ -63,7 +63,7 @@ inline void regEvents_nodeService()
 	iUtils->registerEvent(bcEvent::LiteSetUplinkREQ::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgREQ::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgRSP::construct);
-	iUtils->registerEvent(bcEvent::PutTxREQ::construct);
+	iUtils->registerEvent(bcEvent::ForwardTxREQ::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(bcEvent::StreamBlock::construct);
 	iUtils->registerEvent(bcEvent::syncGetGranulesREQ::construct);

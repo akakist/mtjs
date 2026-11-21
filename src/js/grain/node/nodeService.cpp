@@ -277,7 +277,12 @@ bool Node::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
         yyjson_doc_free(doc);
     }
 
-    if (!err) sendEvent(ServiceEnum::Node, new bcEvent::PutTxREQ(e->tx, this));
+    if (!err)
+    {
+        // бывшая логика PutTxREQ: добавить в локальный пул
+        transaction_pool_of_leader.insert_or_assign(hash, e->tx);
+        // прямой push на лидера — ОТЛОЖЕН (нужен разбор race с ротацией лидера)
+    }
     passEvent(new bcEvent::AddTxRSP(hash, err.has_value(), err ? *err : "transaction added to pool",
                                     poppedFrontRoute(e->route)));
     return true;
@@ -443,27 +448,59 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
             REF_getter<MsgData::HeartBeatREQ> h=new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                         epoch_current(),
                         this_node_name, iUtils->getNow().v, 0);
-            auto hb_hash = h->getHash();
             auto mf=getMetaFull();
 
-            bool ping_quorum = bt.is_PingRSP_m_quorum(hb_hash, root.get(), db_state.get());
-
-            // Стадия 1: пинг (первый + ретрай раз в 0.5с пока нет кворума 67%)
-            if (!bt.ping_sent || (!ping_quorum && now_us - bt.last_ping_us >= 500000))
+            // Инициировать пинг-стадию один раз за раунд — дальше её ведёт TIMER_PingRSP
+            if (!bt.ping_sent)
             {
                 bt.ping_sent = true;
-                bt.last_ping_us = now_us;
                 REF_getter<MsgData::PingREQ> ping = new MsgData::PingREQ();
                 ping->hb = h;
                 broadcast_MsgEvent_via_broadcaster(ping.get(), mf->tree_all_nodes);
+                sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_PingRSP,
+                          toRef(h->getHash().container), h.get(), 0.5, this));
             }
 
-            // Стадия 2: GetTx только после кворума пинга (к живым, throttle 0.5с)
-            if (ping_quorum && now_us - bt.last_tx_request_us >= 500000)
+            // GetTx-стадия: редкий фолбэк 0.5с, только после завершения пинга
+            if (bt.ping_done && now_us - bt.last_tx_request_us >= 500000)
             {
                 bt.last_tx_request_us = now_us;
                 do_request_for_transactions(h.get(), mf);
             }
+        }
+        return true;
+    }
+    case timers::TIMER_PingRSP:
+    {
+        if(sync_in_progress)
+        {
+            return true;
+        }
+        auto &bt = l_blocks[prev_root_hash_Z()];
+        THASH_id hb_hash;
+        hb_hash.container=e->data->container;
+        MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
+        if(!hb)
+        throw CommonError("if(!hb)");
+
+        if(!bt.is_PingRSP_m_quorum(hb_hash, root.get(), db_state.get()))
+        {
+            // кворума нет — ретрай пинга
+            auto mf=getMetaFull();
+            REF_getter<MsgData::PingREQ> ping = new MsgData::PingREQ();
+            ping->hb = hb;
+            broadcast_MsgEvent_via_broadcaster(ping.get(), mf->tree_all_nodes);
+            sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_PingRSP,
+                      toRef(hb_hash.container), hb, 0.5, this));
+        }
+        else
+        {
+            // кворум есть — финализируем живой сет, пинг-стадия завершена
+            bt.alive.clear();
+            for (auto& z : bt.PingRSP_m[hb_hash])
+                bt.alive.insert(z.first);
+            bt.ping_done = true;
+            logNode("ping done: alive=%zu", bt.alive.size());
         }
         return true;
     }
@@ -479,14 +516,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
         if(!hb)
         throw CommonError("if(!hb)");
-        if(bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get())
-           && bt.is_PingRSP_m_quorum(hb_hash, root.get(), db_state.get()))
+        if(bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
         {
-            // финализируем живой сет из ответивших на пинг
-            bt.alive.clear();
-            for (auto& z : bt.PingRSP_m[hb_hash])
-                bt.alive.insert(z.first);
-            // if()
             do_start_block(hb);
             logNode("do_start_block();");
             bt.GetTxRSP_m[hb_hash].clear();
@@ -574,8 +605,8 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             return NodeMsgRSP((const bcEvent::NodeMsgRSP *)e.get());
         case bcEventEnum::NodeNotRespondedREQ:
             return on_NodeNotResponded((const bcEvent::NodeNotRespondedREQ *)e.get());
-        case bcEventEnum::PutTxREQ:
-            return PutTxREQ((const bcEvent::PutTxREQ *)e.get());
+        case bcEventEnum::ForwardTxREQ:
+            return ForwardTxREQ((const bcEvent::ForwardTxREQ *)e.get());
         case timerEventEnum::TickTimer:
             return on_timer((const timerEvent::TickTimer *)e.get());
         case timerEventEnum::TickAlarm:
@@ -603,6 +634,8 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return ClientMsg((const bcEvent::ClientMsg *)ev->e.get());
             case bcEventEnum::AddTxREQ:
                 return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(ev->e.get()));
+            case bcEventEnum::ForwardTxREQ:
+                return ForwardTxREQ(static_cast<const bcEvent::ForwardTxREQ *>(ev->e.get()));
 
             case bcEventEnum::syncGetGranulesREQ:
                 return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)ev->e.get());
@@ -628,6 +661,8 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return ClientMsg((const bcEvent::ClientMsg *)ev->e.get());
             case bcEventEnum::AddTxREQ:
                 return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(ev->e.get()));
+            case bcEventEnum::ForwardTxREQ:
+                return ForwardTxREQ(static_cast<const bcEvent::ForwardTxREQ *>(ev->e.get()));
             case bcEventEnum::syncGetGranulesREQ:
                 return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)ev->e.get());
             case bcEventEnum::syncGetGranulesRSP:
@@ -1228,7 +1263,7 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
     return true;
 }
 
-bool Node::Service::PutTxREQ(const bcEvent::PutTxREQ *e)
+bool Node::Service::ForwardTxREQ(const bcEvent::ForwardTxREQ *e)
 {
     MUTEX_INSPECTOR;
     auto h=e->tx->getHash();
