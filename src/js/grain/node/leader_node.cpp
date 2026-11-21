@@ -19,7 +19,8 @@ bool Node::Service::PingRSP(const MsgData::PingRSP *r, const NODE_id &src_node, 
     if (bt.is_PingRSP_m_quorum(h, root.get(), db_state.get()))
     {
         // кворум набран — короткое окно для поздних понгов (каждый понг ресетит аларм)
-        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_PingRSP, toRef(h.container), r->hb.get(), 0.05, this));
+        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::ALARM_do_request_for_tx, toRef(h.container), r->hb.get(), 0.05, this));
+        // logNode("is_PingRSP_m_quorum from %s",src_node.container.c_str());
     }
     return true;
 }
@@ -55,7 +56,7 @@ bool Node::Service::GetTxRSP(const MsgData::GetTxRSP *r, const NODE_id &src_node
         double to=0.05;
         if(transaction_pool_of_leader.empty())
             to=1.;
-        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTxRSP, toRef(h.container), r->hb.get(),to, this));
+        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::ALARM_START_BLOCK, toRef(h.container), r->hb.get(),to, this));
     }
     XPASS;
     return true;

@@ -66,10 +66,11 @@ namespace Node
     enum timers
     {
         TIMER_PERIODIC_CLOCK,
-        TIMER_GetTxRSP,
-        TIMER_PingRSP,
-        TIMER_GetTxREQ,
-        TIMER_GetTxFromLeader,
+        ALARM_START_BLOCK,
+        ALARM_do_request_for_tx,
+        // TIMER_GetTxREQ,
+        ALARM_Ping,
+        // TIMER_GetTxFromLeader,
         ALARM_SYNC_WATCHDOG,
         TIMER_REPORT_MEM,
         TIMER_BlockDiffValidateREQ,

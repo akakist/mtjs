@@ -404,7 +404,7 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
         auto cl=current_leader();
         if(cl.valid() && cl->getName()==this_node_name)
         {
-            sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(TIMER_GetTxFromLeader,NULL,NULL,0.02,this));
+            sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(ALARM_Ping,NULL,NULL,0.02,this));
 
         }
         return true;
@@ -435,10 +435,19 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         logNode("fail leader %s",e->data->container.c_str());
         auto & cli=cli_leader_info[prev_root_hash_Z()];
         if(cli.node_leader.valid() && cli.node_leader->node_leader.container==e->data->container)
+        {
+            if (getenv("MTJS_LEADER_TRACE"))
+                logNode("[leader-expired] prev=%s clear cached leader=%s",
+                    prev_root_hash_Z().str().substr(0,8).c_str(), e->data->container.c_str());
             cli.node_leader=nullptr;
+        }
+        else if (getenv("MTJS_LEADER_TRACE"))
+            logNode("[leader-expired] no cache match: cached=%s expired=%s",
+                cli.node_leader.valid() ? cli.node_leader->node_leader.container.c_str() : "(null)",
+                e->data->container.c_str());
         return true;
     }
-    case timers::TIMER_GetTxFromLeader:
+    case timers::ALARM_Ping:
     {
         auto cl=current_leader();
         if(cl.valid() && cl->getName()==this_node_name)
@@ -446,7 +455,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
             auto &bt = l_blocks[prev_root_hash_Z()];
             REF_getter<MsgData::HeartBeatREQ> h=new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                         epoch_current(),
-                        this_node_name, iUtils->getNow().v, 0);
+                        this_node_name);
             auto mf=getMetaFull();
 
             // пинг один раз за раунд — дальше цепочку ведут PingRSP -> TIMER_PingRSP
@@ -460,7 +469,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         }
         return true;
     }
-    case timers::TIMER_PingRSP:
+    case timers::ALARM_do_request_for_tx:
     {
         if(sync_in_progress)
         {
@@ -482,36 +491,33 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
 
         // стартуем GetTx: первый GetTxREQ + аларм ре-арма
         auto mf=getMetaFull();
+        logNode("ALARM_PingRSP : done");
         do_request_for_transactions(hb, mf);
-        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTxREQ,
-                  toRef(hb_hash.container), hb, 0.5, this));
         return true;
     }
-    case timers::TIMER_GetTxREQ:
-    {
-        if(sync_in_progress)
-        {
-            return true;
-        }
-        auto &bt = l_blocks[prev_root_hash_Z()];
-        THASH_id hb_hash;
-        hb_hash.container=e->data->container;
-        MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
-        if(!hb)
-        throw CommonError("if(!hb)");
+    // case timers::TIMER_GetTxREQ:
+    // {
+    //     if(sync_in_progress)
+    //     {
+    //         return true;
+    //     }
+    //     auto &bt = l_blocks[prev_root_hash_Z()];
+    //     THASH_id hb_hash;
+    //     hb_hash.container=e->data->container;
+    //     MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
+    //     if(!hb)
+    //     throw CommonError("if(!hb)");
 
-        if(!bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
-        {
-            // кворума tx нет — ре-броадкаст GetTxREQ и ре-арм
-            auto mf=getMetaFull();
-            do_request_for_transactions(hb, mf);
-            sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTxREQ,
-                      toRef(hb_hash.container), hb, 0.5, this));
-        }
-        // кворум есть — больше не шлём; дальше только финальное окно TIMER_GetTxRSP
-        return true;
-    }
-    case timers::TIMER_GetTxRSP:
+    //     if(!bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
+    //     {
+    //         // кворума tx нет — ре-броадкаст GetTxREQ и ре-арм
+    //         auto mf=getMetaFull();
+    //         do_request_for_transactions(hb, mf);
+    //     }
+    //     // кворум есть — больше не шлём; дальше только финальное окно TIMER_GetTxRSP
+    //     return true;
+    // }
+    case timers::ALARM_START_BLOCK:
     {
         if(sync_in_progress)
         {
@@ -1643,14 +1649,30 @@ REF_getter<const bc_node> Node::Service::current_leader()
         lastBlockTime=prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v;
     const auto now=iUtils->getNow().v;
     if(now<lastBlockTime)
+    {
+        if (getenv("MTJS_LEADER_TRACE"))
+            logNode("[leader] prev=%s NULL(clock-back) last=%lld now=%lld",
+                prev_root_hash_Z().str().substr(0,8).c_str(), (long long)lastBlockTime, (long long)now);
         return nullptr;   // часы ушли назад относительно блока — слот не определён
+    }
 
     const int64_t since=now-lastBlockTime;
     // правая граница слота — мёртвая зона: лидера нет
     if(since%SLOT_MKS>=SLOT_MKS-NO_LEADER_FRAME_MKS)
+    {
+        if (getenv("MTJS_LEADER_TRACE"))
+            logNode("[leader] prev=%s NULL(dead-zone) since=%lld",
+                prev_root_hash_Z().str().substr(0,8).c_str(), (long long)since);
         return nullptr;
+    }
 
-    const NODE_id& name=leaders[(since/SLOT_MKS)%leaders.size()].name;
+    const int64_t slot=since/SLOT_MKS;
+    const NODE_id& name=leaders[slot%leaders.size()].name;
+    if (getenv("MTJS_LEADER_TRACE"))
+        logNode("[leader] prev=%s last=%lld now=%lld since=%lld slot=%lld idx=%zu of=%zu leader=%s",
+            prev_root_hash_Z().str().substr(0,8).c_str(),
+            (long long)lastBlockTime, (long long)now, (long long)since, (long long)slot,
+            (size_t)(slot%leaders.size()), leaders.size(), name.container.c_str());
     return cells::getNodeNoCreateConst(root.get(),db_state.get(),name);
 }
 REF_getter<BlockMetaFull> Node::Service::getMetaFull()
