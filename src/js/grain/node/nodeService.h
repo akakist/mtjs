@@ -145,7 +145,7 @@ namespace Node
 
         bool isNodeGreater(const NODE_id& nodeLeft, const NODE_id& nodeRight, const REF_getter<BlockMetaFull>& meta);
 
-        void mark_activity(const std::set<NODE_id>& node_validators, Rollback* roll, TIME_mks block_timestamp, int64_t epoch);
+        void mark_activity(const std::set<NODE_id>& alive_set, Rollback* roll, TIME_mks block_timestamp);
 
 
 

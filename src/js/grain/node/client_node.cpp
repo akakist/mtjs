@@ -484,6 +484,7 @@ bool Node::Service::PingREQ(const MsgData::PingREQ *r, const NODE_id &src_node, 
     // безусловный liveness-пинг: отвечаем всегда (даже при sync) — просто «я жив»
     REF_getter<MsgData::PingRSP> rsp = new MsgData::PingRSP;
     rsp->hb = r->hb;
+    rsp->sig.sign(my_sk_bls, r->hb->getHash().container);   // BLS-подпись alive
     pass_NodeMsgRSP(rsp.get(), route);
     return true;
 }
@@ -570,15 +571,20 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
     passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
 }
-void Node::Service::mark_activity(const std::set<NODE_id>& node_validators, Rollback* roll, TIME_mks block_timestamp, int64_t epoch)
+void Node::Service::mark_activity(const std::set<NODE_id>& alive_set, Rollback* roll, TIME_mks block_timestamp)
 {
-    // живость помечаем ТОЛЬКО у реально подписавших прошлый блок (по эпохе).
-    // Пинг — субъективен (цензурируется), поэтому в vne его не учитываем.
+    // живость: для нод из подписанного alive-сета (пинг) обновляем
+    // и activity (физическое удаление/GC), и last_update (кэш, без чтения activity).
     auto ls=cells::getAllNodes(root.get(), db_state.get(), roll, block_timestamp);
     for(auto &z: ls)
     {
-        if(node_validators.count(z->getName()))
-            z->last_seen_epoch = epoch;
+        if(!alive_set.count(z->getName()))
+            continue;
+        z->last_update = block_timestamp;
+        if (cells::getActivityNoCreateConst(root.get(), db_state.get(), z->getDbId()).valid()) {
+            auto act = cells::getActivityNoCreate(root.get(), db_state.get(), z->getDbId(), roll, block_timestamp);
+            act->update_time(TIME_mks{block_timestamp}, NULL);
+        }
     }
 }
 

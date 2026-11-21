@@ -20,6 +20,8 @@ namespace MsgData
         REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
         std::vector<NODE_id> node_diff_validators;
         blst_cpp::AggregateSignature agg_diff_sig;
+        std::vector<NODE_id> alive_validators;       // кто ответил на пинг (подписал hb)
+        blst_cpp::AggregateSignature agg_alive_sig;  // агрегат их BLS-подписей
         void update(Blake2bHasher& h) const
         {
             blockAcceptedREQ->update(h);
@@ -28,6 +30,11 @@ namespace MsgData
                 h.update(z.container);
             }
             h.update(agg_diff_sig.serialize());
+            for(auto& z: alive_validators)
+            {
+                h.update(z.container);
+            }
+            h.update(agg_alive_sig.serialize());
         }
         void pack(outBuffer& b) const final
         {
@@ -35,6 +42,8 @@ namespace MsgData
             b<<blockAcceptedREQ;
             b<<node_diff_validators;
             b<<agg_diff_sig;
+            b<<alive_validators;
+            b<<agg_alive_sig;
         }
         void unpack(inBuffer& b) final
         {
@@ -42,6 +51,8 @@ namespace MsgData
             b>>blockAcceptedREQ;
             b>>node_diff_validators;
             b>>agg_diff_sig;
+            b>>alive_validators;
+            b>>agg_alive_sig;
         }
     };
 

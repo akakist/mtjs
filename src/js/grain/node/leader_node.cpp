@@ -145,6 +145,25 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
             ba2->node_diff_validators.push_back(z->node_validator);
             nnn.insert(z->node_validator.container);
         }
+        // агрегат alive-сета (подписанный пинг): кто реально ответил на пинг
+        if (!bt.PingRSP_m.empty())
+        {
+            auto it = bt.PingRSP_m.begin();
+            const auto& hb_hash = it->first;
+            std::vector<blst_cpp::PublicKey> alive_pk;
+            for (auto& z : it->second)
+            {
+                auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(), z.first);
+                if (!n.valid()) continue;
+                alive_pk.push_back(n->get_bls_pk());
+                ba2->agg_alive_sig.add(z.second->sig);
+                ba2->alive_validators.push_back(z.first);
+            }
+            if (!alive_pk.empty() && !ba2->agg_alive_sig.verify(alive_pk, hb_hash.container))
+            {
+                throw CommonError("alive aggregate verify FAIL");
+            }
+        }
         if (ba2->agg_diff_sig.verify(agg_pk, r->blockAcceptedHash.container))
         {
         }

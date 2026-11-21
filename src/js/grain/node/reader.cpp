@@ -184,7 +184,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 rsp->bls_pk = base16::encode(n->get_bls_pk().serialize());
                 rsp->ip = n->get_ip();
                 rsp->enabled = n->isEnabled();
-                rsp->last_seen_epoch = n->last_seen_epoch;
+                rsp->last_update = n->last_update.v;
                 rsp->full_stake = n->get_full_stake();
                 rsp->stakes = n->getStakes();
             }

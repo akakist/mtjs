@@ -19,7 +19,7 @@ private:
     std::map<ADDRESS_id /*user*/, int64_t> stakes;
     bool enabled=true;
 public:
-    int64_t last_seen_epoch=0;    // эпоха последней подписи диффа (живость)
+    TIME_mks last_update;         // момент последнего alive (0 = ещё не пинговал — sentinel)
     size_t size() const
     {
         
@@ -34,7 +34,7 @@ public:
             r+=z.first.addr.size();
             r+=sizeof(int64_t);
         }
-        r+=sizeof(last_seen_epoch);
+        r+=sizeof(last_update);
         return r;
     }
     void setEnabled(bool _enabled)
@@ -147,14 +147,14 @@ public:
     {
         data_base::pack(o);
         o<<1;
-        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<enabled<<last_seen_epoch;
+        o<<name_<<owner_address<<bls_pk<<ed_pk<<ip<<stakes<<enabled<<last_update;
     }
     void unpack(inBuffer& o) final
     {
         data_base::unpack(o);
         auto v=o.get_PN();
 
-        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>enabled>>last_seen_epoch;
+        o>>name_>>owner_address>>bls_pk>>ed_pk>>ip>>stakes>>enabled>>last_update;
     }
 
 };

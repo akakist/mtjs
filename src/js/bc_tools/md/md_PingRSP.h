@@ -1,6 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "md_HeartBeatREQ.h"
+#include "blst_cp.h"
 namespace MsgData
 {
     struct PingRSP: public Base
@@ -9,21 +10,25 @@ namespace MsgData
         {
         }
         REF_getter<MsgData::HeartBeatREQ> hb;
+        blst_cpp::Signature sig;   // BLS-подпись ноды над hb->getHash() (alive-сет)
         void update(Blake2bHasher& h) const
         {
             hb->update(h);
+            h.update(sig.serialize());
         }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
             b<<hb;
+            b<<sig;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>hb;
+            b>>sig;
         }
         static Base* construct()
         {

@@ -767,7 +767,7 @@ Node::Service::~Service()
 
 bool Node::Service::on_NodeNotResponded(const bcEvent::NodeNotRespondedREQ *e)
 {
-    // локальный unresponsive-кэш убран: живость ведётся по last_seen_epoch (дифф-подпись)
+    // локальный unresponsive-кэш убран: живость ведётся по last_update (alive-сет)
     return true;
 }
 
@@ -1155,9 +1155,9 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         // «пропустившими». Правильный вход — node_diff_validators (все, кто
         // ответил на BlockDiffValidateREQ).
         if (prev_block.valid()) {
-            std::set<NODE_id> prev_validators(prev_block->node_diff_validators.begin(),
-                                              prev_block->node_diff_validators.end());
-            mark_activity(prev_validators, NULL, b.validateBlockREQ->block_timestamp, b.validateBlockREQ->heart_beat->new_epoch);
+            std::set<NODE_id> alive_set(prev_block->alive_validators.begin(),
+                                        prev_block->alive_validators.end());
+            mark_activity(alive_set, NULL, b.validateBlockREQ->block_timestamp);
         }
     }
     auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
@@ -1690,11 +1690,14 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
 
     // Валидаторами (и лидерами) могут быть только активные ноды со стейком >= minstake.
     // Активность = подпись диффа в пределах TTL (last_seen не протух).
-    // живость — по эпохе (детерминированно): нода в vne, если подписывала дифф в пределах TTL
-    const int64_t NODE_TTL_BLOCKS = 30;
-    int64_t cur_epoch = epoch_current();
+    // живость — по last_update (timestamp): 0 = sentinel «ещё не пинговал» → включаем;
+    // иначе сравниваем отставание с TTL (детерминированно по block_timestamp прошлого блока).
+    const TTL_mks NODE_TTL = TTL_mks{60 * 1000000};   // 60с
+    TIME_mks now_ts = prev_block.valid()
+        ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp : TIME_mks{};
     auto node_active = [&](const bc_node* n) -> bool {
-        return (cur_epoch - n->last_seen_epoch) <= NODE_TTL_BLOCKS;
+        if (n->last_update.v == 0) return true;
+        return (now_ts - n->last_update) <= NODE_TTL;
     };
     for (auto& x : nnn)
         if (x.second->isEnabled() && node_active(x.second.get())
@@ -1751,15 +1754,13 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull()
         validator_count=m->vne.size();      // не выходим за пределы vne
     std::vector<NodeElement> vne_committe;
 
-    auto answered_min=v->getValue("answered_committee_min");
-
-    // Попытка 1: строгий фильтр (answered > answered_min && stake >= minstake)
+    // Попытка 1: строгий фильтр (уже пинговал && stake >= minstake)
     for(size_t i=0; vne_committe.size()< validator_count && i< m->vne.size(); i++)
     {
         auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(),m->vne[i].name);
         if (!n.valid())
             continue;
-        if (n->last_seen_epoch <= answered_min)
+        if (n->last_update.v == 0)
             continue;
         if(m->vne[i].stake_A>=minstake)
         {
