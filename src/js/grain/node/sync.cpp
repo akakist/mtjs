@@ -64,7 +64,7 @@ void Node::Service::collect_granules_since_blocktimestamp(Cellable *c, IDatabase
         dbdump.push_back({c->getDbId(),c->getBuffer_mx()});
         cnt++;
     }
-    for(auto& x:c->children_hashes_mx)
+    for(auto& x:c->children_hashes)
     {
         auto cc=cells::getLeafNoCreate(c,db,x.first,true);
         if(!cc.valid())
@@ -180,8 +180,8 @@ bool Node::Service::syncGetGranulesRSP(const bcEvent::syncGetGranulesRSP* m)
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
         THASH_id h;
         h.container=z.first;
-        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, NULL,z.second,false,TIME_mks{});
-        if (leaf.valid()) leaf->setDirty(NULL,leaf->parent->last_block_timestamp);
+        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, NULL,z.second,false);
+        // if (leaf.valid()) leaf->setDirty(NULL,leaf->parent->last_block_timestamp);
         logNode("sync: %s",base16::encode(z.first).c_str());
     }
     

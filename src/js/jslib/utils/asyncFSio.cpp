@@ -1527,7 +1527,11 @@ struct filehandle_read: public async_task
         std::string b;
         b.resize(size);
         if(pz!=-1)
+#if defined(__APPLE__) || defined(__FreeBSD__)
+            lseek(fd,pz,SEEK_SET);
+#else
             lseek64(fd,pz,SEEK_SET);
+#endif
         rv=::read(fd,b.data(),b.size());
         if(rv<0)
             errstr=strerror(errno);
@@ -1616,7 +1620,11 @@ struct filehandle_write: public async_task
     void execute()
     {
         if(pz!=-1)
+#if defined(__APPLE__) || defined(__FreeBSD__)
+            lseek(fd,pz,SEEK_SET);
+#else
             lseek64(fd,pz,SEEK_SET);
+#endif
         rv=::write(fd,buf.data(),buf.size());
         if(rv<0)
             errstr=strerror(errno);

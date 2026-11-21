@@ -1,4 +1,10 @@
-#include <bits/stdc++.h>
+// Replace the GCC-only <bits/stdc++.h> header with the standard headers used here.
+#include <iostream>
+#include <map>
+#include <queue>
+#include <string>
+#include <utility>
+#include <vector>
 #include "tree.h"
 #include "NODE_id.h"
 // using namespace BroadcasterTree;

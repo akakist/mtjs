@@ -68,7 +68,7 @@ namespace cells {
 
     REF_getter<Cellable> getLeafOrCreate(Cellable* cur, IDatabase* db, const std::string& id, bool checkHash, Rollback* roll, std::set<REF_getter<Cellable>> &created);
     REF_getter<Cellable> getLeafNoCreate(Cellable* cur, IDatabase* db, const std::string& id, bool checkHash);
-    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& name, Rollback* roll, const std::string& buffer, bool checkHash, TIME_mks block_timestamp);
+    REF_getter<data_base> replaceLeaf(Cellable* root, IDatabase* db, const THASH_id& name, Rollback* roll, const std::string& buffer, bool checkHash);
 
 // ============================================================
 // address state

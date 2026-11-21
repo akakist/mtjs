@@ -116,10 +116,14 @@ UnknownBase *MTJS::Service::construct(const SERVICE_id &id, const std::string &n
 
 #define CONFIG_MODULE_SUPPORT 1
 #include <quickjs.h>
+// mallinfo2 is glibc-specific and malloc.h is not available on macOS.
+#if defined(__GLIBC__)
 #include <malloc.h>
+#endif
 #include <stdio.h>
 
 void print_mem_stats() {
+#if defined(__GLIBC__)
     struct mallinfo2 mi = mallinfo2();
 
     printf("=== Memory Stats ===\n");
@@ -129,6 +133,11 @@ void print_mem_stats() {
     printf("Память через mmap:   %zu MB\n", mi.hblkhd / 1024 / 1024);
     printf("Можно вернуть ОС:    %zu MB\n", mi.keepcost / 1024 / 1024);
     printf("====================\n");
+#else
+    printf("=== Memory Stats ===\n");
+    printf("Detailed malloc statistics are unavailable on this platform\n");
+    printf("====================\n");
+#endif
 }
 void dump_memory_usage(JSRuntime *runtime)
 {

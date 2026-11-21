@@ -1052,7 +1052,6 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
             
             st->block_height=bh;
         }
-        st->setDirty(NULL,b.validateBlockREQ->block_timestamp);
     }
     DBG(logNode("execute_block: tx_count=%zu", (size_t)b.validateBlockREQ->transaction_bodies.size()));
     // Nonce повышаем после всех tx: внутри цикла u взят до execute_transaction,
@@ -1145,7 +1144,6 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), a, NULL, b.validateBlockREQ->block_timestamp);
         if (!u.valid()) { logNode("execute_block: nonce bump: address not found"); continue; }
         u->incNonce();
-        u->setDirty(NULL, b.validateBlockREQ->block_timestamp);
     }
     calc_fee_rewards_nodes(b, lc);
     // Отключаем ноды, не ответившие на прошлый блок (missed_rounds > missed_rounds_max).
@@ -1197,13 +1195,11 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
                     
                     u->balance += portion;
                 }
-                u->setDirty(NULL,b.validateBlockREQ->block_timestamp);
             } else {
                 // owner не найден — аномалия (node_create owner должен быть)
                 logNode("calc_fee_rewards: owner not found for node %s (skip reward %lld)",
                         z.container.c_str(), (long long)portion);
             }
-            u->setDirty(NULL, b.validateBlockREQ->block_timestamp);
             b.emit_block("reward",R"({"node":"%s","fee":"%s"})",z.container.c_str(),std::to_string(portion).c_str());
         }
 
@@ -1456,7 +1452,6 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         if (!st.valid()) 
             throw CommonError("if (!st.valid()) ");
         st->tx_count++;
-        st->setDirty(NULL, b.validateBlockREQ->block_timestamp);
     }
     // ▲▲▲    
     int64_t gasLimitTokens = 0, priority = 0, value = 0;

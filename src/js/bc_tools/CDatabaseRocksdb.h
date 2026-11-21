@@ -74,7 +74,16 @@ options.max_background_flushes = 4;                // было 2
 
 
 
-        rocksdb::Status status = rocksdb::DB::Open(options, db_name, &db_ptr);
+        rocksdb::Status status;
+        // RocksDB 10 changed DB::Open to accept std::unique_ptr<DB>*.
+        // Keep the internal raw pointer for compatibility with older releases.
+#if ROCKSDB_MAJOR >= 10
+        std::unique_ptr<rocksdb::DB> opened_db;
+        status = rocksdb::DB::Open(options, db_name, &opened_db);
+        db_ptr = opened_db.release();
+#else
+        status = rocksdb::DB::Open(options, db_name, &db_ptr);
+#endif
 
         if (!status.ok()) {
             std::cerr << "Не удалось открыть RocksDB: " << status.ToString() << std::endl;
@@ -88,13 +97,13 @@ options.max_background_flushes = 4;                // было 2
 
     std::string db_name;
 
-    std::string getDbName()
+    std::string getDbName() override
     {
         return db_name;
     }
 
 
-int write_granules_batch(const _db_to_save &v)
+int write_granules_batch(const _db_to_save &v) override
 {
     const size_t CHUNK = 10000;
 
@@ -141,7 +150,7 @@ int write_granules_batch(const _db_to_save &v)
         return 0;
     }
 
-    int getGranule(const std::string& k, std::string* v)
+    int getGranule(const std::string& k, std::string* v) override
     {
 
         rocksdb::Status status = db_ptr->Get(rocksdb::ReadOptions(), k, v);

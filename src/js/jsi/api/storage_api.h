@@ -65,7 +65,7 @@ struct JSI_Granule : public Refcountable {
     void flush(Rollback* roll, TIME_mks block_timestamp) {
         if (_deleted) return;
         if (__update_time) cnode->update_time(TIME_mks{__update_time}, roll);
-        if (dirtyD) cnode->setDirty(roll, block_timestamp);
+        // if (dirtyD) cnode->setDirty(roll, block_timestamp);
         for (auto& z : children) z.second->flush(roll, block_timestamp);
     }
 };

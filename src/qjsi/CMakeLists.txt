@@ -1,7 +1,5 @@
-cmake_minimum_required(VERSION 4.2)
+#cmake_minimum_required(VERSION 4.2)
 project(quickjs)
-
-file(STRINGS VERSION version)
 
 set(quickjsi_src 
   cutils_i.c
@@ -11,7 +9,9 @@ set(quickjsi_src
 )
 add_subdirectory(test)
 
-set(quickjsi_def CONFIG_VERSION="${version}" _GNU_SOURCE CONFIG_BIGNUM)
+# Do not pass the local VERSION marker through compiler definitions:
+# it may contain characters that are invalid on a preprocessor command line.
+set(quickjsi_def _GNU_SOURCE CONFIG_BIGNUM)
 
 add_library(quickjs-i ${quickjsi_src})
 target_compile_definitions(quickjs-i PRIVATE ${quickjsi_def} )

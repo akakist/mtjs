@@ -21,8 +21,9 @@ set(linuxlib     mariadbclient )
 endif()
 
 if(APPLE)
+set(linuxlib     ${MARIADB_LIBRARIES} )
 target_link_libraries(mtjs   node-serviceS  node4-serviceS    node6-serviceS  scanservice   contract-api
-rockdb     mtjsmoduleS mtjscommon    mtjsnet mtjsutils bctools  quickjs quickjs-i megatron-main   zsingle megatron-core   ${linuxlib}  yyjson ssh  blst 
+rocksdb    mtjsmoduleS mtjscommon    mtjsnet mtjsutils bctools  quickjs quickjs-i megatron-main   zsingle megatron-core sodium   ${linuxlib}  yyjson  blst
 
 #curl  
 ${OPENSSL_LIBRARIES}

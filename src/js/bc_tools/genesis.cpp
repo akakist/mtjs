@@ -65,9 +65,7 @@ void init_genesis(Cellable* root, IDatabase* db)
     // ▲▲▲
 
     auto nl=cells::getNodeListOrCreate(root,db,NULL,time0);
-    nl->setDirty(NULL,time0);
     auto votes=cells::getVotesOrCreate(root,db,NULL,time0);
-    votes->setDirty(NULL,time0);
 
     auto st2 = cells::getStateOrCreate(root,db,NULL,time0);
     st2->chain_id      = j.value("chain_id", (int64_t)1);
@@ -79,7 +77,6 @@ void init_genesis(Cellable* root, IDatabase* db)
     st2->contract_count = 0;
     st2->tx_count      = 0;
     st2->block_height  = 0;
-    st2->setDirty(NULL,time0);
 
     auto v = cells::getValuesOrCreate(root, db, NULL,time0);
     if (j.contains("params") && j["params"].is_object()) {
@@ -99,7 +96,6 @@ void init_genesis(Cellable* root, IDatabase* db)
             v->emitters_bin.insert(addr);
         }
     }
-    v->setDirty(NULL,time0);
 
     if (j.contains("users") && j["users"].is_array()) {
         for (auto& u : j["users"]) {
@@ -129,7 +125,6 @@ void init_genesis(Cellable* root, IDatabase* db)
                     if (!id) throw CommonError("genesis: users.%s addKey failed", label.c_str());
                 }
             }
-            ua->setDirty(NULL,time0);
 
             // ▼▼▼ INSERT: activity для адреса (ttl = 0, вечный)
             cells::getActivityOrCreate(root, db, ua->getDbId(), {}, TTL_sec{}, NULL, time0);
@@ -138,7 +133,6 @@ void init_genesis(Cellable* root, IDatabase* db)
             st2->total_supply += i128(bal);
         }
     }
-    st2->setDirty(NULL,time0);
 
     if (j.contains("nodes") && j["nodes"].is_array()) {
         for (auto& n : j["nodes"]) {
@@ -172,7 +166,6 @@ void init_genesis(Cellable* root, IDatabase* db)
             if (n.contains("stake") && n["stake"].is_string())
                 stake = std::stoll(n["stake"].get<std::string>());
             nn->add_stake(owner, stake);
-            nn->setDirty(NULL,time0);
 
             // ▼▼▼ INSERT: activity для ноды (ttl = 0, вечный)
             cells::getActivityOrCreate(root, db, nn->getDbId(), {}, TTL_sec{}, NULL, time0);
@@ -181,7 +174,6 @@ void init_genesis(Cellable* root, IDatabase* db)
             st2->total_stake += i128(stake);
         }
     }
-    st2->setDirty(NULL,time0);
     _db_to_save dbz;
     proceed_merkle_on_transaction_pool_hashers(root,dbz);
     db->write_granules_batch(dbz);

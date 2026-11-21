@@ -24,7 +24,7 @@ struct data_base : public Refcountable
     ~data_base()
     {
     }
-    void setDirty(Rollback* roll, TIME_mks block_timestamp);
+    // void setDirty(Rollback* roll, TIME_mks block_timestamp);
     void snapshot(Rollback* roll);
     ;
     size_t size_() const
@@ -72,8 +72,8 @@ struct Cellable: public Refcountable
 
     TIME_mks last_block_timestamp;   // момент последнего изменения ячейки
 
-    std::map<std::string,THASH_id > children_hashes_mx;
-    std::map<std::string, REF_getter<Cellable>> children_ptrs_mx;
+    std::map<std::string,THASH_id > children_hashes;
+    std::map<std::string, REF_getter<Cellable>> children_ptrs;
 
     /// @brief выставляется в конструкторе мутекс не нужен
     unsigned int payload_ctor_idx=hsh::HSH_END;
@@ -91,17 +91,12 @@ public:
     {
         size_t sz=0;
         sz+=m_id.size();
-        for(auto& z:children_hashes_mx)
+        for(auto& z:children_hashes)
         {
             sz+=z.first.size();
             sz+=z.second.container.size();
         }
         return sz;
-    }
-    void snapshot_1_only(Rollback* r)
-    {
-        if (r && !r->data.count(this))
-            r->data[this] = getBuffer_mx();
     }
     // 1) Снапшот для отката — СТРОГО до мутации. Идемпотентно (первый вызов).
     void snapshot(Rollback* r, const std::set<REF_getter<Cellable>>& exclude)
@@ -114,13 +109,6 @@ public:
     // 2) Пометить dirty + поднять ts + прокинуть родителям. Рекурсия идёт через
     //    setDirty__ — иначе у предков не снимется снапшот, а их children_hashes
     //    тоже меняются при пересчёте и должны откатываться.
-    void markDirty_1_only(TIME_mks block_timestamp)
-    {
-        is_dirty = true;
-        if (block_timestamp > last_block_timestamp)
-            last_block_timestamp = block_timestamp;
-
-    }
     void markDirty(TIME_mks block_timestamp)
     {
         is_dirty = true;
@@ -129,12 +117,6 @@ public:
         if (parent)
             parent->markDirty(block_timestamp);
     }
-    // Обратносовместимая обёртка: snapshot (до мутации) + markDirty.
-    // void setDirty__(Rollback* r, TIME_mks block_timestamp)
-    // {
-    //     snapshot(r);
-    //     markDirty(r, block_timestamp);
-    // }
 
     std::string getDbId() const;
     void clear(const std::string &id)
@@ -154,8 +136,8 @@ public:
         Cellable *r=this;
         while(v.size())
         {
-            auto it=r->children_ptrs_mx.find(v[0]);
-            if(it!=r->children_ptrs_mx.end())
+            auto it=r->children_ptrs.find(v[0]);
+            if(it!=r->children_ptrs.end())
             {
                 r=it->second.get();
                 v.pop_front();
@@ -168,7 +150,7 @@ public:
             r=r->parent;
             if(r)
             {
-                r->children_ptrs_mx.erase(id);
+                r->children_ptrs.erase(id);
             }
         }
 
@@ -196,7 +178,7 @@ public:
         o<<payload_ctor_idx;
         o<<last_block_timestamp;
         {
-            o<<children_hashes_mx;
+            o<<children_hashes;
             bool valid=data.valid();
             o<<valid;
             if(valid)
@@ -211,7 +193,7 @@ public:
         in>>payload_ctor_idx;
         in>>last_block_timestamp;
         {
-            in>>children_hashes_mx;
+            in>>children_hashes;
             bool valid;
             in>>valid;
             // Тумбстоун/пустая ячейка: данных нет. Чистим data, иначе у ячейки,
