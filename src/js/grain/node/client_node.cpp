@@ -479,6 +479,15 @@ void Node::Service::resetBlockExpired(const NODE_id &n)
     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(TIMER_BLOCK_EXPIRED,toRef(n.container),NULL,5., this));
 }
 
+bool Node::Service::PingREQ(const MsgData::PingREQ *r, const NODE_id &src_node, const route_t &route)
+{
+    // безусловный liveness-пинг: отвечаем всегда (даже при sync) — просто «я жив»
+    REF_getter<MsgData::PingRSP> rsp = new MsgData::PingRSP;
+    rsp->hb = r->hb;
+    pass_NodeMsgRSP(rsp.get(), route);
+    return true;
+}
+
 bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node, const route_t &route)
 {
     MUTEX_INSPECTOR;

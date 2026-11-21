@@ -4,6 +4,8 @@
 #include "md/md_HeartBeatRSP.h"
 #include "md/md_GetTxREQ.h"
 #include "md/md_GetTxRSP.h"
+#include "md/md_PingREQ.h"
+#include "md/md_PingRSP.h"
 #include "md/md_ValidateBlockREQ.h"
 #include "md/md_ValidateBlockRSP.h"
 #include "md/md_BlockAcceptedREQ.h"
@@ -81,4 +83,6 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetGranuleRSP, MsgData::GetGranuleRSP::construct);    
     registerMsg(msgid::ScanREQ, MsgData::ScanREQ::construct);
     registerMsg(msgid::ScanRSP, MsgData::ScanRSP::construct);
+    registerMsg(msgid::PingREQ, MsgData::PingREQ::construct);
+    registerMsg(msgid::PingRSP, MsgData::PingRSP::construct);
 }

@@ -26,6 +26,8 @@
 #include "md/md_ValidateBlockREQ.h"
 #include "md/md_GetTxREQ.h"
 #include "md/md_GetTxRSP.h"
+#include "md/md_PingREQ.h"
+#include "md/md_PingRSP.h"
 #include "md/md_BlockAcceptedREQ.h"
 #include "md/md_BlockDiffValidateREQ.h"
 #include "md/md_BlockDiffValidateRSP.h"
@@ -116,6 +118,8 @@ namespace Node
         // bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
         bool GetTxREQ(const MsgData::GetTxREQ* r, const NODE_id & src_node, const route_t& route);
         bool GetTxRSP(const MsgData::GetTxRSP* r, const NODE_id & src_node, const route_t& route);
+        bool PingREQ(const MsgData::PingREQ* r, const NODE_id & src_node, const route_t& route);
+        bool PingRSP(const MsgData::PingRSP* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockREQ(const MsgData::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockRSP(const MsgData::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
         bool BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route);
@@ -153,6 +157,8 @@ namespace Node
 
             std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTxRSP> > >GetTxRSP_m; /// для подсчета ответивших нод
             bool is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* mf);
+            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::PingRSP> > >PingRSP_m;
+            bool is_PingRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db);
 
 
             std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
@@ -162,6 +168,10 @@ namespace Node
             bool is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db);
 
             std::map<THASH_id, REF_getter<MsgData::BlockDiffValidateREQ> > blockDiffValidateREQ_2;
+            std::set<NODE_id> alive;   // ответившие на GetTxREQ (живой сет) — фильтр рассылки блока
+            int64_t last_tx_request_us = 0;   // троттлинг пинга GetTxREQ (раз в 0.5с)
+            bool ping_sent = false;   // пинг высылается один раз на блок
+            int64_t last_ping_us = 0;   // ретрай пинга раз в 0.5с пока нет кворума
 
         };
         _db_to_save db_to_save_Z;

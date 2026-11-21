@@ -318,6 +318,17 @@ std::vector<REF_getter<MsgData::TX>> Node::Service::collectTx()
     return out;
 }
 
+static TreeNode filter_tree(const std::vector<NodeElement>& vne, const std::set<NODE_id>& alive)
+{
+    std::vector<NodeElement> filtered;
+    for (auto& n : vne)
+        if (alive.count(n.name))
+            filtered.push_back(n);
+    if (filtered.empty())
+        filtered = vne;   // все мертвы — buildTree требует непустой
+    return buildTree(filtered);
+}
+
 void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
 {
     MUTEX_INSPECTOR;
@@ -363,7 +374,8 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
     {
         // return;
     }
-    broadcast_MsgEvent_via_broadcaster(vb.get(), mf->tree_committe);
+    TreeNode comm_tree = filter_tree(mf->committee_vne, bt.alive);
+    broadcast_MsgEvent_via_broadcaster(vb.get(), comm_tree);
 }
 
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
@@ -426,11 +438,32 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         auto cl=current_leader();
         if(cl.valid() && cl->getName()==this_node_name)
         {
+            auto &bt = l_blocks[prev_root_hash_Z()];
+            int64_t now_us = iUtils->getNow().v;
             REF_getter<MsgData::HeartBeatREQ> h=new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                         epoch_current(),
                         this_node_name, iUtils->getNow().v, 0);
+            auto hb_hash = h->getHash();
             auto mf=getMetaFull();
-            do_request_for_transactions(h.get(),mf);
+
+            bool ping_quorum = bt.is_PingRSP_m_quorum(hb_hash, root.get(), db_state.get());
+
+            // Стадия 1: пинг (первый + ретрай раз в 0.5с пока нет кворума 67%)
+            if (!bt.ping_sent || (!ping_quorum && now_us - bt.last_ping_us >= 500000))
+            {
+                bt.ping_sent = true;
+                bt.last_ping_us = now_us;
+                REF_getter<MsgData::PingREQ> ping = new MsgData::PingREQ();
+                ping->hb = h;
+                broadcast_MsgEvent_via_broadcaster(ping.get(), mf->tree_all_nodes);
+            }
+
+            // Стадия 2: GetTx только после кворума пинга (к живым, throttle 0.5с)
+            if (ping_quorum && now_us - bt.last_tx_request_us >= 500000)
+            {
+                bt.last_tx_request_us = now_us;
+                do_request_for_transactions(h.get(), mf);
+            }
         }
         return true;
     }
@@ -446,8 +479,13 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
         if(!hb)
         throw CommonError("if(!hb)");
-        if(bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
+        if(bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get())
+           && bt.is_PingRSP_m_quorum(hb_hash, root.get(), db_state.get()))
         {
+            // финализируем живой сет из ответивших на пинг
+            bt.alive.clear();
+            for (auto& z : bt.PingRSP_m[hb_hash])
+                bt.alive.insert(z.first);
             // if()
             do_start_block(hb);
             logNode("do_start_block();");
@@ -475,7 +513,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         {
 
             auto mf=getMetaFull();
-            broadcast_MsgEvent_via_broadcaster(r,mf->tree_all_nodes);
+            TreeNode all_tree = filter_tree(mf->vne, bt.alive);
+            broadcast_MsgEvent_via_broadcaster(r, all_tree);
             bt.BlockDiffValidateRSP_m[h].clear();
 
 
@@ -493,7 +532,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         auto h=r->blockAcceptedREQ->blockInfo->getHash();
         if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
         {
-            broadcast_MsgEvent_via_broadcaster(r,mf->tree_all_nodes);
+            TreeNode all_tree = filter_tree(mf->vne, bt.alive);
+            broadcast_MsgEvent_via_broadcaster(r, all_tree);
             bt.ValidateBlockRSP_m[h].clear();
 
         }
@@ -730,6 +770,8 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
         {
         case msgid::GetTxREQ:
             return GetTxREQ(static_cast<const MsgData::GetTxREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::PingREQ:
+            return PingREQ(static_cast<const MsgData::PingREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::ValidateBlockREQ:
             // last_activity_time=iUtils->getNow().v;
             return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
@@ -804,6 +846,8 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
     {
     case msgid::GetTxRSP:
         return GetTxRSP(static_cast<const MsgData::GetTxRSP *>(ee.get()), m->node_signer, m->route);
+    case msgid::PingRSP:
+        return PingRSP(static_cast<const MsgData::PingRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ValidateBlockRSP:
         return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::BlockDiffValidateRSP:
@@ -947,7 +991,10 @@ void Node::Service::do_request_for_transactions(MsgData::HeartBeatREQ* hb, const
     rt->ip=n->get_ip();
     // li.request_for_transactions_time = iUtils->getNow().v;
 
-    broadcast_MsgEvent_via_broadcaster(rt.get(),meta->tree_all_nodes);
+    // GetTx только к живым (после стадии пинга bt.alive собран)
+    auto &bt = l_blocks[prev_root_hash_Z()];
+    TreeNode tx_tree = filter_tree(meta->vne, bt.alive);
+    broadcast_MsgEvent_via_broadcaster(rt.get(), tx_tree);
 }
 
 THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
@@ -1785,6 +1832,29 @@ bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& 
         return true;
     return false;
 }
+bool Node::Service::block_leader::is_PingRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db)
+{
+    int64_t fullstakeVal = 0;
+    auto ls=cells::getAllNodesConst(r, db);
+    for (auto &z : ls)
+    {
+        if(z->isEnabled())
+            fullstakeVal += z->get_full_stake();
+    }
+    int64_t stakeVal = 0;
+    auto &mm=PingRSP_m[h];
+    for (auto &z : mm)
+    {
+        auto n=cells::getNodeNoCreateConst(r, db,z.first);
+        if(!n.valid())
+            throw CommonError("if(!n.valid()) $p555");
+        stakeVal += n->get_full_stake();
+    }
+    if ((stakeVal * 100) / fullstakeVal > QUORUM )
+        return true;
+    return false;
+}
+
 bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable*r, IDatabase* db)
 {
     int64_t fullstakeVal = 0;

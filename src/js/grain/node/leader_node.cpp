@@ -11,6 +11,19 @@
 #include <vector>
 #include "md/md_BlockDiffValidateREQ.h"
 
+bool Node::Service::PingRSP(const MsgData::PingRSP *r, const NODE_id &src_node, const route_t &route)
+{
+    auto &bt = l_blocks[prev_root_hash_Z()];
+    auto h = r->hb->getHash();
+    bt.PingRSP_m[h].insert_or_assign(src_node, r);
+    if (bt.is_PingRSP_m_quorum(h, root.get(), db_state.get()))
+    {
+        // живой сет собран (67% всего стейка) — перепроверяем оба кворума
+        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTxRSP, toRef(h.container), r->hb.get(), 0.05, this));
+    }
+    return true;
+}
+
 bool Node::Service::GetTxRSP(const MsgData::GetTxRSP *r, const NODE_id &src_node, const route_t &route)
 {
     XTRY;

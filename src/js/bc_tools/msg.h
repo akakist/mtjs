@@ -88,7 +88,8 @@ namespace msgid
         GetAddressInfoREQ=31, GetAddressInfoRSP=32,
         CallViewREQ=33, CallViewRSP=34,
         GetGranuleREQ=35, GetGranuleRSP=36,
-        ScanREQ=37, ScanRSP=38,    
+        ScanREQ=37, ScanRSP=38,
+        PingREQ=39, PingRSP=40,
     };
 
 }
