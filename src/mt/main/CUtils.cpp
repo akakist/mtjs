@@ -650,6 +650,17 @@ int64_t CUtils::geb_params_int64_t(std::deque<std::string> &tokens, const std::s
 }
 
 
+// Тестовый сдвиг часов ноды (мкс): MTJS_CLOCK_LAG_US=<signed int64>.
+// Положительный — нода «впереди», отрицательный — «отстаёт». Читается один раз.
+static int64_t mtjs_clock_lag_us()
+{
+    static int64_t lag = []() {
+        const char* e = getenv("MTJS_CLOCK_LAG_US");
+        return e ? (int64_t)atoll(e) : (int64_t)0;
+    }();
+    return lag;
+}
+
 TIME_mks CUtils::getNow()
 {
 
@@ -667,7 +678,7 @@ TIME_mks CUtils::getNow()
 
     now=_1;
     now+=_2;
-    return TIME_mks{(int64_t)now};
+    return TIME_mks{(int64_t)now + mtjs_clock_lag_us()};
 #else
     timeb tb;
     ftime(&tb);
