@@ -68,6 +68,7 @@ namespace Node
         TIMER_PERIODIC_CLOCK,
         TIMER_GetTxRSP,
         TIMER_PingRSP,
+        TIMER_GetTxREQ,
         TIMER_GetTxFromLeader,
         ALARM_SYNC_WATCHDOG,
         TIMER_REPORT_MEM,
@@ -170,7 +171,6 @@ namespace Node
 
             std::map<THASH_id, REF_getter<MsgData::BlockDiffValidateREQ> > blockDiffValidateREQ_2;
             std::set<NODE_id> alive;   // ответившие на GetTxREQ (живой сет) — фильтр рассылки блока
-            int64_t last_tx_request_us = 0;   // троттлинг пинга GetTxREQ (раз в 0.5с)
             bool ping_sent = false;   // пинг высылается один раз на блок
             bool ping_done = false;   // пинг-стадия завершена (alive финализирован)
 

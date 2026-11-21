@@ -444,28 +444,18 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         if(cl.valid() && cl->getName()==this_node_name)
         {
             auto &bt = l_blocks[prev_root_hash_Z()];
-            int64_t now_us = iUtils->getNow().v;
             REF_getter<MsgData::HeartBeatREQ> h=new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                         epoch_current(),
                         this_node_name, iUtils->getNow().v, 0);
             auto mf=getMetaFull();
 
-            // Инициировать пинг-стадию один раз за раунд — дальше её ведёт TIMER_PingRSP
+            // пинг один раз за раунд — дальше цепочку ведут PingRSP -> TIMER_PingRSP
             if (!bt.ping_sent)
             {
                 bt.ping_sent = true;
                 REF_getter<MsgData::PingREQ> ping = new MsgData::PingREQ();
                 ping->hb = h;
                 broadcast_MsgEvent_via_broadcaster(ping.get(), mf->tree_all_nodes);
-                sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_PingRSP,
-                          toRef(h->getHash().container), h.get(), 0.5, this));
-            }
-
-            // GetTx-стадия: редкий фолбэк 0.5с, только после завершения пинга
-            if (bt.ping_done && now_us - bt.last_tx_request_us >= 500000)
-            {
-                bt.last_tx_request_us = now_us;
-                do_request_for_transactions(h.get(), mf);
             }
         }
         return true;
@@ -483,25 +473,42 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         if(!hb)
         throw CommonError("if(!hb)");
 
-        if(!bt.is_PingRSP_m_quorum(hb_hash, root.get(), db_state.get()))
+        // пинг финиширован: финализируем живой сет и переходим к GetTx
+        bt.alive.clear();
+        for (auto& z : bt.PingRSP_m[hb_hash])
+            bt.alive.insert(z.first);
+        bt.ping_done = true;
+        logNode("ping done: alive=%zu", bt.alive.size());
+
+        // стартуем GetTx: первый GetTxREQ + аларм ре-арма
+        auto mf=getMetaFull();
+        do_request_for_transactions(hb, mf);
+        sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTxREQ,
+                  toRef(hb_hash.container), hb, 0.5, this));
+        return true;
+    }
+    case timers::TIMER_GetTxREQ:
+    {
+        if(sync_in_progress)
         {
-            // кворума нет — ретрай пинга
+            return true;
+        }
+        auto &bt = l_blocks[prev_root_hash_Z()];
+        THASH_id hb_hash;
+        hb_hash.container=e->data->container;
+        MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
+        if(!hb)
+        throw CommonError("if(!hb)");
+
+        if(!bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
+        {
+            // кворума tx нет — ре-броадкаст GetTxREQ и ре-арм
             auto mf=getMetaFull();
-            REF_getter<MsgData::PingREQ> ping = new MsgData::PingREQ();
-            ping->hb = hb;
-            broadcast_MsgEvent_via_broadcaster(ping.get(), mf->tree_all_nodes);
-            sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_PingRSP,
+            do_request_for_transactions(hb, mf);
+            sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(timers::TIMER_GetTxREQ,
                       toRef(hb_hash.container), hb, 0.5, this));
         }
-        else
-        {
-            // кворум есть — финализируем живой сет, пинг-стадия завершена
-            bt.alive.clear();
-            for (auto& z : bt.PingRSP_m[hb_hash])
-                bt.alive.insert(z.first);
-            bt.ping_done = true;
-            logNode("ping done: alive=%zu", bt.alive.size());
-        }
+        // кворум есть — больше не шлём; дальше только финальное окно TIMER_GetTxRSP
         return true;
     }
     case timers::TIMER_GetTxRSP:
