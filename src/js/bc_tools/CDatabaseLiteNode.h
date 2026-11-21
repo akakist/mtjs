@@ -33,7 +33,16 @@ struct CDatabaseLiteNode : public IDatabase {
         // RocksDB open (как раньше)
         rocksdb::Options options;
         options.create_if_missing = true;
-        rocksdb::Status status = rocksdb::DB::Open(options, db_name, &db_ptr);
+        rocksdb::Status status;
+        // RocksDB 10 changed DB::Open to accept std::unique_ptr<DB>*.
+        // Keep the raw member for compatibility with the existing code.
+#if ROCKSDB_MAJOR >= 10
+        std::unique_ptr<rocksdb::DB> opened_db;
+        status = rocksdb::DB::Open(options, db_name, &opened_db);
+        db_ptr = opened_db.release();
+#else
+        status = rocksdb::DB::Open(options, db_name, &db_ptr);
+#endif
         if (!status.ok()) { std::cerr << "CDatabaseLiteNode: " << status.ToString() << std::endl; exit(1); }
     }
     ~CDatabaseLiteNode() { if (db_ptr) { delete db_ptr; db_ptr = nullptr; } }

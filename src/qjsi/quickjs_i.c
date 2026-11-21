@@ -7807,7 +7807,7 @@ void JSI_ComputeMemoryUsage(JSIRuntime *rt, JSIMemoryUsage *s)
 
 void JSI_DumpMemoryUsage(FILE *fp, const JSIMemoryUsage *s, JSIRuntime *rt)
 {
-    fprintf(fp, "QuickJS memory usage -- " CONFIG_VERSION " version, %d-bit, malloc limit: %"PRId64"\n\n",
+    fprintf(fp, "QuickJS memory usage -- %d-bit, malloc limit: %"PRId64"\n\n",
             (int)sizeof(void *) * 8, s->malloc_limit);
 #if 1
     if (rt) {

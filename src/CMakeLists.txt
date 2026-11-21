@@ -1,6 +1,6 @@
 
 
-cmake_minimum_required (VERSION 3.16)
+cmake_minimum_required (VERSION 3.2)
 
 project (MTJS)
 
@@ -56,6 +56,16 @@ find_package(yyjson REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(PostgreSQL REQUIRED)
 
+# Locate libsodium through pkg-config. This is required for Homebrew prefixes
+# on macOS and works unchanged with system packages on Linux.
+pkg_check_modules(SODIUM REQUIRED libsodium)
+include_directories(${SODIUM_INCLUDE_DIRS})
+link_directories(${SODIUM_LIBRARY_DIRS})
+
+pkg_check_modules(ROCKSDB_PKG REQUIRED rocksdb)
+include_directories(${ROCKSDB_PKG_INCLUDE_DIRS})
+link_directories(${ROCKSDB_PKG_LIBRARY_DIRS})
+
 
 
 pkg_search_module(nlohmann_json REQUIRED nlohmann_json)
@@ -90,6 +100,10 @@ message(STATUS "OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES}" )
 message(STATUS "OPENSSL_INCLUDE_DIR ${OPENSSL_INCLUDE_DIR}" )
 message(STATUS "OPENSSL_LIBRARY_DIR ${OPENSSL_LIBRARY_DIR}" )
     include_directories(${OPENSSL_INCLUDE_DIR})
+    # Some legacy targets still link OpenSSL by bare "crypto" and "ssl" names.
+    # Add the detected library directory so those links work on macOS too.
+    get_filename_component(OPENSSL_LIBRARY_DIR "${OPENSSL_CRYPTO_LIBRARY}" DIRECTORY)
+    link_directories("${OPENSSL_LIBRARY_DIR}")
 endif()
 
 if(NOT APPLE)
@@ -119,7 +133,9 @@ endif()
 
 include_directories(. qjsi)
 
-include_directories(megatron mt/main mt/corelib)
+# Keep only one copy of core headers in the search path. The megatron
+# directory duplicates mt and causes redefinitions on macOS/clang.
+include_directories(mt/main mt/corelib)
 
 OPTION(MT_CORE_SERVICES_SINGLE_PLUGING "Build apps/core-plugins - all core plugins in one file" ON)
 
@@ -135,18 +151,29 @@ lib/cpp-jwt/include
 
 
 if(APPLE)
-    set(ENV{PKG_CONFIG_PATH} "/usr/local/mysql/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
     pkg_check_modules(OPENSSL REQUIRED openssl)
-    
-    pkg_check_modules(MARIADB REQUIRED libmariadb)
-    if(MARIADB_FOUND)
-        message(STATUS "Found MariaDB via pkg-config!")
-        include_directories(${MARIADB_INCLUDE_DIRS})
-        link_directories(${MARIADB_LIBRARY_DIRS})
-    else()
-        message(WARNING "MariaDB pkg-config file not found. Will try manual fallback paths.")
+
+    # The MariaDB server package provides pkg-config metadata with different
+    # headers. Use Connector/C because this project includes <mariadb/mysql.h>.
+    find_path(MARIADB_INCLUDE_DIR mariadb/mysql.h
+        PATHS /opt/homebrew/opt/mariadb-connector-c/include
+              /usr/local/opt/mariadb-connector-c/include
+    )
+    unset(MARIADB_LIBRARY CACHE)
+    find_library(MARIADB_LIBRARY NAMES mariadb
+        PATHS /opt/homebrew/opt/mariadb-connector-c/lib
+              /usr/local/opt/mariadb-connector-c/lib
+        NO_DEFAULT_PATH
+    )
+    if(NOT MARIADB_INCLUDE_DIR OR NOT MARIADB_LIBRARY)
+        message(FATAL_ERROR "MariaDB Connector/C with mariadb/mysql.h was not found")
     endif()
-    
+
+    get_filename_component(MARIADB_LIBRARY_DIR "${MARIADB_LIBRARY}" DIRECTORY)
+    include_directories("${MARIADB_INCLUDE_DIR}")
+    link_directories("${MARIADB_LIBRARY_DIR}")
+    set(MARIADB_LIBRARIES "${MARIADB_LIBRARY}")
+
 include_directories(
 )
 link_directories( qjsi quickjs)

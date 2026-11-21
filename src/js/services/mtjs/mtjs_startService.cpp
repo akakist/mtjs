@@ -107,7 +107,12 @@ static void *js_trace_realloc(JSMallocState *s, void *ptr, size_t size)
     }
     return ptr2;
 }
+// macOS provides malloc_size in malloc/malloc.h instead of malloc.h.
+#if defined(__APPLE__)
+#include <malloc/malloc.h>
+#else
 #include <malloc.h>
+#endif
 static size_t js_trace_malloc_usable_size(const void *ptr)
 {
 #if defined(__APPLE__)
