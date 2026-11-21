@@ -321,35 +321,32 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             }
             std::set<REF_getter<data_base>> deleted_granules;
 
-            CallContext call_ctx;
-            call_ctx.contract = cc.get();
-            call_ctx.mode = is_view ? ExecContext::Mode::TxView : ExecContext::Mode::Tx;
-            call_ctx.depth = 0;
-            call_ctx.call_stack = new CallStack;
-            call_ctx.host = host;
+            REF_getter<TxContext> call_ctx = new TxContext(TIME_mks{tx.msg.blockTimestamp});
+            call_ctx->contract = cc.get();
+            call_ctx->call_stack = new CallStack;
+            call_ctx->host = host;
             int64_t test_value = tx.msg.value;
-            call_ctx.value_ptr = &test_value;
-            call_ctx.deleted_granules=& deleted_granules;
-            call_ctx.block_timestamp=tx.msg.blockTimestamp;
+            call_ctx->value_ptr = &test_value;
+            call_ctx->deleted_granules = &deleted_granules;
 
             void* saved_opaque = JSI_GetContextOpaque(cc->ctx);
-            JSI_SetContextOpaque(cc->ctx, &call_ctx);
+            JSI_SetContextOpaque(cc->ctx, call_ctx.get());
             FeesSnapshot fees;
             TestMsgSource msg_src(tx.msg);
             CONTRACT_id caller;
             JSIValue result;
             if (is_view) {
                 result = cc->call_view(NULL,cmd.method, cmd.params, &msg_src,
-                                                call_ctx.call_stack, host, 5, call_ctx.block_timestamp);
+                                                call_ctx->call_stack, host, 5, call_ctx->now);
             } else {
                 result = cc->call_method(NULL, cmd.method, cmd.params, &msg_src,
-                                                  call_ctx.call_stack, host, NULL,
-                                                  caller, &fees, &deleted_granules,TIME_mks{});
+                                                  call_ctx->call_stack, host, NULL,
+                                                  caller, &fees, &deleted_granules, call_ctx->now);
             }
             JSI_SetContextOpaque(cc->ctx, saved_opaque);
             
-            std::vector<jsiEvent> cmd_emits = call_ctx.emits;
-            call_ctx.emits.clear();
+            std::vector<jsiEvent> cmd_emits = call_ctx->emits;
+            call_ctx->emits.clear();
 
             if (JSI_IsException(result)) {
                 JSI_FreeValue(cc->ctx, result);

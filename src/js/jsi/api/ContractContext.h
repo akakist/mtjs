@@ -73,8 +73,8 @@ struct ContractContext : public Refcountable {
                              const nlohmann::json& params,
                              CallStack* call_stack,
                               ContractHost* host,
-                             TIME_mks block_timestamp,
-                             TIME_mks now);
+                             TIME_mks now,
+                             TIME_mks block_timestamp);
 };
 
 

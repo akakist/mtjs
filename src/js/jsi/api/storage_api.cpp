@@ -216,7 +216,7 @@ static JSIValue jsg_set(JSIContext* ctx, JSIValueConst this_val, int argc, JSIVa
 
     std::string s = serialize_value(ctx, argv[0]);
     if (!is_serializable(s)) return JSI_ThrowTypeError(ctx, "set: cannot serialize");
-    w->gw->cnode->set(s, c->block_timestamp);
+    w->gw->cnode->set(s, c->now);
     w->gw->do_update_time(c->msg_source->get_blockTimestamp());
     w->gw->setDirtyD();
     return JSI_UNDEFINED;

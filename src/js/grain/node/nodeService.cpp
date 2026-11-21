@@ -1352,7 +1352,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 CallStack call_stack;
 
                 // внешний CallContext — чтобы call_method докладывал emits в него (parent->emits)
-                CallContext ext_ctx;
+                TxContext ext_ctx(TIME_mks{});
                 ext_ctx.contract = cc.get();
                 ext_ctx.host = contractHost.get();
                 ext_ctx.call_stack = &call_stack;

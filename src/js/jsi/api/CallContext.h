@@ -4,6 +4,7 @@
 #include "Rollback.h"
 #include "jsiEvent.h"
 #include <vector>
+#include <functional>
 #include "IMsgSource.h"
 #include "FeesSnapshot.h"
 #include "db_to_save.h"
@@ -11,42 +12,50 @@
 #include "storage_api.h"
 #include "cells.h"
 #include "ContractHost.h"
+#include "CallStack.h"
 struct ContractContext;
-struct CallStack;
 struct ContractHost;
 
 // ============================================================
 // Три режима исполнения контракта:
-//   method  (tx)      — мутации, msg, газ, roll     → TxContext
-//   view    (tx)      — только чтение, msg родителя  → TxViewContext
-//   query   (reader)  — только чтение, now на входе  → QueryContext
-// Общее (root, contract, host, call_stack, msg, block_timestamp) — в ExecContext.
+//   Tx      (tx)      — мутации, msg, газ, roll
+//   TxView  (view)    — только чтение, msg родителя
+//   Query   (query)   — только чтение, now + esi на входе
+// Общее — ExecContext (mode, now, contract, call_stack, host, msg_source, caller, root).
+// now — ЕДИНОЕ время: tx/view = block_timestamp, query = wall-clock (сэмпл один раз).
 // ============================================================
-struct ExecContext {
+struct ExecContext : public Refcountable
+{
     enum class Mode { Tx, TxView, Query };
-    Mode mode = Mode::Tx;               // конкретный режим проставляет конструктор места
+    const Mode mode;
+    const TIME_mks now;                  // ЕДИНОЕ время, ставит конструктор
+
     ContractContext* contract = nullptr;
-    int depth = 0;
     CallStack* call_stack = nullptr;
     ContractHost* host = nullptr;
-    IMsgSource* msg_source = nullptr;   // view наследует родительский; query — nullptr
+    IMsgSource* msg_source = nullptr;    // view наследует родительский; query — nullptr
     CONTRACT_id caller;
-    TIME_mks block_timestamp;           // время чейна для method/view
     Cellable* root = nullptr;
-    std::map<std::string, REF_getter<JSI_Granule>> JSI_Granule_children;  // живёт и во вью
+    std::map<std::string, REF_getter<JSI_Granule>> JSI_Granule_children;
+
+    ExecContext(Mode m, TIME_mks _now) : Refcountable("ExecContext"), mode(m), now(_now) {}
+    int depth() const { return (int)call_stack->call_stack.size() - 1; }
 };
 
 /// method в транзакции: можно писать
-struct TxContext : ExecContext {
+struct TxContext : ExecContext
+{
     Rollback* roll = nullptr;
     std::vector<jsiEvent> emits;
-    int64_t* value_ptr = nullptr;   // текущий value (нода: &t.value; test_runner: &test_value)
+    int64_t* value_ptr = nullptr;        // текущий value (нода: &t.value; test_runner: &test_value)
     FeesSnapshot* fees = nullptr;
     std::set<REF_getter<data_base>>* deleted_granules = nullptr;
 
+    TxContext(TIME_mks _now) : ExecContext(Mode::Tx, _now) {}
+
     void flush(Cellable* root, const REF_getter<JSI_Granule>& g)
     {
-        for (auto& z : JSI_Granule_children) z.second->flush(roll, block_timestamp);
+        for (auto& z : JSI_Granule_children) z.second->flush(roll, now);
         auto max_time = 0;
         for (auto& z : JSI_Granule_children)
             if (z.second->__update_time > max_time) max_time = z.second->__update_time;
@@ -55,14 +64,20 @@ struct TxContext : ExecContext {
 };
 
 /// view, вызванный из tx: только чтение, msg и время — от родителя
-struct TxViewContext : ExecContext {};
-
-/// query из reader: только чтение, now сэмплируется на входе
-struct QueryContext : ExecContext {
-    TIME_mks now;
+struct TxViewContext : ExecContext
+{
+    TxViewContext(TIME_mks _now) : ExecContext(Mode::TxView, _now) {}
 };
 
-/// временный алиас: существующий代码 продолжает работать, пока переводим пути
+/// query из reader: только чтение, now (wall-clock) сэмплируется на входе,
+/// block_timestamp — время чейна (для query.blockTimestamp).
+struct QueryContext : ExecContext
+{
+    const TIME_mks block_timestamp;
+
+    QueryContext(TIME_mks _now, TIME_mks _chain)
+        : ExecContext(Mode::Query, _now), block_timestamp(_chain) {}
+};
+
+/// временный алиас: существующий код продолжает работать, пока переводим пути
 using CallContext = TxContext;
-
-
