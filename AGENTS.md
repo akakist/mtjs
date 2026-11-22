@@ -12,6 +12,17 @@
 - Правки — только через scp/ssh на билд-хост; локальной сборки нет.
 - Каждый тест с гранулами гонять на свежем кластере (иначе «x exists» из прошлого прогона).
 
+### Тестовые ключи и genesis (НЕ в git — там приватные ключи)
+В репозитории их нет (`.gitignore`). В чистом клоне сгенерировать:
+```bash
+cd ~/mtjs/src/build && make -j16          # даст keygen_genesis
+cd ../js/ts/dist
+~/mtjs/src/build/bin/keygen_genesis --users 5 --nodes 10 \
+  --out-genesis genesis.json --out-keys keys_test.json
+cp genesis.json storage/ && cp keys_test.json storage/ && cp keys_test.json gym/
+```
+`storage/` и `gym/` — копией (не абсолютным симлинком: он машинно-зависимый).
+
 ## Ключевые конвенции
 - `REF_getter<T>` — владение; `new ...`; `Refcountable(const char* nm)` без default-ctor.
 - `TIME_mks` (мкс, поле `.v`), `TTL_mks`, `to_mks()`, `TIME_sec`; `iUtils->getNow()` = wall-clock µs.
