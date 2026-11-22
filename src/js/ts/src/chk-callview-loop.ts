@@ -1,6 +1,11 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
 const node = "127.0.0.1:2301";
 const INTERRUPT_SRC_PATH = "/home/bsr/mtjs/src/js/tsi/dist/contracts/interrupt.js";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
@@ -36,7 +41,7 @@ async function ensureContract(name: string, srcPath: string) {
     // ttl обязателен и для deploy, и для update
     const req = { tx: [{ contract: "root", method, params: { name, src, ttl: 100000 } }],
                   nonce, value: 0, gasLimit: 100000, priority: 0, sender: rootAddr, key_id: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce, () => {});
+    const rsp = await mtjs.tx_submit(node, 1, jstr(req), rootSk, nonce, () => {});
     if (rsp.err) throw new Error(method + ": " + rsp.err_str);
     await mtjs.tx_wait_block(node, rsp.tx_hash, 10);
     const c2 = await mtjs.get_contract(node, name, 3);
@@ -54,7 +59,7 @@ async function main() {
         const t0 = Date.now();
         const r = await mtjs.call_view(node, "interrupt", "loopView", {}, 1, 5);
         const dt = Date.now() - t0;
-        console.log("  result:", JSON.stringify(r), "in", dt, "ms");
+        console.log("  result:", jstr(r), "in", dt, "ms");
         check(r.found === true, "found");
         check(r.error === true, "error=true (interrupted)");
         check(r.result.indexOf("interrupt") >= 0, "result mentions interrupt");

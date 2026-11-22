@@ -1,6 +1,11 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
 const node = "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 
@@ -66,7 +71,7 @@ async function submitAndWait(skVal: string, addr: string, tx: any[], value = 0, 
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), skVal, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), skVal, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
             throw new Error("submit: " + rsp.err_str);
@@ -87,7 +92,7 @@ async function submitAndWaitErr(skVal: string, addr: string, tx: any[], value = 
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), skVal, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), skVal, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
             throw new Error("submit: " + rsp.err_str);
@@ -140,7 +145,7 @@ async function voteUntilApplied(param: string, value: string, ttl: string) {
                 console.log("  [" + vnode + "] vote_failed (ttl_expired) → erase, continue");
                 continue;
             }
-            return { ok: false, err: "vote_failed: " + JSON.stringify(failed), node: vnode, em };
+            return { ok: false, err: "vote_failed: " + jstr(failed), node: vnode, em };
         }
         return { ok: false, err: "no vote_counted/applied/failed", node: vnode, em };
     }
@@ -197,7 +202,7 @@ async function t3_ttl_required() {
     const es = block.errstr(rsp.tx_hash);
     check(typeof es === "string" && es.indexOf("ttl") >= 0, "errstr mentions ttl");
     if (!(typeof es === "string" && es.indexOf("ttl") >= 0)) {
-        console.log("  emits:", JSON.stringify(block.emits(rsp.tx_hash)));
+        console.log("  emits:", jstr(block.emits(rsp.tx_hash)));
     }
 }
 
@@ -217,7 +222,7 @@ async function t4_vote_not_owner() {
     const es = block.errstr(rsp.tx_hash);
     check(typeof es === "string" && es.indexOf("owner") >= 0, "errstr mentions owner");
     if (!(typeof es === "string" && es.indexOf("owner") >= 0)) {
-        console.log("  emits:", JSON.stringify(block.emits(rsp.tx_hash)));
+        console.log("  emits:", jstr(block.emits(rsp.tx_hash)));
     }
 }
 

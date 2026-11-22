@@ -8,6 +8,7 @@
 #include "THASH_id.h"
 #include <cstdint>
 #include "FeesSnapshot.h"
+#include "emit_pack.h"
 struct b_params
 {
     b_params(IDatabase* _db): att_data(new MsgData::attachment_data()),db(_db) {}
@@ -18,26 +19,18 @@ struct b_params
     REF_getter<BlockMetaFull> meta;
     FeesSnapshot fees;
 
-    void emit_command(const THASH_id& txId, int seqId, const std::string& command, const char* fmt, ...)
+    // эмиты — единый бинарный формат (см. emit_pack.h), без JSON-строк
+    void emit_cmd(const THASH_id& txId, int seqId, const std::string& command, const std::string& payload)
     {
-        va_list ap; char str[1024]; va_start(ap, fmt);
-        int len = vsnprintf(str, sizeof(str), fmt, ap);
-        bool overflow = (len >= (int)sizeof(str)); va_end(ap);
-        att_data->blockRoot.children[base16::encode(txId.container)].children[std::to_string(seqId)].emits.push_back({command, overflow?"\"overflow\"":str});
+        att_data->blockRoot.children[base16::encode(txId.container)].children[std::to_string(seqId)].emits.push_back({command, payload});
     }
-    void emit_tx(const THASH_id& txId, const std::string& command, const char* fmt, ...)
+    void emit_tx_cmd(const THASH_id& txId, const std::string& command, const std::string& payload)
     {
-        va_list ap; char str[1024]; va_start(ap, fmt);
-        int len = vsnprintf(str, sizeof(str), fmt, ap);
-        bool overflow = (len >= (int)sizeof(str)); va_end(ap);
-        att_data->blockRoot.children[base16::encode(txId.container)].emits.push_back({command, overflow?"\"overflow\"":str});
+        att_data->blockRoot.children[base16::encode(txId.container)].emits.push_back({command, payload});
     }
-    void emit_block(const std::string& command, const char* fmt, ...)
+    void emit_block_cmd(const std::string& command, const std::string& payload)
     {
-        va_list ap; char str[1024]; va_start(ap, fmt);
-        int len = vsnprintf(str, sizeof(str), fmt, ap);
-        bool overflow = (len >= (int)sizeof(str)); va_end(ap);
-        att_data->blockRoot.emits.push_back({command, overflow?"\"overflow\"":str});
+        att_data->blockRoot.emits.push_back({command, payload});
     }
 };
 

@@ -22,6 +22,8 @@
 
 #include "quickjs.h"
 #include <string>
+extern JSValue mtjs_pack_bytes(JSContext* ctx, JSValueConst val, std::string& out);
+
 #include <vector>
 #include <cstdio>
 #include "msg.h"
@@ -31,6 +33,7 @@
 #include "md/md_GetUserNonceREQ.h"
 #include "md/md_GetContractDataREQ.h"
 #include "md/md_GetNodeInfoREQ.h"
+#include "md/md_GetNodesREQ.h"
 #include "md/md_GetValuesREQ.h"
 #include "md/md_GetContractREQ.h"
 #include "md/md_CallViewREQ.h"
@@ -547,6 +550,39 @@ JSValue js_get_node_info(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     return g_prom.release();
 }
 
+JSValue js_get_nodes(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
+{
+    MUTEX_INSPECTOR;
+    JSScope<10, 10> scope(ctx);
+    mtjs_opaque *op = (mtjs_opaque *)JS_GetContextOpaque(ctx);
+    if (!op) return JS_ThrowInternalError(ctx, "get_nodes: !op");
+    if (argc != 2) return JS_ThrowInternalError(ctx, "get_nodes(node, timeout)");
+    if (!JS_IsString(argv[0])) return JS_ThrowInternalError(ctx, "get_nodes: node must be string");
+    if (!JS_IsNumber(argv[1])) return JS_ThrowInternalError(ctx, "get_nodes: timeout must be number");
+    std::string node_addr = scope.toStdString(argv[0]);
+    double to = 0;
+    if (JS_ToFloat64(ctx, &to, argv[1])) return JS_ThrowInternalError(ctx, "get_nodes: timeout parse error");
+
+    REF_getter<MsgData::GetNodesREQ> rq = new MsgData::GetNodesREQ();
+    auto hash = rq->getHash();
+    op->broadcaster->sendEvent(node_addr, ServiceEnum::Node,
+                               new bcEvent::ClientMsg(rq->getBuffer(), op->listener_->serviceId));
+    op->broadcaster->sendEvent(ServiceEnum::Timer,
+                               new timerEvent::SetAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(hash.container), NULL, to, op->listener_));
+
+    auto &pd = op->node_req_promises[hash.container];
+    pd.ctx = ctx;
+    JSValue prom[2];
+    JSValue promise = JS_NewPromiseCapability(ctx, prom);
+    JSValueGuard g_resolve(ctx, prom[0]);
+    JSValueGuard g_reject(ctx, prom[1]);
+    JSValueGuard g_prom(ctx, promise);
+    if (JS_IsException(promise)) return JS_ThrowInternalError(ctx, "JS_NewPromiseCapability error");
+    pd.resolve = g_resolve;
+    pd.reject = g_reject;
+    return g_prom.release();
+}
+
 JSValue js_get_values(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
 {
     MUTEX_INSPECTOR;
@@ -632,7 +668,7 @@ JSValue js_call_view(JSContext *ctx, JSValueConst this_val, int argc, JSValueCon
     std::string contract  = scope.toStdString(argv[1]);
     std::string view      = scope.toStdString(argv[2]);
     std::string params_json;
-    qjs::convert_js_value_to_json(ctx, argv[3], params_json);
+    mtjs_pack_bytes(ctx, argv[3], params_json);
     int64_t timeout_sec = 5;
     if (JS_ToInt64(ctx, &timeout_sec, argv[4])) return JS_ThrowInternalError(ctx, "call_view: timeout_sec parse error");
     double to = 0;
@@ -940,6 +976,7 @@ void js_register_add_instance(JSContext *ctx, JSValue &mtjs_obj)
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_wait_block",     JS_NewCFunction(ctx, js_tx_wait_block,      "tx_wait_block", 3));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_block",         JS_NewCFunction(ctx, js_get_block,          "get_block", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_node_info",     JS_NewCFunction(ctx, js_get_node_info,      "get_node_info", 3));
+    JS_SetPropertyStr(ctx, mtjs_obj, "get_nodes",         JS_NewCFunction(ctx, js_get_nodes,          "get_nodes", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_values",        JS_NewCFunction(ctx, js_get_values,         "get_values", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "tx_unsubscribe", JS_NewCFunction(ctx, js_tx_unsubscribe, "tx_unsubscribe", 2));
     JS_SetPropertyStr(ctx, mtjs_obj, "get_contract_data", JS_NewCFunction(ctx, js_get_contract_data,  "get_contract_data", 4));

@@ -1,4 +1,5 @@
 #include "mtjs_block.h"
+extern JSValue mtjs_granule_unpack(JSContext* ctx, const std::string& container);
 #include "bcEvent.h"
 #include "md/md_BlockAccepted2REQ.h"
 #include "md/md_attachment_data.h"
@@ -9,7 +10,6 @@
 #include "js_tools.h"
 #include <string>
 #include <vector>
-#include <nlohmann/json.hpp>
 
 JSClassID js_block_class_id = 0;
 
@@ -30,7 +30,7 @@ JSValue emit_node_to_js(JSContext* ctx, const EmitNode& node)
     for (size_t i = 0; i < node.emits.size(); ++i) {
         JSValue emit_arr = JS_NewArray(ctx);
         JS_SetPropertyUint32(ctx, emit_arr, 0, JS_NewString(ctx, node.emits[i].first.c_str()));
-        JSValue data_obj = JS_ParseJSON(ctx, node.emits[i].second.c_str(), node.emits[i].second.size(), "");
+        JSValue data_obj = mtjs_granule_unpack(ctx, node.emits[i].second);
         JS_SetPropertyUint32(ctx, emit_arr, 1, data_obj);
         JS_SetPropertyUint32(ctx, emits_arr, i, emit_arr);
     }
@@ -108,11 +108,16 @@ static JSValue js_block_status(JSContext* ctx, JSValueConst this_val, int argc, 
     const std::string& cmd = n->emits[0].first;
     if (cmd == "error") return JS_NewString(ctx, "err");
     if (cmd == "result") {
-        try {
-            auto j = nlohmann::json::parse(n->emits[0].second);
-            if (j.contains("success") && j["success"].is_boolean())
-                return JS_NewString(ctx, j["success"].get<bool>() ? "ok" : "err");
-        } catch (...) {}
+        // эмиты бинарные (granule_pack), не JSON
+        JSValue v = mtjs_granule_unpack(ctx, n->emits[0].second);
+        if (JS_IsException(v)) { JS_FreeValue(ctx, v); return JS_NewString(ctx, "unknown"); }
+        JSValue succ = JS_GetPropertyStr(ctx, v, "success");
+        JSValue ret = JS_NewString(ctx, "unknown");
+        if (JS_IsBool(succ))
+            ret = JS_NewString(ctx, JS_ToBool(ctx, succ) ? "ok" : "err");
+        JS_FreeValue(ctx, succ);
+        JS_FreeValue(ctx, v);
+        return ret;
     }
     return JS_NewString(ctx, "unknown");
 }
@@ -128,17 +133,21 @@ static JSValue js_block_errstr(JSContext* ctx, JSValueConst this_val, int argc, 
     if (!n || n->emits.empty()) return JS_NULL;
     const std::string& cmd = n->emits[0].first;
     if (cmd != "error" && cmd != "result") return JS_NULL;
-    try {
-        auto j = nlohmann::json::parse(n->emits[0].second);
-        bool is_err = (cmd == "error");
-        if (cmd == "result" && j.contains("success") && j["success"].is_boolean() && !j["success"].get<bool>())
-            is_err = true;
-        if (is_err && j.contains("error") && j["error"].is_string()) {
-            auto s = j["error"].get<std::string>();
-            return JS_NewStringLen(ctx, s.data(), s.size());
-        }
-    } catch (...) {}
-    return JS_NULL;
+    JSValue v = mtjs_granule_unpack(ctx, n->emits[0].second);
+    if (JS_IsException(v)) { JS_FreeValue(ctx, v); return JS_NULL; }
+    bool is_err = (cmd == "error");
+    JSValue succ = JS_GetPropertyStr(ctx, v, "success");
+    if (cmd == "result" && JS_IsBool(succ) && !JS_ToBool(ctx, succ)) is_err = true;
+    JS_FreeValue(ctx, succ);
+    JSValue e = JS_GetPropertyStr(ctx, v, "error");
+    JSValue ret = JS_NULL;
+    if (is_err && JS_IsString(e)) {
+        const char* cs = JS_ToCString(ctx, e);
+        if (cs) { ret = JS_NewString(ctx, cs); JS_FreeCString(ctx, cs); }
+    }
+    JS_FreeValue(ctx, e);
+    JS_FreeValue(ctx, v);
+    return ret;
 }
 static JSValue js_block_emits(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
 {

@@ -13,6 +13,24 @@
 //   MAX_BATCHES     максимум батчей за запуск (0 = без лимита)
 //   GAS_LIMIT       лимит газа на tx (по умолчанию 10000000)
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v) {
+    if (typeof v === "bigint")
+        return Number(v);
+    if (Array.isArray(v))
+        return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o = {};
+        for (const k of Object.keys(v))
+            o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
 const node = std.getenv("NODE") || "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 const RETENTION_DAYS = parseInt(std.getenv("RETENTION_DAYS") || "180", 10);
@@ -53,7 +71,7 @@ async function submitAndWait(tx, gasLimit) {
     for (let attempt = 0; attempt < 5; attempt++) {
         const nonce = await getNonce(rootAddr);
         const req = { tx, nonce: nonce.toString(), value: 0, gasLimit, priority: 0, sender: rootAddr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), rootSk, nonce.toString(), () => { });
         if (rsp.err) {
             if (attempt + 1 < 5) {
                 await new Promise(r => setTimeout(r, 300));
@@ -84,14 +102,7 @@ function compactEmit(block, txHash) {
                 if (e[0] !== "compact")
                     continue;
                 let v = e[1];
-                if (typeof v === "string") {
-                    try {
-                        v = JSON.parse(v);
-                    }
-                    catch (_) {
-                        v = null;
-                    }
-                }
+                v = unBig(v);
                 if (v)
                     out = v;
             }
@@ -135,6 +146,6 @@ async function main() {
     console.log("compact: done, batches=" + batches + ", deleted=" + totalDeleted + ", gen=" + gen);
 }
 main().then(() => std.exit(0)).catch((e) => {
-    console.error("compact: FAILED: " + (e && e.message ? e.message : JSON.stringify(e)));
+    console.error("compact: FAILED: " + (e && e.message ? e.message : jstr(e)));
     std.exit(1);
 });

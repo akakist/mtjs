@@ -3,7 +3,6 @@
 #include "quickjs_i.h"
 #include <map>
 #include <string>
-#include <nlohmann/json.hpp>
 #include "contract_constants.h"
 #include "jsiValueGuard.h"
 #include "jsiMsg.h"
@@ -52,7 +51,7 @@ struct ContractContext : public Refcountable {
 
     // method: msg есть, газ есть, roll есть
     JSIValue call_method(Cellable* root, const std::string& method_name,
-                             const nlohmann::json& params,
+                             const std::string& params_packed,
                              IMsgSource* msg_source,
                              CallStack* call_stack,
                               ContractHost* host, Rollback* roll,
@@ -62,7 +61,7 @@ struct ContractContext : public Refcountable {
     // view: msg НЕТ, газа НЕТ, roll НЕТ (read-only)
     // view: msg НЕТ, газа НЕТ, roll НЕТ (read-only). timeout_sec — лимит времени.
     JSIValue call_view(Cellable* root,const std::string& view_name,
-                             const nlohmann::json& params,
+                             const JSIValue& params,
                              IMsgSource* msg_source,
                              CallStack* call_stack,
                               ContractHost* host,
@@ -70,7 +69,7 @@ struct ContractContext : public Refcountable {
                              TIME_mks block_timestamp = TIME_mks{});
     // query: reader-only, без газа, now сэмплируется на входе
     JSIValue call_query(Cellable* root, const std::string& query_name,
-                             const nlohmann::json& params,
+                             const JSIValue& params,
                              CallStack* call_stack,
                               ContractHost* host,
                              TIME_mks now,

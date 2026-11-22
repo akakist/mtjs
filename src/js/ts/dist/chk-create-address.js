@@ -1,5 +1,9 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
 const node = "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 let rootSk = "";
@@ -56,7 +60,7 @@ async function submitAndWait(sk, addr, tx, value = 0, gasLimit = 100000, retries
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (a + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -82,7 +86,7 @@ async function submitAndWaitErr(sk, addr, tx, value = 0, gasLimit = 100000, retr
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (a + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));

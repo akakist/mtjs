@@ -1,6 +1,24 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v: any): any {
+    if (typeof v === "bigint") return Number(v);
+    if (Array.isArray(v)) return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o: any = {};
+        for (const k of Object.keys(v)) o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
+
+
 const node = "127.0.0.1:2301";
 const STORAGE_SRC_PATH = "/home/bsr/mtjs/src/js/tsi/dist/contracts/storage_test.js";
 const GAS_LIMIT = 100000;
@@ -47,7 +65,7 @@ async function submitAndWait(sk: string, addr: string, tx: any[], value = 0, gas
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => {});
         if (rsp.err) { if (a+1 < retries) { await new Promise(r=>setTimeout(r,300)); continue; } throw new Error("submit: "+rsp.err_str); }
         const b = await waitTx(rsp.tx_hash, 10);
         const st = b.status(rsp.tx_hash);
@@ -61,7 +79,7 @@ async function submitAndWaitErr(sk: string, addr: string, tx: any[], value = 0, 
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => {});
         if (rsp.err) { if (a+1 < retries) { await new Promise(r=>setTimeout(r,300)); continue; } throw new Error("submit: "+rsp.err_str); }
         const b = await waitTx(rsp.tx_hash, 10);
         const st = b.status(rsp.tx_hash);
@@ -127,16 +145,18 @@ async function main() {
     // ============================================================
     {
         console.log("\n[t1] t_simple_set (method) — get_granule(ttl) + set");
-        const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-            { contract: "storage_test", method: "t_simple_set", params: {} },
-        ]);
-        check(block.status(rsp.tx_hash) === "ok", "t_simple_set ok (errstr=" + (block.errstr(rsp.tx_hash)||"") + ")");
-        const r = await mtjs.get_contract_data(node, "storage_test", "concert/sectorA/place11", 3);
-        check(r.found === true, "concert/sectorA/place11 found");
-        if (r.found) {
-            const v = JSON.parse(r.value);
-            check(v.owner === rootAddr, "owner == root (got " + v.owner + ")");
-            check(v.price === 100, "price == 100 (got " + v.price + ")");
+        for (const comp of ["cpy", "zstd", "lz4"]) {
+            const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
+                { contract: "storage_test", method: "t_simple_set", params: { compression: comp } },
+            ]);
+            check(block.status(rsp.tx_hash) === "ok", "t_simple_set(" + comp + ") ok (errstr=" + (block.errstr(rsp.tx_hash)||"") + ")");
+            const r = await mtjs.get_contract_data(node, "storage_test", "concert/sectorA/place11", 3);
+            check(r.found === true, "granule found (" + comp + ")");
+            if (r.found) {
+                const v: any = r.value;   // JSValue (не JSON)
+                check(v.owner === rootAddr, "owner == root (" + comp + ", got " + v.owner + ")");
+                check(v.price === 100, "price == 100n (" + comp + ", got " + v.price + ")");
+            }
         }
     }
 
@@ -146,11 +166,11 @@ async function main() {
     {
         console.log("\n[t2] t_simple_get (view) — read ok");
         const r = await mtjs.call_view(node, "storage_test", "t_simple_get", {}, 5, 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.found === true, "found");
         check(r.error === false, "no error");
         if (r.found && !r.error) {
-            const v = JSON.parse(r.result);
+            const v = unBig(r.result);
             check(v.owner === rootAddr, "owner == root");
             check(v.price === 100, "price == 100");
         }
@@ -162,7 +182,7 @@ async function main() {
     {
         console.log("\n[t3] t_view_set (view) → not allowed / not a function");
         const r = await mtjs.call_view(node, "storage_test", "t_view_set", {}, 5, 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.found === true, "found (view exists)");
         check(r.error === true, "error=true");
         check(viewGuardMsg(r), "result mentions not allowed/not a function (got: " + r.result + ")");
@@ -174,7 +194,7 @@ async function main() {
     {
         console.log("\n[t4] t_view_create (view) → not allowed");
         const r = await mtjs.call_view(node, "storage_test", "t_view_create", {}, 5, 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.error === true, "error=true");
         check(viewGuardMsg(r), "result mentions not allowed/not a function (got: " + r.result + ")");
     }
@@ -185,7 +205,7 @@ async function main() {
     {
         console.log("\n[t5] t_view_del (view) → not allowed / not a function");
         const r = await mtjs.call_view(node, "storage_test", "t_view_del", {}, 5, 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.error === true, "error=true");
         check(viewGuardMsg(r), "result mentions not allowed/not a function (got: " + r.result + ")");
     }
@@ -196,7 +216,7 @@ async function main() {
     {
         console.log("\n[t6] t_view_callmethod (view) → not allowed");
         const r = await mtjs.call_view(node, "storage_test", "t_view_callmethod", {}, 5, 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.error === true, "error=true");
         check(viewGuardMsg(r), "result mentions not allowed (got: " + r.result + ")");
     }
@@ -207,7 +227,7 @@ async function main() {
     {
         console.log("\n[t7] t_view_callview (view) → not allowed");
         const r = await mtjs.call_view(node, "storage_test", "t_view_callview", {}, 5, 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.error === true, "error=true");
         check(viewGuardMsg(r), "result mentions not allowed (got: " + r.result + ")");
     }
@@ -251,7 +271,7 @@ async function main() {
                 if (em) for (const k of Object.keys(em)) {
                     for (const e of em[k].emits) {
                         if (e[0] === "gc") {
-                            let v = e[1]; if (typeof v === "string") try { v = JSON.parse(v); } catch(_) {}
+                            let v = unBig(e[1]);
                             if (v && typeof v.applied === "number") applied += v.applied;
                         }
                     }

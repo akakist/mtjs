@@ -47,3 +47,5 @@ endif()
 
 # install(TARGETS mtjsmodule DESTINATION ${PLUGIN_TARGET_DIR})
 
+
+target_link_libraries(mtjsmoduleS PUBLIC zstd lz4)

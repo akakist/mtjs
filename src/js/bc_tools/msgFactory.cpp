@@ -23,6 +23,8 @@
 
 
 #include "md/md_GetNodeInfoREQ.h"
+#include "md/md_GetNodesREQ.h"
+#include "md/md_GetNodesRSP.h"
 #include "md/md_GetNodeInfoRSP.h"
 #include "md/md_GetValuesREQ.h"
 #include "md/md_GetValuesRSP.h"
@@ -83,6 +85,8 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetGranuleRSP, MsgData::GetGranuleRSP::construct);    
     registerMsg(msgid::ScanREQ, MsgData::ScanREQ::construct);
     registerMsg(msgid::ScanRSP, MsgData::ScanRSP::construct);
+    registerMsg(msgid::GetNodesREQ, MsgData::GetNodesREQ::construct);
+    registerMsg(msgid::GetNodesRSP, MsgData::GetNodesRSP::construct);
     registerMsg(msgid::PingREQ, MsgData::PingREQ::construct);
     registerMsg(msgid::PingRSP, MsgData::PingRSP::construct);
 }

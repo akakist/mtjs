@@ -9,10 +9,9 @@
 #include "jsiscope.h"
 #include "convert.h"
 #include "contract_constants.h"
-#include <nlohmann/json.hpp>
+#include "jsi_pack.h"
 #include "NodeGranuleIO.h"
 
-using json = nlohmann::json;
 
 static CallContext* call_ctx(JSIContext* ctx) {
     return (CallContext*)JSI_GetContextOpaque(ctx);
@@ -206,7 +205,7 @@ static JSIValue jsg_exists(JSIContext* ctx, JSIValueConst this_val, int argc, JS
 // jsg_set (только writable)
 // ============================================================
 static JSIValue jsg_set(JSIContext* ctx, JSIValueConst this_val, int argc, JSIValueConst* argv) {
-    if (argc != 1) return JSI_ThrowTypeError(ctx, "set(value)");
+    if (argc < 1 || argc > 2) return JSI_ThrowTypeError(ctx, "set(value, compression?)");
     if (!is_writable(ctx, this_val))
         return JSI_ThrowTypeError(ctx, "set is not allowed (read-only storage)");
     auto* c = require_tx_ctx(ctx);
@@ -214,8 +213,11 @@ static JSIValue jsg_set(JSIContext* ctx, JSIValueConst this_val, int argc, JSIVa
     auto* w = granule_wrap(ctx, this_val);
     if (!w || !w->gw.valid()) return JSI_ThrowTypeError(ctx, "invalid this");
 
-    std::string s = serialize_value(ctx, argv[0]);
-    if (!is_serializable(s)) return JSI_ThrowTypeError(ctx, "set: cannot serialize");
+    int compression = 0;
+    try { compression = parse_compression(ctx, argc == 2 ? argv[1] : JSI_UNDEFINED); }
+    catch (const std::exception& e) { return JSI_ThrowTypeError(ctx, "set: %s", e.what()); }
+    std::string s = granule_pack(ctx, argv[0], compression);
+    if (s.size() > MAX_GRANULE_SIZE) return JSI_ThrowTypeError(ctx, "set: value too large");
     w->gw->cnode->set(s, c->now);
     w->gw->do_update_time(c->msg_source->get_blockTimestamp());
     w->gw->setDirtyD();
@@ -333,7 +335,7 @@ static JSIValue jsg_get(JSIContext* ctx, JSIValueConst this_val, int argc, JSIVa
         std::string s;
         if (!granule_get_value(ctx, this_val, &s)) return JSI_NULL;
         if (s.empty()) return JSI_NULL;
-        try { json j = json::parse(s); return json_to_jsi(ctx, j); }
+        try { return granule_unpack(ctx, s); }
         catch (...) { return JSI_NULL; }
     }
     JSIScope<10,10> scope(ctx);

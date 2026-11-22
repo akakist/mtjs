@@ -1,6 +1,11 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
 // chk-granule-lite.ts — лайт-нода: local евенты → CDatabaseLiteNode → HTTP /granule → полная нода.
 //   t1: lite_set_uplink → full node
 //   t2: get_granule_lite(addr, hash) → body из full node (stale=false)
@@ -57,7 +62,7 @@ async function submitAndWait(tx: any[], value = 0, gasLimit = 100000, retries = 
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), rootSk, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
             throw new Error("submit: " + rsp.err_str);
@@ -125,7 +130,7 @@ async function main() {
         const addr = "00".repeat(32);
         const hash = "00".repeat(32);
         const r = await mtjs.get_granule_lite(addr, hash, 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.found === false, "found=false (unknown addr)");
     }
 
@@ -135,7 +140,7 @@ async function main() {
         console.log("\n[t3] get_granule_lite(addr, empty_hash) → found=false (нет addr в state)");
         const addr = "11".repeat(32);
         const r = await mtjs.get_granule_lite(addr, "", 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.found === false, "found=false");
     }
 

@@ -93,6 +93,8 @@ bool Scan::Service::ClientMsg(const bcEvent::ClientMsg *e)
             it->Next();
         }
         rsp->scanned = scanned;
+        if (getenv("MTJS_SCAN_TRACE"))
+            logErr2("scan: scanned=%lld dbids=%zu max_sec=%lld", (long long)scanned, rsp->dbids.size(), (long long)max_sec);
         if (it->Valid()) rsp->next_from.container = it->key().ToString();
         else rsp->done = true;
 

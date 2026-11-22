@@ -1,6 +1,11 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
 const node = "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 
@@ -107,7 +112,7 @@ async function submitBatch(u: User, tx: any[], retries = 3) {
         const now = Date.now();
         lastTxSubmitTs = now;
         if (!firstTxTs) firstTxTs = now;
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), u.sk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), u.sk, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await sleep(200); continue; }
             throw new Error("submit: " + rsp.err_str);

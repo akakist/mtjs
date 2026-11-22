@@ -71,6 +71,9 @@ public:
     /// get packed number, nothrows
     uint64_t get_PN_nothrow(bool &success);
 
+    /// 128-битное целое: zigzag + LEB128 (7 бит/байт). 1 байт для |v|<64.
+    __int128 get_i128();
+
     /// get packed number prefixed string (PN - string lenth), throws
     std::string get_PSTR();
 
@@ -147,6 +150,9 @@ public:
 
     /// put packed number
     outBuffer& put_PN(const uint64_t);
+
+    /// 128-битное целое: zigzag + LEB128 (см. inBuffer::get_i128)
+    outBuffer& put_i128(__int128 v);
 
     /// put packed number prefixed string
     outBuffer& put_PSTR(const std::string &);
@@ -308,6 +314,33 @@ inline unsigned char inBuffer::get_8_nothrow(bool &success)
     unsigned char c= m_data[out_pos++];
     return c;
 }
+inline __int128 inBuffer::get_i128()
+{
+    unsigned __int128 z = 0;
+    int shift = 0;
+    while (true) {
+        unsigned char c = get_8();
+        z |= ((unsigned __int128)(c & 0x7F)) << shift;
+        if (!(c & 0x80)) break;
+        shift += 7;
+    }
+    return (__int128)(z >> 1) ^ -(__int128)(z & 1);   // обратный zigzag
+}
+
+inline outBuffer& outBuffer::put_i128(__int128 v)
+{
+    unsigned __int128 u = (unsigned __int128)v;
+    unsigned __int128 z = (u << 1) ^ (unsigned __int128)(v >> 127);  // zigzag
+    while (true) {
+        unsigned char c = (unsigned char)(z & 0x7F);
+        z >>= 7;
+        if (z) c |= 0x80;
+        put_8(c);
+        if (!z) break;
+    }
+    return *this;
+}
+
 inline uint64_t inBuffer::get_PN()
 {
     uint64_t NN=0;

@@ -1,5 +1,23 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v) {
+    if (typeof v === "bigint")
+        return Number(v);
+    if (Array.isArray(v))
+        return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o = {};
+        for (const k of Object.keys(v))
+            o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
 const node = "127.0.0.1:2301";
 const GYM_SRC_PATH = "/home/bsr/mtjs/src/js/tsi/dist/contracts/gym.js";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
@@ -62,7 +80,7 @@ async function submitAndWait(sk, addr, tx, value = 0, gasLimit = 100000, retries
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (attempt + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -143,11 +161,11 @@ async function main() {
     {
         console.log("\n[t1] call_view gym.getAdmin");
         const r = await mtjs.call_view(node, "gym", "getAdmin", {}, 5, 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.found === true, "found");
         check(r.error === false, "no error");
         try {
-            const v = JSON.parse(r.result);
+            const v = unBig(r.result);
             check(typeof v.addr === "string" && v.addr.length > 0, "addr non-empty");
             check(v.addr === rootAddr, "addr == root");
         }
@@ -159,7 +177,7 @@ async function main() {
     {
         console.log("\n[t2] call_view gym.unknownView");
         const r = await mtjs.call_view(node, "gym", "unknownView", {}, 5, 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.found === false, "found=false");
         check(r.error === true, "error=true");
         check(r.result.indexOf("view not found") >= 0, "result mentions 'view not found'");
@@ -168,7 +186,7 @@ async function main() {
     {
         console.log("\n[t3] call_view unknownContract.getAdmin");
         const r = await mtjs.call_view(node, "unknownContract", "getAdmin", {}, 5, 5);
-        console.log("  result:", JSON.stringify(r));
+        console.log("  result:", jstr(r));
         check(r.found === false, "found=false");
         check(r.error === true, "error=true");
         check(r.result.indexOf("contract not found") >= 0, "result mentions 'contract not found'");

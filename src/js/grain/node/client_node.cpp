@@ -414,7 +414,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
             stale.push_back({blake2b_hash(old_body).container, old_body});
     }
 
-    int64_t now = iUtils->getNow().v;
+    int64_t now = getNow().v;
     for (auto& z : stale)
         stale_cache[z.first] = { z.second, now };
 
@@ -515,7 +515,7 @@ bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node
         logNode("request sync since=%lld epoch_req=%lld local_epoch=%lld prev_block=%s full=%d",
                 (long long)since,(long long)r->hb->new_epoch,(long long)epoch_current(),
                 prev_block.valid()?"yes":"no",(int)sync_full);
-        REF_getter<bcEvent::syncGetGranulesREQ> e=new bcEvent::syncGetGranulesREQ(since,this_node_name,iUtils->getNow().v,ListenerBase::serviceId);
+        REF_getter<bcEvent::syncGetGranulesREQ> e=new bcEvent::syncGetGranulesREQ(since,this_node_name,getNow().v,ListenerBase::serviceId);
         e->sign(my_sk_ed);
         sendEvent(r->ip,ServiceEnum::Node,e.get());
         sync_in_progress=true;
@@ -552,7 +552,9 @@ bool Node::Service::GetTxREQ(const MsgData::GetTxREQ *r, const NODE_id &src_node
     }
 
     cli.node_leader=r->hb;
-    
+    cli.leader_route = route;          // запомнили путь к лидеру
+    cli.leader_route_valid = true;
+
     resetBlockExpired(r->hb->node_leader);
 
     REF_getter<MsgData::GetTxRSP> rsp = new MsgData::GetTxRSP;
@@ -628,7 +630,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
         if (epoch_current() != r->heart_beat->new_epoch)
         {
-            t.emit_block("error", R"({"code":-32602,"error":"epoch invalid"})");
+            t.emit_block_cmd("error", EmitObj().n("code", -32602).s("error", "epoch invalid").pack());
             err = true;
             logNode("if (epoch_current() != r->heart_beat->new_epoch)");
         }

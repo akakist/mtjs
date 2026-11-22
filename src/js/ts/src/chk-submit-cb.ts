@@ -1,6 +1,11 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
 // chk-submit-cb.ts — tx_submit(..., cb) → cb({tx_hash: hex, status: submitted|finalized|timeout|err})
 // node :2301.
 
@@ -76,7 +81,7 @@ async function submitAndWait(sk: string, addr: string, tx: any[], value = 0, gas
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
             throw new Error("submit: " + rsp.err_str);
@@ -120,9 +125,9 @@ async function t1_ok() {
     const cbs: any[] = [];
     const tx = [{contract:"root",method:"transfer",params:{to:rootAddr,amount:"100"}}];
     const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0, sender: u1Addr, key_id: 0 };
-    const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1Sk, ui.nonce, (st: any) => {
+    const rsp = await mtjs.tx_submit(node, 10, jstr(req), u1Sk, ui.nonce, (st: any) => {
         cbs.push(st);
-        console.log("  cb:", JSON.stringify(st));
+        console.log("  cb:", jstr(st));
     });
     if (rsp.err) { check(false, "submit: " + rsp.err_str); return; }
     const txHash = rsp.tx_hash;
@@ -154,9 +159,9 @@ async function t2_err() {
     const cbs: any[] = [];
     const tx = [{contract:"root",method:"transfer",params:{to:rootAddr,amount:"2000000"}}];
     const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0, sender: u1Addr, key_id: 0 };
-    const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1Sk, ui.nonce, (st: any) => {
+    const rsp = await mtjs.tx_submit(node, 10, jstr(req), u1Sk, ui.nonce, (st: any) => {
         cbs.push(st);
-        console.log("  cb:", JSON.stringify(st));
+        console.log("  cb:", jstr(st));
     });
     if (rsp.err) { check(false, "submit: " + rsp.err_str); return; }
     const txHash = rsp.tx_hash;
@@ -180,9 +185,9 @@ async function t3_timeout() {
     const cbs: any[] = [];
     const tx = [{contract:"root",method:"transfer",params:{to:rootAddr,amount:"100"}}];
     const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0, sender: u1Addr, key_id: 0 };
-    const rsp = await mtjs.tx_submit(node, 0.001, JSON.stringify(req), u1Sk, ui.nonce, (st: any) => {
+    const rsp = await mtjs.tx_submit(node, 0.001, jstr(req), u1Sk, ui.nonce, (st: any) => {
         cbs.push(st);
-        console.log("  cb:", JSON.stringify(st));
+        console.log("  cb:", jstr(st));
     });
     if (rsp.err) { check(false, "submit: " + rsp.err_str); return; }
     await new Promise<void>((r) => setTimeout(r, 1000));
@@ -204,10 +209,10 @@ async function t4_two_tx() {
     for (let i = 0; i < 2; i++) {
         const tx = [{contract:"root",method:"transfer",params:{to:rootAddr,amount:"10"}}];
         const req = { tx, nonce: (n0 + BigInt(i)).toString(), value: 1000000, gasLimit: 100000, priority: 0, sender: u1Addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1Sk, (n0 + BigInt(i)).toString(), (st: any) => {
+        const rsp = await mtjs.tx_submit(node, 10, jstr(req), u1Sk, (n0 + BigInt(i)).toString(), (st: any) => {
             if (!cbs[st.tx_hash]) cbs[st.tx_hash] = [];
             cbs[st.tx_hash].push(st);
-            console.log("  cb[" + st.tx_hash.slice(0,8) + "]:", JSON.stringify(st));
+            console.log("  cb[" + st.tx_hash.slice(0,8) + "]:", jstr(st));
         });
         if (rsp.err) { check(false, "submit " + i + ": " + rsp.err_str); return; }
         hashes.push(rsp.tx_hash);

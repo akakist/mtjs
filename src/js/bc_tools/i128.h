@@ -103,22 +103,8 @@ inline bool operator>=(int64_t a, const i128& b) { return (__int128)a >= b.v; }
 inline bool operator==(int64_t a, const i128& b) { return (__int128)a == b.v; }
 inline bool operator!=(int64_t a, const i128& b) { return (__int128)a != b.v; }
 
-// ---- ioBuffer: inline-хелперы (без правки ioBuffer.h) ----
-inline void i128_put(outBuffer& o, __int128 v) {
-    unsigned __int128 u = (unsigned __int128)v;
-    unsigned __int128 z = (u << 1) ^ (unsigned __int128)(v >> 127);  // zigzag
-    o.put_PN((uint64_t)z);
-    o.put_PN((uint64_t)(z >> 64));
-}
-inline __int128 i128_get(inBuffer& o) {
-    uint64_t lo = o.get_PN();
-    uint64_t hi = o.get_PN();
-    unsigned __int128 z = ((unsigned __int128)hi << 64) | lo;
-    return (__int128)(z >> 1) ^ -(__int128)(z & 1);   // обратный zigzag
-}
-
-inline outBuffer& operator<<(outBuffer& o, const i128& z) { i128_put(o, z.v); return o; }
-inline inBuffer& operator>>(inBuffer& o, i128& z) { z.v = i128_get(o); return o; }
+inline outBuffer& operator<<(outBuffer& o, const i128& z) { o.put_i128(z.v); return o; }
+inline inBuffer& operator>>(inBuffer& o, i128& z) { z.v = o.get_i128(); return o; }
 
 // ---- GRAN ----
 struct GRAN {

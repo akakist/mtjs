@@ -46,6 +46,7 @@ interface KeyPair {
         block_height: number;
         genesis_time: number;
         chain_id: number;
+        root_hash: string;    // текущий корень состояния (Merkle root)
     }
 
     interface ContractInfo {
@@ -107,8 +108,7 @@ interface KeyPair {
         bls_pk: string;
         ip: string;
         enabled: boolean;
-        missed_rounds: number;
-        answered_rounds: number;
+        last_update: number;      // мкс, момент последнего alive (0 = ещё не пинговал)
         full_stake: string;
         stakes: { [addr: string]: string };
     }
@@ -155,6 +155,7 @@ interface KeyPair {
         tx_wait_block(nodeaddr: string, tx_hash_hex: string, timeout: number): Promise<Block>;
         get_block(nodeaddr: string, timeout: number): Promise<Block>;
         get_node_info(nodeaddr: string, name: string, timeout: number): Promise<NodeInfo>;
+        get_nodes(nodeaddr: string, timeout: number): Promise<{ found: boolean; errcode?: number; errstr?: string; nodes: { name: string; ip: string }[] }>;
         get_values(nodeaddr: string, timeout: number): Promise<ValuesInfo>;
         get_contract_data(nodeaddr: string, contract: string, key: string, timeout: number): Promise<ContractData>;
         get_contract(nodeaddr: string, contract: string, timeout: number): Promise<ContractInfo>;

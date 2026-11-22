@@ -1,5 +1,9 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
 const node = "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 let rootSk = "";
@@ -37,7 +41,7 @@ const rootAddr = mtjs.addr_from_name("root");
     console.log("=== ADDRESS (minimal) ===");
     {
         const info = await mtjs.get_address_info(node, rootAddr, 3);
-        console.log("  root found:", info.found, "keys:", JSON.stringify(info.keys));
+        console.log("  root found:", info.found, "keys:", jstr(info.keys));
         check(info.found === true, "root found (addr)");
         check(Array.isArray(info.keys) && info.keys.length === 1, "root keys: 1 (ed25519)");
         if (info.keys && info.keys.length > 0) {

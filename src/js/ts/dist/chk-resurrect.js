@@ -3,6 +3,24 @@
 // плюс компакция: живая гранула не должна удаляться, тумбстоун — должен.
 // (Контракт больше не может явно удалять гранулу — только TTL.)
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v) {
+    if (typeof v === "bigint")
+        return Number(v);
+    if (Array.isArray(v))
+        return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o = {};
+        for (const k of Object.keys(v))
+            o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
 const node = "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 const SRC = `"use strict";
@@ -72,7 +90,7 @@ async function submitAndWait(tx, value = 0, gasLimit = 100000, retries = 5) {
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(rootAddr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: rootAddr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), rootSk, nonce.toString(), () => { });
         if (rsp.err) {
             if (attempt + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -108,14 +126,7 @@ function hasEmit(em, name) {
             if (e[0] !== name)
                 continue;
             let v = e[1];
-            if (typeof v === "string") {
-                try {
-                    v = JSON.parse(v);
-                }
-                catch (_) {
-                    return {};
-                }
-            }
+            v = unBig(v);
             return v || {};
         }
     return null;
@@ -126,7 +137,7 @@ async function granuleState(key) {
         return { found: false };
     let v = null;
     try {
-        v = JSON.parse(g.value);
+        v = unBig(g.value);
     }
     catch (_) { }
     return { found: true, v };

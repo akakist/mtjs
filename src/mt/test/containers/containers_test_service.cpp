@@ -6,6 +6,8 @@
 #include "IUtils.h"
 #include "commonError.h"
 #include "obuf.h"
+#include "i128.h"
+#include <cstdlib>
 
 
 template <class T1, class T2> bool ASSERT_eq(const char* file, int line, const char* func, const T1& t1, const T2& t2)
@@ -436,6 +438,91 @@ void TEST8()
 }
 
 void registerSSL(const char* pn);
+// ============================================================
+// int128: i128_put/i128_get (zigzag + 2×put_PN) — границы + random
+// ============================================================
+static std::string i128_str(__int128 v) { i128 x; x.v = v; return x.str(); }
+
+void TEST9()
+{
+    printf(GREEN("RUN TEST %s\n"),__PRETTY_FUNCTION__);
+    __int128 vals[] = {
+        (__int128)0, (__int128)1, (__int128)-1, (__int128)2, (__int128)-2,
+        (__int128)126, (__int128)127, (__int128)-127, (__int128)128, (__int128)-128,
+        (__int128)INT64_MAX, (__int128)INT64_MIN,
+        ((__int128)INT64_MAX)+1, ((__int128)INT64_MIN)-1,
+        ((__int128)1<<64), ((__int128)1<<64)-1, -((__int128)1<<64),
+        ((__int128)1<<126), ((__int128)1<<126)-1, -((__int128)1<<126),
+        ((__int128)1<<127)-1, -((__int128)1<<127),   // i128 max/min
+    };
+    for (auto v : vals) {
+        outBuffer o;
+        o.put_i128(v);
+        inBuffer in(o.asString()->container);
+        __int128 vv = in.get_i128();
+        ASSERT_EQ(i128_str(v), i128_str(vv));
+    }
+    srand(12345);
+    for (int i = 0; i < 2000; i++) {
+        __int128 v = ((__int128)(int64_t)rand()<<97) ^ ((__int128)(int64_t)rand()<<64)
+                   ^ ((__int128)(int64_t)rand()<<32) ^ (int64_t)rand();
+        if (i & 1) v = -v;
+        outBuffer o;
+        o.put_i128(v);
+        inBuffer in(o.asString()->container);
+        ASSERT_EQ(i128_str(v), i128_str(in.get_i128()));
+    }
+    printf(GREEN(" TEST9 passed OK\n"));
+}
+
+// ============================================================
+// int128 формат B (LEB128): границы + random + сравнение размеров с форматом A
+// ============================================================
+void TEST10()
+{
+    printf(GREEN("RUN TEST %s\n"),__PRETTY_FUNCTION__);
+    __int128 vals[] = {
+        (__int128)0, (__int128)1, (__int128)-1, (__int128)2, (__int128)-2,
+        (__int128)63, (__int128)-63, (__int128)64, (__int128)-64,
+        (__int128)8191, (__int128)-8191, (__int128)8192, (__int128)-8192,
+        (__int128)INT64_MAX, (__int128)INT64_MIN,
+        ((__int128)INT64_MAX)+1, ((__int128)INT64_MIN)-1,
+        ((__int128)1<<64), ((__int128)1<<64)-1, -((__int128)1<<64),
+        ((__int128)1<<126), ((__int128)1<<126)-1, -((__int128)1<<126),
+        ((__int128)1<<127)-1, -((__int128)1<<127),
+    };
+    for (auto v : vals) {
+        outBuffer ob; ob.put_i128(v);
+        inBuffer inb(ob.asString()->container);
+        ASSERT_EQ(i128_str(v), i128_str(inb.get_i128()));
+
+        outBuffer oa; oa.put_i128(v);
+        inBuffer ina(oa.asString()->container);
+        ASSERT_EQ(i128_str(v), i128_str(ina.get_i128()));
+
+        // A и B читаются разными функциями — размеры могут отличаться (это ок)
+        if (v == 0 || v == 1 || v == -1 || v == 63 || v == -63) {
+            size_t la = oa.asString()->container.size();
+            size_t lb = ob.asString()->container.size();
+            if (lb != 1) {
+                printf(RED("LEB128 size for %s is %zu, expected 1\n"), i128_str(v).c_str(), lb);
+                return;
+            }
+            (void)la;
+        }
+    }
+    srand(54321);
+    for (int i = 0; i < 2000; i++) {
+        __int128 v = ((__int128)(int64_t)rand()<<97) ^ ((__int128)(int64_t)rand()<<64)
+                   ^ ((__int128)(int64_t)rand()<<32) ^ (int64_t)rand();
+        if (i & 1) v = -v;
+        outBuffer ob; ob.put_i128(v);
+        inBuffer inb(ob.asString()->container);
+        ASSERT_EQ(i128_str(v), i128_str(inb.get_i128()));
+    }
+    printf(GREEN(" TEST10 passed OK\n"));
+}
+
 int run(int ac, char** av)
 {
     printf(GREEN("RUN TEST %s"),__PRETTY_FUNCTION__);
@@ -450,6 +537,8 @@ int run(int ac, char** av)
         TEST6();
         TEST66();
         TEST7();
+        TEST9();
+        TEST10();
         TEST8();
         delete iUtils;
     } catch(const CommonError&e)

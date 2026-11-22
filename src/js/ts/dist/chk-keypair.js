@@ -1,5 +1,9 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
 // chk-keypair.ts — generate_keypair для 4 типов (ed25519/secp256k1/p256/bls12-381)
 //                 + create_address + transfer + node_create (BLS).
 // node :2301.
@@ -65,7 +69,7 @@ async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, retr
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (a + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));

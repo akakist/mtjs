@@ -112,7 +112,7 @@ bool Node::Service::syncGetGranulesREQ(const bcEvent::syncGetGranulesREQ*e)
     // (iUtils->getNow().v, микросекунды). Повтор того же REQ отклоняется по
     // монотонности, вне окна — по свежести, а размер запрашиваемой дельты
     // ограничен, чтобы реплей/мусорный since не заставлял отдавать весь чейн.
-    const int64_t now=iUtils->getNow().v;
+    const int64_t now=getNow().v;
     static constexpr int64_t SYNC_REQ_TTL_MKS   = 30LL*1000*1000;   // 30 s
 
     if(e->current_time<=0 || e->current_time>now+SYNC_REQ_TTL_MKS/2)

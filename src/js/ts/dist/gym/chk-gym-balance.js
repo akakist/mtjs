@@ -1,5 +1,23 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v) {
+    if (typeof v === "bigint")
+        return Number(v);
+    if (Array.isArray(v))
+        return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o = {};
+        for (const k of Object.keys(v))
+            o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
 // chk-gym-balance.ts — contract balance: buyVisits → contract.balance += 50;
 //   withdraw (owner) — contract.balance -= b; refundValue(b) → sender value.
 // node :2301. root — admin/owner.
@@ -72,7 +90,7 @@ async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, retr
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (attempt + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -98,7 +116,7 @@ async function submitAndWaitErr(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, r
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (attempt + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -175,7 +193,7 @@ async function getVisits() {
     const r = await mtjs.get_contract_data(node, "gym", "abonement" + rootAddr, 3);
     if (!r.found)
         return -1;
-    return Number(JSON.parse(r.value).visits);
+    return Number(unBig(r.value).visits);
 }
 async function main() {
     await loadKeys();

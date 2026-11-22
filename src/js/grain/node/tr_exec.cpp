@@ -49,9 +49,8 @@ std::optional<std::string> Node::Service::execute_mint(yyjson_val *params, b_par
         {  st->total_supply += i128(amount); }
     }
     // ▲▲▲
-    b.emit_command(t.tx_id, seqId,"mint",R"({"to":"%s","amount":"%s"})",
-                   base16::encode(t.senderAddress.addr).c_str(),
-                   std::to_string(amount).c_str());
+    b.emit_cmd(t.tx_id, seqId, "mint",
+               EmitObj().s("to", base16::encode(t.senderAddress.addr)).s("amount", std::to_string(amount)).pack());
 
     return std::nullopt;
 }
@@ -83,11 +82,10 @@ std::optional<std::string> Node::Service::execute_transfer(yyjson_val *params, b
     to->balance += amount;
     cells::getActivityNoCreate(root.get(),db_state.get(),to->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
 
-    b.emit_command(t.tx_id, seqId, "transfer",
-        R"({"from":"%s","to":"%s","amount":"%s"})",
-        base16::encode(t.senderAddress.addr).c_str(),
-        base16::encode(to_addr.addr).c_str(),
-        std::to_string(amount).c_str());
+    b.emit_cmd(t.tx_id, seqId, "transfer",
+        EmitObj().s("from", base16::encode(t.senderAddress.addr))
+                 .s("to", base16::encode(to_addr.addr))
+                 .s("amount", std::to_string(amount)).pack());
     return std::nullopt;
 }
 
@@ -120,7 +118,7 @@ std::optional<std::string> Node::Service::execute_node_update(yyjson_val *params
 
     {
         nn->set_ip(ip);
-        b.emit_command(t.tx_id, seqId, "node_change_ip",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
+        b.emit_cmd(t.tx_id, seqId, "node_change_ip", EmitObj().s("node", name.container).s("ip", ip).pack());
 
     }
 
@@ -175,7 +173,7 @@ std::optional<std::string> Node::Service::execute_node_create(yyjson_val *params
     cells::getActivityOrCreate(root.get(),db_state.get(),n->getDbId(),{},TTL_sec{ttl},t.roll, t.b->validateBlockREQ->block_timestamp)->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
     t.gasUsed+=b.fees.gas_node_create;
 
-    b.emit_command(t.tx_id, seqId, "node_create",R"({"node":"%s","ip":"%s"})",name.container.c_str(),ip.c_str());
+    b.emit_cmd(t.tx_id, seqId, "node_create", EmitObj().s("node", name.container).s("ip", ip).pack());
     return std::nullopt;
 }
 
@@ -215,10 +213,9 @@ std::optional<std::string> Node::Service::execute_node_stake(yyjson_val *params,
         st->total_stake += i128(amount);
     }
 
-    b.emit_command(t.tx_id, seqId, "node_stake",R"({"node":"%s","stake":"%s","from":"%s"})",
-                   node.container.c_str(),
-                   std::to_string(amount).c_str(),
-                   base16::encode(t.senderAddress.addr).c_str());
+    b.emit_cmd(t.tx_id, seqId, "node_stake",
+               EmitObj().s("node", node.container).s("stake", std::to_string(amount))
+                        .s("from", base16::encode(t.senderAddress.addr)).pack());
     cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
 
     return std::nullopt;
@@ -265,10 +262,10 @@ std::optional<std::string> Node::Service::execute_unstake_node(yyjson_val *param
         st->total_stake -= i128(amount);
     }
 
-    b.emit_command(t.tx_id, seqId, "node_unstake",R"({"node":"%s","from":"%s","amount":"%s"})",
-                   node.container.c_str(),
-                   base16::encode(t.senderAddress.addr).c_str(),
-                   std::to_string(amount).c_str());
+    b.emit_cmd(t.tx_id, seqId, "node_unstake",
+               EmitObj().s("node", node.container)
+                        .s("from", base16::encode(t.senderAddress.addr))
+                        .s("amount", std::to_string(amount)).pack());
     return std::nullopt;
 }
 
@@ -298,7 +295,7 @@ std::optional<std::string> Node::Service::execute_node_enable(yyjson_val *params
 
     t.gasUsed+=b.fees.gas_node_enable;
 
-    b.emit_command(t.tx_id, seqId, "node_enable",R"({"node":"%s"})", node.container.c_str());
+    b.emit_cmd(t.tx_id, seqId, "node_enable", EmitObj().s("node", node.container).pack());
 
 
     return std::nullopt;
@@ -331,7 +328,7 @@ std::optional<std::string> Node::Service::execute_node_disable(yyjson_val *param
 
     t.gasUsed+=b.fees.gas_node_disable;
 
-    b.emit_command(t.tx_id, seqId, "node_disable",R"({"node":"%s"})", node.container.c_str());
+    b.emit_cmd(t.tx_id, seqId, "node_disable", EmitObj().s("node", node.container).pack());
 
 
 
@@ -430,9 +427,9 @@ std::optional<std::string> Node::Service::execute_contract_deploy(yyjson_val *pa
     us->contracts.insert(cn);
     cells::getActivityNoCreate(root.get(), db_state.get(), us->getDbId(),t.roll,t.b->validateBlockREQ->block_timestamp)->update_time(t.b->validateBlockREQ->block_timestamp, t.roll);
 
-    b.emit_command(t.tx_id, seqId, "contract_deploy",
-        R"({"name":"%s","owner":"%s","ttl":"%lld"})",
-        name.c_str(), base16::encode(t.senderAddress.addr).c_str(), (long long)ttl);
+    b.emit_cmd(t.tx_id, seqId, "contract_deploy",
+        EmitObj().s("name", name).s("owner", base16::encode(t.senderAddress.addr))
+                 .s("ttl", std::to_string((long long)ttl)).pack());
 
     return std::nullopt;
 }
@@ -470,7 +467,7 @@ std::optional<std::string> Node::Service::execute_contract_update(yyjson_val *pa
     cells::getActivityNoCreate(root.get(),db_state.get(),n->getDbId(),t.roll,b.validateBlockREQ->block_timestamp)->update_time(t.b->validateBlockREQ->block_timestamp,t.roll);
 
 
-    b.emit_command(t.tx_id, seqId, "contract_update",R"({"name":"%s","owner":"%s"})",cn.container.c_str(),base16::encode(t.senderAddress.addr).c_str());
+    b.emit_cmd(t.tx_id, seqId, "contract_update", EmitObj().s("name", cn.container).s("owner", base16::encode(t.senderAddress.addr)).pack());
 
     contractHost->contract_cache.erase(cn);
     return std::nullopt;
@@ -539,10 +536,10 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
         } else {
             int64_t elapsed = block_ts.v - it->second.create_time;
             if (elapsed > it->second.ttl) {
-                b.emit_command(t.tx_id, seqId, "vote_failed",
-                    R"({"param":"%s","value":"%s","reason":"ttl_expired","elapsed":"%lld","ttl":"%lld"})",
-                    param.c_str(), value.c_str(),
-                    (long long)elapsed, (long long)it->second.ttl);
+                b.emit_cmd(t.tx_id, seqId, "vote_failed",
+                    EmitObj().s("param", param).s("value", value).s("reason", "ttl_expired")
+                             .s("elapsed", std::to_string((long long)elapsed))
+                             .s("ttl", std::to_string((long long)it->second.ttl)).pack());
                 {
                     votes->votes.erase(vhash);
                 }
@@ -570,14 +567,11 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
                     vv->values["validator_min_stake_activated"] = 1;   // активация sybil (getMetaFull — TBD)
             }
             votes->votes.erase(vhash);
-            b.emit_command(t.tx_id, seqId, "vote_applied",
-                R"({"param":"%s","value":"%s"})", param.c_str(), value.c_str());
+            b.emit_cmd(t.tx_id, seqId, "vote_applied", EmitObj().s("param", param).s("value", value).pack());
         }
     }
 
-    b.emit_command(t.tx_id, seqId, "vote_counted",
-        R"({"node":"%s","param":"%s","value":"%s"})",
-        node.container.c_str(), param.c_str(), value.c_str());
+    b.emit_cmd(t.tx_id, seqId, "vote_counted", EmitObj().s("node", node.container).s("param", param).s("value", value).pack());
 
     return std::nullopt;
 }
@@ -652,10 +646,11 @@ std::optional<std::string> Node::Service::execute_compact(yyjson_val* params, b_
     logNode("execute_compact: cutoff=%lld deleted=%d complete=%d gen=%lld",
             (long long)cutoff.v, (int)dels.size(), (int)complete, (long long)st->state_gen);
     // статистика наружу: ручной инструмент по ней решает, нужен ли ещё батч
-    b.emit_command(t.tx_id, 0, "compact",
-                   R"({"deleted":%d,"complete":%d,"gen":%lld,"cutoff":%lld})",
-                   (int)dels.size(), (int)complete, (long long)st->state_gen,
-                   (long long)cutoff.v);
+    b.emit_cmd(t.tx_id, 0, "compact",
+               EmitObj().n("deleted", (__int128)(int)dels.size())
+                        .n("complete", (__int128)(int)complete)
+                        .n("gen", (__int128)(long long)st->state_gen)
+                        .n("cutoff", (__int128)(long long)cutoff.v).pack());
     return std::nullopt;
 }
 
@@ -671,7 +666,7 @@ std::optional<std::string> Node::Service::execute_gc(
     yyjson_val* arr = yyjson_obj_get(params, "items");
     if (!arr || !yyjson_is_arr(arr)) return "param 'items' must be array";
 
-    TIME_mks now{std::max(t.b->validateBlockREQ->block_timestamp.v, iUtils->getNow().v)};
+    TIME_mks now{std::max(t.b->validateBlockREQ->block_timestamp.v, getNow().v)};
 
     int applied = 0, skipped = 0;
     int applied_granule = 0, applied_contract = 0, applied_node = 0, applied_address = 0;
@@ -704,11 +699,11 @@ std::optional<std::string> Node::Service::execute_gc(
         else     applied++;
     }
 
-    b.emit_command(t.tx_id, seqId, "gc_granule",  R"({"count":%d})", applied_granule);
-    b.emit_command(t.tx_id, seqId, "gc_contract", R"({"count":%d})", applied_contract);
-    b.emit_command(t.tx_id, seqId, "gc_node",     R"({"count":%d})", applied_node);
-    b.emit_command(t.tx_id, seqId, "gc_address",  R"({"count":%d})", applied_address);
-    b.emit_command(t.tx_id, seqId, "gc",          R"({"applied":%d,"skipped":%d})", applied, skipped);
+    b.emit_cmd(t.tx_id, seqId, "gc_granule",  EmitObj().n("count", (__int128)applied_granule).pack());
+    b.emit_cmd(t.tx_id, seqId, "gc_contract", EmitObj().n("count", (__int128)applied_contract).pack());
+    b.emit_cmd(t.tx_id, seqId, "gc_node",     EmitObj().n("count", (__int128)applied_node).pack());
+    b.emit_cmd(t.tx_id, seqId, "gc_address",  EmitObj().n("count", (__int128)applied_address).pack());
+    b.emit_cmd(t.tx_id, seqId, "gc",          EmitObj().n("applied", (__int128)applied).n("skipped", (__int128)skipped).pack());
     logNode("execute_gc: applied=%d skipped=%d granule=%d", applied, skipped, applied_granule);
     return std::nullopt;
 }
@@ -742,8 +737,8 @@ std::optional<std::string> Node::Service::execute_add_address_key(yyjson_val* pa
 
     auto id = u->addKey((uint8_t)type, kb);
     if (!id) return "too many keys (max 5)";
-    b.emit_command(t.tx_id, seqId, "add_address_key",
-        R"({"addr":"%s","key_id":%llu})", addr_hex.c_str(), (unsigned long long)*id);
+    b.emit_cmd(t.tx_id, seqId, "add_address_key",
+        EmitObj().s("addr", addr_hex).n("key_id", (__int128)(unsigned long long)*id).pack());
     return std::nullopt;
 }
 
@@ -766,8 +761,8 @@ std::optional<std::string> Node::Service::execute_remove_address_key(yyjson_val*
     if (u->sizeKeys() <= 1) return "cannot remove last key";
 
     u->removeKey((uint64_t)key_id);
-    b.emit_command(t.tx_id, seqId, "remove_address_key",
-        R"({"addr":"%s","key_id":%lld})", addr_hex.c_str(), (long long)key_id);
+    b.emit_cmd(t.tx_id, seqId, "remove_address_key",
+        EmitObj().s("addr", addr_hex).n("key_id", (__int128)(long long)key_id).pack());
     return std::nullopt;
 }
 
@@ -819,8 +814,8 @@ std::optional<std::string> Node::Service::execute_create_address(yyjson_val* par
     cells::getActivityOrCreate(root.get(),db_state.get(),u->getDbId(),{},TTL_sec{ttl},t.roll,t.b->validateBlockREQ->block_timestamp)->update_time(t.b->validateBlockREQ->block_timestamp,t.roll);
 
     t.gasUsed += b.fees.gas_create_address;
-    b.emit_command(t.tx_id, seqId, "create_address",
-        R"({"addr":"%s","keys":%d})", addr_hex.c_str(), (int)parsed.size());
+    b.emit_cmd(t.tx_id, seqId, "create_address",
+        EmitObj().s("addr", addr_hex).n("keys", (__int128)(int)parsed.size()).pack());
     return std::nullopt;
 }
 
@@ -895,8 +890,8 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             // 3. Удалить bc_node
             deleteGranule(n, ttt.roll, dbd,ttt.b->validateBlockREQ->block_timestamp);
 
-            bbb.emit_command(ttt.tx_id, 0, "gc_node",
-                R"({"name":"%s","stake_returned":true})", name.container.c_str());
+            bbb.emit_cmd(ttt.tx_id, 0, "gc_node",
+                EmitObj().s("name", name.container).b("stake_returned", true).pack());
             break;
         }
 
@@ -915,9 +910,9 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             }
 
             deleteGranule(u, ttt.roll, dbd, ttt.b->validateBlockREQ->block_timestamp);
-            bbb.emit_command(ttt.tx_id, 0, "gc_address_deleted",
-                R"({"addr":"%s","burned":"%lld"})",
-                base16::encode(g->getDbId()).c_str(), (long long)burned);
+            bbb.emit_cmd(ttt.tx_id, 0, "gc_address_deleted",
+                EmitObj().s("addr", base16::encode(g->getDbId()))
+                         .s("burned", std::to_string((long long)burned)).pack());
             break;
         }
 
@@ -940,8 +935,7 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             c->owners.clear();
 
             deleteGranule(c, ttt.roll, dbd,ttt.b->validateBlockREQ->block_timestamp);
-            bbb.emit_command(ttt.tx_id, 0, "gc_contract_deleted",
-                R"({"name":"%s"})", name.c_str());
+            bbb.emit_cmd(ttt.tx_id, 0, "gc_contract_deleted", EmitObj().s("name", name).pack());
             break;
         }
 

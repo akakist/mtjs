@@ -48,6 +48,7 @@
 
 
 #include "yyjson_to_quickjs.h"
+#include "pack_yyjson.h"
 #include "js_tools.h"
 #include "jsi/api/ContractHost.h"
 #include "NodeGranuleIO.h"
@@ -69,119 +70,7 @@ static REF_getter<ContractHost> make_node_contract_host(const REF_getter<IDataba
     h->source = new NodeContractSourceIO(db);
     return h;
 }
-// ============================================================
-// dump helpers (для /dump)
-// ============================================================
-static nlohmann::json dump_hb(const REF_getter<MsgData::HeartBeatREQ>& hb)
-{
-    if (!hb.valid()) return nullptr;
-    return {
-        {"prev",   hb->prev_root_hash_1.str()},
-        {"epoch",  hb->new_epoch},
-        {"leader", hb->node_leader.container},
-        {"hash",   hb->getHash().str()}
-    };
-}
 
-static nlohmann::json dump_leader_cert(const REF_getter<MsgData::LeaderCert>& lc)
-{
-    if (!lc.valid()) return nullptr;
-    nlohmann::json j;
-    j["hb"] = dump_hb(lc->hb);
-    for (auto& z : lc->node_validators) j["validators"].push_back(z.container);
-    j["agg_sig"] = base16::encode(lc->agg_sig.serialize());
-    return j;
-}
-
-static nlohmann::json dump_block_info(const REF_getter<MsgData::BlockInfo>& bi)
-{
-    if (!bi.valid()) return nullptr;
-    return {
-        {"root",       bi->new_root_hash1.str()},
-        {"tx_hash",    bi->tx_hash.str()},
-        {"diffs_hash", bi->diffs_hash.str()},
-        {"att_hash",   bi->att_data_hash.str()},
-        {"hb",         dump_hb(bi->heart_beat)}
-    };
-}
-
-static nlohmann::json dump_block_accepted2(const REF_getter<MsgData::BlockAccepted2REQ>& ba2)
-{
-    if (!ba2.valid()) return nullptr;
-    nlohmann::json j;
-    if (ba2->blockAcceptedREQ.valid()) {
-        j["blockInfo"] = dump_block_info(ba2->blockAcceptedREQ->blockInfo);
-        for (auto& z : ba2->blockAcceptedREQ->node_validators) j["node_validators"].push_back(z.container);
-        j["agg_sig"] = base16::encode(ba2->blockAcceptedREQ->agg_sig.serialize());
-    }
-    for (auto& z : ba2->node_diff_validators) j["node_diff_validators"].push_back(z.container);
-    j["agg_diff_sig"] = base16::encode(ba2->agg_diff_sig.serialize());
-    return j;
-}
-
-void Node::Service::dump(nlohmann::json& j)
-{
-    j["node"] = this_node_name.container;
-    j["prev_root_hash"] = prev_root_hash_Z().str();
-    j["epoch"] = epoch_current();
-    j["sync_in_progress"] = (bool)sync_in_progress;
-
-
-    // l_blocks (все события)
-    for (auto& [prev, bt] : l_blocks) {
-        auto& lb = j["l_blocks"][base16::encode(prev.container)];
-        auto& li = bt;
-
-
-        // validate_block rsp
-        for (auto& [bh, v] : bt.ValidateBlockRSP_m) {
-            for (auto& rsp : v) {
-                if (!rsp.valid()) continue;
-                lb["validate_rsp"].push_back({
-                    {"block_hash", bh.str()},
-                    {"validator",  rsp->node_validator.container},
-                    {"blockInfo",  dump_block_info(rsp->blockInfo)},
-                    {"sig",        base16::encode(rsp->sig.serialize())},
-                    {"tx_count",   (int)rsp->tx_hashes.size()},
-                    {"diffs_count",(int)rsp->diffs.size()}
-                });
-            }
-        }
-
-    }
-
-    // tx_pool
-    j["tx_pool"]["size"] = (int)transaction_pool_of_leader.size();
-    for (auto& [h, tx] : transaction_pool_of_leader) {
-        if (!tx.valid()) continue;
-        auto sk=tx->getSenderKey();
-        j["tx_pool"]["txs"].push_back({
-            {"hash", base16::encode(h.container)},
-            {"body", tx->tx_body},
-            {"sender", sk ? sk->first : std::string()},
-            {"key_id", sk ? sk->second : -1}
-        });
-    }
-
-    // prev_block
-    j["prev_block"] = dump_block_accepted2(prev_block);
-
-    // nodes
-    // if (db_state.valid()) {
-    //     auto an = cells::getAllNodes(root.get(), db_state.get());
-    //     for (auto& n : an) {
-    //         if (!n.valid()) continue;
-    //         j["nodes"].push_back({
-    //             {"name", n->getName().container},
-    //             {"enabled", n->isEnabled()},
-    //             {"stake", std::to_string(n->get_full_stake())},
-    //             {"owner", base16::encode(n->get_owner().addr)},
-    //             {"ip", n->get_ip()},
-    //             {"missed_rounds", n->missed_rounds}
-    //         });
-    //     }
-    // }
-}
 #include "CDatabaseLiteNode.h"
 bool Node::Service::on_startService(const systemEvent::startService *)
 {
@@ -279,9 +168,16 @@ bool Node::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
 
     if (!err)
     {
-        // бывшая логика PutTxREQ: добавить в локальный пул
         transaction_pool_of_leader.insert_or_assign(hash, e->tx);
-        // прямой push на лидера — ОТЛОЖЕН (нужен разбор race с ротацией лидера)
+
+        // Прямой push лидеру по его IP (не ждём GetTxREQ: нода может
+        // early-return'ить в GetTxREQ и не отдать свой пул).
+        auto cl = current_leader();
+        if (cl.valid() && cl->getName() != this_node_name)
+        {
+            sendEvent(cl->get_ip(), ServiceEnum::Node,
+                      new bcEvent::ForwardTxREQ(e->tx, route_t()));
+        }
     }
     passEvent(new bcEvent::AddTxRSP(hash, err.has_value(), err ? *err : "transaction added to pool",
                                     poppedFrontRoute(e->route)));
@@ -362,7 +258,7 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
 
     REF_getter<MsgData::ValidateBlockREQ> vb = new MsgData::ValidateBlockREQ();
     vb->heart_beat = hb;
-    vb->block_timestamp=iUtils->getNow();
+    vb->block_timestamp=getNow();
     // vb->lc = makeLeaderCert(hb, mf.get());
 
     auto &bt = l_blocks[prev];
@@ -388,7 +284,7 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
     MUTEX_INSPECTOR;
     if (e->tid == TIMER_STALE_CLEANUP) {
         MUTEX_INSPECTOR;
-        cleanup_stale(iUtils->getNow().v);
+        cleanup_stale(getNow().v);
         return true;
     }
     if(e->tid == TIMER_PERIODIC_CLOCK)
@@ -908,6 +804,11 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
     return true;
 }
 
+TIME_mks Node::Service::getNow()
+{
+    return TIME_mks{iUtils->getNow().v + clock_lag_us_};
+}
+
 Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *ins, Mode m)
     : UnknownBase(nm),
       ListenerBuffered1Thread(nm, id),
@@ -916,7 +817,8 @@ Node::Service::Service(const SERVICE_id &id, const std::string &nm, IInstance *i
       mode_(m)
 {
     MUTEX_INSPECTOR;
-    node_start_timestamp=iUtils->getNow().v;
+    clock_lag_us_ = ins->getConfig()->get_int64_t("clock_lag_us", 0, "test clock skew (us, signed)");
+    node_start_timestamp=getNow().v;
 
     if (mode_ == Lite) {
         // Lite: без сети, без ключей. Только uplink + локальный кеш.
@@ -1139,9 +1041,9 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
             }
         }
         if (!t_err)
-            b.emit_tx(tx_hash, "result", R"({"success":true})");
+            b.emit_tx_cmd(tx_hash, "result", EmitObj().b("success", true).pack());
         else
-            b.emit_tx(tx_hash, "error", R"({"error":"%s"})", t_err->c_str());
+            b.emit_tx_cmd(tx_hash, "error", EmitObj().s("error", *t_err).pack());
     }
 
     // Фаза block-level изменений — вне tx: nonce, затем награды.
@@ -1206,13 +1108,13 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
                 logNode("calc_fee_rewards: owner not found for node %s (skip reward %lld)",
                         z.container.c_str(), (long long)portion);
             }
-            b.emit_block("reward",R"({"node":"%s","fee":"%s"})",z.container.c_str(),std::to_string(portion).c_str());
+            b.emit_block_cmd("reward", EmitObj().s("node", z.container).s("fee", std::to_string(portion)).pack());
         }
 
     }
 
 
-    b.emit_block("total_fee",R"({"fee":"%s"})",std::to_string(b.node_rewards).c_str());
+    b.emit_block_cmd("total_fee", EmitObj().s("fee", std::to_string(b.node_rewards)).pack());
 
 }
 
@@ -1347,13 +1249,10 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 auto cc = contractHost->get_contract(root.get(), c);
                 if (!cc.valid()) return "contract not found: " + contract_str;
 
-                // params yyjson -> json
-                std::string params_str = yyjson_val_write(params, 0, nullptr);
-                nlohmann::json params_json;
-                if (!params_str.empty()) {
-                    try { params_json = nlohmann::json::parse(params_str); }
-                    catch (const std::exception& e) { return std::string("params parse error: ") + e.what(); }
-                } else params_json = nlohmann::json::object();
+                // params yyjson -> бинарь (тот же формат, что granule_pack)
+                std::string params_packed;
+                try { params_packed = pak::pack_yyjson(params); }
+                catch (const std::exception& e) { return std::string("params pack error: ") + e.what(); }
 
                 CallStack call_stack;
 
@@ -1369,7 +1268,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 
                 NodeMsgSource src(&t);
                 CONTRACT_id caller;
-                JSIValue result = cc->call_method(root.get(), method_str, params_json, &src, 
+                JSIValue result = cc->call_method(root.get(), method_str, params_packed, &src, 
                                                            &call_stack, contractHost.get(), t.roll, caller, & b.fees, deleted_granules,b.validateBlockREQ->block_timestamp);
 
                 JSI_SetContextOpaque(cc->ctx, prev_ctx);
@@ -1396,7 +1295,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
 
                 // эмиты текущей команды → b.emit_command(tx_id, seqId=index, name, value_json)
                 for (auto& ev : ext_ctx.emits) {
-                    b.emit_command(t.tx_id, (int)index, ev.name, "%s", ev.value.c_str());
+                    b.emit_cmd(t.tx_id, (int)index, ev.name, ev.value);
                 }
             }
             ++index;
@@ -1458,6 +1357,8 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         if (!st.valid()) 
             throw CommonError("if (!st.valid()) ");
         st->tx_count++;
+        // ячейку состояния надо пометить dirty, иначе calc_tree_hash её пропустит
+        st->parent->markDirty(b.validateBlockREQ->block_timestamp);
     }
     // ▲▲▲    
     int64_t gasLimitTokens = 0, priority = 0, value = 0;
@@ -1470,7 +1371,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     if (!err) err = yy_get_int64_t(jroot, "priority", priority);
     if (err)
     {
-        b.emit_tx(tx_id, "error", R"({"error":"%s"})", err->c_str());
+        b.emit_tx_cmd(tx_id, "error", EmitObj().s("error", *err).pack());
         return err;
     }
 
@@ -1647,7 +1548,7 @@ REF_getter<const bc_node> Node::Service::current_leader()
     int64_t lastBlockTime=0;
     if(prev_block.valid())
         lastBlockTime=prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v;
-    const auto now=iUtils->getNow().v;
+    const auto now=getNow().v;
     if(now<lastBlockTime)
     {
         if (getenv("MTJS_LEADER_TRACE"))

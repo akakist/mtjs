@@ -1,5 +1,23 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v) {
+    if (typeof v === "bigint")
+        return Number(v);
+    if (Array.isArray(v))
+        return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o = {};
+        for (const k of Object.keys(v))
+            o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
 // chk-storage.ts — JSI_Granule (create_granule/get_granule/set/get/del/touch).
 // node :2301. root — sender.
 const node = "127.0.0.1:2301";
@@ -66,7 +84,7 @@ async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, retr
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (a + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -92,7 +110,7 @@ async function submitAndWaitErr(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, r
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (a + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -174,7 +192,7 @@ async function main() {
         const r = await mtjs.get_contract_data(node, "storage_test", "t1/a", 3);
         check(r.found === true, "t1/a found");
         if (r.found) {
-            const v = JSON.parse(r.value);
+            const v = unBig(r.value);
             check(v.hello === "world", "t1/a.hello == 'world' (got " + v.hello + ")");
         }
     }
@@ -196,7 +214,7 @@ async function main() {
         const r = await mtjs.get_contract_data(node, "storage_test", "t3/a/b", 3);
         check(r.found === true, "t3/a/b found");
         if (r.found) {
-            const v = JSON.parse(r.value);
+            const v = unBig(r.value);
             check(v.n === 42, "t3/a/b.n == 42 (got " + v.n + ")");
         }
     }

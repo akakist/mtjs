@@ -1,5 +1,23 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v) {
+    if (typeof v === "bigint")
+        return Number(v);
+    if (Array.isArray(v))
+        return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o = {};
+        for (const k of Object.keys(v))
+            o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
 const node = "127.0.0.1:2301";
 const GAS_LIMIT = 100000;
 const CALLER_A_SRC_PATH = "/home/bsr/mtjs/src/js/tsi/dist/contracts/caller_a.js";
@@ -69,7 +87,7 @@ async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, retr
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (attempt + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -95,7 +113,7 @@ async function submitAndWaitErr(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, r
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (attempt + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -168,12 +186,7 @@ function childEmits(block, txHash, seqId) {
     const out = [];
     for (const e of nd.emits) {
         let val = e[1];
-        if (typeof val === "string") {
-            try {
-                val = JSON.parse(val);
-            }
-            catch (_) { }
-        }
+        val = unBig(val);
         out.push({ name: e[0], value: val });
     }
     return out;
@@ -197,7 +210,7 @@ async function main() {
         ]);
         check(block.status(rsp.tx_hash) === "ok", "status ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
         const em = childEmits(block, rsp.tx_hash, 0);
-        console.log("  emits[0]:", JSON.stringify(em));
+        console.log("  emits[0]:", jstr(em));
         const r = findEmit(em, "whoAmI");
         check(r !== null, "whoAmI emit present");
         if (r) {
@@ -212,7 +225,7 @@ async function main() {
         ]);
         check(block.status(rsp.tx_hash) === "ok", "status ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
         const em = childEmits(block, rsp.tx_hash, 0);
-        console.log("  emits[0]:", JSON.stringify(em));
+        console.log("  emits[0]:", jstr(em));
         const r = findEmit(em, "whoCalled");
         check(r !== null, "whoCalled emit present");
         if (r) {
@@ -237,7 +250,7 @@ async function main() {
         ]);
         check(block.status(rsp.tx_hash) === "ok", "status ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
         const em = childEmits(block, rsp.tx_hash, 0);
-        console.log("  emits[0]:", JSON.stringify(em));
+        console.log("  emits[0]:", jstr(em));
         const r = findEmit(em, "whoCalled");
         check(r !== null, "whoCalled emit present");
         if (r)

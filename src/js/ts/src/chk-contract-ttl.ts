@@ -1,6 +1,11 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
 const node = "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 
@@ -45,7 +50,7 @@ async function submitAndWait(tx: any[], value = 0, gasLimit = 100000, retries = 
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(rootAddr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: rootAddr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), rootSk, nonce.toString(), () => {});
         if (rsp.err) { if (a+1 < retries) { await new Promise(r=>setTimeout(r,300)); continue; } throw new Error(rsp.err_str); }
         const b = await waitTx(rsp.tx_hash, 10);
         return { rsp, block: b };
@@ -56,7 +61,7 @@ async function submitAndWaitErr(tx: any[], value = 0, gasLimit = 100000, retries
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(rootAddr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: rootAddr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), rootSk, nonce.toString(), () => {});
         if (rsp.err) { if (a+1 < retries) { await new Promise(r=>setTimeout(r,300)); continue; } throw new Error(rsp.err_str); }
         const b = await waitTx(rsp.tx_hash, 10);
         return { rsp, block: b };
@@ -79,7 +84,7 @@ async function main() {
         ]);
         check(block.status(rsp.tx_hash) === "ok", "deploy ok (errstr=" + (block.errstr(rsp.tx_hash)||"") + ")");
         const c = await mtjs.get_contract(node, NAME, 3);
-        console.log("  get_contract:", JSON.stringify({found: c.found, ttl: c.ttl, update_time: c.update_time}));
+        console.log("  get_contract:", jstr({found: c.found, ttl: c.ttl, update_time: c.update_time}));
         check(c.found === true, "found");
         check(c.ttl === 2, "ttl == 2 (got " + c.ttl + ")");
         check(c.update_time > 0, "update_time > 0");

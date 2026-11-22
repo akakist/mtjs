@@ -1,5 +1,23 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v) {
+    if (typeof v === "bigint")
+        return Number(v);
+    if (Array.isArray(v))
+        return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o = {};
+        for (const k of Object.keys(v))
+            o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 const GAS_LIMIT = 20000;
 const NODES = 10;
@@ -130,7 +148,7 @@ async function callViewRetryAny(contract, view, params, timeoutSec = 5, timeout 
 async function submitAndWait(sk, addr, tx, nonce, value, nodeaddr, gasLimit = GAS_LIMIT, retries = 5) {
     for (let a = 0; a < retries; a++) {
         const req = { tx, nonce, value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(nodeaddr, 120, JSON.stringify(req), sk, nonce, () => { });
+        const rsp = await mtjs.tx_submit(nodeaddr, 120, jstr(req), sk, nonce, () => { });
         if (rsp.err) {
             if (a + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -156,7 +174,7 @@ async function submitBatch(txs) {
     let sent = 0;
     const promises = [];
     for (const t of txs) {
-        const p = mtjs.tx_submit(t.node, 120, JSON.stringify({
+        const p = mtjs.tx_submit(t.node, 120, jstr({
             tx: t.tx, nonce: t.nonce, value: t.value, gasLimit: GAS_LIMIT,
             priority: 0, sender: t.addr, key_id: 0,
         }), t.sk, t.nonce, () => { })
@@ -261,7 +279,7 @@ async function main() {
         const r = await callViewRetryAny("tickets", "getEvent", { event: EVENT_NAME }, 10, 10);
         check(r.found === true && !r.error, "view getEvent ok");
         if (r.found && !r.error) {
-            const v = JSON.parse(r.result);
+            const v = unBig(r.result);
             check(v.total === 100000, "total=100k (got " + v.total + ")");
             check(v.sold === 0, "sold=0");
         }
@@ -282,7 +300,7 @@ async function main() {
         const kp = mtjs.generate_keypair(0);
         const nonceCreate = (rootBaseNonce + BigInt(ui * 2)).toString();
         const nonceTransfer = (rootBaseNonce + BigInt(ui * 2 + 1)).toString();
-        promises.push(mtjs.tx_submit(na, 120, JSON.stringify({
+        promises.push(mtjs.tx_submit(na, 120, jstr({
             tx: [{ contract: "root", method: "create_address", params: {
                         addr: uAddr,
                         keys: [{ type: 0, keybuffer: kp.pk }],
@@ -296,7 +314,7 @@ async function main() {
             return { ok: !rsp.err, rsp, name: uName, phase: "create" };
         })
             .catch((e) => ({ ok: false, err: e, name: uName, phase: "create" })));
-        promises.push(mtjs.tx_submit(na, 120, JSON.stringify({
+        promises.push(mtjs.tx_submit(na, 120, jstr({
             tx: [{ contract: "root", method: "transfer", params: {
                         to: uAddr, amount: need.toString(),
                     } }],
@@ -362,7 +380,7 @@ async function main() {
     {
         const r = await callViewRetryAny("tickets", "getEvent", { event: EVENT_NAME }, 60, 60);
         if (r.found && !r.error) {
-            const v = JSON.parse(r.result);
+            const v = unBig(r.result);
             check(v.sold === USERS * TICKETS_PER_USER, "sold=" + (USERS * TICKETS_PER_USER) + " (got " + v.sold + ")");
         }
         else {
@@ -376,7 +394,7 @@ async function main() {
     {
         const r = await callViewRetryAny("tickets", "getTicket", { event: EVENT_NAME, sector: 0, row: 0, seat: 0 }, 10, 10);
         if (r.found && !r.error) {
-            const v = JSON.parse(r.result);
+            const v = unBig(r.result);
             check(v.found === true, "ticket found");
             check(v.sold === true, "sold=true");
         }

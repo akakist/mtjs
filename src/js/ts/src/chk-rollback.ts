@@ -1,6 +1,11 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
 // chk-rollback.ts — on-chain роллбэки.
 // node :2301.
 
@@ -62,7 +67,7 @@ async function submitAndWait(sk: string, addr: string, tx: any[], value = 0, gas
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
             throw new Error("submit: " + rsp.err_str);
@@ -83,7 +88,7 @@ async function submitAndWaitErr(sk: string, addr: string, tx: any[], value = 0, 
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
             throw new Error("submit: " + rsp.err_str);
@@ -209,7 +214,7 @@ async function t4_vote_ttl_no_effect() {
     const st = block.status(rsp.tx_hash);
     if (st !== "ok") {
         console.log("  t4 errstr:", block.errstr(rsp.tx_hash));
-        console.log("  t4 emits:", JSON.stringify(block.emits(rsp.tx_hash)));
+        console.log("  t4 emits:", jstr(block.emits(rsp.tx_hash)));
     }
     check(st === "ok", "status ok (TX успешна, vote failed)");
     const em = childEmits(block, rsp.tx_hash);

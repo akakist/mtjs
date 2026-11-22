@@ -1,5 +1,10 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
 const node = "127.0.0.1:2301";
 function check(c: boolean, m: string) {
     console.log((c ? "  ✅ " : "  ❌ ") + m);
@@ -8,7 +13,7 @@ function check(c: boolean, m: string) {
     console.log("[chk-state]");
     try {
         const s = await mtjs.get_state(node, 3);
-        console.log("  " + JSON.stringify(s));
+        console.log("  " + jstr(s));
         check(s.found === true, "found");
         check(typeof s.total_supply === "string", "total_supply string");
         check(typeof s.total_stake === "string", "total_stake string");

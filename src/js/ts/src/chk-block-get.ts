@@ -1,6 +1,11 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
 const node = "127.0.0.1:2301";
 // Ключ root берём из того же keys_test.json, с которым поднимали genesis.
 // Env-переменные (u_root_ed_sk/k_root_ed_pk) — только как fallback.
@@ -39,7 +44,7 @@ async function main() {
 
     const tx = [{ contract: "root", method: "mint", params: { amount: "1" } }];
     const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0, sender: addr, key_id: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+    const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => {});
     console.log("  submit:", rsp.err, rsp.err_str);
     if (rsp.err) { check(false, "submit failed"); return; }
 

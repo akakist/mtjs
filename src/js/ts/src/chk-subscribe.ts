@@ -1,6 +1,11 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
 const node = "127.0.0.1:2301";
 // Ключ root берём из того же keys_test.json, с которым поднимали genesis.
 // Env-переменные (u_root_ed_sk/k_root_ed_pk) — только как fallback.
@@ -22,7 +27,7 @@ let got = 0;
 mtjs.tx_subscribe(node, (b: Block) => {
     got++;
     console.log("cb#" + got + " block_hash:", b.block_hash);
-    console.log("  tx_hashes:", JSON.stringify(b.tx_hashes));
+    console.log("  tx_hashes:", jstr(b.tx_hashes));
     console.log("  finalized:", b.finalized);
 });
 
@@ -33,7 +38,7 @@ async function main() {
     const nonce = BigInt(ui.nonce);
     const tx = [{ contract: "root", method: "mint", params: { amount: "1" } }];
     const req = { tx, nonce: nonce.toString(), value: 1000000, gasLimit: 100000, priority: 0, sender: addr, key_id: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+    const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => {});
     console.log("submit:", rsp.err, rsp.err_str);
     const t0 = Date.now();
     while (got === 0 && Date.now() - t0 < 10000) {
@@ -41,6 +46,6 @@ async function main() {
     }
     console.log("got:", got);
 }
-main().then(() => {console.log("OK"); std.exit(0);}).catch((e: any) =>{ console.log("ERR:", JSON.stringify(e)); std.exit(1);});
+main().then(() => {console.log("OK"); std.exit(0);}).catch((e: any) =>{ console.log("ERR:", jstr(e)); std.exit(1);});
 setInterval(() => {}, 1000000);
 

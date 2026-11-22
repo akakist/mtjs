@@ -45,7 +45,7 @@ This ensures deterministic execution and efficient state transitions.
 
 Nodes execute the same block of transactions and compute the resulting Merkle root.
 
-If **70% of the stake** produces the **same root hash**,  
+If **67% of the stake** produces the **same root hash**,  
 that state is considered valid and finalized.
 
 > In Grain, the subject of consensus is not the block itself,  
@@ -122,6 +122,15 @@ Grain is under active development.
 Architecture and implementation details may evolve as the protocol matures.
 
 ---
+
+## 📚 Документация
+
+Технические описания:
+
+- [Консенсус и хранение](docs/consensus.md) — стадии блока, живость (alive-сет), лидер, кворумы, Merkle-дерево.
+- [Лайт-нода](docs/light-node.md) — трустлесс, режимы, запросы по хэшам, вложенность гранул.
+- [Разработка контрактов](docs/contracts-dev.md) — registerMethod/view/query, окружение JS, vscode + d.ts.
+- [Скрипты и HTTP](docs/scripts.md) — клиент mtjs, chunked, стриминг блоков/эмитов.
 
 ## 📄 License
 

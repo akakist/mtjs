@@ -7,6 +7,8 @@
 #include <md_GetUserNonceREQ.h>
 #include <md_GetUserNonceRSP.h>
 #include <md_GetNodeInfoREQ.h>
+#include <md_GetNodesREQ.h>
+#include <md_GetNodesRSP.h>
 #include <md_GetNodeInfoRSP.h>
 #include <md_GetValuesREQ.h>
 #include <md_GetValuesRSP.h>
@@ -18,6 +20,7 @@
 #include <md_CallViewRSP.h>
 #include <convert.h>
 #include <md_CallViewREQ.h>
+#include "jsi_pack.h"
 #include <md_GetContractDataREQ.h>
 #include "CallStack.h"
 
@@ -29,6 +32,7 @@ static bool is_syncing_state_req(int p) {
     switch (p) {
     case msgid::GetUserNonceREQ:
     case msgid::GetNodeInfoREQ:
+    case msgid::GetNodesREQ:
     case msgid::GetValuesREQ:
     case msgid::GetContractDataREQ:
     case msgid::GetContractREQ:
@@ -44,6 +48,7 @@ static REF_getter<MsgData::Base> make_syncing_rsp(int p) {
     switch (p) {
     case msgid::GetUserNonceREQ:     return new MsgData::GetUserNonceRSP;
     case msgid::GetNodeInfoREQ:     return new MsgData::GetNodeInfoRSP;
+    case msgid::GetNodesREQ:        return new MsgData::GetNodesRSP;
     case msgid::GetValuesREQ:       return new MsgData::GetValuesRSP;
     case msgid::GetContractDataREQ: return new MsgData::GetContractDataRSP;
     case msgid::GetContractREQ:     return new MsgData::GetContractRSP;
@@ -171,6 +176,22 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
             // ▲▲▲
         }
         break;
+        case msgid::GetNodesREQ:
+        {
+            REF_getter<MsgData::GetNodesRSP> rsp = new MsgData::GetNodesRSP;
+            auto nl = cells::getNodeListNoCreateConst(root.get(), db_state.get());
+            if (nl.valid()) {
+                rsp->setOk();
+                for (auto& name : nl->getList()) {
+                    auto node = cells::getNodeNoCreateConst(root.get(), db_state.get(), name);
+                    if (node.valid()) rsp->nodes[name.container] = node->get_ip();
+                }
+            } else {
+                rsp->setError(msgcode::NOT_FOUND, "node list not found");
+            }
+            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
+            break;
+        }
         case msgid::GetNodeInfoREQ:
         {
             auto pp=(MsgData::GetNodeInfoREQ*) b.get();
@@ -261,6 +282,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 rsp->block_height = st->block_height;
                 rsp->genesis_time = st->genesis_time;
                 rsp->chain_id = st->chain_id;
+                rsp->root_hash = prev_root_hash_Z().str();
             } else {
                 rsp->setError(msgcode::NOT_FOUND, "state not found");
             }
@@ -287,16 +309,16 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 rsp->result_json = "view not found: " + pp->view;
             } else {
                 rsp->setOk();
-                nlohmann::json params;
+                JSIValue params = JSI_NULL;
                 bool params_ok = true;
                 try {
                     params = pp->params_json.empty()
-                           ? nlohmann::json::object()
-                           : nlohmann::json::parse(pp->params_json);
+                           ? JSI_NewObject(cc->ctx)
+                           : unpack_jsi(cc->ctx, pp->params_json);
                 } catch (const std::exception& e) {
                     params_ok = false;
                     rsp->error = true;
-                    rsp->result_json = std::string("params: invalid json: ") + e.what();
+                    rsp->result_json = std::string("params: ") + e.what();
                 }
                 if (params_ok) {
                     CallStack cs;
@@ -318,10 +340,11 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                         rsp->error = true;
                         rsp->result_json = emsg.empty() ? "view exception" : emsg;
                     } else {
-                        rsp->result_json = serialize_value(cc->ctx, r);
+                        rsp->result_json = granule_pack(cc->ctx, r, 0);
                         JSI_FreeValue(cc->ctx, r);
                     }
                 }
+                JSI_FreeValue(cc->ctx, params);
             }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
@@ -374,6 +397,12 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
         case msgid::GetValuesREQ: {
             auto rsp = new MsgData::GetValuesRSP;
             rsp->setOk();
+            passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
+            break;
+        }
+        case msgid::GetNodesREQ: {
+            auto rsp = new MsgData::GetNodesRSP;
+            rsp->setError(msgcode::SYNCING, ex.what());
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));
             break;
         }

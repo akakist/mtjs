@@ -1,5 +1,9 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
 const node = "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 let rootSk = "";
@@ -43,13 +47,13 @@ async function main() {
     await loadKeys();
     console.log("=== GET_USER_NONCE (NoCreate, reject unknown) ===");
     const s0 = await mtjs.get_state(node, 3);
-    console.log("  state0:", JSON.stringify(s0));
+    console.log("  state0:", jstr(s0));
     const acc0 = s0.account_count;
     // t1: root — found: true (genesis)
     {
         console.log("\n[t1] root (genesis) — found: true");
         const ui = await mtjs.get_user_nonce(node, rootAddr, 3);
-        console.log("  ui:", JSON.stringify(ui));
+        console.log("  ui:", jstr(ui));
         check(ui.found === true, "root found: true");
         check(ui.nonce !== undefined && ui.balance !== undefined, "root nonce/balance present");
     }
@@ -59,7 +63,7 @@ async function main() {
         const unknown = randomAddrHex();
         try {
             const ui = await mtjs.get_user_nonce(node, unknown, 3);
-            check(false, "unknown: expected reject, got " + JSON.stringify(ui));
+            check(false, "unknown: expected reject, got " + jstr(ui));
         }
         catch (e) {
             const es = errStr(e);

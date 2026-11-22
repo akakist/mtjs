@@ -1,12 +1,17 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
 const node = "127.0.0.1:2301";
 function errStr(e: any): string { return (e && typeof e==="object" && ("errcode" in e||"errstr" in e)) ? "errcode="+e.errcode+" errstr="+e.errstr : String(e); }
 
 (async () => {
     try {
         const v = await mtjs.get_values(node, 3);
-        console.log("[diag] get_values found=" + v.found + " fees=" + JSON.stringify(v.fees));
+        console.log("[diag] get_values found=" + v.found + " fees=" + jstr(v.fees));
     } catch (e: any) { console.log("[diag] get_values ERR: " + errStr(e)); }
 
     for (let i = 0; i < 10; i++) {

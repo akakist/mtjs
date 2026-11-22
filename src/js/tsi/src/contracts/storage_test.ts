@@ -25,21 +25,26 @@ registerMethod("t3_nested", function(p: {}, m: JsiMsg) {
 // ============================================================
 // simple (concert/sectorA/place11) — цепочка
 // ============================================================
-registerMethod("t_simple_set", function(p: {}, m: JsiMsg) {
+registerMethod("t_simple_set", function(p: { compression?: string }, m: JsiMsg) {
     var g = get("concert", TTL);
     var s = g.get("sectorA", TTL);
     var pl = s.get("place11", TTL);
-    pl.set({ owner: m.sender, price: 100 });
+    pl.set({ owner: m.sender, price: 100 }, (p as any).compression);
 });
 
 registerView("t_simple_get", function(p: {}) {
     var g = get("concert");
-    if (!g) return { found: false };
+    if (!g) return { found: false, dbg: "g_missing" };
     var s = g.get("sectorA");
-    if (!s) return { found: false };
+    if (!s) return { found: false, dbg: "s_missing" };
     var pl = s.get("place11");
-    if (!pl) return { found: false };
-    return pl.get();
+    if (!pl) return { found: false, dbg: "pl_missing" };
+    try {
+        var v = pl.get();
+        return { found: true, dbg: "ok", val: v };
+    } catch (e: any) {
+        return { found: false, dbg: "pl.get_throw: " + String(e) };
+    }
 });
 
 registerMethod("t_simple_del", function(p: {}, m: JsiMsg) {

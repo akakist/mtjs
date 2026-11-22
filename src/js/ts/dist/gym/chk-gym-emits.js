@@ -1,5 +1,23 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v) {
+    if (typeof v === "bigint")
+        return Number(v);
+    if (Array.isArray(v))
+        return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o = {};
+        for (const k of Object.keys(v))
+            o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
 const node = "127.0.0.1:2301";
 const GYM_SRC_PATH = "/home/bsr/mtjs/src/js/tsi/dist/contracts/gym.js";
 const GAS_LIMIT = 100000;
@@ -68,7 +86,7 @@ async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, retr
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (attempt + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -137,13 +155,13 @@ async function getAbonement() {
     const r = await mtjs.get_contract_data(node, "gym", "abonement" + rootAddr, 3);
     if (!r.found)
         return -1;
-    return Number(JSON.parse(r.value).visits);
+    return Number(unBig(r.value).visits);
 }
 async function getPasses() {
     const r = await mtjs.get_contract_data(node, "gym", "entry" + rootAddr, 3);
     if (!r.found)
         return [];
-    return JSON.parse(r.value).passes || [];
+    return unBig(r.value).passes || [];
 }
 function childEmits(block, txHash, seqId) {
     const ch = block.children(txHash);
@@ -155,12 +173,7 @@ function childEmits(block, txHash, seqId) {
     const out = [];
     for (const e of node.emits) {
         let val = e[1];
-        if (typeof val === "string") {
-            try {
-                val = JSON.parse(val);
-            }
-            catch (_) { }
-        }
+        val = unBig(val);
         out.push({ name: e[0], value: val });
     }
     return out;
@@ -204,7 +217,7 @@ async function main() {
         ]);
         check(block.status(rsp.tx_hash) === "ok", "issuePass ok");
         const em = childEmits(block, rsp.tx_hash, 0);
-        console.log("  emits[0]:", JSON.stringify(em));
+        console.log("  emits[0]:", jstr(em));
         const pi = findEmit(em, "PassIssued");
         check(pi !== null, "PassIssued present in children[0].emits");
         if (pi) {
@@ -234,7 +247,7 @@ async function main() {
         ]);
         check(block.status(rsp.tx_hash) === "ok", "createEntry ok");
         const em = childEmits(block, rsp.tx_hash, 0);
-        console.log("  emits[0]:", JSON.stringify(em));
+        console.log("  emits[0]:", jstr(em));
         const ec = findEmit(em, "EntryCreated");
         check(ec !== null, "EntryCreated present");
         if (ec) {
@@ -259,7 +272,7 @@ async function main() {
             ]);
             check(block.status(rsp.tx_hash) === "ok", "markUsed ok");
             const em = childEmits(block, rsp.tx_hash, 0);
-            console.log("  emits[0]:", JSON.stringify(em));
+            console.log("  emits[0]:", jstr(em));
             const eu = findEmit(em, "EntryUsed");
             check(eu !== null, "EntryUsed present");
             if (eu) {
@@ -286,7 +299,7 @@ async function main() {
             ]);
             check(block.status(rsp.tx_hash) === "ok", "markUsed (count=" + remain + ") ok");
             const em = childEmits(block, rsp.tx_hash, 0);
-            console.log("  emits[0]:", JSON.stringify(em));
+            console.log("  emits[0]:", jstr(em));
             const eclosed = findEmit(em, "EntryClosed");
             check(eclosed !== null, "EntryClosed present (used==M → splice)");
             if (eclosed)
@@ -309,7 +322,7 @@ async function main() {
             ]);
             check(block.status(rsp.tx_hash) === "ok", "cancelEntry ok");
             const em = childEmits(block, rsp.tx_hash, 0);
-            console.log("  emits[0]:", JSON.stringify(em));
+            console.log("  emits[0]:", jstr(em));
             const ecancel = findEmit(em, "EntryCancelled");
             check(ecancel !== null, "EntryCancelled present");
             if (ecancel) {
@@ -334,7 +347,7 @@ async function main() {
             ]);
             check(block.status(rsp.tx_hash) === "ok", "disableEntry ok");
             const em = childEmits(block, rsp.tx_hash, 0);
-            console.log("  emits[0]:", JSON.stringify(em));
+            console.log("  emits[0]:", jstr(em));
             const edis = findEmit(em, "EntryDisabled");
             check(edis !== null, "EntryDisabled present");
             if (edis)

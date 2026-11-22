@@ -47,6 +47,8 @@ const char *msgName(int id)
         return "BlockDiffValidateREQ";
     case msgid::BlockDiffValidateRSP:
         return "BlockDiffValidateRSP";
+    case msgid::GetNodesREQ: return "GetNodesREQ";
+    case msgid::GetNodesRSP: return "GetNodesRSP";
     case msgid::GetNodeInfoREQ: return "GetNodeInfoREQ";
     case msgid::GetNodeInfoRSP: return "GetNodeInfoRSP";
     case msgid::GetValuesREQ: return "GetValuesREQ";

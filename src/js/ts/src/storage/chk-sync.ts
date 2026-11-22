@@ -1,6 +1,24 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v: any): any {
+    if (typeof v === "bigint") return Number(v);
+    if (Array.isArray(v)) return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o: any = {};
+        for (const k of Object.keys(v)) o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
+
+
 // chk-sync.ts — node_create → addInstance → trigger block → 503 → sync → OK → state matches.
 //   t1: root funded
 //   t2: deploy bulk
@@ -62,7 +80,7 @@ async function submitAndWait(tx: any[], value = 0, gasLimit = 100000, retries = 
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), rootSk, nonce.toString(), () => {});
         if (rsp.err) { if (a+1 < retries) { await sleep(300); continue; } throw new Error("submit: " + rsp.err_str); }
         const b = await waitTx(rsp.tx_hash, waitSec);
         const st = b.status(rsp.tx_hash);
@@ -315,7 +333,7 @@ async function main() {
 
         const r = await mtjs.call_view(testNode, "bulk", "count", { prefix: "bulk/b0" }, 60, 10);
         if (r.found && !r.error) {
-            const v = JSON.parse(r.result);
+            const v = unBig(r.result);
             check(v.count === PER_TX, "n_test bulk.count(b0) == " + PER_TX + " (got " + v.count + ")");
         } else {
             check(false, "n_test bulk.count failed: " + (r.result || "not found"));

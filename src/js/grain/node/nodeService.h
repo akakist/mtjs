@@ -178,7 +178,6 @@ namespace Node
         };
         _db_to_save db_to_save_Z;
 
-        void dump(nlohmann::json& j);
 
 
         void do_request_for_transactions(MsgData::HeartBeatREQ* hb, const REF_getter<BlockMetaFull>& meta);
@@ -186,6 +185,8 @@ namespace Node
         struct client_leader_info
         {
             REF_getter<MsgData::HeartBeatREQ> node_leader=nullptr;
+            route_t leader_route;      // маршрут обратно к лидеру (из GetTxREQ)
+            bool leader_route_valid=false;
         };
 
         /// Синк идёт: гейт для всех обработчиков консенсуса.
@@ -231,6 +232,8 @@ namespace Node
         }
         REF_getter<MsgData::BlockAccepted2REQ> prev_block;
         int64_t node_start_timestamp=0;
+        int64_t clock_lag_us_ = 0;              // тестовый сдвиг часов ноды (мкс, со знаком)
+        TIME_mks getNow();                      // time source ноды = wall-clock + clock_lag_us_
         int64_t seqId2=0;
         void clear()
         {

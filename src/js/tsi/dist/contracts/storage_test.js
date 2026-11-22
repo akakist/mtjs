@@ -25,19 +25,25 @@ registerMethod("t_simple_set", function (p, m) {
     var g = get("concert", TTL);
     var s = g.get("sectorA", TTL);
     var pl = s.get("place11", TTL);
-    pl.set({ owner: m.sender, price: 100 });
+    pl.set({ owner: m.sender, price: 100 }, p.compression);
 });
 registerView("t_simple_get", function (p) {
     var g = get("concert");
     if (!g)
-        return { found: false };
+        return { found: false, dbg: "g_missing" };
     var s = g.get("sectorA");
     if (!s)
-        return { found: false };
+        return { found: false, dbg: "s_missing" };
     var pl = s.get("place11");
     if (!pl)
-        return { found: false };
-    return pl.get();
+        return { found: false, dbg: "pl_missing" };
+    try {
+        var v = pl.get();
+        return { found: true, dbg: "ok", val: v };
+    }
+    catch (e) {
+        return { found: false, dbg: "pl.get_throw: " + String(e) };
+    }
 });
 registerMethod("t_simple_del", function (p, m) {
     var g = get("concert", TTL);

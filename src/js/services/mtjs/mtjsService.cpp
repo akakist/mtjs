@@ -25,6 +25,7 @@
 #include "md/md_GetUserNonceRSP.h"
 #include "md/md_GetContractDataRSP.h"
 #include "md/md_GetNodeInfoRSP.h"
+#include "md/md_GetNodesRSP.h"
 #include "md/md_GetValuesRSP.h"
 #include "md/md_GetContractREQ.h"
 #include "md/md_GetContractRSP.h"
@@ -38,7 +39,6 @@
 #include "md/md_ScanREQ.h"
 #include "md/md_ScanRSP.h"
 // #include <yyjson.h>
-#include <nlohmann/json.hpp>
 #include "js_tools.h"
 #include "mtjs_block.h"
 extern "C"
@@ -116,6 +116,10 @@ UnknownBase *MTJS::Service::construct(const SERVICE_id &id, const std::string &n
 
 #define CONFIG_MODULE_SUPPORT 1
 #include <quickjs.h>
+#include <zstd.h>
+#include <lz4.h>
+#include "ioBuffer.h"
+#include "i128.h"
 // mallinfo2 is glibc-specific and malloc.h is not available on macOS.
 #if defined(__GLIBC__)
 #include <malloc.h>
@@ -612,6 +616,160 @@ bool MTJS::Service::AddTxRSP(const bcEvent::AddTxRSP* e)
     return true;
 
 }
+// ============================================================
+// Распаковка гранулы (формат jsi_pack: [format_byte][payload])
+// нативное JS_* (mtjs-клиент) — зеркало jsi_pack (qjsi-контракты).
+// ============================================================
+static JSValue mtjs_i128_to_bigint(JSContext* ctx, __int128 v) {
+    std::string str = i128(v).str();
+    JSValue g = JS_GetGlobalObject(ctx);
+    JSValue fn = JS_GetPropertyStr(ctx, g, "BigInt");
+    if (JS_IsException(fn) || JS_IsUndefined(fn)) {
+        JS_FreeValue(ctx, fn); JS_FreeValue(ctx, g);
+        return JS_NULL;
+    }
+    JSValue arg = JS_NewStringLen(ctx, str.data(), str.size());
+    JSValue out = JS_Call(ctx, fn, g, 1, &arg);
+    JS_FreeValue(ctx, arg); JS_FreeValue(ctx, fn); JS_FreeValue(ctx, g);
+    return out;
+}
+
+enum class MtjsTag : int64_t {
+    Null = 0, Bool = 1, Int = 2, Str = 3, Array = 4, Object = 5,
+};
+
+static JSValue mtjs_unpack_impl(JSContext* ctx, inBuffer& in) {
+    int64_t tag = 0;
+    in >> tag;
+    switch (tag) {
+        case (int64_t)MtjsTag::Null:   return JS_NULL;
+        case (int64_t)MtjsTag::Bool: { bool b = false; in >> b; return JS_NewBool(ctx, b); }
+        case (int64_t)MtjsTag::Int: { __int128 v = in.get_i128(); return mtjs_i128_to_bigint(ctx, v); }
+        case (int64_t)MtjsTag::Str: { std::string s; in >> s; return JS_NewStringLen(ctx, s.data(), s.size()); }
+        case (int64_t)MtjsTag::Array: {
+            int64_t n = 0; in >> n;
+            JSValue arr = JS_NewArray(ctx);
+            for (int64_t i = 0; i < n; ++i) {
+                JSValue v = mtjs_unpack_impl(ctx, in);
+                JS_SetPropertyUint32(ctx, arr, (uint32_t)i, v);
+            }
+            return arr;
+        }
+        case (int64_t)MtjsTag::Object: {
+            int64_t n = 0; in >> n;
+            JSValue obj = JS_NewObject(ctx);
+            for (int64_t i = 0; i < n; ++i) {
+                std::string k; in >> k;
+                JSValue v = mtjs_unpack_impl(ctx, in);
+                JS_SetPropertyStr(ctx, obj, k.c_str(), v);
+            }
+            return obj;
+        }
+    }
+    return JS_NULL;
+}
+
+JSValue mtjs_granule_unpack(JSContext* ctx, const std::string& container) {
+    if (container.empty()) return JS_NULL;
+    uint8_t fmt = (uint8_t)container[0];
+    std::string payload = container.substr(1);
+    if (fmt == 1) {
+        unsigned long long sz = ZSTD_getFrameContentSize(payload.data(), payload.size());
+        if (sz == ZSTD_CONTENTSIZE_ERROR || sz == ZSTD_CONTENTSIZE_UNKNOWN) return JS_NULL;
+        std::string raw((size_t)sz, '\0');
+        size_t r = ZSTD_decompress(&raw[0], raw.size(), payload.data(), payload.size());
+        if (ZSTD_isError(r)) return JS_NULL;
+        raw.resize(r);
+        payload.swap(raw);
+    } else if (fmt == 2) {
+        // [orig_size(4)][lz4_data]
+        if (payload.size() < 4) return JS_NULL;
+        uint32_t orig = 0; memcpy(&orig, payload.data(), 4);
+        std::string dst(orig, '\0');
+        int n = LZ4_decompress_safe(payload.data() + 4, &dst[0], (int)(payload.size() - 4), (int)orig);
+        if (n < 0) return JS_NULL;
+        dst.resize(n);
+        payload.swap(dst);
+    } else if (fmt != 0) {
+        return JS_NULL;
+    }
+    inBuffer in(payload);
+    return mtjs_unpack_impl(ctx, in);
+}
+
+JSValue mtjs_unpack_bytes(JSContext* ctx, const std::string& bytes) {
+    inBuffer in(bytes);
+    return mtjs_unpack_impl(ctx, in);
+}
+
+// Нативная упаковка JSValue -> [оформление jsi_pack] (зеркало jsi_pack, клиент).
+// Формат совпадает с nodой: pack_jsi (тег + i128 + string/array/object).
+static void mtjs_pack_impl(JSContext* ctx, JSValueConst val, outBuffer& o) {
+    if (JS_IsNull(val) || JS_IsUndefined(val)) { o << (int64_t)MtjsTag::Null; return; }
+    if (JS_IsBool(val)) { o << (int64_t)MtjsTag::Bool; o << (bool)(JS_ToBool(ctx, val) != 0); return; }
+    int tag = JS_VALUE_GET_TAG(val);
+    if (tag == JS_TAG_BIG_INT || tag == JS_TAG_SHORT_BIG_INT) {
+        size_t len = 0;
+        const char* s = JS_ToCStringLen(ctx, &len, val);
+        if (!s) throw std::runtime_error("pack: bigint");
+        std::string str(s, len);
+        JS_FreeCString(ctx, s);
+        o << (int64_t)MtjsTag::Int;
+        o.put_i128(i128::fromString(str).v);
+        return;
+    }
+    if (tag == JS_TAG_INT) { o << (int64_t)MtjsTag::Int; o.put_i128((__int128)JS_VALUE_GET_INT(val)); return; }
+    if (JS_IsString(val)) {
+        size_t len = 0;
+        const char* s = JS_ToCStringLen(ctx, &len, val);
+        std::string r(s ? s : "", s ? len : 0);
+        if (s) JS_FreeCString(ctx, s);
+        o << (int64_t)MtjsTag::Str; o << r; return;
+    }
+    if (JS_IsArray(ctx, val)) {
+        JSValue lv = JS_GetPropertyStr(ctx, val, "length");
+        int64_t len = 0; JS_ToInt64(ctx, &len, lv); JS_FreeValue(ctx, lv);
+        o << (int64_t)MtjsTag::Array; o << (int64_t)len;
+        for (int64_t i = 0; i < len; ++i) {
+            JSValue item = JS_GetPropertyUint32(ctx, val, (uint32_t)i);
+            mtjs_pack_impl(ctx, item, o);
+            JS_FreeValue(ctx, item);
+        }
+        return;
+    }
+    if (JS_IsObject(val)) {
+        JSPropertyEnum* props = nullptr;
+        uint32_t count = 0;
+        std::map<std::string, JSValue> items;
+        if (JS_GetOwnPropertyNames(ctx, &props, &count, val, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) == 0) {
+            for (uint32_t i = 0; i < count; ++i) {
+                const char* k = JS_AtomToCString(ctx, props[i].atom);
+                std::string key = k ? k : "";
+                if (k) JS_FreeCString(ctx, k);
+                JSValue item = JS_GetProperty(ctx, val, props[i].atom);
+                items[key] = item;
+                JS_FreeAtom(ctx, props[i].atom);
+            }
+            js_free(ctx, props);
+        }
+        o << (int64_t)MtjsTag::Object; o << (int64_t)items.size();
+        for (auto& kv : items) {
+            o << kv.first;
+            mtjs_pack_impl(ctx, kv.second, o);
+            JS_FreeValue(ctx, kv.second);
+        }
+        return;
+    }
+    throw std::runtime_error("pack: unsupported value");
+}
+
+JSValue mtjs_pack_bytes(JSContext* ctx, JSValueConst val, std::string& out) {
+    outBuffer o;
+    mtjs_pack_impl(ctx, val, o);
+    out = o.asString()->container;
+    return JS_UNDEFINED;
+}
+
 bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
 {
     MUTEX_INSPECTOR;
@@ -680,7 +838,9 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
         JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));        
         JS_SetPropertyStr(ctx, obj, "error", JS_NewBool(ctx, rs->error));
-        JS_SetPropertyStr(ctx, obj, "result", JS_NewString(ctx, rs->result_json.c_str()));
+        JS_SetPropertyStr(ctx, obj, "result", rs->error
+            ? JS_NewString(ctx, rs->result_json.c_str())
+            : mtjs_granule_unpack(ctx, rs->result_json));
         JSValue ret = JS_Call(ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
         scope.addValue(ret);
         opaque.node_req_promises.erase(e->hash_of_request.container);
@@ -730,6 +890,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JS_SetPropertyStr(ctx, obj, "tx_count",       JS_NewInt64(ctx, rs->tx_count));
         JS_SetPropertyStr(ctx, obj, "block_height",   JS_NewInt64(ctx, rs->block_height));
         JS_SetPropertyStr(ctx, obj, "genesis_time",   JS_NewInt64(ctx, rs->genesis_time));
+        JS_SetPropertyStr(ctx, obj, "root_hash", JS_NewString(ctx, rs->root_hash.c_str()));
         JS_SetPropertyStr(ctx, obj, "chain_id",       JS_NewInt64(ctx, rs->chain_id));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
         scope.addValue(ret);
@@ -826,6 +987,32 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         return true;
     }
     break;
+    case msgid::GetNodesRSP:
+    {
+        auto *rs = (MsgData::GetNodesRSP*) b.get();
+        auto *ctx = it->second.ctx;
+        JSScope<20, 20> scope(it->second.ctx);
+        auto obj = JS_NewObject(ctx);
+        scope.addValue(obj);
+        JS_SetPropertyStr(ctx, obj, "found",   JS_NewBool(ctx, rs->found()));
+        JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
+        JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));
+        JSValue nodes_arr = JS_NewArray(ctx);
+        int idx = 0;
+        for (auto& kv : rs->nodes) {
+            JSValue item = JS_NewObject(ctx);
+            JS_SetPropertyStr(ctx, item, "name", JS_NewString(ctx, kv.first.c_str()));
+            JS_SetPropertyStr(ctx, item, "ip",   JS_NewString(ctx, kv.second.c_str()));
+            JS_SetPropertyUint32(ctx, nodes_arr, idx++, item);
+        }
+        JS_SetPropertyStr(ctx, obj, "nodes", nodes_arr);
+        JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
+        scope.addValue(ret);
+        opaque.node_req_promises.erase(e->hash_of_request.container);
+        sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(Timers::TIMER_ClientMsg_TIMEDOUT, toRef(e->hash_of_request.container), this));
+        return true;
+    }
+    break;
     case msgid::GetValuesRSP:
     {
         auto *rs=(MsgData::GetValuesRSP*) b.get();
@@ -862,7 +1049,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));        
         JS_SetPropertyStr(ctx, obj, "contract", JS_NewString(ctx, rs->contract.c_str()));
         JS_SetPropertyStr(ctx, obj, "key", JS_NewString(ctx, rs->key.c_str()));
-        JS_SetPropertyStr(ctx, obj, "value", JS_NewString(ctx, rs->value.c_str()));
+        JS_SetPropertyStr(ctx, obj, "value", mtjs_granule_unpack(ctx, rs->value));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
         scope.addValue(ret);
         opaque.node_req_promises.erase(e->hash_of_request.container);
@@ -877,44 +1064,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
 }
 extern "C" JSValue parse_yyjson(JSContext *ctx, const char *json_str, size_t len);
 
-#include <nlohmann/json.hpp>
 
-void to_json(nlohmann::json& j, const EmitNode& node) {
-    MUTEX_INSPECTOR;
-    XTRY;
-    // Сначала добавляем эмиты текущего уровня
-    nlohmann::json emits_array = nlohmann::json::array();
-    for (const auto& emit_pair : node.emits)
-    {
-        XTRY;
-        MUTEX_INSPECTOR;
-        nlohmann::json emit_obj;
-        emit_obj["cmd"] = emit_pair.first;
-        try {
-            MUTEX_INSPECTOR;
-            logErr2("parse %s", emit_pair.second.c_str());
-            emit_obj["data"] = nlohmann::json::parse(emit_pair.second);
-
-        }
-        catch(std::exception& e)
-        {
-            logErr2("Failed to parse JSON for emit data: %s, error: %s", emit_pair.second.c_str(), e.what());
-            // emit_obj["data"] = emit_pair.second;
-        }
-        emits_array.push_back(emit_obj);
-        XPASS;
-    }
-    j["emits"] = emits_array;
-
-    // Затем рекурсивно обрабатываем детей
-    for (const auto& child_pair : node.children)
-    {
-        XTRY;
-        j["children"][child_pair.first] = child_pair.second;
-        XPASS;
-    }
-    XPASS;
-}
 bool MTJS::Service::ClientTxSubscribeRSP(const bcEvent::ClientTxSubscribeRSP *e)
 {
     MUTEX_INSPECTOR;

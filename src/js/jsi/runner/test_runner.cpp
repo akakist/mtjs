@@ -336,8 +336,10 @@ static bool run_transactions(JSIRuntime* rt, JSIContext* runner_ctx, TestCase& t
             CONTRACT_id caller;
             JSIValue result;
             if (is_view) {
-                result = cc->call_view(NULL,cmd.method, cmd.params, &msg_src,
+                JSIValue vparams = json_to_jsi(cc->ctx, cmd.params);
+                result = cc->call_view(NULL,cmd.method, vparams, &msg_src,
                                                 call_ctx->call_stack, host, 5, call_ctx->now);
+                JSI_FreeValue(cc->ctx, vparams);
             } else {
                 result = cc->call_method(NULL, cmd.method, cmd.params, &msg_src,
                                                   call_ctx->call_stack, host, NULL,

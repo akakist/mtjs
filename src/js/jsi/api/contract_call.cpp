@@ -1,4 +1,5 @@
 #include "quickjs_i.h"
+#include "jsi_pack.h"
 #include "ContractContext.h"
 #include "CallContext.h"
 #include "CallFrame.h"
@@ -10,7 +11,6 @@
 #include "t_params.h"
 #include "FeesSnapshot.h"
 
-using json = nlohmann::json;
 JSIValue build_msg_object(JSIContext* ctx, const jsiMsg& /*m*/) ;
 
 #include "contract_constants.h"
@@ -40,7 +40,7 @@ namespace {
 // method: msg есть, газ есть, roll есть
 // ============================================================
 JSIValue ContractContext::call_method(Cellable* root,const std::string& method_name,
-                             const json& params,
+                             const std::string& params_packed,
                              IMsgSource* msg_source,
                              CallStack* call_stack,
                               ContractHost* host, Rollback* roll,
@@ -79,7 +79,7 @@ JSIValue ContractContext::call_method(Cellable* root,const std::string& method_n
     JSI_SetInterruptHandler(rt, interrupt_handler, call_ctx.get());
     JSI_UpdateStackTop(rt);
 
-    JSIValue params_js = json_to_jsi(ctx, params);
+    JSIValue params_js = unpack_jsi(ctx, params_packed);
     if (JSI_IsException(params_js)) {
         JSI_SetInterruptHandler(rt, nullptr, nullptr);
         JSI_SetContextOpaque(ctx, saved);
@@ -128,7 +128,7 @@ JSIValue ContractContext::call_method(Cellable* root,const std::string& method_n
 // query: reader-only, без газа, now сэмплируется на входе и наследуется вложенными
 // ============================================================
 JSIValue ContractContext::call_query(Cellable* root, const std::string& query_name,
-                             const json& params,
+                             const JSIValue& params,
                              CallStack* call_stack,
                              ContractHost* host,
                              TIME_mks now,
@@ -164,7 +164,7 @@ JSIValue ContractContext::call_query(Cellable* root, const std::string& query_na
     JSI_SetInterruptHandler(rt, view_interrupt_handler, &vi);
     JSI_UpdateStackTop(rt);
 
-    JSIValue params_js = json_to_jsi(ctx, params);
+    JSIValue params_js = JSI_DupValue(ctx, params);
     if (JSI_IsException(params_js)) {
         JSI_SetInterruptHandler(rt, nullptr, nullptr);
         JSI_SetContextOpaque(ctx, saved);
@@ -182,7 +182,7 @@ JSIValue ContractContext::call_query(Cellable* root, const std::string& query_na
 }
 
 JSIValue ContractContext::call_view(Cellable* root,const std::string& view_name,
-                             const json& params,
+                             const JSIValue& params,
                              IMsgSource* msg_source,
                              CallStack* call_stack,
                              ContractHost* host,
@@ -226,7 +226,7 @@ JSIValue ContractContext::call_view(Cellable* root,const std::string& view_name,
     JSI_SetInterruptHandler(rt, view_interrupt_handler, &vi);   // ← лимит времени
     JSI_UpdateStackTop(rt);
 
-    JSIValue params_js = json_to_jsi(ctx, params);
+    JSIValue params_js = JSI_DupValue(ctx, params);
     if (JSI_IsException(params_js)) {
         JSI_SetInterruptHandler(rt, nullptr, nullptr);
         JSI_SetContextOpaque(ctx, saved);

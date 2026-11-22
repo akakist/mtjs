@@ -1,6 +1,24 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v: any): any {
+    if (typeof v === "bigint") return Number(v);
+    if (Array.isArray(v)) return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o: any = {};
+        for (const k of Object.keys(v)) o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
+
+
 // chk-gc.ts — GC: scan_expired → root.gc({items}) → проверка
 // node :2301. root — emitter/sender.
 
@@ -58,7 +76,7 @@ async function submitAndWait(sk: string, addr: string, tx: any[], value = 0, gas
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
             throw new Error("submit: " + rsp.err_str);
@@ -97,7 +115,7 @@ function childEmits(block: Block, txHash: string): { [seq: string]: any[] } {
 function emitVal(e: any): any {
     // e = [name, value]; value может быть объект или JSON-строка
     let v = e[1];
-    if (typeof v === "string") { try { v = JSON.parse(v); } catch (_) { return null; } }
+    v = unBig(v);
     return v;
 }
 function sumEmitCount(em: { [seq: string]: any[] }, name: string): number {
@@ -138,7 +156,7 @@ async function gcPass(label: string): Promise<GcTotal> {
             ]);
             check(block.status(rsp.tx_hash) === "ok", label + " gc ok (errstr=" + block.errstr(rsp.tx_hash) + ")");
             const em = childEmits(block, rsp.tx_hash);
-            console.log("  " + label + " children:", JSON.stringify(em));
+            console.log("  " + label + " children:", jstr(em));
             total.applied  += sumGcApplied(em);
             total.granule  += sumEmitCount(em, "gc_granule");
             total.contract += sumEmitCount(em, "gc_contract");
@@ -214,7 +232,7 @@ async function main() {
             const g = await mtjs.get_contract_data(node, "ttl_test", "x", 3);
             check(g.found === true, "x found");
             if (g.found) {
-                const v = JSON.parse(g.value);
+                const v = unBig(g.value);
                 check(v.v === 777, "x.v == 777 (got " + v.v + ")");
             }
         }

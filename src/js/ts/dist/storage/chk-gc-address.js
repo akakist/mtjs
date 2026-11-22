@@ -1,5 +1,23 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v) {
+    if (typeof v === "bigint")
+        return Number(v);
+    if (Array.isArray(v))
+        return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o = {};
+        for (const k of Object.keys(v))
+            o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
 // chk-gc-address.ts — GC адреса: ttl expired → удалить адрес, сжечь баланс.
 // node :2301. root — sender.
 const node = "127.0.0.1:2301";
@@ -60,7 +78,7 @@ async function submitAndWait(sk, addr, tx, value = 0, gasLimit = GAS_LIMIT, retr
     for (let a = 0; a < retries; a++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (a + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -106,12 +124,7 @@ async function gcOnce(label, dbids) {
     if (em)
         for (const k of Object.keys(em)) {
             for (const e of em[k].emits) {
-                let v = e[1];
-                if (typeof v === "string")
-                    try {
-                        v = JSON.parse(v);
-                    }
-                    catch (_) { }
+                let v = unBig(e[1]);
                 if (e[0] === "gc" && v && typeof v.applied === "number")
                     applied += v.applied;
                 if (e[0] === "gc_address" && v && typeof v.count === "number")
@@ -148,7 +161,7 @@ async function main() {
     }
     const info0 = await mtjs.get_address_info(node, newAddr, 3);
     check(info0.found === true, "address found (before gc)");
-    check(BigInt(info0.balance) === 1000n, "balance=1000 (got " + info0.balance + ")");
+    check(Number(info0.balance) === 1000, "balance=1000 (got " + info0.balance + ")");
     // 3. Ждать 3s
     await new Promise(r => setTimeout(r, 3000));
     // 4. scan + gc

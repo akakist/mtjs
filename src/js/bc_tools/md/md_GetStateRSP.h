@@ -17,6 +17,7 @@ namespace MsgData
         int64_t block_height = 0;
         int64_t genesis_time = 0;
         int64_t chain_id = 0;
+        std::string root_hash;   // текущий корень состояния (Merkle root)
         void update(Blake2bHasher& h) const
         {
             update_status(h);
@@ -28,6 +29,7 @@ namespace MsgData
             h.update(std::to_string(block_height));
             h.update(std::to_string(genesis_time));
             h.update(std::to_string(chain_id));
+            h.update(root_hash);
         }
         void pack(outBuffer& b) const final
         {
@@ -35,7 +37,7 @@ namespace MsgData
             pack_status(b);
             b<<total_supply<<total_stake
              <<account_count<<node_count<<contract_count
-             <<tx_count<<block_height<<genesis_time<<chain_id;
+             <<tx_count<<block_height<<genesis_time<<chain_id<<root_hash;
         }
         void unpack(inBuffer& b) final
         {
@@ -43,7 +45,7 @@ namespace MsgData
             unpack_status(b);
             b>>total_supply>>total_stake
              >>account_count>>node_count>>contract_count
-             >>tx_count>>block_height>>genesis_time>>chain_id;
+             >>tx_count>>block_height>>genesis_time>>chain_id>>root_hash;
         }
         static Base* construct() { return new GetStateRSP(); }
     };

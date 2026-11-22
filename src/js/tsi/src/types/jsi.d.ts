@@ -1,3 +1,4 @@
+type GranuleCompression = "cpy" | "zstd" | "lz4";
 // JSI API контрактов (jsi/api/contract_api.cpp, register_api).
 // Рантайм: quickjs_i.c/quickjs_i.h (int64-only, float64 удалён).
 // banned (grep в r.sh, lib: ["es5"] их содержит, tsc НЕ ловит):
@@ -25,7 +26,7 @@ interface JsiStorage {
     get(): any;                                      // value (JSON, null если пусто)
     get(name: string): JsiStorage | null;            // child (null если нет)
     get(name: string, ttl: number): JsiStorage;      // child orCreate
-    set(value: any): void;
+    set(value: any, compression?: GranuleCompression): void;
     del(): void;
 }
 
@@ -37,19 +38,19 @@ interface JsiStorageView {
 
 interface JsiStorageWritable extends JsiStorageView {
     get(name: string, ttl: number): JsiStorageWritable;
-    set(value: any): void;
+    set(value: any, compression?: GranuleCompression): void;
     del(): void;
 }
 
 // interface JsiStorage {
 //     // создать дочерний (ошибка, если уже есть)
-//     create_granule(name: string, ttl: number): JsiStorage;
+//     create_granule(name: string, ttl: number, compression?: GranuleCompression): JsiStorage;
 
 //     // получить дочерний (ошибка, если нет — try/catch в контракте)
 //     get_granule(name: string): JsiStorage;
 
 //     // данные (container = serialize(value))
-//     set(value: any): void;
+//     set(value: any, compression?: GranuleCompression): void;
 //     get(): any;   // null, если пусто
 
 //     // удалить (bc_granule + bc_activity)
@@ -64,7 +65,7 @@ interface JsiStorageWritable extends JsiStorageView {
 
     // interface JsiStorageWritable extends JsiStorageView {
     //     get_granule(name: string, ttl: number): JsiStorageWritable;   // orCreate
-    //     set(value: any): void;
+    //     set(value: any, compression?: GranuleCompression): void;
     //     del(): void;
     // }
 
@@ -97,14 +98,14 @@ declare function registerView(name: string, fn: (params: any) => any): void;
 // ============================================================
 declare function getGranule(key: string): JsiGranule | undefined;
 
-declare function createGranule(key: string, value: any, ttl: number): void;
+declare function createGranule(key: string, value: any, ttl: number, compression?: GranuleCompression): void;
 
 declare function setGranule(key: string, value: any): void;
 
 // ============================================================
 // Новый API (иерархия): create_granule/get_granule
 // ============================================================
-// declare function create_granule(path: string, ttl: number): JsiStorage;
+declare function create_granule(path: string, ttl: number, compression?: GranuleCompression): JsiStorage;
 
 // получить корневой (ошибка, если нет)
 // declare function get_granule(path: string): JsiStorage;

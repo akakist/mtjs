@@ -1,6 +1,24 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v: any): any {
+    if (typeof v === "bigint") return Number(v);
+    if (Array.isArray(v)) return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o: any = {};
+        for (const k of Object.keys(v)) o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
+
+
 const node = "127.0.0.1:2301";
 const GYM_SRC_PATH = "/home/bsr/mtjs/src/js/tsi/dist/contracts/gym.js";
 const GAS_LIMIT = 100000;
@@ -57,7 +75,7 @@ async function submitAndWait(sk: string, addr: string, tx: any[], value = 0, gas
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
             throw new Error("submit: " + rsp.err_str);
@@ -151,11 +169,11 @@ async function main() {
     }
     {
         const r = await mtjs.get_contract_data(node, "gym", "abonement" + rootAddr, 3);
-        console.log("  abonement:", JSON.stringify(r));
+        console.log("  abonement:", jstr(r));
         check(r.found === true, "abonement found");
         if (r.found) {
             let v: any = null;
-            try { v = JSON.parse(r.value); } catch (e: any) { check(false, "abonement value JSON: " + String(e)); }
+            try { v = unBig(r.value); } catch (e: any) { check(false, "abonement value JSON: " + String(e)); }
             if (v) check(Number(v.visits) >= 0, "abonement.visits >= 0 (got " + (v && v.visits) + ")");
         }
     }
@@ -166,7 +184,7 @@ async function main() {
         let activeId = -1;
         if (r.found) {
             try {
-                const v = JSON.parse(r.value);
+                const v = unBig(r.value);
                 activeId = findActiveId(v.passes || [], now);
             } catch (e: any) {}
         }
@@ -181,7 +199,7 @@ async function main() {
     }
     {
         const r = await mtjs.get_contract_data(node, "gym", "entry" + rootAddr, 3);
-        console.log("  entry:", JSON.stringify(r));
+        console.log("  entry:", jstr(r));
         check(r.found === true, "entry found");
     }
 
@@ -191,7 +209,7 @@ async function main() {
         let activeId = -1;
         if (r.found) {
             try {
-                const v = JSON.parse(r.value);
+                const v = unBig(r.value);
                 activeId = findActiveId(v.passes || [], now);
             } catch (e: any) {}
         }
@@ -208,7 +226,7 @@ async function main() {
         const r = await mtjs.get_contract_data(node, "gym", "entry" + rootAddr, 3);
         if (r.found) {
             try {
-                const v = JSON.parse(r.value);
+                const v = unBig(r.value);
                 const passes = v.passes || [];
                 const usedAny = passes.some((pp: any) => Number(pp.used) >= 1);
                 check(usedAny, "some entry.passes[].used >= 1");

@@ -2,7 +2,6 @@
 #include "md_Base.h"
 #include "md_HeartBeatREQ.h"
 #include "md_attachment_data.h"
-#include <nlohmann/json.hpp>
 namespace MsgData
 {
     struct BlockInfo: public Base

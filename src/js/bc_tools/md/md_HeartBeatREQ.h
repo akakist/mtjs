@@ -3,7 +3,6 @@
 #include "THASH_id.h"
 
 #include "NODE_id.h"
-#include <nlohmann/json.hpp>
 namespace MsgData
 {
     struct HeartBeatREQ: public Base

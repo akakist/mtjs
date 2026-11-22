@@ -4,6 +4,24 @@
 // (Контракт больше не может явно удалять гранулу — только TTL.)
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v: any): any {
+    if (typeof v === "bigint") return Number(v);
+    if (Array.isArray(v)) return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o: any = {};
+        for (const k of Object.keys(v)) o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
+
+
 const node = "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 
@@ -63,7 +81,7 @@ async function submitAndWait(tx: any[], value = 0, gasLimit = 100000, retries = 
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(rootAddr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: rootAddr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), rootSk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), rootSk, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
             throw new Error("submit: " + rsp.err_str);
@@ -89,7 +107,7 @@ function hasEmit(em: { [seq: string]: any[] }, name: string): any {
     for (const k of Object.keys(em)) for (const e of em[k]) {
         if (e[0] !== name) continue;
         let v: any = e[1];
-        if (typeof v === "string") { try { v = JSON.parse(v); } catch (_) { return {}; } }
+        v = unBig(v);
         return v || {};
     }
     return null;
@@ -98,7 +116,7 @@ async function granuleState(key: string): Promise<{ found: boolean; v?: any }> {
     const g: any = await mtjs.get_contract_data(node, "resurrect_test", key, 3);
     if (!g.found) return { found: false };
     let v: any = null;
-    try { v = JSON.parse(g.value); } catch (_) { }
+    try { v = unBig(g.value); } catch (_) { }
     return { found: true, v };
 }
 async function waitGone(key: string, to = 15): Promise<boolean> {

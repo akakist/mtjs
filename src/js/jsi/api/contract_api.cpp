@@ -1,9 +1,9 @@
 #include "quickjs_i.h"
+#include "jsi_pack.h"
 #include <iostream>
 #include "ContractContext.h"
 #include "contract_constants.h"
 #include <vector>
-#include <nlohmann/json.hpp>
 #include "CallContext.h"
 #include "jsiscope.h"
 #include "convert.h"
@@ -13,7 +13,6 @@
 #include "t_params.h"
 #include "QUORUM.h"   // GAS_STEP
 
-using json = nlohmann::json;
 ExecContext* require_ctx__1(JSIContext* ctx) ;
 
 
@@ -247,10 +246,13 @@ JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueCon
         if (io->existsGranule(call->root, cc->name, cid))
             return JSI_ThrowTypeError(ctx, "createGranule: already exists: %s%s",
                                       cc->name.container.c_str(), key.c_str());
-        std::string s = serialize_value(ctx, argv[1]);
-        if (!is_serializable(s))
-            return JSI_ThrowTypeError(ctx, "createGranule(%s%s): cannot serialize value",
-                                      cc->name.container.c_str(), key.c_str());
+        int compression = 0;
+        try { compression = parse_compression(ctx, argc >= 4 ? argv[3] : JSI_UNDEFINED); }
+        catch (const std::exception& e) {
+            return JSI_ThrowTypeError(ctx, "createGranule(%s%s): %s",
+                                      cc->name.container.c_str(), key.c_str(), e.what());
+        }
+        std::string s = granule_pack(ctx, argv[1], compression);
         if (s.size() > MAX_GRANULE_SIZE)
             return JSI_ThrowTypeError(ctx, "createGranule(%s%s): value too large",
                                       cc->name.container.c_str(), key.c_str());
@@ -304,10 +306,8 @@ JSIValue jsi_setGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
             return JSI_ThrowTypeError(ctx, "setGranule: no ttl (granule without ttl)");
         int64_t ttl_gas = (ttl + call->fees->ttl_seconds_per_gas - 1) / call->fees->ttl_seconds_per_gas;   // без base
 
-        std::string s = serialize_value(ctx, argv[1]);
-        if (!is_serializable(s))
-            return JSI_ThrowTypeError(ctx, "setGranule(%s%s): cannot serialize value",
-                                      cc->name.container.c_str(), key.c_str());
+        // тот же бинарный формат, что createGranule/getGranule (granule_pack)
+        std::string s = granule_pack(ctx, argv[1], 0);
         if (s.size() > MAX_GRANULE_SIZE)
             return JSI_ThrowTypeError(ctx, "setGranule(%s%s): value too large",
                                       cc->name.container.c_str(), key.c_str());
@@ -350,12 +350,8 @@ JSIValue jsi_getGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
         if (!io->getGranule(call->root, cc->name,cid, value)){
             return JSI_UNDEFINED;
         } 
-        json j = json::parse(value);
-        return json_to_jsi(ctx, j);
+        return granule_unpack(ctx, value);
     } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
-    catch (const json::exception& e) { 
-        return JSI_ThrowTypeError(ctx, "getGranule: %s", e.what()); 
-    }
     catch (const std::exception& e) { return JSI_ThrowInternalError(ctx, "getGranule: %s", e.what()); }
     catch (...) { return JSI_ThrowInternalError(ctx, "getGranule: unknown C++ exception"); }
 }
@@ -458,8 +454,7 @@ JSIValue jsi_emit(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv)
         JSIScope<20,20> scope(ctx);
         auto name = scope.toStdString(argv[0]);
         if (name.empty()) return JSI_EXCEPTION;
-        std::string s = serialize_value(ctx, argv[1]);
-        if (!is_serializable(s)) return JSI_ThrowTypeError(ctx, "emit(%s): cannot serialize value", name.c_str());
+        std::string s = granule_pack(ctx, argv[1], 0);
         call->emits.push_back(jsiEvent{ cc->name.container, name, s });
         return JSI_UNDEFINED;
     } catch (const std::bad_alloc&) { return JSI_ThrowOutOfMemory(ctx); }
@@ -486,10 +481,10 @@ JSIValue jsi_callMethod(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst*
         if (call->contract->name == contract_name) return JSI_ThrowTypeError(ctx, "callMethod to self not allowed");
         auto cc = call->host->get_contract(call->root,contract_name);
         if (!cc.valid()) return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.container.c_str());
-        json params = json_from_jsi(ctx, argv[2]);
+        std::string params_packed = pack_jsi(ctx, argv[2]);
         void* prev = JSI_GetContextOpaque(cc->ctx);      // ContractContext* (или nullptr)
         JSI_SetContextOpaque(cc->ctx, call);             // CallContext* caller
-        JSIValue r = cc->call_method(call->root, method_name, params, call->msg_source, 
+        JSIValue r = cc->call_method(call->root, method_name, params_packed, call->msg_source, 
                                                call->call_stack, call->host, call->roll, call->contract->name,call->fees,call->deleted_granules, call->now);
         JSI_SetContextOpaque(cc->ctx, prev);             // восстановить
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
@@ -540,10 +535,9 @@ JSIValue jsi_callQuery(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* 
         if (contract_name.container.empty() || query_name.empty()) return JSI_EXCEPTION;
         auto cc = call->host->get_contract(call->root, contract_name);
         if (!cc.valid()) return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.container.c_str());
-        json params = json_from_jsi(ctx, argv[2]);
         void* prev = JSI_GetContextOpaque(cc->ctx);
         JSI_SetContextOpaque(cc->ctx, call);
-        JSIValue r = cc->call_query(call->root, query_name, params, call->call_stack, call->host,
+        JSIValue r = cc->call_query(call->root, query_name, argv[2], call->call_stack, call->host,
                                              call->now, call->block_timestamp);
         JSI_SetContextOpaque(cc->ctx, prev);
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
@@ -577,10 +571,9 @@ JSIValue jsi_callView(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* a
         }
         auto cc = call->host->get_contract(call->root, contract_name);
         if (!cc.valid()) return JSI_ThrowTypeError(ctx, "contract not found: %s", contract_name.container.c_str());
-        json params = json_from_jsi(ctx, argv[2]);
         void* prev = JSI_GetContextOpaque(cc->ctx);
         JSI_SetContextOpaque(cc->ctx, call);
-        JSIValue r = cc->call_view(call->root, view_name, params, call->msg_source, call->call_stack, call->host, timeout_sec, call->now);
+        JSIValue r = cc->call_view(call->root, view_name, argv[2], call->msg_source, call->call_stack, call->host, timeout_sec, call->now);
         JSI_SetContextOpaque(cc->ctx, prev);
         if (JSI_IsException(r)) { print_exception(cc->ctx); JSI_FreeValue(cc->ctx, r); return JSI_EXCEPTION; }
         JSIValue r_caller = convert_value(cc->ctx, ctx, r);

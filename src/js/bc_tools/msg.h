@@ -90,6 +90,7 @@ namespace msgid
         GetGranuleREQ=35, GetGranuleRSP=36,
         ScanREQ=37, ScanRSP=38,
         PingREQ=39, PingRSP=40,
+        GetNodesREQ=41, GetNodesRSP=42,
     };
 
 }

@@ -1,5 +1,23 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v) {
+    return JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? Number(x) : x));
+}
+// гранулы/эмиты хранят целые как BigInt, а тесты сравнивают с обычными числами
+function unBig(v) {
+    if (typeof v === "bigint")
+        return Number(v);
+    if (Array.isArray(v))
+        return v.map(unBig);
+    if (v && typeof v === "object") {
+        const o = {};
+        for (const k of Object.keys(v))
+            o[k] = unBig(v[k]);
+        return o;
+    }
+    return v;
+}
 const node = "127.0.0.1:2301";
 const SRC = "/home/bsr/mtjs/src/js/tsi/dist/contracts/ttl_test.js";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
@@ -58,7 +76,7 @@ async function submitAndWait(sk, addr, tx, value = 0, gasLimit = 100000, retries
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (attempt + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -84,7 +102,7 @@ async function submitAndWaitErr(sk, addr, tx, value = 0, gasLimit = 100000, retr
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => { });
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => { });
         if (rsp.err) {
             if (attempt + 1 < retries) {
                 await new Promise(r => setTimeout(r, 300));
@@ -193,7 +211,7 @@ async function main() {
         const g = await mtjs.get_contract_data(node, "ttl_test", "x", 3);
         check(g.found === true, "x found (после set)");
         if (g.found) {
-            const v = JSON.parse(g.value);
+            const v = unBig(g.value);
             check(v.v === 2, "x.v == 2 (got " + v.v + ")");
         }
     }

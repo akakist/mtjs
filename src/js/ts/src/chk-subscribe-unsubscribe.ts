@@ -1,6 +1,11 @@
 #!/usr/local/bin/mtjs
 import * as std from "std";
 
+// JSON.stringify с поддержкой BigInt (значения гранул — 128-битные)
+function jstr(v: any): string {
+    return JSON.stringify(v, (_k: string, x: any) => (typeof x === "bigint" ? Number(x) : x));
+}
+
 const node = "127.0.0.1:2301";
 
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
@@ -67,7 +72,7 @@ async function submitAndWait(sk: string, addr: string, tx: any[], value = 0, gas
     for (let attempt = 0; attempt < retries; attempt++) {
         const nonce = await getNonce(addr);
         const req = { tx, nonce: nonce.toString(), value, gasLimit, priority: 0, sender: addr, key_id: 0 };
-        const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), sk, nonce.toString(), () => {});
+        const rsp = await mtjs.tx_submit(node, 1, jstr(req), sk, nonce.toString(), () => {});
         if (rsp.err) {
             if (attempt + 1 < retries) { await new Promise(r => setTimeout(r, 300)); continue; }
             throw new Error("submit: " + rsp.err_str);
@@ -129,7 +134,7 @@ async function t2_unsubscribe() {
     const ui = await mtjs.get_user_nonce(node, u1Addr, 3);
     const tx = [{contract:"root",method:"transfer",params:{to:rootAddr,amount:"100"}}];
     const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0, sender: u1Addr, key_id: 0 };
-    const rsp = await mtjs.tx_submit(node, 1, JSON.stringify(req), u1Sk, ui.nonce, () => {});
+    const rsp = await mtjs.tx_submit(node, 1, jstr(req), u1Sk, ui.nonce, () => {});
     if (rsp.err) { check(false, "submit: " + rsp.err_str); return; }
     // ждём 1s (блок должен пройти, но tx_subscribe отписан → subBlocks не растёт)
     await new Promise<void>((r) => setTimeout(r, 1000));
@@ -153,9 +158,9 @@ async function t3_both() {
     const cbs: any[] = [];
     const tx = [{contract:"root",method:"transfer",params:{to:rootAddr,amount:"100"}}];
     const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0, sender: u1Addr, key_id: 0 };
-    const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1Sk, ui.nonce, (st: any) => {
+    const rsp = await mtjs.tx_submit(node, 10, jstr(req), u1Sk, ui.nonce, (st: any) => {
         cbs.push(st);
-        console.log("  cb:", JSON.stringify(st));
+        console.log("  cb:", jstr(st));
     });
     if (rsp.err) { check(false, "submit: " + rsp.err_str); return; }
     await waitTx(rsp.tx_hash, 10);
@@ -178,9 +183,9 @@ async function t4_unsub_not_kill_cb() {
     const cbs: any[] = [];
     const tx = [{contract:"root",method:"transfer",params:{to:rootAddr,amount:"100"}}];
     const req = { tx, nonce: ui.nonce, value: 1000000, gasLimit: 100000, priority: 0, sender: u1Addr, key_id: 0 };
-    const rsp = await mtjs.tx_submit(node, 10, JSON.stringify(req), u1Sk, ui.nonce, (st: any) => {
+    const rsp = await mtjs.tx_submit(node, 10, jstr(req), u1Sk, ui.nonce, (st: any) => {
         cbs.push(st);
-        console.log("  cb:", JSON.stringify(st));
+        console.log("  cb:", jstr(st));
     });
     if (rsp.err) { check(false, "submit: " + rsp.err_str); return; }
 

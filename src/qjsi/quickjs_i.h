@@ -75,7 +75,7 @@ typedef uint32_t JSAtom;
 enum {
     /* all tags with a reference count are negative */
     JSI_TAG_FIRST       = -9, /* first negative tag */
-    // JSI_TAG_BIG_INT     = -9,
+    JSI_TAG_BIG_INT     = -9,
     JSI_TAG_SYMBOL      = -8,
     JSI_TAG_STRING      = -7,
     JSI_TAG_STRING_ROPE = -6,
@@ -90,8 +90,8 @@ enum {
     JSI_TAG_UNINITIALIZED = 4,
     JSI_TAG_CATCH_OFFSET = 5,
     JSI_TAG_EXCEPTION   = 6,
-    // JSI_TAG_SHORT_BIG_INT = 7,
-    // JSI_TAG_FLOAT64     = 8,
+    JSI_TAG_SHORT_BIG_INT = 7,
+    JSI_TAG_FLOAT64     = 8,
     /* any larger tag is FLOAT64 if JSI_NAN_BOXING */
 };
 
@@ -246,6 +246,14 @@ typedef struct JSIValue {
 #define JSI_MKVAL(tag, val) (JSIValue){ (JSIValueUnion){ .int64 = val }, tag }
 #define JSI_MKVALU(tag, val) (JSIValue){ (JSIValueUnion){ .uint64 = val }, tag}
 #define JSI_MKPTR(tag, p) (JSIValue){ (JSIValueUnion){ .ptr = p }, tag}
+
+static inline JSIValue __JSI_NewShortBigInt(JSIContext *ctx, int64_t d)
+{
+    return JSI_MKVAL(JSI_TAG_SHORT_BIG_INT, d);
+}
+
+/* the fork dropped float64; NaN is represented as undefined */
+#define JSI_NAN JSI_UNDEFINED
 
 // #define JSI_TAG_IS_FLOAT64(tag) ((unsigned)(tag) == JSI_TAG_FLOAT64)
 
@@ -558,12 +566,21 @@ static jsi_force_inline JSIValue JSI_NewUint32(JSIContext *ctx, uint64_t val)
     return JSI_MKVALU(JSI_TAG_INT, val);
 }
 
+JSIValue JSI_NewBigInt64(JSIContext *ctx, int64_t v);
+JSIValue JSI_NewBigUint64(JSIContext *ctx, uint64_t v);
+
 
 
 static inline JSI_BOOL JSI_IsNumber(JSIValueConst v)
 {
     int tag = JSI_VALUE_GET_TAG(v);
     return tag == JSI_TAG_INT ;
+}
+
+static inline JSI_BOOL JSI_IsBigInt(JSIContext *ctx, JSIValueConst v)
+{
+    int tag = JSI_VALUE_GET_TAG(v);
+    return tag == JSI_TAG_BIG_INT || tag == JSI_TAG_SHORT_BIG_INT;
 }
 
 

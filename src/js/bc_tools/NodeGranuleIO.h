@@ -171,8 +171,12 @@ struct NodeGranuleIO : GranuleIO {
         auto dbid= blake2b_hash(cells::getContractDataKey(c,cd));
         auto data = cells::getContractDataNoCreateConst(root,db.get(),c,cd);
         auto act  = cells::getActivityNoCreateConst(root,db.get(),dbid.container);
-        if (!data.valid() || !act.valid())
+        if (!data.valid() || !act.valid()) {
+            if (getenv("MTJS_GRANULE_TRACE"))
+                logErr2("getCNodeConst: %s data=%d act=%d dbid=%s", cd.container.c_str(),
+                        data.valid()?1:0, act.valid()?1:0, base16::encode(dbid.container).c_str());
             return nullptr;   // гранула/активность удалена (тумбстоун) — «не найдено»
+        }
         REF_getter<const CNodeConst_prod> ret=new CNodeConst_prod(data,act);
         // ret->data=cells::getContractDataNoCreateConst(root,db.get(),c,cd);
         // if(!ret->data.valid())

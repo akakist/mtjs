@@ -7,7 +7,11 @@ contract_api.cpp
 contract_host.cpp
 storage_api.cpp
 storage_api.h
+jsi_pack.cpp
+jsi_pack.h
 )
 
 
 
+
+target_link_libraries(contract-api PUBLIC zstd lz4)
