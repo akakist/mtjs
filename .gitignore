@@ -1,0 +1,39 @@
+# тестовые leveldb-базы и мусор в dist (не коммитим)
+src/js/ts/dist/db*/
+src/js/ts/dist/storage/db*/
+src/js/ts/dist/zclear
+src/js/ts/dist/zzz.diff
+src/js/ts/dist/1
+src/js/ts/dist/111*
+src/js/ts/dist/z
+src/js/ts/dist/tsconfig.tsbuildinfo
+rs.sh
+src/js/apply_edit
+src/js/arch.tar
+src/js/bad.patch
+src/js/f
+src/js/fff.txt
+# сборки/бинарники вне src/build
+src/js/jsi_pack
+src/js/jsi_unpack
+src/js/ts/z
+src/js/ts/zs3
+src/js/ts/aaa.duff
+src/js/ts/zzz.patch
+src/js/ts/projects/test-qjsi/test_runner
+src/js/ts/projects/test-qjsi/z
+src/js/tsi/dist/test_runner
+src/mt/tools/scang/scang
+src/qjsi/out/
+src/qjsi/tmp/
+src/js/z
+src/js/zzz.patch
+src/js/ts/dist/bad/
+src/js/ts/dist/keygen_genesis
+# тестовые ключи и genesis (приватные ключи — не коммитим)
+src/js/ts/dist/genesis.json
+src/js/ts/dist/keys_test.json
+src/js/ts/dist/storage/genesis.json
+src/js/ts/dist/storage/keys_test.json
+src/js/ts/dist/gym/keys_test.json
+.git1/
