@@ -14,6 +14,8 @@
 #include "IInstance.h"
 #include "broadcaster.h"
 #include "THASH_id.h"
+#include <csignal>
+#include <unistd.h>
 #include "QUORUM.h"
 #include "corelib/mutexInspector.h"
 #include "Event/bcEvent.h"
@@ -90,7 +92,10 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         for (auto& z : http_granule_addr_)
             sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
         sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(TIMER_STALE_CLEANUP, NULL, NULL, 60., this));
+        sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(TIMER_BLOCK_STATUS, NULL, NULL, 0.2, this));
         prev_block=load_last_block(db_state.get());
+        block_lock=load_signed_block(db_state.get());   // legacy-ключ
+        loadCliVote();                                   // голоса cli (приоритетнее)
         root=getRoot(db_state.get(),prev_block);
         sendEvent(ServiceEnum::Scan, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
     }
@@ -206,11 +211,14 @@ std::vector<REF_getter<MsgData::TX>> Node::Service::collectTx()
     }
     transaction_pool_of_leader.clear();
     std::vector<REF_getter<MsgData::TX>> out;
+    // Ограничиваем блок: тяжёлый блок не успевает в block-expiry -> fail leader -> стол.
     for (auto &x : ordered) {
         for (auto &y : x.second) {
             for (auto &z : y.second) {
-                out.push_back(z);
+                // всё возвращаем в пул (принятые удалит обработчик блока),
+                // но в блок берём не больше лимита
                 transaction_pool_of_leader.insert_or_assign(z->getHash(), z);
+                if (out.size() < (size_t)MAX_TXS_PER_BLOCK) out.push_back(z);
             }
         }
     }
@@ -268,6 +276,14 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
     for (auto &tx : txs) {
         vb->transaction_bodies.push_back(tx);
     }
+    {
+        REF_getter<MsgData::Offer> off = new MsgData::Offer();
+        off->hb = hb;
+        off->block_timestamp = vb->block_timestamp;
+        off->txs = vb->transaction_bodies;
+        bt.offer_hash = off->getHash();   // для статуса: появился -> tx не шлём
+    }
+    relayBlockStatus(nullptr, nullptr);   // статус с offer_hash: сбор tx закрыт
     logNode("do_start_block: broadcast ValidateBlockREQ tx_count=%zu (sorted)",
             vb->transaction_bodies.size());
     // ▲▲▲
@@ -275,16 +291,56 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
     {
         // return;
     }
-    TreeNode comm_tree = filter_tree(mf->committee_vne, bt.alive);
+    // Оффер идёт всему комитету, а не только ответившим на пинг: иначе при
+    // пустом/позднем alive-сете предложение не доходит ни до кого.
+    TreeNode comm_tree = mf->tree_committe;
     broadcast_MsgEvent_via_broadcaster(vb.get(), comm_tree);
+
+    // Тестовый fault-injection для сплита: заморозить автора сразу после
+    // частичной рассылки (маркер MTJS_BCAST_ONCE, задержка в мкс).
+    // Так на блоке остаётся часть подписей, а остальные лидеры на той же
+    // высоте предлагают другой блок — получается доказанный раскол.
+    if (const char* us_env = getenv("MTJS_TEST_FREEZE_AFTER_BROADCAST_US"))
+    {
+        const char* fe = getenv("MTJS_TEST_FREEZE_AFTER_BROADCAST_EPOCH");
+        const long long minE = fe ? atoll(fe) : 0;
+        const char* once = "/tmp/regress/MTJS_BCAST_ONCE";
+        if (hb->new_epoch >= minE && access(once, F_OK) == 0 && unlink(once) == 0)
+        {
+            usleep(atoi(us_env));
+            logNode("TEST: freeze after broadcast epoch=%lld txs=%zu",
+                    (long long)hb->new_epoch, vb->transaction_bodies.size());
+            fflush(stdout);
+            raise(SIGSTOP);
+        }
+    }
 }
 
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
+    if (e->tid == TIMER_BLOCK_STATUS) {
+        auto cl = current_leader();
+        if (cl.valid() && cl->getName() == this_node_name)
+            broadcastCurrentBlockStatus();
+        return true;
+    }
     if (e->tid == TIMER_STALE_CLEANUP) {
         MUTEX_INSPECTOR;
         cleanup_stale(getNow().v);
+        {
+            const int64_t now = getNow().v;
+            const int64_t ttl = (int64_t)DATA_CACHE_TTL_SEC * 1000000;
+            for (auto it = data_cache.begin(); it != data_cache.end(); )
+            {
+                if (now - it->second.first > ttl)
+                {
+                    // data_cache.erase(it->first);
+                    it = data_cache.erase(it);
+                }
+                else ++it;
+            }
+        }
         return true;
     }
     if(e->tid == TIMER_PERIODIC_CLOCK)
@@ -341,26 +397,59 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
             logNode("[leader-expired] no cache match: cached=%s expired=%s",
                 cli.node_leader.valid() ? cli.node_leader->node_leader.container.c_str() : "(null)",
                 e->data->container.c_str());
+        // Шаг 3: таймаут — повод собрать доказательства, а не снять замок.
+        maybeCollectCert();
         return true;
     }
     case timers::ALARM_Ping:
     {
+        // Шаг 3: если на текущей высоте уже подписан блок другим лидером —
+        // сначала собираем 2/3-сертификат, новый блок не предлагаем.
+        if (maybeCollectCert())
+            return true;
         auto cl=current_leader();
         if(cl.valid() && cl->getName()==this_node_name)
         {
+            // Раунд не чаще STATUS_INTERVAL от прошлого блока: иначе каждый
+            // применённый блок сразу запускает следующий и пустые блоки идут
+            // непрерывно. Это замена sendStatus-интервала, пока статуса нет.
+            const int64_t now = getNow().v;
+            if (prev_block.valid()
+                && now - prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v < STATUS_INTERVAL_MKS)
+                return true;
+
             auto &bt = l_blocks[prev_root_hash_Z()];
+            // Попытка живёт слот, а не prev_root: иначе при зависшей высоте
+            // после круга все лидеры «уже пинговали» и новых попыток нет.
+            const int64_t slot = current_slot();
+            if (bt.leader_slot != slot)
+            {
+                bt.leader_slot = slot;
+                bt.ping_sent = false;
+                bt.block_started = false;
+                bt.tx_deadline_mks = 0;
+                bt.alive.clear();
+            }
             REF_getter<MsgData::HeartBeatREQ> h=new MsgData::HeartBeatREQ(prev_root_hash_Z(),
                         epoch_current(),
                         this_node_name);
+            bt.my_hb = h;
             auto mf=getMetaFull();
 
-            // пинг один раз за раунд — дальше цепочку ведут PingRSP -> TIMER_PingRSP
+            // Раунд стартует статусом: сертов и offer_hash пока нет — ноды шлют tx.
             if (!bt.ping_sent)
             {
                 bt.ping_sent = true;
-                REF_getter<MsgData::PingREQ> ping = new MsgData::PingREQ();
-                ping->hb = h;
-                broadcast_MsgEvent_via_broadcaster(ping.get(), mf->tree_all_nodes);
+                relayBlockStatus(nullptr, nullptr);
+            }
+            // Начало раунда: пул пуст — ждём дольше (но меньше интервала
+            // статуса), есть tx — короткое окно.
+            if (!bt.block_started && bt.tx_deadline_mks == 0)
+            {
+                bt.tx_deadline_mks = now + STATUS_INTERVAL_MKS;
+                const int64_t want = transaction_pool_of_leader.empty()
+                        ? TX_EMPTY_TIMEOUT_MKS : TX_SHORT_TIMEOUT_MKS;
+                armBlockStartAlarm(bt, h, (double)want / 1000000.0);
             }
         }
         return true;
@@ -415,6 +504,9 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
     // }
     case timers::ALARM_START_BLOCK:
     {
+        // Кворум GetTx больше не нужен: тх — это мемпул, блок валидируется позже.
+        // Аларм стартует от пинга (100 мс) и перевзводится на 10 мс приходом тх,
+        // но не позже дедлайна раунда.
         if(sync_in_progress)
         {
             return true;
@@ -425,12 +517,17 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
         if(!hb)
         throw CommonError("if(!hb)");
-        if(bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
-        {
-            do_start_block(hb);
-            logNode("do_start_block();");
-            bt.GetTxRSP_m[hb_hash].clear();
-        }
+        if(bt.block_started)
+            return true;
+        auto cl=current_leader();
+        if(!cl.valid() || cl->getName()!=this_node_name)
+            return true;
+        if(hb->new_epoch != epoch_current() || hb->prev_root_hash_1 != prev_root_hash_Z())
+            return true;
+        bt.block_started = true;
+        do_start_block(hb);
+        logNode("do_start_block(); (tx alarm)");
+        bt.GetTxRSP_m[hb_hash].clear();
         return true;
     }
     case TIMER_BlockDBStore:
@@ -472,6 +569,32 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         auto h=r->blockAcceptedREQ->blockInfo->getHash();
         if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
         {
+            // Тестовый fault-injection: лидер собрал 2/3 подписей, но не
+            // разослал BDV (имитация падения в окне достройки). Только для
+            // отладки смены раунда, в обычном режиме env не выставлен.
+            if (getenv("MTJS_TEST_FREEZE_LEADER"))
+            {
+                const char* fe = getenv("MTJS_TEST_FREEZE_EPOCH");
+                const long long fe_min = fe ? atoll(fe) : 0;
+                const long long fe_cur = r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch;
+                // замораживаем только ИСХОДНОГО лидера блока (собрал свои
+                // подписи), а не достройщика по сертификату
+                const bool is_proposer =
+                    r->blockAcceptedREQ->blockInfo->heart_beat->node_leader == this_node_name;
+                if (fe_cur >= fe_min && is_proposer)
+                {
+                    // одноразовый триггер: маркер удаляет только тот, кто
+                    // реально замораживается (иначе его съест достройщик)
+                    const char* once = "/tmp/regress/MTJS_FREEZE_ONCE";
+                    if (access(once, F_OK) == 0 && unlink(once) == 0)
+                    {
+                        logNode("TEST: freeze before BDV epoch=%lld root=%s",
+                                fe_cur, r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
+                        fflush(stdout);
+                        raise(SIGSTOP);
+                    }
+                }
+            }
             TreeNode all_tree = mf->tree_all_nodes;  // полный vne — чтобы дифф подписывали все живые по активности
             broadcast_MsgEvent_via_broadcaster(r, all_tree);
             bt.ValidateBlockRSP_m[h].clear();
@@ -480,6 +603,60 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         return true;
     }
     break;        
+
+    case timers::ALARM_TX_SENT:
+    {
+        // страховка: если блок так и не случился, возвращаем tx в доступные
+        THASH_id h;
+        h.container = e->data->container;
+        tx_sent.erase(h);
+        return true;
+    }
+    case timers::ALARM_DL_TIMEOUT:
+    {
+        int64_t id = atoll(e->data->container.c_str());
+        auto it = dl_tasks.find(id);
+        if (it != dl_tasks.end())
+        {
+            auto done = it->second.done;
+            dl_tasks.erase(it);
+            logNode("[dl] task=%lld timeout", (long long)id);
+            if (done) done(false);
+        }
+        return true;
+    }
+    case timers::ALARM_GetValidateBlockRSP:
+    {
+        // Шаг 3: периодический пересчёт собранных голосов + ре-броадкаст
+        // запроса. Замок не снимаем и новый блок не предлагаем, пока
+        // доказательств нет.
+        if (!cert_collecting) return true;
+        if (sync_in_progress)
+        {
+            logNode("cert: sync started — stop epoch=%lld", (long long)cert_collect.epoch);
+            cert_collecting = false;
+            return true;
+        }
+        if (cert_collect.epoch != epoch_current())
+        {
+            logNode("cert: epoch moved %lld -> %lld — stop",
+                    (long long)cert_collect.epoch, (long long)epoch_current());
+            cert_collecting = false;
+            return true;
+        }
+        if (!isCurrentLeaderMe())
+        {
+            logNode("cert: not leader anymore — stop epoch=%lld", (long long)cert_collect.epoch);
+            cert_collecting = false;
+            return true;
+        }
+        broadcastCertReq();
+        finishCertCollection();
+        if (cert_collecting)
+            sendEvent(ServiceEnum::Timer,
+                      new timerEvent::ResetAlarm(ALARM_GetValidateBlockRSP, NULL, NULL, 0.5, this));
+        return true;
+    }
 
     default: logNode("unhandled alarm %d",e->tid);
     }
@@ -516,6 +693,18 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             return on_NodeNotResponded((const bcEvent::NodeNotRespondedREQ *)e.get());
         case bcEventEnum::ForwardTxREQ:
             return ForwardTxREQ((const bcEvent::ForwardTxREQ *)e.get());
+        case bcEventEnum::GetPrevBlockREQ:
+            return GetPrevBlockREQ((const bcEvent::GetPrevBlockREQ *)e.get());
+        case bcEventEnum::GetPrevBlockRSP:
+            return GetPrevBlockRSP((const bcEvent::GetPrevBlockRSP *)e.get());
+        case bcEventEnum::GetHashedDataREQ:
+            return on_GetHashedDataREQ((const bcEvent::GetHashedDataREQ *)e.get());
+        case bcEventEnum::GetHashedDataRSP:
+            return on_GetHashedDataRSP((const bcEvent::GetHashedDataRSP *)e.get());
+        case bcEventEnum::OfferREQ:
+            return OfferREQ((const bcEvent::OfferREQ *)e.get());
+        case bcEventEnum::OfferRSP:
+            return OfferRSP((const bcEvent::OfferRSP *)e.get());
         case timerEventEnum::TickTimer:
             return on_timer((const timerEvent::TickTimer *)e.get());
         case timerEventEnum::TickAlarm:
@@ -545,6 +734,18 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(ev->e.get()));
             case bcEventEnum::ForwardTxREQ:
                 return ForwardTxREQ(static_cast<const bcEvent::ForwardTxREQ *>(ev->e.get()));
+            case bcEventEnum::GetPrevBlockREQ:
+                return GetPrevBlockREQ(static_cast<const bcEvent::GetPrevBlockREQ *>(ev->e.get()));
+            case bcEventEnum::GetPrevBlockRSP:
+                return GetPrevBlockRSP(static_cast<const bcEvent::GetPrevBlockRSP *>(ev->e.get()));
+            case bcEventEnum::GetHashedDataREQ:
+                return on_GetHashedDataREQ(static_cast<const bcEvent::GetHashedDataREQ *>(ev->e.get()));
+            case bcEventEnum::GetHashedDataRSP:
+                return on_GetHashedDataRSP(static_cast<const bcEvent::GetHashedDataRSP *>(ev->e.get()));
+            case bcEventEnum::OfferREQ:
+                return OfferREQ(static_cast<const bcEvent::OfferREQ *>(ev->e.get()));
+            case bcEventEnum::OfferRSP:
+                return OfferRSP(static_cast<const bcEvent::OfferRSP *>(ev->e.get()));
 
             case bcEventEnum::syncGetGranulesREQ:
                 return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)ev->e.get());
@@ -572,6 +773,10 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(ev->e.get()));
             case bcEventEnum::ForwardTxREQ:
                 return ForwardTxREQ(static_cast<const bcEvent::ForwardTxREQ *>(ev->e.get()));
+            case bcEventEnum::GetPrevBlockREQ:
+                return GetPrevBlockREQ(static_cast<const bcEvent::GetPrevBlockREQ *>(ev->e.get()));
+            case bcEventEnum::GetPrevBlockRSP:
+                return GetPrevBlockRSP(static_cast<const bcEvent::GetPrevBlockRSP *>(ev->e.get()));
             case bcEventEnum::syncGetGranulesREQ:
                 return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)ev->e.get());
             case bcEventEnum::syncGetGranulesRSP:
@@ -712,13 +917,19 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     {
         switch (msg->type)
         {
-        case msgid::GetTxREQ:
-            return GetTxREQ(static_cast<const MsgData::GetTxREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::PingREQ:
-            return PingREQ(static_cast<const MsgData::PingREQ *>(msg.get()), m->node_signer, m->route);
+        // case msgid::GetTxREQ:
+        //     return GetTxREQ(static_cast<const MsgData::GetTxREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::BlockStatusREQ:
+            return BlockStatusREQ(static_cast<const MsgData::BlockStatusREQ *>(msg.get()), m->node_signer, m->route);
+        // case msgid::PingREQ:
+        //     return PingREQ(static_cast<const MsgData::PingREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::ValidateBlockREQ:
             // last_activity_time=iUtils->getNow().v;
             return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::GetValidateBlockRSPREQ:
+            return GetValidateBlockRSPREQ(static_cast<const MsgData::GetValidateBlockRSPREQ *>(msg.get()), m->node_signer, m->route);
+        case msgid::UnlockRoundREQ:
+            return UnlockRoundREQ(static_cast<const MsgData::UnlockRoundREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::BlockAccepted2REQ:
             // last_activity_time=iUtils->getNow().v;
             return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
@@ -790,12 +1001,14 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
     {
     case msgid::GetTxRSP:
         return GetTxRSP(static_cast<const MsgData::GetTxRSP *>(ee.get()), m->node_signer, m->route);
-    case msgid::PingRSP:
-        return PingRSP(static_cast<const MsgData::PingRSP *>(ee.get()), m->node_signer, m->route);
+    // case msgid::PingRSP:
+    //     return PingRSP(static_cast<const MsgData::PingRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::ValidateBlockRSP:
         return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::BlockDiffValidateRSP:
         return BlockDiffValidateRSP(static_cast<const MsgData::BlockDiffValidateRSP *>(ee.get()), m->node_signer, m->route);
+    case msgid::GetValidateBlockRSPRSP:
+        return GetValidateBlockRSPRSP(static_cast<const MsgData::GetValidateBlockRSPRSP *>(ee.get()), m->node_signer, m->route);
     default:
         throw CommonError("unhandled22 p020 %s", msgName(id));
         break;
@@ -954,7 +1167,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         logNode("[TRACE execute_block] begin txs=%zu", (size_t)b.validateBlockREQ->transaction_bodies.size());
     // logNode("[execute_block] sender %s",b.)
     {
-        auto st = cells::getStateNoCreate(root.get(), db_state.get(),NULL,b.validateBlockREQ->block_timestamp);
+        auto st = cells::getStateNoCreate(root.get(), db_state.get(), NULL, b.validateBlockREQ->block_timestamp);
         auto bh=lc->new_epoch;
         if (st.valid()) {
             
@@ -1063,8 +1276,8 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         // «пропустившими». Правильный вход — node_diff_validators (все, кто
         // ответил на BlockDiffValidateREQ).
         if (prev_block.valid()) {
-            std::set<NODE_id> alive_set(prev_block->alive_validators.begin(),
-                                        prev_block->alive_validators.end());
+            std::set<NODE_id> alive_set(prev_block->node_diff_validators.begin(),
+                                        prev_block->node_diff_validators.end());
             mark_activity(alive_set, NULL, b.validateBlockREQ->block_timestamp);
         }
     }
@@ -1164,7 +1377,7 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
             logNode("verify lc quorum failed %lld %lld",stake,full_stake);
             return false;
         }
-        if (!lc->agg_diff_sig.verify(agg_pk, lc->blockAcceptedREQ->getHash().container))
+        if (!lc->agg_diff_sig.verify(agg_pk, lc->blockAcceptedREQ->blockInfo->getHash().container))
         {
             logNode("verify lc - sign invalid");
             return false;
@@ -1179,6 +1392,511 @@ bool Node::Service::ForwardTxREQ(const bcEvent::ForwardTxREQ *e)
     MUTEX_INSPECTOR;
     auto h=e->tx->getHash();
     transaction_pool_of_leader.insert_or_assign(h,e->tx);
+    // пришла тх — продлеваем коротким алармом (в пределах дедлайна раунда)
+    auto &bt = l_blocks[prev_root_hash_Z()];
+    if (bt.ping_sent && bt.my_hb.valid())
+    {
+        if (transaction_pool_of_leader.size() >= (size_t)MAX_TXS_PER_BLOCK)
+            armBlockStartAlarm(bt, bt.my_hb, 0.0);       // лимит — оффер сразу
+        else
+            armBlockStartAlarm(bt, bt.my_hb, (double)TX_SHORT_TIMEOUT_MKS / 1000000.0);
+    }
+    return true;
+}
+
+void Node::Service::armBlockStartAlarm(block_leader& bt, const REF_getter<MsgData::HeartBeatREQ>& hb, double want_secs)
+{
+    MUTEX_INSPECTOR;
+    if (!hb.valid() || bt.block_started) return;
+    const int64_t now = getNow().v;
+    if (bt.tx_deadline_mks <= 0)
+        bt.tx_deadline_mks = now + 500000;
+    int64_t delay = (int64_t)(want_secs * 1000000.0);
+    if (now + delay > bt.tx_deadline_mks)
+        delay = bt.tx_deadline_mks - now;
+    if (delay < 0) delay = 0;
+    if (getenv("MTJS_TX_ALARM_TRACE"))
+        logNode("[txalarm] arm want=%.3f delay=%.4f started=%d hb_epoch=%lld now=%lld deadline=%lld",
+                want_secs, (double)delay / 1000000.0, (int)bt.block_started,
+                (long long)hb->new_epoch, (long long)now, (long long)bt.tx_deadline_mks);
+    sendEvent(ServiceEnum::Timer,
+              new timerEvent::ResetAlarm(timers::ALARM_START_BLOCK,
+                                         toRef(hb->getHash().container), hb.get(),
+                                         (double)delay / 1000000.0, this));
+}
+
+int64_t Node::Service::current_slot()
+{
+    if (!prev_block.valid()) return 0;
+    const int64_t last = prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v;
+    const int64_t now = getNow().v;
+    if (now < last) return -1;
+    return (now - last) / SLOT_MKS;
+}
+
+bool Node::Service::GetPrevBlockREQ(const bcEvent::GetPrevBlockREQ *e)
+{
+    MUTEX_INSPECTOR;
+    logNode("GetPrevBlockREQ: asked hash=%s", e->hash.str().c_str());
+    REF_getter<MsgData::BlockAccepted2REQ> blk;
+    if (prev_block.valid() &&
+        prev_block->blockAcceptedREQ->blockInfo->new_root_hash1 == e->hash)
+        blk = prev_block;
+    logNode("GetPrevBlockREQ: reply=%s local_prev=%s",
+            blk.valid() ? "block" : "EMPTY",
+            prev_block.valid() ? prev_root_hash_Z().str().c_str() : "none");
+    passEvent(new bcEvent::GetPrevBlockRSP(blk, poppedFrontRoute(e->route)));
+    return true;
+}
+
+bool Node::Service::GetPrevBlockRSP(const bcEvent::GetPrevBlockRSP *e)
+{
+    MUTEX_INSPECTOR;
+    if (!e->block.valid())
+    {
+        logNode("GetPrevBlockRSP: EMPTY (unknown prev)");
+        return true;
+    }
+    auto info = e->block->blockAcceptedREQ->blockInfo;
+    auto hb = info->heart_beat;
+    logNode("GetPrevBlockRSP: block epoch=%lld prev=%s new=%s; local epoch=%lld prev=%s",
+            (long long)hb->new_epoch, hb->prev_root_hash_1.str().c_str(),
+            info->new_root_hash1.str().c_str(),
+            (long long)epoch_current(), prev_root_hash_Z().str().c_str());
+
+    // не отстали — выходим
+    if (hb->new_epoch <= epoch_current() && info->new_root_hash1 == prev_root_hash_Z())
+        return true;
+
+    if (sync_in_progress)
+        return true;
+    auto cl = current_leader();
+    if (!cl.valid())
+    {
+        logNode("GetPrevBlockRSP: no leader for sync");
+        return true;
+    }
+    const int64_t since = (prev_block.valid() && !sync_full)
+        ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v : 0;
+    if (sync_full) sync_fresh_root = true;
+    {
+        auto st = cells::getStateNoCreateConst(root.get(), db_state.get());
+        sync_old_cutoff = st.valid() ? st->compact_before_ts : TIME_mks{};
+    }
+    logNode("request sync (prev-block) since=%lld epoch_req=%lld local_epoch=%lld root=%s full=%d",
+            (long long)since, (long long)hb->new_epoch, (long long)epoch_current(),
+            info->new_root_hash1.str().c_str(), (int)sync_full);
+    REF_getter<bcEvent::syncGetGranulesREQ> req =
+        new bcEvent::syncGetGranulesREQ(since, this_node_name, getNow().v, ListenerBase::serviceId);
+    req->sign(my_sk_ed);
+    sendEvent(cl->get_ip(), ServiceEnum::Node, req.get());
+    sync_in_progress = true;
+    sync_watchdog_arm();
+    return true;
+}
+
+
+// ── data plane: кеш данных и задачи async_dl ────────────────────────────
+std::string Node::Service::self_ip()
+{
+    auto me = cells::getNodeNoCreateConst(root.get(), db_state.get(), this_node_name);
+    if (me.valid()) return me->get_ip();
+    return std::string();
+}
+
+void Node::Service::cachePayload(const REF_getter<MsgData::Base> &p)
+{
+    if (!p.valid()) return;
+    THASH_id h = p->getHash();
+    data_cache[h] = {getNow().v, p};
+    // data_cache_created[h] = getNow().v;
+    if (getenv("MTJS_DATA_TRACE"))
+        logNode("[data] cached %s type=%s", h.str().c_str(), msgName(p->type));
+}
+
+REF_getter<MsgData::Base> Node::Service::getCachedPayload(const THASH_id &h)
+{
+    auto it = data_cache.find(h);
+    if (it == data_cache.end()) return nullptr;
+    return it->second.second;
+}
+
+void Node::Service::cacheBlockPayloads(const REF_getter<MsgData::attachment_data> &att)
+{
+    // att_data — единый payload (эмиты, награды, диффы, tx_hashes).
+    if (att.valid())
+        cachePayload(REF_getter<MsgData::Base>(att.get()));
+}
+
+void Node::Service::async_dl(const std::vector<THASH_id> &hashes,
+                             const std::vector<std::string> &sources,
+                             std::function<void(bool)> done)
+{
+    MUTEX_INSPECTOR;
+    std::set<THASH_id> need;
+    for (auto& h : hashes) need.insert(h);
+    std::set<THASH_id> have;
+    for (auto& h : need)
+        if (getCachedPayload(h).valid()) have.insert(h);
+
+    if (have.size() == need.size())
+    {
+        // всё уже есть — финалайз там же
+        if (done) done(true);
+        return;
+    }
+
+    dl_task t;
+    t.id = ++dl_task_seq;
+    t.need = need;
+    t.have = have;
+    t.sources = sources;
+    t.done = done;
+    t.deadline_mks = getNow().v + (int64_t)(DL_TASK_TIMEOUT_SEC * 1000000);
+    const int64_t id = t.id;
+    dl_tasks[id] = t;
+    sendEvent(ServiceEnum::Timer,
+              new timerEvent::SetAlarm(timers::ALARM_DL_TIMEOUT, toRef(std::to_string(id)),
+                                       NULL, DL_TASK_TIMEOUT_SEC, this));
+    logNode("[dl] task=%lld start need=%zu have=%zu sources=%zu",
+            (long long)id, need.size(), have.size(), sources.size());
+    requestNextDlSource(dl_tasks[id]);
+}
+
+void Node::Service::requestNextDlSource(dl_task &t)
+{
+    std::vector<THASH_id> missing;
+    for (auto& h : t.need)
+        if (!t.have.count(h)) missing.push_back(h);
+
+    if (missing.empty() || getNow().v >= t.deadline_mks || t.next_source >= t.sources.size())
+    {
+        auto done = t.done;
+        const int64_t id = t.id;
+        dl_tasks.erase(id);
+        logNode("[dl] task=%lld fail missing=%zu sources_used=%zu/%zu",
+                (long long)id, missing.size(), t.next_source, t.sources.size());
+        if (done) done(false);
+        return;
+    }
+
+    auto to = t.sources[t.next_source++];
+    logNode("[dl] task=%lld request %zu hashes (source %zu/%zu)",
+            (long long)t.id, missing.size(), t.next_source, t.sources.size());
+    sendEvent(to, ServiceEnum::Node,
+              new bcEvent::GetHashedDataREQ(t.id, missing, self_ip(), route_t()));
+}
+
+bool Node::Service::on_GetHashedDataREQ(const bcEvent::GetHashedDataREQ *e)
+{
+    MUTEX_INSPECTOR;
+    std::vector<int> statuses;
+    std::vector<REF_getter<MsgData::Base>> data;
+    for (auto& h : e->hashes)
+    {
+        auto p = getCachedPayload(h);
+        if (p.valid())
+        {
+            statuses.push_back(HashedData::OK);
+            data.push_back(p);
+        }
+        else
+            statuses.push_back(HashedData::NOT_FOUND);
+    }
+    logNode("[dl] serve task=%lld asked=%zu found=%zu",
+            (long long)e->task_id, e->hashes.size(), data.size());
+    sendEvent(e->reply_to, ServiceEnum::Node,
+              new bcEvent::GetHashedDataRSP(e->task_id, e->hashes, statuses, data, route_t()));
+    return true;
+}
+
+bool Node::Service::on_GetHashedDataRSP(const bcEvent::GetHashedDataRSP *r)
+{
+    MUTEX_INSPECTOR;
+    auto it = dl_tasks.find(r->task_id);
+    if (it == dl_tasks.end())
+    {
+        // ответ на уже завершённую/просроченную задачу
+        return true;
+    }
+    dl_task& t = it->second;
+
+    size_t k = 0;   // индекс в data (только OK)
+    for (size_t i = 0; i < r->hashes.size(); i++)
+    {
+        if (i >= r->statuses.size()) break;
+        if (r->statuses[i] != HashedData::OK) continue;
+        if (k >= r->data.size()) break;
+        auto p = r->data[k++];
+        if (!p.valid()) continue;
+        if (p->getHash() != r->hashes[i])
+        {
+            logNode("[dl] task=%lld BAD_HASH for %s",
+                    (long long)r->task_id, r->hashes[i].str().c_str());
+            continue;
+        }
+        cachePayload(p);
+        t.have.insert(r->hashes[i]);
+    }
+
+    if (t.have.size() == t.need.size())
+    {
+        auto done = t.done;
+        const int64_t id = t.id;
+        dl_tasks.erase(it);
+        logNode("[dl] task=%lld complete", (long long)id);
+        if (done) done(true);
+        return true;
+    }
+
+    requestNextDlSource(t);
+    return true;
+}
+
+
+// ── единая шина статуса блока ──────────────────────────────────────────
+bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_id& src_node, const route_t& route)
+{
+    MUTEX_INSPECTOR;
+    (void)src_node; (void)route;
+    // Всё выводим из сертов: высота/база не нужны отдельными полями.
+    THASH_id base_root = prev_root_hash_Z();
+    int64_t epoch = epoch_current();
+
+    if (!sync_in_progress && e->hb.valid() && e->hb->prev_root_hash_1 != prev_root_hash_Z())
+    {
+        logNode("PingREQ: prev_root mismatch remote=%s local=%s, asking prev-block", e->hb->prev_root_hash_1.str().c_str(), prev_root_hash_Z().str().c_str());
+        passEvent(new bcEvent::GetPrevBlockREQ(e->hb->prev_root_hash_1,
+                                               poppedFrontRoute(route)));
+    }
+
+    auto derive = [&](const REF_getter<MsgData::BlockAcceptedREQ>& c) {
+        if (c.valid() && c->blockInfo.valid() && c->blockInfo->heart_beat.valid())
+        {
+            base_root = c->blockInfo->heart_beat->prev_root_hash_1;
+            epoch = c->blockInfo->heart_beat->new_epoch;
+            return true;
+        }
+        return false;
+    };
+    if (!e->accepted.empty()) derive(e->accepted.begin()->second);
+    mergeBlockStatus(e, epoch);
+    REF_getter<BlockMetaFull> mf;
+    try { mf = getMetaFull(base_root); } catch (...) { mf = nullptr; }
+    auto stake_of = [&](const NODE_id& id) -> int64_t {
+        if (!mf.valid()) return 0;
+        auto it = mf->prev_stakes.find(id);
+        return it == mf->prev_stakes.end() ? 0 : it->second;
+    };
+    int64_t committee_full = 0;
+    if (mf.valid())
+        for (auto& z : mf->committe_members) committee_full += stake_of(z);
+    int64_t network_full = 0;
+    if (mf.valid())
+        for (auto& z : mf->vne) network_full += stake_of(z.name);
+
+    bool committee_ok = false;
+    REF_getter<MsgData::BlockAcceptedREQ> committee_cert;
+    int64_t total_signer_stake = 0;
+    for (auto& z : e->accepted)
+    {
+        auto& cert = z.second;
+        if (!cert.valid() || !cert->blockInfo.valid()) continue;
+        std::vector<blst_cpp::PublicKey> pks;
+        bool ok = true;
+        int64_t signed_committee = 0, signed_total = 0;
+        for (auto& nid : cert->node_validators)
+        {
+            auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(), nid);
+            if (!n.valid()) { ok = false; break; }
+            pks.push_back(n->get_bls_pk());
+            int64_t st = stake_of(nid);
+            signed_total += st;
+            if (mf.valid() && mf->committe_members.count(nid)) signed_committee += st;
+        }
+        total_signer_stake += signed_total;
+        if (!ok || pks.empty()) continue;
+        if (!cert->agg_sig.verify(pks, cert->blockInfo->getHash().container)) continue;
+
+        const bool committee_q = committee_full > 0
+                && (signed_committee * 100) / committee_full > QUORUM;
+        const bool network_q = network_full > 0
+                && (signed_total * 100) / network_full > QUORUM;
+        if (committee_q) { committee_ok = true; if (!committee_cert.valid()) committee_cert = cert; }
+        if (network_q)
+        {
+            logNode("[blockstatus] network 2/3 hash=%s epoch=%lld — финал (RocksDB + prev_block)",
+                    z.first.str().c_str(), (long long)epoch);
+            THASH_id ah = cert->blockInfo->att_data_hash;
+            auto cached = getCachedPayload(ah);
+            auto att = REF_getter<MsgData::attachment_data>(
+                    dynamic_cast<MsgData::attachment_data*>(cached.get()));
+            if (att.valid())
+            {
+                REF_getter<MsgData::BlockAccepted2REQ> wrap = new MsgData::BlockAccepted2REQ();
+                wrap->blockAcceptedREQ = cert;
+                REF_getter<MsgData::BlockDBStore> bds = new MsgData::BlockDBStore();
+                bds->blockAccepted2REQ = wrap;
+                bds->tx_hashes = att->tx_hashes;
+                bds->diffs = att->diffs;
+                bds->att_data = att;
+                BlockDBStore(bds.get(), src_node, route_t());
+            }
+            else
+                logNode("[blockstatus] network 2/3: нет att_data %s — ждём/тянем", ah.str().c_str());
+            return true;
+        }
+    }
+
+    // Аккумуляция: если комитет 2/3, а нас в списке нет — добавляем свою подпись
+    // (если блок уже применён или мы в комитете) и рассылаем обновлённый серт.
+    if (committee_ok && committee_cert.valid()
+        && !accepted_signed.count(committee_cert->blockInfo->getHash()))
+    {
+        bool mine = false;
+        for (auto& nid : committee_cert->node_validators)
+            if (nid == this_node_name) { mine = true; break; }
+        const bool applied = prev_block.valid()
+            && prev_block->blockAcceptedREQ->blockInfo->new_root_hash1
+               == committee_cert->blockInfo->new_root_hash1;
+        const bool in_committee = mf.valid() && mf->committe_members.count(this_node_name) > 0;
+        if (!mine && (applied || in_committee))
+        {
+            blst_cpp::Signature sig;
+            sig.sign(my_sk_bls, committee_cert->blockInfo->getHash().container);
+            REF_getter<MsgData::BlockAcceptedREQ> nb = new MsgData::BlockAcceptedREQ();
+            nb->blockInfo = committee_cert->blockInfo;
+            nb->node_validators = committee_cert->node_validators;
+            nb->agg_sig = committee_cert->agg_sig;
+            nb->node_validators.push_back(this_node_name);
+            nb->agg_sig.add(sig);
+            accepted_signed.insert(nb->blockInfo->getHash());
+
+            REF_getter<MsgData::BlockStatusREQ> req = new MsgData::BlockStatusREQ();
+            req->accepted[nb->blockInfo->getHash()] = nb;
+            auto itst = block_status.find(epoch);
+            if (itst != block_status.end() && itst->second.valid() && itst->second->has_offer_hash)
+            {
+                req->has_offer_hash = true;
+                req->offer_hash = itst->second->offer_hash;
+            }
+            mergeBlockStatus(req.get(), epoch);
+            if (mf.valid())
+                broadcast_MsgEvent_via_broadcaster(req.get(), mf->tree_all_nodes);
+            logNode("[blockstatus] added my signature for %s (applied=%d committee=%d)",
+                    nb->blockInfo->getHash().str().c_str(), (int)applied, (int)in_committee);
+        }
+    }
+
+    if (committee_ok)
+        logNode("[blockstatus] committee 2/3 epoch=%lld — блок решён, ждём сеть", (long long)epoch);
+    else if (network_full > 0 && (total_signer_stake * 100) / network_full > QUORUM)
+        logNode("[blockstatus] split epoch=%lld total=%lld/%lld — unlock (TODO)",
+                (long long)epoch, (long long)total_signer_stake, (long long)network_full);
+
+    if (!e->has_offer_hash)
+    {
+        REF_getter<MsgData::GetTxRSP> rsp = new MsgData::GetTxRSP();
+        for (auto& z : transaction_pool_of_leader)
+        {
+            if (tx_sent.count(z.first)) continue;
+            if (rsp->trs.size() >= (size_t)MAX_TXS_PER_BLOCK) break;
+            rsp->trs.push_back(z.second);
+            tx_sent.insert(z.first);
+            sendEvent(ServiceEnum::Timer,
+                      new timerEvent::SetAlarm(timers::ALARM_TX_SENT, toRef(z.first.container),
+                                               z.second.get(), TX_SENT_TTL_SEC, this));
+        }
+        if (!rsp->trs.empty())
+        {
+            rsp->hb = new MsgData::HeartBeatREQ(base_root, epoch, src_node);
+            pass_NodeMsgRSP(rsp.get(), route);
+            logNode("[blockstatus] offer_hash нет -> отправили %zu tx", rsp->trs.size());
+        }
+    }
+
+    logNode("[blockstatus] wait epoch=%lld (accepted=%zu offer=%d)",
+            (long long)epoch, e->accepted.size(), (int)e->has_offer_hash);
+    return true;
+}
+
+void Node::Service::mergeBlockStatus(const MsgData::BlockStatusREQ *e, int64_t epoch)
+{
+    auto& st = block_status[epoch];
+    if (!st.valid()) st = new MsgData::BlockStatusREQ();
+    if (e->has_offer_hash) {
+        st->has_offer_hash = true;
+        st->offer_hash = e->offer_hash;
+    }
+    for (auto& z : e->accepted)
+    {
+        if (!z.second.valid()) continue;
+        auto it = st->accepted.find(z.first);
+        if (it == st->accepted.end()
+            || it->second->node_validators.size() < z.second->node_validators.size())
+            st->accepted[z.first] = z.second;
+    }
+}
+
+void Node::Service::broadcastCurrentBlockStatus()
+{
+    const int64_t ep = epoch_current();
+    auto it = block_status.find(ep);
+    if (it == block_status.end() || !it->second.valid()) return;
+    REF_getter<BlockMetaFull> mf;
+    try { mf = getMetaFull(); } catch (...) { return; }
+    if (!mf.valid()) return;
+    logNode("[blockstatus] periodic relay epoch=%lld accepted=%zu",
+            (long long)ep, it->second->accepted.size());
+    broadcast_MsgEvent_via_broadcaster(it->second.get(), mf->tree_all_nodes);
+}
+
+void Node::Service::relayBlockStatus(const REF_getter<MsgData::BlockAcceptedREQ> &block_cert,
+                                     const REF_getter<MsgData::BlockAccepted2REQ> &diff_cert)
+{
+    REF_getter<BlockMetaFull> mf;
+    try { mf = getMetaFull(); } catch (...) { return; }
+    if (!mf.valid()) return;
+    REF_getter<MsgData::BlockStatusREQ> req = new MsgData::BlockStatusREQ();
+    auto itb = l_blocks.find(prev_root_hash_Z());
+    if (itb != l_blocks.end() && !itb->second.offer_hash.container.empty())
+    {
+        req->has_offer_hash = true;
+        req->offer_hash = itb->second.offer_hash;
+    }
+    if (block_cert.valid() && block_cert->blockInfo.valid()
+        && block_cert->blockInfo->heart_beat.valid())
+        req->accepted[block_cert->blockInfo->getHash()] = block_cert;
+    if (!req->accepted.empty())
+    {
+        auto& c = req->accepted.begin()->second;
+        if (c.valid() && c->blockInfo.valid() && c->blockInfo->heart_beat.valid())
+            mergeBlockStatus(req.get(), c->blockInfo->heart_beat->new_epoch);
+    }
+    logNode("[blockstatus] relay accepted=%zu offer=%d",
+            req->accepted.size(), (int)req->has_offer_hash);
+    // Broadcast штатным путём: MsgData через NodeMsg (как Ping/GetTx).
+    broadcast_MsgEvent_via_broadcaster(req.get(), mf->tree_all_nodes);
+}
+
+bool Node::Service::OfferREQ(const bcEvent::OfferREQ *e)
+{
+    MUTEX_INSPECTOR;
+    // TODO: кеш офферов по хешу; пока not found.
+    REF_getter<MsgData::Offer> off = new MsgData::Offer();
+    logNode("[offer] REQ hash=%s -> not found", e->offer_hash.str().c_str());
+    sendEvent(e->reply_to, ServiceEnum::Node,
+              new bcEvent::OfferRSP(e->offer_hash, false, off, route_t()));
+    return true;
+}
+
+bool Node::Service::OfferRSP(const bcEvent::OfferRSP *e)
+{
+    MUTEX_INSPECTOR;
+    logNode("[offer] RSP hash=%s found=%d txs=%zu",
+            e->offer_hash.str().c_str(), (int)e->found,
+            e->offer.valid() ? e->offer->txs.size() : (size_t)0);
+    // TODO: если найден — использовать оффер (исполнить/включить в att_data).
     return true;
 }
 
@@ -1353,12 +2071,13 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     std::set<REF_getter<data_base>> deleted_granules;
     // ▼▼▼ INSERT: bc_state tx_count++ (TX попала в блок; NULL — не rollback)
     {
-        auto st = cells::getStateNoCreate(root.get(), db_state.get(), &roll,b.validateBlockREQ->block_timestamp);
+        // OrCreate: ячейка попадает в children_ptrs дерева, иначе мутация
+        // остаётся на детачнутой копии и calc_tree_hash её не сохранит.
+        auto st = cells::getStateNoCreate(root.get(), db_state.get(), &roll, b.validateBlockREQ->block_timestamp);
         if (!st.valid()) 
             throw CommonError("if (!st.valid()) ");
         st->tx_count++;
-        // ячейку состояния надо пометить dirty, иначе calc_tree_hash её пропустит
-        st->parent->markDirty(b.validateBlockREQ->block_timestamp);
+        logNode("tx_count %lld",st->tx_count);
     }
     // ▲▲▲    
     int64_t gasLimitTokens = 0, priority = 0, value = 0;
@@ -1576,11 +2295,13 @@ REF_getter<const bc_node> Node::Service::current_leader()
             (size_t)(slot%leaders.size()), leaders.size(), name.container.c_str());
     return cells::getNodeNoCreateConst(root.get(),db_state.get(),name);
 }
-REF_getter<BlockMetaFull> Node::Service::getMetaFull()
+REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_hash)
 {
     MUTEX_INSPECTOR;
     // int round=hb->round;
-    auto b=prev_root_hash_Z();
+    // корень, на котором построен блок (meta_root_hash) может отличаться от
+    // нашего текущего — иначе мету для проверяемого блока не собрать.
+    auto b = meta_root_hash.container.empty() ? prev_root_hash_Z() : meta_root_hash;
     // auto round=ti_ / HB_TIME_WINDOW;
     auto it=block_meta_full.find(b);
     if(it!=block_meta_full.end())

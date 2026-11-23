@@ -42,6 +42,11 @@
 #include "md/md_GetGranuleRSP.h"
 #include "md/md_ScanREQ.h"
 #include "md/md_ScanRSP.h"
+#include "md/md_GetValidateBlockRSPREQ.h"
+#include "md/md_GetValidateBlockRSPRSP.h"
+#include "md/md_UnlockRoundREQ.h"
+#include "md/md_Offer.h"
+#include "md/md_BlockStatusREQ.h"
 
 
 
@@ -89,4 +94,9 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetNodesRSP, MsgData::GetNodesRSP::construct);
     registerMsg(msgid::PingREQ, MsgData::PingREQ::construct);
     registerMsg(msgid::PingRSP, MsgData::PingRSP::construct);
+    registerMsg(msgid::GetValidateBlockRSPREQ, MsgData::GetValidateBlockRSPREQ::construct);
+    registerMsg(msgid::GetValidateBlockRSPRSP, MsgData::GetValidateBlockRSPRSP::construct);
+    registerMsg(msgid::UnlockRoundREQ, MsgData::UnlockRoundREQ::construct);
+    registerMsg(msgid::Offer, MsgData::Offer::construct);
+    registerMsg(msgid::BlockStatusREQ, MsgData::BlockStatusREQ::construct);
 }

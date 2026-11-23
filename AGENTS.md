@@ -74,3 +74,5 @@ cp genesis.json storage/ && cp keys_test.json storage/ && cp keys_test.json gym/
 ## Важное
 - Тестовые leveldb (`src/js/ts/dist/db*`, `src/js/ts/dist/storage/db*`) — в `.gitignore`, не коммитить.
 - Мусор (`rs.sh`, `apply_edit`, `*.tar`, `*.patch`, `dist/z`, `*.tsbuildinfo`) — не коммитить.
+- **Никакого `git add -A` / `git add .`** — только явные пути пофайлово.
+  Проект большой, а `.git` — ~5 МБ: мусор (leveldb, бинарники, ключи) не должен попасть в индекс.

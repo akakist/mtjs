@@ -21,11 +21,9 @@ namespace MsgData
         {
 
         }
+        /// TODO - нужно выкинуть контент tx_hashes att_data  diffs. deleted - нужен ли, у нас схема удаления сейчас работает без этого вроде
         REF_getter<BlockInfo> blockInfo;
-        std::vector<THASH_id> tx_hashes;
         REF_getter<attachment_data> att_data;
-        std::map<std::string,std::string> diffs;
-        std::set<std::string> deleted;
         blst_cpp::Signature sig;
         NODE_id node_validator;
 
@@ -34,18 +32,6 @@ namespace MsgData
             blockInfo->update(h);
             h.update(sig.serialize());
             h.update(node_validator.container);
-            for(auto& t: tx_hashes)
-            {
-                h.update(t.container);
-            }
-            for(auto& t:diffs)
-            {
-                h.update(t.first);
-                h.update(t.second);
-
-            }
-            for(auto& z: deleted)
-                h.update(z);
 
             att_data->update(h);
         }
@@ -56,8 +42,7 @@ namespace MsgData
             Base::pack(b);
             b<<blockInfo;
             b<<sig;
-            b<<node_validator;
-            b<<tx_hashes<<att_data<<diffs << deleted;
+            b<<node_validator<<att_data;
         }
         void unpack(inBuffer& b) final
         {
@@ -65,8 +50,7 @@ namespace MsgData
             Base::unpack(b);
             b>>blockInfo;
             b>>sig;
-            b>>node_validator;
-            b>>tx_hashes>>att_data>>diffs >> deleted;
+            b>>node_validator>>att_data;
         }
         void sign(const blst_cpp::SecretKey &sk)
         {

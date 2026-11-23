@@ -221,6 +221,7 @@ namespace blst_cpp {
             }
         }
 
+        bool initialized() const { return init_; }
         blst_p2_affine affine() const {
             if (!init_)
                 throw std::runtime_error("empty aggregate signature"+_DMI());

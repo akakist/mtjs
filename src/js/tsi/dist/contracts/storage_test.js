@@ -30,20 +30,14 @@ registerMethod("t_simple_set", function (p, m) {
 registerView("t_simple_get", function (p) {
     var g = get("concert");
     if (!g)
-        return { found: false, dbg: "g_missing" };
+        return { found: false };
     var s = g.get("sectorA");
     if (!s)
-        return { found: false, dbg: "s_missing" };
+        return { found: false };
     var pl = s.get("place11");
     if (!pl)
-        return { found: false, dbg: "pl_missing" };
-    try {
-        var v = pl.get();
-        return { found: true, dbg: "ok", val: v };
-    }
-    catch (e) {
-        return { found: false, dbg: "pl.get_throw: " + String(e) };
-    }
+        return { found: false };
+    return pl.get();
 });
 registerMethod("t_simple_del", function (p, m) {
     var g = get("concert", TTL);

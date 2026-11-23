@@ -92,8 +92,15 @@ namespace cells {
     {
         MUTEX_INSPECTOR;
         auto cur = _cur;
-        // cur->snapshot_1_only(roll);
-        // cur->markDirty_1_only(block_timestamp);
+
+        // 1) Ячейка уже захвачена в дерево — отдаём её.
+        auto ip = cur->children_ptrs.find(id);
+        if (ip != cur->children_ptrs.end())
+            return ip->second;
+
+        // 2) Есть хеш => ячейка уже существует в базе: читаем и ЗАХВАТЫВАЕМ в дерево.
+        //    Иначе мутации уходили бы в детачнутую копию и терялись (calc_tree_hash
+        //    обходит только children_ptrs).
         auto it = cur->children_hashes.find(id);
         if (it != cur->children_hashes.end())
         {
@@ -101,27 +108,21 @@ namespace cells {
             if (!r.valid()) {
                 // stale root (hash mismatch) → пробросить NULL, не падать
                 logErr2("getLeafOrCreate: NULL at '%s' (stale root)", id.c_str());
+                return r;
             }
-            // r->snapshot_1_only(roll);
-            // r->markDirty_1_only(block_timestamp);
+            cur->children_ptrs.insert({id, r.get()});
             return r;
         }
-        // if (roll)
-        // {
-        //     cur->snapshot(roll);
-        // }
+
+        // 3) Нет ни в ptrs, ни в хешах => создаём новую.
         // снапшот родителя ДО мутации children_hashes_mx: иначе в откат
         // попадёт родитель УЖЕ с этим ребёнком (пустой хеш) и ребёнок не вырежется.
         cur->snapshot(roll, created);
         cur->children_hashes[id].container = "";
-        auto it2 = cur->children_ptrs.find(id);
-        if (it2 != cur->children_ptrs.end())
-            throw CommonError("if(it!=children_ptrs.end())");
         REF_getter<Cellable> c = new Cellable(cur, id);
         cur->children_ptrs.insert({id, c});
         // новая ячейка: снапшот родителя уже сделан выше, пустой ребёнок в roll
         // не нужен — отсутствие ребёнка при откате даёт именно родительский снапшот.
-        // c->markDirty(block_timestamp);
         created.insert(c);
 
         return c;
@@ -297,7 +298,6 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
             auto st = getStateNoCreate(root, db, roll, block_timestamp);
             if (st.valid())
             {
-                
                 st->account_count++;
             }
         }

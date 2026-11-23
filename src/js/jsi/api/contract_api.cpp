@@ -210,6 +210,21 @@ JSIValue jsi_registerView(JSIContext* ctx, JSIValueConst, int argc, JSIValueCons
     catch (...) { return JSI_ThrowInternalError(ctx, "registerView: unknown C++ exception"); }
 }
 
+// int64-аргумент может прийти как Number (INT/FLOAT64) или QuickJS BigInt.
+static bool jsi_arg_int64(JSIContext* ctx, JSIValueConst v, int64_t* out)
+{
+    int t = JSI_VALUE_GET_TAG(v);
+    if (!(t == JSI_TAG_BIG_INT || t == JSI_TAG_SHORT_BIG_INT))
+        return JSI_ToInt64(ctx, out, v) == 0;
+    size_t len = 0;
+    const char* s = JSI_ToCStringLen(ctx, &len, v);   // BigInt -> десятичная строка
+    if (!s) return false;
+    bool ok = false;
+    try { *out = std::stoll(std::string(s, len)); ok = true; } catch (...) {}
+    JSI_FreeCString(ctx, s);
+    return ok;
+}
+
 JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueConst* argv) {
     MUTEX_INSPECTOR;
     try {
@@ -233,7 +248,7 @@ JSIValue jsi_createGranule(JSIContext* ctx, JSIValueConst, int argc, JSIValueCon
 
         // TTL: обязателен, > 0, <= MAX_GRANULE_TTL
         int64_t ttl = 0;
-        if (JSI_ToInt64(ctx, &ttl, argv[2]) != 0)
+        if (!jsi_arg_int64(ctx, argv[2], &ttl))
             return JSI_ThrowTypeError(ctx, "createGranule: ttl must be int64");
         if (ttl <= 0)
             return JSI_ThrowTypeError(ctx, "createGranule: ttl must be > 0 (no eternal granules)");

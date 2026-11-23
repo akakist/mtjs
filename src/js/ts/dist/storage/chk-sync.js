@@ -170,7 +170,7 @@ async function main() {
         check(err === 0, "all " + TOTAL_BLOCKS + " fill ok");
     }
     // ============================================================
-    // t4: node_create n_test (enabled=true автоматом, stake=0)
+    // t4: node_create n_test + node_stake (без стейка нода не попадает в дерево рассылки)
     // ============================================================
     const kpEd = mtjs.generate_keypair(0); // ed25519
     const kpBls = mtjs.generate_keypair(3); // bls12-381
@@ -191,6 +191,15 @@ async function main() {
         check(ni.enabled === true, "n_test enabled (автоматом)");
         check(ni.ed_pk === kpEd.pk, "ed_pk matches");
         check(ni.bls_pk === kpBls.pk, "bls_pk matches");
+        // стейк: иначе getMetaFull выкидывает ноду из vne/tree_all_nodes
+        console.log("\n[t4b] node_stake " + TEST_NODE_NAME);
+        const st = await submitAndWait([
+            { contract: "root", method: "node_stake", params: {
+                    node: TEST_NODE_NAME,
+                    amount: "100",
+                } },
+        ], 100); // value: node_stake списывает из value транзакции
+        check(st.block.status(st.rsp.tx_hash) === "ok", "node_stake ok (errstr=" + (st.block.errstr(st.rsp.tx_hash) || "") + ")");
     }
     // ============================================================
     // t5: addInstance n_test + mint 0 (trigger block → HB → do_sync)
@@ -314,7 +323,7 @@ async function main() {
         let syncing_gd = 0, ready_gd = 0;
         for (let i = 0; i < 10; i++) {
             try {
-                const gd = await mtjs.get_contract_data(testNode, "bulk", "b0/0", 3);
+                const gd = await mtjs.get_contract_data(testNode, "bulk", "bulk/b0/0", 3);
                 if (gd.errcode === 503 || (gd.errstr && gd.errstr.indexOf("syncing") >= 0))
                     syncing_gd++;
                 else
@@ -359,9 +368,9 @@ async function main() {
         check(s0.block_height === st.block_height, "block_height: " + s0.block_height + " == " + st.block_height);
         const ci = await mtjs.get_contract(testNode, "bulk", 5);
         check(ci.found === true, "n_test get_contract(bulk) OK");
-        const gd = await mtjs.get_contract_data(testNode, "bulk", "b0/0", 5);
+        const gd = await mtjs.get_contract_data(testNode, "bulk", "bulk/b0/0", 5);
         check(gd.found === true, "n_test get_contract_data(bulk/b0/0) OK");
-        const gdLast = await mtjs.get_contract_data(testNode, "bulk", "b0/" + (PER_TX - 1), 5);
+        const gdLast = await mtjs.get_contract_data(testNode, "bulk", "bulk/b0/" + (PER_TX - 1), 5);
         check(gdLast.found === true, "n_test get_contract_data(bulk/b0/" + (PER_TX - 1) + ") OK");
         const r = await mtjs.call_view(testNode, "bulk", "count", { prefix: "bulk/b0" }, 60, 10);
         if (r.found && !r.error) {

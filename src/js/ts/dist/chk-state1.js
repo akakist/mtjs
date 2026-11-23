@@ -8,6 +8,7 @@ const node = "127.0.0.1:2301";
 const KEYS_PATH = std.getenv("MTJS_KEYS_PATH") || "keys_test.json";
 let rootSk = "";
 let rootPk = "";
+let aliceAddr = "";
 async function loadKeys() {
     const raw = await mtjs.fs.readFile(KEYS_PATH);
     const keys = JSON.parse(raw);
@@ -16,6 +17,7 @@ async function loadKeys() {
         throw new Error("keys_test.json: no users.root.keys[0].sk/pk");
     rootSk = r.sk;
     rootPk = r.pk;
+    aliceAddr = keys.users?.alice?.addr || "";
 }
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
@@ -36,6 +38,7 @@ function errStr(e) {
         ? "errcode=" + e.errcode + " errstr=" + e.errstr : String(e);
 }
 const pending = {};
+const recentBlocks = {};
 mtjs.tx_subscribe(node, (b) => {
     for (const h of b.tx_hashes) {
         const p = pending[h];
@@ -47,6 +50,7 @@ mtjs.tx_subscribe(node, (b) => {
     }
 });
 function waitTx(h, to) {
+    if (recentBlocks[h]) { const b = recentBlocks[h]; delete recentBlocks[h]; return Promise.resolve(b); }
     return new Promise((res, rej) => {
         const timer = setTimeout(() => { delete pending[h]; rej({ errcode: 1, errstr: "timeout" }); }, to * 1000);
         pending[h] = { resolve: res, reject: rej, timer };
@@ -127,7 +131,7 @@ async function main() {
         console.log("\n[t2] transfer (ok) → tx_count/block_height");
         const s1 = await getState();
         const { rsp, block } = await submitAndWait(rootSk, rootAddr, [
-            { contract: "root", method: "transfer", params: { to: rootAddr, amount: "1" } },
+            { contract: "root", method: "transfer", params: { to: aliceAddr || rootAddr, amount: "1" } },
         ], 100000, 20000);
         const s2 = await getState();
         check(s2.tx_count > s1.tx_count, "tx_count grew: " + s1.tx_count + " -> " + s2.tx_count);

@@ -16,15 +16,15 @@ namespace MsgData
 
         }
         BlockInfo(const THASH_id& _new_root_hash,
-        const THASH_id & _tx_hash,
-        const THASH_id & _diffs_hash,
+        // const THASH_id & _tx_hash,
+        // const THASH_id & _diffs_hash,
         const THASH_id & _att_hash,
         const REF_getter<HeartBeatREQ> &_heart_beat,
         int64_t bs
         ):Base(msgid::BlockInfo),
         new_root_hash1(_new_root_hash),
-        tx_hash(_tx_hash),
-        diffs_hash(_diffs_hash),
+        // tx_hash(_tx_hash),
+        // diffs_hash(_diffs_hash),
         att_data_hash(_att_hash),
         heart_beat(_heart_beat),
         block_timestamp(bs)
@@ -33,9 +33,10 @@ namespace MsgData
 
         }
         THASH_id new_root_hash1;
-        THASH_id tx_hash;
-        THASH_id diffs_hash;
+        // THASH_id tx_hash;
+        // THASH_id diffs_hash;
         THASH_id att_data_hash;
+        THASH_id offer_hash;   // хеш оффера лидера (hb+ts+тела tx)
         REF_getter<HeartBeatREQ> heart_beat;
         TIME_mks block_timestamp;
 
@@ -44,9 +45,10 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             h.update(new_root_hash1.container);
-            h.update(tx_hash.container);
-            h.update(diffs_hash.container);
+            // h.update(tx_hash.container);
+            // h.update(diffs_hash.container);
             h.update(att_data_hash.container);
+            h.update(offer_hash.container);
            
             heart_beat->update(h);
             h.update(std::to_string(block_timestamp.v));
@@ -58,8 +60,9 @@ namespace MsgData
             Base::pack(b);
             b<<new_root_hash1;
             b<<att_data_hash;
-            b<<tx_hash;
-            b<<diffs_hash;
+            b<<offer_hash;
+            // b<<tx_hash;
+            // b<<diffs_hash;
             b<<heart_beat;
             b<<block_timestamp;
         }
@@ -69,8 +72,9 @@ namespace MsgData
             Base::unpack(b);
             b>>new_root_hash1;
             b>>att_data_hash;
-            b>>tx_hash;
-            b>>diffs_hash;
+            b>>offer_hash;
+            // b>>tx_hash;
+            // b>>diffs_hash;
             b>>heart_beat;
             b>>block_timestamp;
         }

@@ -1,6 +1,7 @@
 #pragma once
 // #include "signedBuffer.h"
 #include "THASH_id.h"
+#include "msockaddr_in.h"
 #include "IDatabase.h"
 #include "blst_cp.h"
 #include "NODE_id.h"
@@ -10,6 +11,7 @@
 #include "md/md_BlockDBStore.h"
 #include "md/md_BlockAccepted2REQ.h"
 #include "md/md_attachment_data.h"
+#include "md/md_Offer.h"
 #include "db_to_save.h"
 #include "IDatabase.h"
 namespace ServiceEnum
@@ -42,6 +44,12 @@ namespace bcEventEnum
     const EVENT_id StreamBlock(ghash("@g_StreamBlock"));
     const EVENT_id HeartBeatREQ(ghash("@g_HeartBeatREQ"));
     const EVENT_id ForwardTxREQ(ghash("@g_ForwardTxREQ"));
+    const EVENT_id GetPrevBlockREQ(ghash("@g_GetPrevBlockREQ"));
+    const EVENT_id GetPrevBlockRSP(ghash("@g_GetPrevBlockRSP"));
+    const EVENT_id GetHashedDataREQ(ghash("@g_GetHashedDataREQ"));
+    const EVENT_id GetHashedDataRSP(ghash("@g_GetHashedDataRSP"));
+    const EVENT_id OfferREQ(ghash("@g_OfferREQ"));
+    const EVENT_id OfferRSP(ghash("@g_OfferRSP"));
     const EVENT_id GetUserNonceREQ(ghash("@g_GetUserNonceREQ"));
     const EVENT_id GetUserNonceRSP(ghash("@g_GetUserNonceRSP"));
     const EVENT_id WriteGranules(ghash("@g_WriteGranules"));
@@ -51,6 +59,22 @@ namespace bcEventEnum
     const EVENT_id StaleGranules(ghash("@g_StaleGranules"));
     const EVENT_id LiteSetUplinkREQ(ghash("@g_LiteSetUplinkREQ")); /// выставить для iDatabase адрес ноды откуда брать гранулы
 
+}
+
+/// Статусы в GetHashedDataRSP (вне bcEvent, чтобы генератор событий не принял
+/// их за классы событий).
+namespace HashedData { enum Status { OK=0, NOT_FOUND=1, BAD_HASH=2 }; }
+
+/// Итог проверки блок-статуса (единая шина BlockStatusREQ/RSP).
+namespace BlockStatus
+{
+    enum Result
+    {
+        consensus_validators = 0,   // есть 2/3 за вариант — можно финализировать
+        split_validators     = 1,   // варианты не добирают кворум — сплит-пруф
+        wait_validators      = 2,   // данных мало — ждём
+        diff_consensus       = 3    // 2/3 diff-голосов — финализируем
+    };
 }
 
 namespace bcEvent
@@ -463,6 +487,102 @@ namespace bcEvent
             o<<tx;
         }
     };
+    // Запрос предыдущего блока по хешу: нужен, чтобы отставшая нода
+    // проверила цепочку и запросила синк.
+    class GetPrevBlockREQ : public Event::Base
+    {
+    public:
+        static Base *construct(const route_t &r) { return new GetPrevBlockREQ(r); }
+        GetPrevBlockREQ(const THASH_id &_hash, const route_t &r)
+            : Base(bcEventEnum::GetPrevBlockREQ, r), hash(_hash) {}
+        THASH_id hash;
+        GetPrevBlockREQ(const route_t &r)
+            : Base(bcEventEnum::GetPrevBlockREQ, r) {}
+        void unpack(inBuffer &o) { o>>hash; }
+        void pack(outBuffer &o) const { o<<hash; }
+    };
+    class GetPrevBlockRSP : public Event::Base
+    {
+    public:
+        static Base *construct(const route_t &r) { return new GetPrevBlockRSP(r); }
+        GetPrevBlockRSP(const REF_getter<MsgData::BlockAccepted2REQ> &_block, const route_t &r)
+            : Base(bcEventEnum::GetPrevBlockRSP, r), block(_block) {}
+        REF_getter<MsgData::BlockAccepted2REQ> block;
+        GetPrevBlockRSP(const route_t &r)
+            : Base(bcEventEnum::GetPrevBlockRSP, r) {}
+        void unpack(inBuffer &o) { o>>block; }
+        void pack(outBuffer &o) const { o<<block; }
+    };
+    // Оффер лидера — отдельно от BlockStatus. Позже включается в att_data.
+    class OfferREQ : public Event::Base
+    {
+    public:
+        static Base *construct(const route_t &r) { return new OfferREQ(r); }
+        OfferREQ(const THASH_id& _offer_hash, const std::string& _reply_to, const route_t& r)
+            : Base(bcEventEnum::OfferREQ, r), offer_hash(_offer_hash), reply_to(_reply_to) {}
+        OfferREQ(const route_t &r) : Base(bcEventEnum::OfferREQ, r) {}
+        THASH_id offer_hash;
+        std::string reply_to;
+        void pack(outBuffer &o) const { o<<offer_hash<<reply_to; }
+        void unpack(inBuffer &o) { o>>offer_hash>>reply_to; }
+    };
+    class OfferRSP : public Event::Base
+    {
+    public:
+        static Base *construct(const route_t &r) { return new OfferRSP(r); }
+        OfferRSP(const THASH_id& _offer_hash, bool _found,
+                 const REF_getter<MsgData::Offer>& _offer, const route_t& r)
+            : Base(bcEventEnum::OfferRSP, r), offer_hash(_offer_hash), found(_found),
+              offer(_offer) {}
+        OfferRSP(const route_t &r) : Base(bcEventEnum::OfferRSP, r) {}
+        THASH_id offer_hash;
+        bool found = false;
+        REF_getter<MsgData::Offer> offer;
+        void pack(outBuffer &o) const { o<<offer_hash<<(int)found<<offer; }
+        void unpack(inBuffer &o)
+        {
+            int f=0;
+            o>>offer_hash>>f>>offer;
+            found=(f!=0);
+        }
+    };
+
+    // Запрос данных по хешу(ам) с id задачи. Ответ — GetHashedDataRSP с тем же
+    // task_id; источники задаёт вызывающая сторона.
+    class GetHashedDataREQ : public Event::Base
+    {
+    public:
+        static Base *construct(const route_t &r) { return new GetHashedDataREQ(r); }
+        GetHashedDataREQ(int64_t id, const std::vector<THASH_id>& h, const std::string& reply, const route_t& r)
+            : Base(bcEventEnum::GetHashedDataREQ, r), task_id(id), hashes(h), reply_to(reply) {}
+        GetHashedDataREQ(const route_t &r)
+            : Base(bcEventEnum::GetHashedDataREQ, r) {}
+        int64_t task_id=0;
+        std::vector<THASH_id> hashes;
+        std::string reply_to;   // куда отправить RSP ("ip:port")
+        void unpack(inBuffer &o) { o>>task_id>>hashes>>reply_to; }
+        void pack(outBuffer &o) const { o<<task_id<<hashes<<reply_to; }
+    };
+    class GetHashedDataRSP : public Event::Base
+    {
+    public:
+        static Base *construct(const route_t &r) { return new GetHashedDataRSP(r); }
+        GetHashedDataRSP(int64_t id, const std::vector<THASH_id>& h,
+                         const std::vector<int>& st,
+                         const std::vector<REF_getter<MsgData::Base>>& d,
+                         const route_t& r)
+            : Base(bcEventEnum::GetHashedDataRSP, r), task_id(id), hashes(h),
+              statuses(st), data(d) {}
+        GetHashedDataRSP(const route_t &r)
+            : Base(bcEventEnum::GetHashedDataRSP, r) {}
+        int64_t task_id=0;
+        std::vector<THASH_id> hashes;
+        std::vector<int> statuses;   // выровнено с hashes
+        std::vector<REF_getter<MsgData::Base>> data;  // только OK, по порядку
+        void unpack(inBuffer &o) { o>>task_id>>hashes>>statuses>>data; }
+        void pack(outBuffer &o) const { o<<task_id<<hashes<<statuses<<data; }
+    };
+
     class AddTxREQ : public Event::Base
     {
 

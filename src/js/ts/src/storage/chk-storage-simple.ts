@@ -155,7 +155,7 @@ async function main() {
             if (r.found) {
                 const v: any = r.value;   // JSValue (не JSON)
                 check(v.owner === rootAddr, "owner == root (" + comp + ", got " + v.owner + ")");
-                check(v.price === 100, "price == 100n (" + comp + ", got " + v.price + ")");
+                check(Number(v.price) === 100, "price == 100n (" + comp + ", got " + v.price + ")");
             }
         }
     }
@@ -172,7 +172,7 @@ async function main() {
         if (r.found && !r.error) {
             const v = unBig(r.result);
             check(v.owner === rootAddr, "owner == root");
-            check(v.price === 100, "price == 100");
+            check(Number(v.price) === 100, "price == 100");
         }
     }
 

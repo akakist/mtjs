@@ -45,17 +45,23 @@ namespace MsgData
         EmitNode blockRoot;
         std::map<ADDRESS_id,int64_t> fees;
         std::map<NODE_id,int64_t> rewards;
+        std::vector<THASH_id> tx_hashes;
+        std::map<std::string,std::string> diffs;
+
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
             b<<fees<<rewards<<blockRoot;
+            b<<tx_hashes<<diffs;
+
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>fees>>rewards>>blockRoot;
+            b>>tx_hashes>>diffs;
         }
 
         void update(Blake2bHasher &h) const
@@ -71,6 +77,16 @@ namespace MsgData
                 h.update(z.first.container);
                 h.update(std::to_string(z.second));
             }
+            for(auto& t: tx_hashes)
+            {
+                h.update(t.container);
+            }
+            for(auto& t:diffs)
+            {
+                h.update(t.first);
+                h.update(t.second);
+            }
+
         }
     };
 

@@ -34,17 +34,12 @@ registerMethod("t_simple_set", function(p: { compression?: string }, m: JsiMsg) 
 
 registerView("t_simple_get", function(p: {}) {
     var g = get("concert");
-    if (!g) return { found: false, dbg: "g_missing" };
+    if (!g) return { found: false };
     var s = g.get("sectorA");
-    if (!s) return { found: false, dbg: "s_missing" };
+    if (!s) return { found: false };
     var pl = s.get("place11");
-    if (!pl) return { found: false, dbg: "pl_missing" };
-    try {
-        var v = pl.get();
-        return { found: true, dbg: "ok", val: v };
-    } catch (e: any) {
-        return { found: false, dbg: "pl.get_throw: " + String(e) };
-    }
+    if (!pl) return { found: false };
+    return pl.get();
 });
 
 registerMethod("t_simple_del", function(p: {}, m: JsiMsg) {

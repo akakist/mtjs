@@ -91,6 +91,10 @@ namespace msgid
         ScanREQ=37, ScanRSP=38,
         PingREQ=39, PingRSP=40,
         GetNodesREQ=41, GetNodesRSP=42,
+        GetValidateBlockRSPREQ=43, GetValidateBlockRSPRSP=44,
+        UnlockRoundREQ=45,
+        Offer=46,
+        BlockStatusREQ=47,
     };
 
 }
