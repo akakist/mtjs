@@ -550,8 +550,8 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
         }
 
         auto voted = votes->votes[vhash].nodes;
-
-        int64_t stake = 0;
+        // auto mf=getMe
+        i128 stake = i128(0);
         for (auto& z : voted) {
             auto nn = cells::getNodeNoCreateConst(root.get(),db_state.get(),z);
             if (!nn.valid())
@@ -902,7 +902,7 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             if (!u->staked_in.empty()) { logNode("gc: address is staker (skip)"); break; }
 
             applied_address++;
-            int64_t burned = u->balance;
+            i128 burned = u->balance;
             auto st = cells::getStateNoCreate(root.get(), db_state.get(), ttt.roll, bbb.validateBlockREQ->block_timestamp);
             if (st.valid() && burned > 0) {
                 // t.markDirty(st.get());

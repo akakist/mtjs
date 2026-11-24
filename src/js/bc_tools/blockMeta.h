@@ -5,20 +5,32 @@
 #include "tree.h"
 struct BlockMetaFull: public Refcountable
 {
-    std::map<NODE_id, int64_t> prev_stakes;
-    int64_t getPrevStake(const NODE_id& n) const
+    std::map<NODE_id, i128> prev_stakes;
+    i128 getPrevStake(const NODE_id& n) const
     {
         auto it=prev_stakes.find(n);
         if(it==prev_stakes.end())
             throw CommonError("if(it==prev_stakes.end())");
         return it->second;
     }
-    int64_t fullStake() const
+    i128 fullStakeAll() const
     {
-        int64_t r=0;
+        i128 r=(i128)0;
         for(auto& z: prev_stakes)
         {
             r+=z.second;
+        }
+        return r;
+    }
+    i128 fullStakeCommitte() const
+    {
+        i128 r=(i128)0;
+        for(auto& z: committe_members)
+        {
+            auto it=prev_stakes.find(z);
+            if(it==prev_stakes.end())
+                throw CommonError("if(it==prev_stakes.end()) @344");
+            r+=it->second;
         }
         return r;
     }
@@ -32,6 +44,8 @@ struct BlockMetaFull: public Refcountable
     TreeNode tree_committe;
     std::map<NODE_id, size_t> position_of_node;
     std::set<NODE_id> committe_members;
+    i128 full_stake_all;
+    i128 full_stake_committe;
     BlockMetaFull(): Refcountable("BlockMetaFull") {}
 
 };

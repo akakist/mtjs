@@ -320,8 +320,7 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
     if (e->tid == TIMER_BLOCK_STATUS) {
-        auto cl = current_leader();
-        if (cl.valid() && cl->getName() == this_node_name)
+        if(isCurrentLeaderMe())
             broadcastCurrentBlockStatus();
         return true;
     }
@@ -1184,7 +1183,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
     for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
     {
         MUTEX_INSPECTOR;
-        resetBlockExpired(b.validateBlockREQ->heart_beat->node_leader);
+        // resetBlockExpired(b.validateBlockREQ->heart_beat->node_leader);
         std::optional<std::string> t_err;
         auto tt=b.validateBlockREQ->transaction_bodies[ti];
         auto tx_hash=tt->getHash();
@@ -1288,7 +1287,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
 {
     MUTEX_INSPECTOR;
 
-    double total_staked=0;
+    i128 total_staked=i128(0);
     auto nn=cells::getAllNodesConst(root.get(), db_state.get());
     auto local_prev_block=prev_block;
     std::set<NODE_id> ns;
@@ -1352,7 +1351,7 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
         MUTEX_INSPECTOR;
         std::vector<blst_cpp::PublicKey> agg_pk;
 
-        int64_t stake=0;
+        i128 stake=i128(0);
         for (auto &z : lc->node_diff_validators)
         {
             auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(),z);
@@ -1361,7 +1360,7 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
             agg_pk.push_back(n->get_bls_pk());
             stake += n->get_full_stake();
         }
-        int64_t full_stake=0;
+        i128 full_stake=i128(0);
         auto ls=cells::getAllNodesConst(root.get(), db_state.get());
         for(auto& z:ls )
         {
@@ -1504,7 +1503,7 @@ std::string Node::Service::self_ip()
     return std::string();
 }
 
-void Node::Service::cachePayload(const REF_getter<MsgData::Base> &p)
+void Node::Service::cachePayloadAdd(const REF_getter<MsgData::Base> &p)
 {
     if (!p.valid()) return;
     THASH_id h = p->getHash();
@@ -1525,7 +1524,7 @@ void Node::Service::cacheBlockPayloads(const REF_getter<MsgData::attachment_data
 {
     // att_data — единый payload (эмиты, награды, диффы, tx_hashes).
     if (att.valid())
-        cachePayload(REF_getter<MsgData::Base>(att.get()));
+        cachePayloadAdd(REF_getter<MsgData::Base>(att.get()));
 }
 
 void Node::Service::async_dl(const std::vector<THASH_id> &hashes,
@@ -1635,7 +1634,7 @@ bool Node::Service::on_GetHashedDataRSP(const bcEvent::GetHashedDataRSP *r)
                     (long long)r->task_id, r->hashes[i].str().c_str());
             continue;
         }
-        cachePayload(p);
+        cachePayloadAdd(p);
         t.have.insert(r->hashes[i]);
     }
 
@@ -1665,10 +1664,55 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
 
     if (!sync_in_progress && e->hb.valid() && e->hb->prev_root_hash_1 != prev_root_hash_Z())
     {
-        logNode("PingREQ: prev_root mismatch remote=%s local=%s, asking prev-block", e->hb->prev_root_hash_1.str().c_str(), prev_root_hash_Z().str().c_str());
+        logNode("BlockStatusREQ: prev_root mismatch remote=%s local=%s, asking prev-block", e->hb->prev_root_hash_1.str().c_str(), prev_root_hash_Z().str().c_str());
         passEvent(new bcEvent::GetPrevBlockREQ(e->hb->prev_root_hash_1,
                                                poppedFrontRoute(route)));
     }
+    auto cl=current_leader();
+    /// освежаем block_status у себя
+    if(cl.valid() && cl->getName()==src_node)
+    {
+        l_blocks[prev_root_hash_Z()].block_status=e;
+    }
+
+    for(auto & ih: e->accepted)
+    {
+        if(ih.second->blockInfo->getHash()!=ih.first)
+        {
+            logNode("if(ih.second->blockInfo->getHash()!=ih.first) - broken BlockStatusREQ");
+            return true;
+        }
+        
+        std::vector<blst_cpp::PublicKey> pks;
+        for(auto &nname: ih.second->node_validators)
+        {
+            auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(),nname);
+            if(!n.valid())
+            {
+                logNode("node not found %s",nname.container.c_str());
+                return true;
+            }
+            pks.push_back(n->get_bls_pk());
+
+        }
+        if(!ih.second->agg_sig.verify(pks,ih.first.container))
+        {
+            logNode("BlockStatusREQ: verify failed");
+            return true;
+        }
+    }
+    auto mf=getMetaFull();
+    std::map<THASH_id, i128> stakes;
+    auto fs=mf->fullStakeAll();
+    for(auto& ih: e->accepted)
+    {
+        for(auto& z: ih.second->node_validators)
+        {
+            stakes[ih.first]+=mf->getPrevStake(z);
+        }
+    }
+    
+
 
     auto derive = [&](const REF_getter<MsgData::BlockAcceptedREQ>& c) {
         if (c.valid() && c->blockInfo.valid() && c->blockInfo->heart_beat.valid())
@@ -1680,9 +1724,8 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
         return false;
     };
     if (!e->accepted.empty()) derive(e->accepted.begin()->second);
-    mergeBlockStatus(e, epoch);
-    REF_getter<BlockMetaFull> mf;
-    try { mf = getMetaFull(base_root); } catch (...) { mf = nullptr; }
+    // mergeBlockStatus(e, epoch);
+    REF_getter<BlockMetaFull> mf=getMetaFull();
     auto stake_of = [&](const NODE_id& id) -> int64_t {
         if (!mf.valid()) return 0;
         auto it = mf->prev_stakes.find(id);
@@ -1768,18 +1811,18 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
             nb->blockInfo = committee_cert->blockInfo;
             nb->node_validators = committee_cert->node_validators;
             nb->agg_sig = committee_cert->agg_sig;
-            nb->node_validators.push_back(this_node_name);
+            nb->node_validators.insert(this_node_name);
             nb->agg_sig.add(sig);
             accepted_signed.insert(nb->blockInfo->getHash());
 
             REF_getter<MsgData::BlockStatusREQ> req = new MsgData::BlockStatusREQ();
             req->accepted[nb->blockInfo->getHash()] = nb;
-            auto itst = block_status.find(epoch);
-            if (itst != block_status.end() && itst->second.valid() && itst->second->has_offer_hash)
-            {
-                req->has_offer_hash = true;
-                req->offer_hash = itst->second->offer_hash;
-            }
+            // auto itst = block_status.find(epoch);
+            // if (itst != block_status.end() && itst->second.valid() && itst->second->has_offer_hash)
+            // {
+            //     req->has_offer_hash = true;
+            //     req->offer_hash = itst->second->offer_hash;
+            // }
             mergeBlockStatus(req.get(), epoch);
             if (mf.valid())
                 broadcast_MsgEvent_via_broadcaster(req.get(), mf->tree_all_nodes);
@@ -1820,35 +1863,39 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
     return true;
 }
 
-void Node::Service::mergeBlockStatus(const MsgData::BlockStatusREQ *e, int64_t epoch)
-{
-    auto& st = block_status[epoch];
-    if (!st.valid()) st = new MsgData::BlockStatusREQ();
-    if (e->has_offer_hash) {
-        st->has_offer_hash = true;
-        st->offer_hash = e->offer_hash;
-    }
-    for (auto& z : e->accepted)
-    {
-        if (!z.second.valid()) continue;
-        auto it = st->accepted.find(z.first);
-        if (it == st->accepted.end()
-            || it->second->node_validators.size() < z.second->node_validators.size())
-            st->accepted[z.first] = z.second;
-    }
-}
+// void Node::Service::mergeBlockStatus(const MsgData::BlockStatusREQ *e, int64_t epoch)
+// {
+//     auto& st = block_status[epoch];
+//     if (!st.valid()) st = new MsgData::BlockStatusREQ();
+//     if (e->has_offer_hash) {
+//         st->has_offer_hash = true;
+//         st->offer_hash = e->offer_hash;
+//     }
+//     for (auto& z : e->accepted)
+//     {
+//         if (!z.second.valid()) continue;
+//         auto it = st->accepted.find(z.first);
+//         if (it == st->accepted.end()
+//             || it->second->node_validators.size() < z.second->node_validators.size())
+//             st->accepted[z.first] = z.second;
+//     }
+// }
 
 void Node::Service::broadcastCurrentBlockStatus()
 {
-    const int64_t ep = epoch_current();
-    auto it = block_status.find(ep);
-    if (it == block_status.end() || !it->second.valid()) return;
-    REF_getter<BlockMetaFull> mf;
-    try { mf = getMetaFull(); } catch (...) { return; }
-    if (!mf.valid()) return;
-    logNode("[blockstatus] periodic relay epoch=%lld accepted=%zu",
-            (long long)ep, it->second->accepted.size());
-    broadcast_MsgEvent_via_broadcaster(it->second.get(), mf->tree_all_nodes);
+
+    auto & bt=l_blocks[prev_root_hash_Z()];
+    if(!bt.block_status.valid())
+        bt.block_status=new MsgData::BlockStatusREQ();
+    // const int64_t ep = epoch_current();
+    // auto it = block_status.find(ep);
+    // if (it == block_status.end() || !it->second.valid()) return;
+    auto mf=getMetaFull();
+    // REF_getter<BlockMetaFull> mf;
+    // try { mf = getMetaFull(); } catch (...) { return; }
+    // if (!mf.valid()) return;
+    logNode("[blockstatus] periodic relay") ;
+    broadcast_MsgEvent_via_broadcaster(bt.block_status.get(), mf->tree_all_nodes);
 }
 
 void Node::Service::relayBlockStatus(const REF_getter<MsgData::BlockAcceptedREQ> &block_cert,
@@ -2164,7 +2211,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         int64_t spent = 0;
         if (auto e = charge_gas(gas_charged, spent))
             return e;
-        int64_t bal1 = 0;
+        i128 bal1 = i128(0);
         {  bal1 = uu->balance; }
         #ifdef DEBUG
         logNode("[t] tx=%s value=%lld gasLimitTokens=%lld priority=%lld gasLimit_gas=%lld gpt=%lld "
@@ -2433,7 +2480,11 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
     }
 
     if (vne_committe.empty())
-        throw CommonError("getMetaFull: no committee (even relaxed)");
+    {
+        logNode("getMetaFull: no committee ");
+        return nullptr;
+    }
+        // throw CommonError("getMetaFull: no committee (even relaxed)");
     
     // std::string com;
     // for(auto &z : m->vne)
@@ -2447,17 +2498,20 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
     }
     m->committee_vne=vne_committe;
 
+    m->full_stake_all=m->fullStakeAll();
+    m->full_stake_committe = m->fullStakeCommitte();
+
     return m;
 }
 
 bool Node::Service::block_leader::is_ValidateBlockRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf)
 {
-    int64_t stakeVal = 0;
+    i128 stakeVal = i128(0);
     for (auto &z : ValidateBlockRSP_m[h])
     {
         stakeVal += mf->getPrevStake(z->node_validator);;
     }
-    int64_t fullstake=0;
+    i128 fullstake=i128(0);
     for(auto &z: mf->committe_members)
     {
         fullstake += mf->getPrevStake(z);
@@ -2471,14 +2525,14 @@ bool Node::Service::block_leader::is_ValidateBlockRSP_m_quorum(const THASH_id& h
 }
 bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable*r, IDatabase* db)
 {
-    int64_t fullstakeVal = 0;
+    i128 fullstakeVal = i128(0);
     auto ls=cells::getAllNodesConst(r, db);
     for (auto &z : ls)
     {
         if(z->isEnabled())
             fullstakeVal += z->get_full_stake();
     }
-    int64_t stakeVal = 0;
+    i128 stakeVal = i128(0);
     auto &mm=GetTxRSP_m[h];
     for (auto &z : mm)
     {
@@ -2493,14 +2547,14 @@ bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& 
 }
 bool Node::Service::block_leader::is_PingRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db)
 {
-    int64_t fullstakeVal = 0;
+    i128 fullstakeVal = i128(0);
     auto ls=cells::getAllNodesConst(r, db);
     for (auto &z : ls)
     {
         if(z->isEnabled())
             fullstakeVal += z->get_full_stake();
     }
-    int64_t stakeVal = 0;
+    i128 stakeVal = i128(0);
     auto &mm=PingRSP_m[h];
     for (auto &z : mm)
     {
@@ -2516,14 +2570,14 @@ bool Node::Service::block_leader::is_PingRSP_m_quorum(const THASH_id& h, Cellabl
 
 bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable*r, IDatabase* db)
 {
-    int64_t fullstakeVal = 0;
+    i128 fullstakeVal = i128(0);
     auto ls=cells::getAllNodesConst(r, db);
     for (auto &z : ls)
     {
         if(z->isEnabled())
             fullstakeVal += z->get_full_stake();
     }
-    int64_t stakeVal = 0;
+    i128 stakeVal = i128(0);
     for (auto &z : BlockDiffValidateRSP_m[h])
     {
         auto n=cells::getNodeNoCreateConst(r, db,z->node_validator);

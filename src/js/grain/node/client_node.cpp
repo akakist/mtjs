@@ -333,7 +333,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         return true;
     }
 
-    int64_t stake_val=0;
+    i128 stake_val=i128(0);
     std::vector<blst_cpp::PublicKey> agg_pk_v;
     for (auto &z : r->blockAccepted2REQ->blockAcceptedREQ->node_validators)
     {
@@ -346,13 +346,13 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         stake_val+=mf->getPrevStake(z);
         XPASS;
     }
-    int64_t full_stake_val=0;
-    for(auto& z: mf->committe_members)
-    {
-        full_stake_val+=mf->getPrevStake(z);
-    }
+    i128 full_stake_val=mf->full_stake_all;
+    // for(auto& z: mf->committe_members)
+    // {
+    //     full_stake_val+=mf->getPrevStake(z);
+    // }
 
-    if((stake_val*100)/full_stake_val < QUORUM)
+    if((stake_val*i128(100))/full_stake_val < QUORUM)
     {
         logNode("validator quorum failed");
         return true;
@@ -455,14 +455,14 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 
         prev_block=r->blockAccepted2REQ;
         accepted_signed.clear();
-        {
-            const int64_t fin = prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch;
-            for (auto it = block_status.begin(); it != block_status.end(); )
-            {
-                if (it->first <= fin) it = block_status.erase(it);
-                else ++it;
-            }
-        }
+        // {
+        //     const int64_t fin = prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch;
+        //     for (auto it = block_status.begin(); it != block_status.end(); )
+        //     {
+        //         if (it->first <= fin) it = block_status.erase(it);
+        //         else ++it;
+        //     }
+        // }
         l_blocks.clear();
         block_meta_full.clear();
         // Шаг 3: высота уехала — сбор сертификата за неё больше не нужен,
@@ -506,10 +506,10 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     return true;
 }
 
-void Node::Service::resetBlockExpired(const NODE_id &n)
-{
-    sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(TIMER_BLOCK_EXPIRED,toRef(n.container),NULL,5., this));
-}
+// void Node::Service::resetBlockExpired(const NODE_id &n)
+// {
+//     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(TIMER_BLOCK_EXPIRED,toRef(n.container),NULL,5., this));
+// }
 #ifdef KALL
 bool Node::Service::PingREQ(const MsgData::PingREQ *r, const NODE_id &src_node, const route_t &route)
 {
@@ -660,26 +660,26 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
     // Тестовый инжект раскола: узлы из списка «не получают» ПЕРВЫЙ блок
     // высоты E (следующий блок той же высоты они подпишут). Собственный блок
     // автор всегда обрабатывает. См. MTJS_TEST_SKIP_FIRST_EPOCH/NODES.
-    if (const char* se = getenv("MTJS_TEST_SKIP_FIRST_EPOCH"))
-    {
-        if (r->heart_beat->new_epoch == atoll(se)
-            && r->heart_beat->node_leader != this_node_name
-            && !test_skipped_epochs.count(r->heart_beat->new_epoch))
-        {
-            const char* names = getenv("MTJS_TEST_SKIP_FIRST_NODES");
-            if (names)
-            {
-                std::string list = std::string(",") + names + ",";
-                if (list.find("," + this_node_name.container + ",") != std::string::npos)
-                {
-                    test_skipped_epochs.insert(r->heart_beat->new_epoch);
-                    logNode("TEST: skip first block epoch=%lld (split injection)",
-                            (long long)r->heart_beat->new_epoch);
-                    return true;
-                }
-            }
-        }
-    }
+    // if (const char* se = getenv("MTJS_TEST_SKIP_FIRST_EPOCH"))
+    // {
+    //     if (r->heart_beat->new_epoch == atoll(se)
+    //         && r->heart_beat->node_leader != this_node_name
+    //         && !test_skipped_epochs.count(r->heart_beat->new_epoch))
+    //     {
+    //         const char* names = getenv("MTJS_TEST_SKIP_FIRST_NODES");
+    //         if (names)
+    //         {
+    //             std::string list = std::string(",") + names + ",";
+    //             if (list.find("," + this_node_name.container + ",") != std::string::npos)
+    //             {
+    //                 test_skipped_epochs.insert(r->heart_beat->new_epoch);
+    //                 logNode("TEST: skip first block epoch=%lld (split injection)",
+    //                         (long long)r->heart_beat->new_epoch);
+    //                 return true;
+    //             }
+    //         }
+    //     }
+    // }
     auto prev_root_hash=prev_root_hash_Z();
     b_params t(db_state.get());
     t.meta=getMetaFull();
@@ -699,7 +699,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
                 cl.valid() ? cl->getName().container.c_str() : "none");
         return true;
     }
-    resetBlockExpired(r->heart_beat->node_leader);
+    // resetBlockExpired(r->heart_beat->node_leader);
 
     if (!err && r->heart_beat->prev_root_hash_1 != prev_root_hash)
     {

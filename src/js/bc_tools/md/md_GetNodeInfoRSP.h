@@ -4,6 +4,7 @@
 #include "ADDRESS_id.h"
 #include <map>
 #include "rsp_status.h"
+#include "i128.h"
 
 namespace MsgData
 {
@@ -17,7 +18,7 @@ namespace MsgData
         std::string ip;
         bool enabled = false;
         int64_t last_update = 0;
-        int64_t full_stake = 0;
+        i128 full_stake = i128(0);
         std::map<ADDRESS_id, int64_t> stakes;
         void update(Blake2bHasher& h) const
         {
@@ -27,7 +28,7 @@ namespace MsgData
             h.update(ed_pk); h.update(bls_pk); h.update(ip);
             h.update(enabled ? "1" : "0");
             h.update(std::to_string(last_update));
-            h.update(std::to_string(full_stake));
+            h.update(full_stake.str());
             for(auto& z: stakes) { h.update(z.first.addr); h.update(std::to_string(z.second)); }
         }
         void pack(outBuffer& b) const final

@@ -947,7 +947,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JS_SetPropertyStr(ctx, obj, "errcode", JS_NewInt32(ctx, rs->errcode));
         JS_SetPropertyStr(ctx, obj, "errstr",  JS_NewString(ctx, rs->errstr.c_str()));        
         JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, std::to_string(rs->nonce).c_str()));
-        JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, std::to_string(rs->balance).c_str()));
+        JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, rs->balance.str().c_str()));
         JSValue ret = JS_Call(it->second.ctx, it->second.resolve.get(), JS_UNDEFINED, 1, &obj);
         scope.addValue(ret);
         opaque.node_req_promises.erase(e->hash_of_request.container);
@@ -972,7 +972,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         JS_SetPropertyStr(ctx, obj, "ip", JS_NewString(ctx, rs->ip.c_str()));
         JS_SetPropertyStr(ctx, obj, "enabled", JS_NewBool(ctx, rs->enabled));
         JS_SetPropertyStr(ctx, obj, "last_update", JS_NewInt64(ctx, rs->last_update));
-        JS_SetPropertyStr(ctx, obj, "full_stake", JS_NewString(ctx, std::to_string(rs->full_stake).c_str()));
+        JS_SetPropertyStr(ctx, obj, "full_stake", JS_NewString(ctx, rs->full_stake.str().c_str()));
         JSValue stakes_obj = JS_NewObject(ctx);
         // scope.addValue(stakes_obj);
         for (auto& kv : rs->stakes) {

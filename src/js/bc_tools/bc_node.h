@@ -4,6 +4,7 @@
 #include "ADDRESS_id.h"
 #include "blst_cp.h"
 #include "nodeElement.h"
+#include "i128.h"
 struct bc_node: public data_base
 {
 
@@ -90,9 +91,9 @@ public:
         
         return name_;
     }
-    int64_t get_full_stake() const
+    i128 get_full_stake() const
     {
-        int64_t ret=0;
+        i128 ret=i128(0);
         
         for(auto &z: stakes)
         {

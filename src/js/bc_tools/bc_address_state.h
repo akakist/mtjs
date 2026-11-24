@@ -6,14 +6,15 @@
 #include <set>
 #include "CONTRACT_id.h"
 #include "NODE_id.h"
+#include "i128.h"
 
 static constexpr size_t MAX_KEYS_PER_ADDRESS = 5;
 
 struct bc_address_state: public data_base {
     bc_address_state(Cellable* p): data_base(hsh::bc_address_state, p) {
-        nonce = 0; balance = 0;
+        nonce = 0; balance = i128(0);
     }
-    int64_t balance = 0;
+    i128 balance = i128(0);
     int64_t nonce   = 0;
     std::map<uint64_t, Key> keys;      // id -> Key
     std::set<CONTRACT_id> contracts;   // контракты, где адрес owner

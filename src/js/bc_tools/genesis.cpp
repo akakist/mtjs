@@ -103,9 +103,9 @@ void init_genesis(Cellable* root, IDatabase* db)
             ADDRESS_id addr = resolve_user(u);
 
             auto ua = cells::getAddressStateOrCreate(root, db,addr, NULL,time0);
-            int64_t bal = 0;
+            i128 bal = i128(0);
             if (u.contains("balance") && u["balance"].is_string())
-                bal = std::stoll(u["balance"].get<std::string>());
+                bal =i128(std::stoll(u["balance"].get<std::string>()));
             {  ua->balance = bal; }
 
             if (u.contains("keys") && u["keys"].is_array()) {

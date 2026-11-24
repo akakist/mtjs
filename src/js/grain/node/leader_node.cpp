@@ -64,10 +64,16 @@ bool Node::Service::GetTxRSP(const MsgData::GetTxRSP *r, const NODE_id &src_node
 
     // Кворум GetTx больше не нужен: тх просто добавляются в пул лидера.
     // Дошли до лимита — оффер сразу; иначе короткое окно «дожать» поток.
-    if (transaction_pool_of_leader.size() >= (size_t)MAX_TXS_PER_BLOCK)
-        armBlockStartAlarm(bt, r->hb, 0.0);
-    else
-        armBlockStartAlarm(bt, r->hb, (double)TX_SHORT_TIMEOUT_MKS / 1000000.0);
+
+    sendEvent(ServiceEnum::Timer,
+            new timerEvent::ResetAlarm(timers::ALARM_START_BLOCK,
+                                        toRef(r->hb->getHash().container), r->hb.get(),
+                                        0.1, this));
+
+    // if (transaction_pool_of_leader.size() >= (size_t)MAX_TXS_PER_BLOCK)
+    //     armBlockStartAlarm(bt, r->hb, 0.0);
+    // else
+    //     armBlockStartAlarm(bt, r->hb, (double)TX_SHORT_TIMEOUT_MKS / 1000000.0);
     XPASS;
     return true;
 }
@@ -174,7 +180,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
             if (!n.valid()) return true;
             pks.push_back(n->get_bls_pk());
             merged->agg_sig.add(z->sig34);
-            merged->node_validators.push_back(z->node_validator);
+            merged->node_validators.insert(z->node_validator);
             have.insert(z->node_validator.container);
         }
         if (!merged->agg_sig.verify(pks, merged->blockInfo->getHash().container))
@@ -229,80 +235,92 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 
     auto &bt = l_blocks[prev_root_hash_Z()];
     auto h=r->blockInfo->getHash();
-    // logNode("blockInfo->getHash() %s from node %s",h.str().c_str(),src_node.container.c_str());
-    bt.ValidateBlockRSP_m[h].push_back(r);
-    auto mf=getMetaFull();
-    if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
+    auto & bl=l_blocks[prev_root_hash_Z()];
+    if(!bl.block_status.valid())
+    bl.block_status=new MsgData::BlockStatusREQ;
+    if(!bl.block_status->accepted[h].valid())
     {
-        XTRY;
-        REF_getter<MsgData::BlockAcceptedREQ> ba = new MsgData::BlockAcceptedREQ();
-        // if (!bt.blockInfo_Z[h].valid())
-        // {
-        //     bt.blockInfo_Z[h] = r->blockInfo;
-        // }
-        // else if (bt.blockInfo_Z[h]->getBuffer() != r->blockInfo->getBuffer())
-        //     throw CommonError("else if(bh.block_payload!=r->payload_block)");
-
-        ba->blockInfo = r->blockInfo;
-        std::vector<blst_cpp::PublicKey> agg_pk;
-        std::set<std::string> nnn;
-        std::string nv_;
-        // Детерминированный порядок по NODE_id: от него зависит hash
-        // BlockAcceptedREQ, а по нему подписывается дифф (шаг 4).
-        auto vbs = bt.ValidateBlockRSP_m[h];
-        std::sort(vbs.begin(), vbs.end(),
-                  [](const REF_getter<MsgData::ValidateBlockRSP>& a,
-                     const REF_getter<MsgData::ValidateBlockRSP>& b) {
-                      return a->node_validator.container < b->node_validator.container;
-                  });
-        for (auto &z : vbs)
-        {
-            nv_+=z->node_validator.container+" ";
-            auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(),z->node_validator);
-            if(!n.valid())
-                throw CommonError("if(!n.valid()) ^14");
-            auto st=mf->getPrevStake(z->node_validator);
-            nv_+=std::to_string(st)+" ";
-            agg_pk.push_back(n->get_bls_pk());
-            ba->agg_sig.add(z->sig);
-            ba->node_validators.push_back(z->node_validator);
-
-            nnn.insert(z->node_validator.container);
-        }
-        if (ba->agg_sig.verify(agg_pk, ba->blockInfo->getHash().container))
-        {
-        }
-        else
-        {
-            logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!! val count %d",bt.ValidateBlockRSP_m[h].size());
-            return true;
-        }
-        REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(
-                ba, vbs[0]->att_data->tx_hashes, vbs[0]->att_data->diffs,
-                std::set<std::string>(), vbs[0]->att_data);
-        sendEvent(ServiceEnum::Timer,
-            new timerEvent::ResetAlarm(
-                TIMER_BlockDiffValidateREQ,
-                NULL,
-                bdv.get(),
-                0.05,
-                this));
-
-        bt.blockDiffValidateREQ_2[bdv->blockAcceptedREQ->getHash()]=bdv;
-
-
-
-        // logNode("validators %s",iUtils->join(" ",nnn).c_str());
-
-
-        // std::string nodelist;
-        // for(auto &z: bt.HeartBeatRSP_m[h])
-        // {
-        //     nodelist+=z.first.container+" ";
-        // }
-        // logNode("hb list %s",nodelist.c_str());
-        XPASS;
+        bl.block_status->accepted[h]=new MsgData::BlockAcceptedREQ;
     }
+    if(!bl.block_status->accepted[h]->node_validators.count(r->node_validator))
+    {
+        bl.block_status->accepted[h]->agg_sig.add(r->sig);
+        bl.block_status->accepted[h]->node_validators.insert(r->node_validator);
+    }
+    // logNode("blockInfo->getHash() %s from node %s",h.str().c_str(),src_node.container.c_str());
+    // bt.ValidateBlockRSP_m[h].push_back(r);
+    // auto mf=getMetaFull();
+    // if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
+    // {
+    //     XTRY;
+    //     REF_getter<MsgData::BlockAcceptedREQ> ba = new MsgData::BlockAcceptedREQ();
+    //     // if (!bt.blockInfo_Z[h].valid())
+    //     // {
+    //     //     bt.blockInfo_Z[h] = r->blockInfo;
+    //     // }
+    //     // else if (bt.blockInfo_Z[h]->getBuffer() != r->blockInfo->getBuffer())
+    //     //     throw CommonError("else if(bh.block_payload!=r->payload_block)");
+
+    //     ba->blockInfo = r->blockInfo;
+    //     std::vector<blst_cpp::PublicKey> agg_pk;
+    //     std::set<std::string> nnn;
+    //     std::string nv_;
+    //     // Детерминированный порядок по NODE_id: от него зависит hash
+    //     // BlockAcceptedREQ, а по нему подписывается дифф (шаг 4).
+    //     auto vbs = bt.ValidateBlockRSP_m[h];
+    //     std::sort(vbs.begin(), vbs.end(),
+    //               [](const REF_getter<MsgData::ValidateBlockRSP>& a,
+    //                  const REF_getter<MsgData::ValidateBlockRSP>& b) {
+    //                   return a->node_validator.container < b->node_validator.container;
+    //               });
+    //     for (auto &z : vbs)
+    //     {
+    //         nv_+=z->node_validator.container+" ";
+    //         auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(),z->node_validator);
+    //         if(!n.valid())
+    //             throw CommonError("if(!n.valid()) ^14");
+    //         auto st=mf->getPrevStake(z->node_validator);
+    //         nv_+=std::to_string(st)+" ";
+    //         agg_pk.push_back(n->get_bls_pk());
+    //         ba->agg_sig.add(z->sig);
+    //         ba->node_validators.push_back(z->node_validator);
+
+    //         nnn.insert(z->node_validator.container);
+    //     }
+    //     if (ba->agg_sig.verify(agg_pk, ba->blockInfo->getHash().container))
+    //     {
+    //     }
+    //     else
+    //     {
+    //         logNode("block_accepted verified FAIL !!!!!!!!!!!!!!!!!!!!! val count %d",bt.ValidateBlockRSP_m[h].size());
+    //         return true;
+    //     }
+    //     REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(
+    //             ba, vbs[0]->att_data->tx_hashes, vbs[0]->att_data->diffs,
+    //             std::set<std::string>(), vbs[0]->att_data);
+    //     sendEvent(ServiceEnum::Timer,
+    //         new timerEvent::ResetAlarm(
+    //             TIMER_BlockDiffValidateREQ,
+    //             NULL,
+    //             bdv.get(),
+    //             0.05,
+    //             this));
+
+    //     bt.blockDiffValidateREQ_2[bdv->blockAcceptedREQ->getHash()]=bdv;
+
+
+
+    //     // logNode("validators %s",iUtils->join(" ",nnn).c_str());
+
+
+    //     // std::string nodelist;
+    //     // for(auto &z: bt.HeartBeatRSP_m[h])
+    //     // {
+    //     //     nodelist+=z.first.container+" ";
+    //     // }
+    //     // logNode("hb list %s",nodelist.c_str());
+    //     XPASS;
+    // }
     XPASS;
     return true;
 }
@@ -651,7 +669,7 @@ void Node::Service::startCertFinalize(const cert_entry &ce)
         if (!n.valid()) return;
         agg_pk.push_back(n->get_bls_pk());
         ba->agg_sig.add(z->sig);
-        ba->node_validators.push_back(z->node_validator);
+        ba->node_validators.insert(z->node_validator);
     }
     if (!ba->agg_sig.verify(agg_pk, ba->blockInfo->getHash().container))
     {

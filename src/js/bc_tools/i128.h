@@ -88,6 +88,7 @@ struct i128 {
 inline i128 operator+(i128 a, const i128& b) { a += b; return a; }
 inline i128 operator-(i128 a, const i128& b) { a -= b; return a; }
 inline i128 operator*(i128 a, const i128& b) { a *= b; return a; }
+inline i128 operator/(i128 a, const i128& b) { return i128(a.v/b.v); }
 
 // i128 <-> int64
 inline i128 operator+(i128 a, int64_t b) { a += b; return a; }

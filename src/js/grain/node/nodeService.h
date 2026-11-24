@@ -201,6 +201,8 @@ namespace Node
         {
             THASH_id offer_hash;   // хеш оффера текущего раунда (для статуса)
 
+            // REF_getter<MsgData::BlockStatusREQ> status=nullptr;
+            REF_getter<MsgData::ValidateBlockREQ> offer=nullptr;
             REF_getter<MsgData::BlockStatusREQ> block_status = nullptr;
             std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTxRSP> > >GetTxRSP_m; /// для подсчета ответивших нод
             bool is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* mf);
@@ -291,12 +293,12 @@ namespace Node
         int64_t dl_task_seq = 0;
 
         // Статус по высотам: лидер хранит/ретранслирует, ноды подхватывают.
-        std::map<int64_t, REF_getter<MsgData::BlockStatusREQ>> block_status;
+        // std::map<int64_t, REF_getter<MsgData::BlockStatusREQ>> block_status;
         void mergeBlockStatus(const MsgData::BlockStatusREQ* e, int64_t epoch);
         void broadcastCurrentBlockStatus();
         bool dl_test_done = false;   // тест-хук MTJS_TEST_DL_FETCH — один раз
 
-        void cachePayload(const REF_getter<MsgData::Base>& p);
+        void cachePayloadAdd(const REF_getter<MsgData::Base>& p);
         REF_getter<MsgData::Base> getCachedPayload(const THASH_id& h);
         /// Закинуть в кеш диффы/att_data/список tx (их getHash — ключи).
         void cacheBlockPayloads(const REF_getter<MsgData::attachment_data>& att);
@@ -506,7 +508,7 @@ namespace Node
         /// Лидер текущего слота. nullptr — лидера нет:
         /// последние NO_LEADER_FRAME_MKS слота, пустой vne, либо нет prev_block.
         REF_getter<const bc_node> current_leader();
-        void resetBlockExpired(const NODE_id &n);
+        // void resetBlockExpired(const NODE_id &n);
         bool on_NodeNotResponded(const bcEvent::NodeNotRespondedREQ *e);
         void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
 

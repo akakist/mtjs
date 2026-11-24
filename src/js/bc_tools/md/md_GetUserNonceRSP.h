@@ -11,12 +11,12 @@ namespace MsgData
         {
             setError(msgcode::NOT_FOUND, "not found");
         }
-        int64_t balance;
+        i128 balance;
         int64_t nonce;
         void update(Blake2bHasher& h) const
         {
             update_status(h);
-            h.update(std::to_string(balance));
+            h.update(balance.str());
             h.update(std::to_string(nonce));
         }
 
