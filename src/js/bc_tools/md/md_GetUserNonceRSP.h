@@ -1,6 +1,7 @@
 #pragma once
 #include "md_Base.h"
 #include "rsp_status.h"
+#include "i128.h"
 
 namespace MsgData
 {

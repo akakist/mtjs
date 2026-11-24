@@ -854,7 +854,7 @@ bool MTJS::Service::ClientMsgReply(const bcEvent::ClientMsgReply *e)
         auto obj = JS_NewObject(ctx);
         scope.addValue(obj);
         JS_SetPropertyStr(ctx, obj, "found", JS_NewBool(ctx, rs->found()));
-        JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, std::to_string(rs->balance).c_str()));
+        JS_SetPropertyStr(ctx, obj, "balance", JS_NewString(ctx, rs->balance.str().c_str()));
         JS_SetPropertyStr(ctx, obj, "nonce", JS_NewString(ctx, std::to_string(rs->nonce).c_str()));
         JSValue keys_arr = JS_NewArray(ctx);
         uint32_t ki = 0;

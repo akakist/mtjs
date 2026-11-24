@@ -88,7 +88,7 @@ namespace Node
         TIMER_PERIODIC_CLOCK,
         ALARM_START_BLOCK,
         ALARM_do_request_for_tx,
-        // TIMER_GetTxREQ,
+        TIMER_GetTxREQ,
         ALARM_Ping,
         // TIMER_GetTxFromLeader,
         ALARM_SYNC_WATCHDOG,
@@ -145,8 +145,8 @@ namespace Node
         bool on_GetHashedDataRSP(const bcEvent::GetHashedDataRSP* e);
         bool BlockStatusREQ(const MsgData::BlockStatusREQ* e, const NODE_id& src_node, const route_t& route);
         /// Ретрансляция статуса сети (block/diff cert) — лидер не решает, а рассылает.
-        void relayBlockStatus(const REF_getter<MsgData::BlockAcceptedREQ>& block_cert,
-                              const REF_getter<MsgData::BlockAccepted2REQ>& diff_cert);
+        // void relayBlockStatus(const REF_getter<MsgData::BlockAcceptedREQ>& block_cert,
+        //                       const REF_getter<MsgData::BlockAccepted2REQ>& diff_cert);
         bool OfferREQ(const bcEvent::OfferREQ* e);
         bool OfferRSP(const bcEvent::OfferRSP* e);
         bool GetPrevBlockRSP(const bcEvent::GetPrevBlockRSP* e);
@@ -169,8 +169,8 @@ namespace Node
         // шаг 3: запрос/ответ сертификата 2/3 за высоту
         
         ///? Зачем нужен GetValidateBlockRSPREQ, GetValidateBlockRSPRSP
-        bool GetValidateBlockRSPREQ(const MsgData::GetValidateBlockRSPREQ* r, const NODE_id & src_node, const route_t& route);
-        bool GetValidateBlockRSPRSP(const MsgData::GetValidateBlockRSPRSP* r, const NODE_id & src_node, const route_t& route);
+        // bool GetValidateBlockRSPREQ(const MsgData::GetValidateBlockRSPREQ* r, const NODE_id & src_node, const route_t& route);
+        // bool GetValidateBlockRSPRSP(const MsgData::GetValidateBlockRSPRSP* r, const NODE_id & src_node, const route_t& route);
         bool UnlockRoundREQ(const MsgData::UnlockRoundREQ* r, const NODE_id & src_node, const route_t& route);
 
         // bool ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
@@ -206,8 +206,8 @@ namespace Node
             REF_getter<MsgData::BlockStatusREQ> block_status = nullptr;
             std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTxRSP> > >GetTxRSP_m; /// для подсчета ответивших нод
             bool is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* mf);
-            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::PingRSP> > >PingRSP_m;
-            bool is_PingRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db);
+            // std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::PingRSP> > >PingRSP_m;
+            // bool is_PingRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db);
 
 
             std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
@@ -294,7 +294,7 @@ namespace Node
 
         // Статус по высотам: лидер хранит/ретранслирует, ноды подхватывают.
         // std::map<int64_t, REF_getter<MsgData::BlockStatusREQ>> block_status;
-        void mergeBlockStatus(const MsgData::BlockStatusREQ* e, int64_t epoch);
+        // void mergeBlockStatus(const MsgData::BlockStatusREQ* e, int64_t epoch);
         void broadcastCurrentBlockStatus();
         bool dl_test_done = false;   // тест-хук MTJS_TEST_DL_FETCH — один раз
 
@@ -357,7 +357,7 @@ namespace Node
         // поэтому он перепингывает hb достраиваемого блока и собирает их сюда
         // (отдельно от bt.PingRSP_m, чтобы не запускать штатный GetTx).
         REF_getter<MsgData::HeartBeatREQ> cert_alive_hb;
-        std::map<THASH_id, std::map<NODE_id, REF_getter<MsgData::PingRSP>>> cert_alive;
+        // std::map<THASH_id, std::map<NODE_id, REF_getter<MsgData::PingRSP>>> cert_alive;
         // тестовый инжект раскола: какие высоты этот узел «пропустил» (первый блок)
         std::set<int64_t> test_skipped_epochs;
         // Высота, по которой сбор уже завершён (COMPLETE/SPLIT): повторно
@@ -375,28 +375,28 @@ namespace Node
         std::map<THASH_id, cert_entry> certs;
 
         /// Запомнить свой подписанный RSP (шаг 3).
-        void rememberSignedRSP(const REF_getter<MsgData::ValidateBlockRSP>& rsp);
+        // void rememberSignedRSP(const REF_getter<MsgData::ValidateBlockRSP>& rsp);
         /// Записать голоса cli в БД сразу (blockInfo+sig, ba_hash+sig).
-        void persistCliVote(int64_t epoch);
+        // void persistCliVote(int64_t epoch);
         /// Подгрузить голоса cli на старте.
-        void loadCliVote();
+        // void loadCliVote();
         /// Выкинуть RSP/hb/certs старее epoch-1 (вызывается при применении блока).
-        void pruneRoundState(int64_t epoch_now);
+        // void pruneRoundState(int64_t epoch_now);
         /// Новый лидер: есть ли подписанный, но не применённый блок на текущей
         /// высоте. true — сбор сертификата запущен/идёт, новый блок не предлагаем.
-        bool maybeCollectCert();
-        void startCertCollection(int64_t epoch);
-        void broadcastCertReq();
-        void finishCertCollection();
+        // bool maybeCollectCert();
+        // void startCertCollection(int64_t epoch);
+        // void broadcastCertReq();
+        // void finishCertCollection();
         /// Шаг 4: собрать канонический BlockAcceptedREQ и запустить стадию диффа.
-        void startCertFinalize(const cert_entry& ce);
+        // void startCertFinalize(const cert_entry& ce);
         /// Шаг 5: проверить сплит-пруф (>=2/3 голосов, ни один root < 2/3).
-        bool verifySplitProof(int64_t epoch, const THASH_id& base,
-                              const std::vector<REF_getter<MsgData::ValidateBlockRSP>>& proof,
-                              int64_t& total_out, int64_t& best_out);
+        // bool verifySplitProof(int64_t epoch, const THASH_id& base,
+        //                       const std::vector<REF_getter<MsgData::ValidateBlockRSP>>& proof,
+        //                       int64_t& total_out, int64_t& best_out);
         /// Шаг 5: снять замок и откатить дерево к применённому состоянию.
         void unlockRoundLocal(int64_t epoch, const THASH_id& base);
-        int64_t certStakeFor(BlockMetaFull* mf, const NODE_id& n);
+        // int64_t certStakeFor(BlockMetaFull* mf, const NODE_id& n);
         bool isCurrentLeaderMe();
 
         int64_t node_start_timestamp=0;

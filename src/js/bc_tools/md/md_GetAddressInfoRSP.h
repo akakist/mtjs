@@ -15,12 +15,12 @@ inline inBuffer&  operator>>(inBuffer& in, KeyInfo& k) { k.unpack(in); return in
 
 struct GetAddressInfoRSP: public Base, public rsp_status  {
     GetAddressInfoRSP():Base(msgid::GetAddressInfoRSP) { setError(msgcode::NOT_FOUND, "not found"); }
-    int64_t balance = 0;
+    i128 balance = i128(0);
     int64_t nonce = 0;
     std::vector<KeyInfo> keys;
     void update(Blake2bHasher& h) const {
         update_status(h);
-        h.update(std::to_string(balance));
+        h.update(balance.str());
         h.update(std::to_string(nonce));
         for (auto& k : keys) {
             h.update(std::to_string(k.id));

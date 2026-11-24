@@ -92,10 +92,10 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::ScanRSP, MsgData::ScanRSP::construct);
     registerMsg(msgid::GetNodesREQ, MsgData::GetNodesREQ::construct);
     registerMsg(msgid::GetNodesRSP, MsgData::GetNodesRSP::construct);
-    registerMsg(msgid::PingREQ, MsgData::PingREQ::construct);
-    registerMsg(msgid::PingRSP, MsgData::PingRSP::construct);
-    registerMsg(msgid::GetValidateBlockRSPREQ, MsgData::GetValidateBlockRSPREQ::construct);
-    registerMsg(msgid::GetValidateBlockRSPRSP, MsgData::GetValidateBlockRSPRSP::construct);
+    // registerMsg(msgid::PingREQ, MsgData::PingREQ::construct);
+    // registerMsg(msgid::PingRSP, MsgData::PingRSP::construct);
+    // registerMsg(msgid::GetValidateBlockRSPREQ, MsgData::GetValidateBlockRSPREQ::construct);
+    // registerMsg(msgid::GetValidateBlockRSPRSP, MsgData::GetValidateBlockRSPRSP::construct);
     registerMsg(msgid::UnlockRoundREQ, MsgData::UnlockRoundREQ::construct);
     registerMsg(msgid::Offer, MsgData::Offer::construct);
     registerMsg(msgid::BlockStatusREQ, MsgData::BlockStatusREQ::construct);

@@ -23,6 +23,7 @@
 #include "jsi_pack.h"
 #include <md_GetContractDataREQ.h>
 #include "CallStack.h"
+#include "i128.h"
 
 // ============================================================
 // SYNCING: пока sync_in_progress, Get*REQ → 503
@@ -169,7 +170,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                 logErr2("case msgid::GetUserNonceREQ: pp->user_address %s !found",pp->user_address.str().c_str());
 #endif
                 rsp->nonce = 0;
-                rsp->balance = 0;
+                rsp->balance = i128(0);
                 rsp->setError(msgcode::NOT_FOUND,"404 not found");
             }
             passEvent(new bcEvent::ClientMsgReply(hash, rsp->getBuffer(), poppedFrontRoute(e->route)));

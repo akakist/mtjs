@@ -147,11 +147,11 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
     {
         MUTEX_INSPECTOR;
         XTRY;
-        if (getenv("MTJS_CERT_TRACE"))
-            logNode("[cert-trace] BDRSP quorum key=%s map=%zu alive_map=%zu",
-                    r->blockAcceptedHash.str().c_str(),
-                    bt.BlockDiffValidateRSP_m[r->blockAcceptedHash].size(),
-                    bt.PingRSP_m.size());
+        // if (getenv("MTJS_CERT_TRACE"))
+        //     logNode("[cert-trace] BDRSP quorum key=%s map=%zu alive_map=%zu",
+        //             r->blockAcceptedHash.str().c_str(),
+        //             bt.BlockDiffValidateRSP_m[r->blockAcceptedHash].size(),
+        //             bt.PingRSP_m.size());
         // Сливаем подписи apply-стадии в тот же BlockAccepted.
         // Подпись diff-RSP уже за blockInfo; кто уже подписал блок — не дублируем.
         REF_getter<MsgData::BlockAcceptedREQ> merged = new MsgData::BlockAcceptedREQ();
@@ -193,7 +193,7 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
             st->accepted[merged->blockInfo->getHash()] = merged;
             st->has_offer_hash = true;
             st->offer_hash = merged->blockInfo->offer_hash;
-            mergeBlockStatus(st.get(), merged->blockInfo->heart_beat->new_epoch);
+            // mergeBlockStatus(st.get(), merged->blockInfo->heart_beat->new_epoch);
             auto mf = getMetaFull();
             if (mf.valid())
                 broadcast_MsgEvent_via_broadcaster(st.get(), mf->tree_all_nodes);
@@ -339,15 +339,16 @@ bool Node::Service::isCurrentLeaderMe()
     return cl.valid() && cl->getName() == this_node_name;
 }
 
-int64_t Node::Service::certStakeFor(BlockMetaFull* mf, const NODE_id& n)
-{
-    if (!mf) return 0;
-    // Голос засчитывается только члену комитета: иначе подпись ноды вне
-    // комитета раздувала бы числитель (знаменатель — стейк комитета).
-    if (!mf->committe_members.count(n)) return 0;
-    auto it = mf->prev_stakes.find(n);
-    return it == mf->prev_stakes.end() ? 0 : it->second;
-}
+// int64_t Node::Service::certStakeFor(BlockMetaFull* mf, const NODE_id& n)
+// {
+//     if (!mf) return 0;
+//     // Голос засчитывается только члену комитета: иначе подпись ноды вне
+//     // комитета раздувала бы числитель (знаменатель — стейк комитета).
+//     if (!mf->committe_members.count(n)) return 0;
+//     auto it = mf->prev_stakes.find(n);
+//     return it == mf->prev_stakes.end() ? 0 : it->second;
+// }
+#ifdef KALL
 
 void Node::Service::startCertCollection(int64_t epoch)
 {
@@ -396,7 +397,6 @@ void Node::Service::broadcastCertReq()
     if (!mf.valid()) return;
     broadcast_MsgEvent_via_broadcaster(req.get(), mf->tree_committe);
 }
-
 void Node::Service::finishCertCollection()
 {
     if (!cert_collecting) return;
@@ -522,7 +522,6 @@ void Node::Service::finishCertCollection()
             (long long)total, (long long)full,
             best_block.str().c_str(), (long long)best_stake);
 }
-
 bool Node::Service::maybeCollectCert()
 {
     if (sync_in_progress || !prev_block.valid()) return false;
@@ -571,57 +570,59 @@ bool Node::Service::maybeCollectCert()
     startCertCollection(E);
     return true;
 }
+#endif
 
-bool Node::Service::GetValidateBlockRSPRSP(const MsgData::GetValidateBlockRSPRSP *r, const NODE_id &src_node, const route_t &route)
-{
-    MUTEX_INSPECTOR;
-    if (!cert_collecting) return true;
-    if (r->epoch != cert_collect.epoch) return true;
+// bool Node::Service::GetValidateBlockRSPRSP(const MsgData::GetValidateBlockRSPRSP *r, const NODE_id &src_node, const route_t &route)
+// {
+//     MUTEX_INSPECTOR;
+//     if (!cert_collecting) return true;
+//     if (r->epoch != cert_collect.epoch) return true;
 
-    for (auto& z : r->rsps)
-    {
-        if (!z.valid() || !z->blockInfo.valid() || !z->blockInfo->heart_beat.valid())
-            continue;
-        // ответчик отвечает только за себя
-        if (z->node_validator != src_node)
-        {
-            logNode("cert: rsp validator %s != sender %s — ignore",
-                    z->node_validator.container.c_str(), src_node.container.c_str());
-            continue;
-        }
-        if (z->blockInfo->heart_beat->new_epoch != cert_collect.epoch) continue;
-        if (z->blockInfo->heart_beat->prev_root_hash_1 != cert_collect.base_root) continue;
+//     for (auto& z : r->rsps)
+//     {
+//         if (!z.valid() || !z->blockInfo.valid() || !z->blockInfo->heart_beat.valid())
+//             continue;
+//         // ответчик отвечает только за себя
+//         if (z->node_validator != src_node)
+//         {
+//             logNode("cert: rsp validator %s != sender %s — ignore",
+//                     z->node_validator.container.c_str(), src_node.container.c_str());
+//             continue;
+//         }
+//         if (z->blockInfo->heart_beat->new_epoch != cert_collect.epoch) continue;
+//         if (z->blockInfo->heart_beat->prev_root_hash_1 != cert_collect.base_root) continue;
 
-        auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(), z->node_validator);
-        if (!n.valid()) continue;
-        if (!z->verify(n->get_bls_pk()))
-        {
-            logNode("cert: bad BLS sig from %s — ignore", src_node.container.c_str());
-            continue;
-        }
-        auto it = cert_collect.votes.find(src_node);
-        if (it != cert_collect.votes.end())
-        {
-            if (it->second->blockInfo->new_root_hash1 == z->blockInfo->new_root_hash1)
-                continue;   // дубль
-            logNode("cert: %s voted twice (lock broken?) — keep first", src_node.container.c_str());
-            continue;
-        }
-        logNode("cert: vote from %s root=%s epoch=%lld",
-                src_node.container.c_str(), z->blockInfo->new_root_hash1.str().c_str(),
-                (long long)cert_collect.epoch);
-        cert_collect.votes[src_node] = z;
-    }
+//         auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(), z->node_validator);
+//         if (!n.valid()) continue;
+//         if (!z->verify(n->get_bls_pk()))
+//         {
+//             logNode("cert: bad BLS sig from %s — ignore", src_node.container.c_str());
+//             continue;
+//         }
+//         auto it = cert_collect.votes.find(src_node);
+//         if (it != cert_collect.votes.end())
+//         {
+//             if (it->second->blockInfo->new_root_hash1 == z->blockInfo->new_root_hash1)
+//                 continue;   // дубль
+//             logNode("cert: %s voted twice (lock broken?) — keep first", src_node.container.c_str());
+//             continue;
+//         }
+//         logNode("cert: vote from %s root=%s epoch=%lld",
+//                 src_node.container.c_str(), z->blockInfo->new_root_hash1.str().c_str(),
+//                 (long long)cert_collect.epoch);
+//         cert_collect.votes[src_node] = z;
+//     }
 
-    finishCertCollection();
-    return true;
-}
+//     finishCertCollection();
+//     return true;
+// }
 
 // ── Шаг 4: достройка блока по сертификату ────────────────────────────────
 // Из отсортированных по NODE_id RSP собираем канонический BlockAcceptedREQ
 // (hash детерминирован), публикуем его со стадией диффа и даём штатному
 // пути TIMER_BlockDiffValidateREQ -> BlockDiffValidateRSP -> BlockDBStore
 // довести блок до применения.
+#ifdef KALL
 void Node::Service::startCertFinalize(const cert_entry &ce)
 {
     MUTEX_INSPECTOR;
@@ -713,11 +714,12 @@ void Node::Service::startCertFinalize(const cert_entry &ce)
     sendEvent(ServiceEnum::Timer,
               new timerEvent::ResetAlarm(TIMER_BlockDiffValidateREQ, NULL, bdv.get(), 0.05, this));
 }
-
+#endif
 // ── Шаг 5: сплит-пруф и снятие замка ─────────────────────────────────────
 // Условие снятия: >=2/3 комитета проголосовали (по стейку), но ни один root
 // не набрал 2/3. Тогда кворума за один блок нет, а значит и финального блока
 // нет — замок снимается, на этой же высоте предлагается новый блок.
+#ifdef KALL
 bool Node::Service::verifySplitProof(int64_t epoch, const THASH_id& base,
                                      const std::vector<REF_getter<MsgData::ValidateBlockRSP>>& proof,
                                      int64_t& total_out, int64_t& best_out)
@@ -730,7 +732,7 @@ bool Node::Service::verifySplitProof(int64_t epoch, const THASH_id& base,
     try { mf = getMetaFull(base); } catch (...) { return false; }
     if (!mf.valid()) return false;
 
-    int64_t full = 0;
+    i128 full = i128(0);
     for (auto& z : mf->committe_members)
     {
         auto it = mf->prev_stakes.find(z);
@@ -751,7 +753,7 @@ bool Node::Service::verifySplitProof(int64_t epoch, const THASH_id& base,
     }
 
     std::map<THASH_id, int64_t> by_block;
-    int64_t total = 0;
+    i128 total = i128(0);
     for (auto& z : votes)
     {
         int64_t st = certStakeFor(mf.get(), z.first);
@@ -767,7 +769,7 @@ bool Node::Service::verifySplitProof(int64_t epoch, const THASH_id& base,
     best_out = best;
     return (total * 100) / full > QUORUM && (best * 100) / full <= QUORUM;
 }
-
+#endif
 void Node::Service::unlockRoundLocal(int64_t epoch, const THASH_id& base)
 {
     if (epoch != epoch_current()) return;
@@ -797,12 +799,12 @@ bool Node::Service::UnlockRoundREQ(const MsgData::UnlockRoundREQ *r, const NODE_
     MUTEX_INSPECTOR;
     if (sync_in_progress) return true;
     int64_t total = 0, best = 0;
-    if (!verifySplitProof(r->epoch, r->base_root, r->proof, total, best))
-    {
-        logNode("UnlockRoundREQ от %s: сплит не доказан (epoch=%lld total=%lld best=%lld) — ignore",
-                src_node.container.c_str(), (long long)r->epoch, (long long)total, (long long)best);
-        return true;
-    }
+    // if (!verifySplitProof(r->epoch, r->base_root, r->proof, total, best))
+    // {
+    //     logNode("UnlockRoundREQ от %s: сплит не доказан (epoch=%lld total=%lld best=%lld) — ignore",
+    //             src_node.container.c_str(), (long long)r->epoch, (long long)total, (long long)best);
+    //     return true;
+    // }
     logNode("UnlockRoundREQ от %s: сплит доказан epoch=%lld total=%lld best=%lld",
             src_node.container.c_str(), (long long)r->epoch, (long long)total, (long long)best);
     unlockRoundLocal(r->epoch, r->base_root);

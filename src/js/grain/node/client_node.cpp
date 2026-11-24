@@ -126,7 +126,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
             bdvrs->sig34.sign(my_sk_bls, r->blockAcceptedREQ->blockInfo->getHash().container);
             bdvrs->blockAcceptedHash = r->blockAcceptedREQ->getHash();
             my_diff_rsp[r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch] = bdvrs;
-            persistCliVote(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
+            // persistCliVote(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
             logNode("BlockDiffValidateREQ: блок уже исполнен epoch=%lld root=%s — подпись без повторного применения",
                     (long long)r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
                     it->second->blockInfo->new_root_hash1.str().c_str());
@@ -162,12 +162,12 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     /// TODO: проверка стейка
     auto mf=getMetaFull();
 
-    int64_t staked=0;
+    i128 staked=i128(0);
     for(auto &z: r->blockAcceptedREQ->node_validators)
     {
         staked+=mf->getPrevStake(z);
     }
-    int64_t fullstake=0;
+    i128 fullstake=i128(0);
     for(auto &z: mf->committe_members)
     {
         fullstake+=mf->getPrevStake(z);
@@ -267,7 +267,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     bdvrs->sig34.sign(my_sk_bls,r->blockAcceptedREQ->blockInfo->getHash().container);
     bdvrs->blockAcceptedHash=r->blockAcceptedREQ->getHash();
     my_diff_rsp[r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch] = bdvrs;
-    persistCliVote(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
+    // persistCliVote(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
 
     // DIAG: what validator signs
     {
@@ -468,7 +468,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         // Шаг 3: высота уехала — сбор сертификата за неё больше не нужен,
         // свои RSP/hb/certs старше предыдущей высоты вычищаем.
         cert_collecting = false;
-        pruneRoundState(epoch_current());
+        // pruneRoundState(epoch_current());
         tx_sent.clear();   // sent живёт до конца блока
 
         for (auto &z : r->tx_hashes)
@@ -501,7 +501,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
     // лидер раунда — из заголовка блока (cli.node_leader больше не нужен)
     sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BLOCK_EXPIRED,toRef(info->heart_beat->node_leader.container),this));
     cli_leader_info[prev_root_hash_Z()].node_leader=nullptr;
-    pruneRoundState(epoch_current());
+    // pruneRoundState(epoch_current());
     XPASS;
     return true;
 }
@@ -833,9 +833,9 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
         rsp->sign(my_sk_bls);
         logNode("ValidateBlockRSP: подписан epoch=%lld root=%s",
                 (long long)r->heart_beat->new_epoch, new_root_hash.str().c_str());
-        rememberSignedRSP(rsp);
+        // rememberSignedRSP(rsp);
         block_lock = blockInfo;
-        persistCliVote(r->heart_beat->new_epoch);
+        // persistCliVote(r->heart_beat->new_epoch);
 
         pass_NodeMsgRSP(rsp.get(), route);
     }
@@ -853,14 +853,14 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 
 // ── Шаг 3: хранение своего RSP и ответ на запрос сертификата ───────────────
 
-void Node::Service::rememberSignedRSP(const REF_getter<MsgData::ValidateBlockRSP> &rsp)
-{
-    if (!rsp.valid() || !rsp->blockInfo.valid() || !rsp->blockInfo->heart_beat.valid())
-        return;
-    my_signed_rsp[rsp->blockInfo->heart_beat->new_epoch] = rsp;
-    pruneRoundState(epoch_current());
-}
-
+// void Node::Service::rememberSignedRSP(const REF_getter<MsgData::ValidateBlockRSP> &rsp)
+// {
+//     if (!rsp.valid() || !rsp->blockInfo.valid() || !rsp->blockInfo->heart_beat.valid())
+//         return;
+//     my_signed_rsp[rsp->blockInfo->heart_beat->new_epoch] = rsp;
+//     pruneRoundState(epoch_current());
+// }
+#ifdef KALL
 void Node::Service::persistCliVote(int64_t epoch)
 {
     if (!db_state.valid()) return;
@@ -885,7 +885,6 @@ void Node::Service::persistCliVote(int64_t epoch)
     logNode("cli: persisted epoch=%lld block=%d diff=%d",
             (long long)epoch, (int)rec->block_rsp.valid(), (int)rec->diff_rsp.valid());
 }
-
 void Node::Service::loadCliVote()
 {
     if (!db_state.valid()) return;
@@ -959,3 +958,4 @@ bool Node::Service::GetValidateBlockRSPREQ(const MsgData::GetValidateBlockRSPREQ
     pass_NodeMsgRSP(rsp.get(), route);
     return true;
 }
+#endif

@@ -95,7 +95,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(TIMER_BLOCK_STATUS, NULL, NULL, 0.2, this));
         prev_block=load_last_block(db_state.get());
         block_lock=load_signed_block(db_state.get());   // legacy-ключ
-        loadCliVote();                                   // голоса cli (приоритетнее)
+        // loadCliVote();                                   // голоса cli (приоритетнее)
         root=getRoot(db_state.get(),prev_block);
         sendEvent(ServiceEnum::Scan, new bcEvent::ServiceInit(my_sk_bls, my_sk_ed, this_node_name, db_state, this));
     }
@@ -283,7 +283,7 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
         off->txs = vb->transaction_bodies;
         bt.offer_hash = off->getHash();   // для статуса: появился -> tx не шлём
     }
-    relayBlockStatus(nullptr, nullptr);   // статус с offer_hash: сбор tx закрыт
+    // relayBlockStatus(nullptr, nullptr);   // статус с offer_hash: сбор tx закрыт
     logNode("do_start_block: broadcast ValidateBlockREQ tx_count=%zu (sorted)",
             vb->transaction_bodies.size());
     // ▲▲▲
@@ -381,6 +381,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         root=getRoot(db_state.get(),prev_block);
         return true;
     }
+#ifdef KALL
     case timers::TIMER_BLOCK_EXPIRED:
     {
         logNode("fail leader %s",e->data->container.c_str());
@@ -397,7 +398,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
                 cli.node_leader.valid() ? cli.node_leader->node_leader.container.c_str() : "(null)",
                 e->data->container.c_str());
         // Шаг 3: таймаут — повод собрать доказательства, а не снять замок.
-        maybeCollectCert();
+        // maybeCollectCert();
         return true;
     }
     case timers::ALARM_Ping:
@@ -453,6 +454,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         }
         return true;
     }
+
     case timers::ALARM_do_request_for_tx:
     {
         if(sync_in_progress)
@@ -479,28 +481,29 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         do_request_for_transactions(hb, mf);
         return true;
     }
-    // case timers::TIMER_GetTxREQ:
-    // {
-    //     if(sync_in_progress)
-    //     {
-    //         return true;
-    //     }
-    //     auto &bt = l_blocks[prev_root_hash_Z()];
-    //     THASH_id hb_hash;
-    //     hb_hash.container=e->data->container;
-    //     MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
-    //     if(!hb)
-    //     throw CommonError("if(!hb)");
+#endif
+    case timers::TIMER_GetTxREQ:
+    {
+        if(sync_in_progress)
+        {
+            return true;
+        }
+        auto &bt = l_blocks[prev_root_hash_Z()];
+        THASH_id hb_hash;
+        hb_hash.container=e->data->container;
+        MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
+        if(!hb)
+        throw CommonError("if(!hb)");
 
-    //     if(!bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
-    //     {
-    //         // кворума tx нет — ре-броадкаст GetTxREQ и ре-арм
-    //         auto mf=getMetaFull();
-    //         do_request_for_transactions(hb, mf);
-    //     }
-    //     // кворум есть — больше не шлём; дальше только финальное окно TIMER_GetTxRSP
-    //     return true;
-    // }
+        if(!bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
+        {
+            // кворума tx нет — ре-броадкаст GetTxREQ и ре-арм
+            auto mf=getMetaFull();
+            do_request_for_transactions(hb, mf);
+        }
+        // кворум есть — больше не шлём; дальше только финальное окно TIMER_GetTxRSP
+        return true;
+    }
     case timers::ALARM_START_BLOCK:
     {
         // Кворум GetTx больше не нужен: тх — это мемпул, блок валидируется позже.
@@ -649,8 +652,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
             cert_collecting = false;
             return true;
         }
-        broadcastCertReq();
-        finishCertCollection();
+        // broadcastCertReq();
+        // finishCertCollection();
         if (cert_collecting)
             sendEvent(ServiceEnum::Timer,
                       new timerEvent::ResetAlarm(ALARM_GetValidateBlockRSP, NULL, NULL, 0.5, this));
@@ -925,8 +928,8 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
         case msgid::ValidateBlockREQ:
             // last_activity_time=iUtils->getNow().v;
             return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
-        case msgid::GetValidateBlockRSPREQ:
-            return GetValidateBlockRSPREQ(static_cast<const MsgData::GetValidateBlockRSPREQ *>(msg.get()), m->node_signer, m->route);
+        // case msgid::GetValidateBlockRSPREQ:
+        //     return GetValidateBlockRSPREQ(static_cast<const MsgData::GetValidateBlockRSPREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::UnlockRoundREQ:
             return UnlockRoundREQ(static_cast<const MsgData::UnlockRoundREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::BlockAccepted2REQ:
@@ -1006,8 +1009,8 @@ bool Node::Service::NodeMsgRSP(const bcEvent::NodeMsgRSP *m)
         return ValidateBlockRSP(static_cast<const MsgData::ValidateBlockRSP *>(ee.get()), m->node_signer, m->route);
     case msgid::BlockDiffValidateRSP:
         return BlockDiffValidateRSP(static_cast<const MsgData::BlockDiffValidateRSP *>(ee.get()), m->node_signer, m->route);
-    case msgid::GetValidateBlockRSPRSP:
-        return GetValidateBlockRSPRSP(static_cast<const MsgData::GetValidateBlockRSPRSP *>(ee.get()), m->node_signer, m->route);
+    // case msgid::GetValidateBlockRSPRSP:
+    //     return GetValidateBlockRSPRSP(static_cast<const MsgData::GetValidateBlockRSPRSP *>(ee.get()), m->node_signer, m->route);
     default:
         throw CommonError("unhandled22 p020 %s", msgName(id));
         break;
@@ -1317,10 +1320,10 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
                 }
             } else {
                 // owner не найден — аномалия (node_create owner должен быть)
-                logNode("calc_fee_rewards: owner not found for node %s (skip reward %lld)",
-                        z.container.c_str(), (long long)portion);
+                logNode("calc_fee_rewards: owner not found for node %s (skip reward %s)",
+                        z.container.c_str(), portion.str().c_str());
             }
-            b.emit_block_cmd("reward", EmitObj().s("node", z.container).s("fee", std::to_string(portion)).pack());
+            b.emit_block_cmd("reward", EmitObj().s("node", z.container).s("fee", portion.str()).pack());
         }
 
     }
@@ -1725,35 +1728,35 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
     };
     if (!e->accepted.empty()) derive(e->accepted.begin()->second);
     // mergeBlockStatus(e, epoch);
-    REF_getter<BlockMetaFull> mf=getMetaFull();
-    auto stake_of = [&](const NODE_id& id) -> int64_t {
-        if (!mf.valid()) return 0;
+    // REF_getter<BlockMetaFull> mf=getMetaFull();
+    auto stake_of = [&](const NODE_id& id) -> i128 {
+        if (!mf.valid()) return i128(0);
         auto it = mf->prev_stakes.find(id);
-        return it == mf->prev_stakes.end() ? 0 : it->second;
+        return it == mf->prev_stakes.end() ? i128(0) : it->second;
     };
-    int64_t committee_full = 0;
+    i128 committee_full = i128(0);
     if (mf.valid())
         for (auto& z : mf->committe_members) committee_full += stake_of(z);
-    int64_t network_full = 0;
+    i128 network_full = i128(0);
     if (mf.valid())
         for (auto& z : mf->vne) network_full += stake_of(z.name);
 
     bool committee_ok = false;
     REF_getter<MsgData::BlockAcceptedREQ> committee_cert;
-    int64_t total_signer_stake = 0;
+    i128 total_signer_stake = i128(0);
     for (auto& z : e->accepted)
     {
         auto& cert = z.second;
         if (!cert.valid() || !cert->blockInfo.valid()) continue;
         std::vector<blst_cpp::PublicKey> pks;
         bool ok = true;
-        int64_t signed_committee = 0, signed_total = 0;
+        i128 signed_committee = i128(0), signed_total = i128(0);
         for (auto& nid : cert->node_validators)
         {
             auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(), nid);
             if (!n.valid()) { ok = false; break; }
             pks.push_back(n->get_bls_pk());
-            int64_t st = stake_of(nid);
+            i128 st = stake_of(nid);
             signed_total += st;
             if (mf.valid() && mf->committe_members.count(nid)) signed_committee += st;
         }
@@ -1823,7 +1826,7 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
             //     req->has_offer_hash = true;
             //     req->offer_hash = itst->second->offer_hash;
             // }
-            mergeBlockStatus(req.get(), epoch);
+            // mergeBlockStatus(req.get(), epoch);
             if (mf.valid())
                 broadcast_MsgEvent_via_broadcaster(req.get(), mf->tree_all_nodes);
             logNode("[blockstatus] added my signature for %s (applied=%d committee=%d)",
@@ -1834,8 +1837,8 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
     if (committee_ok)
         logNode("[blockstatus] committee 2/3 epoch=%lld — блок решён, ждём сеть", (long long)epoch);
     else if (network_full > 0 && (total_signer_stake * 100) / network_full > QUORUM)
-        logNode("[blockstatus] split epoch=%lld total=%lld/%lld — unlock (TODO)",
-                (long long)epoch, (long long)total_signer_stake, (long long)network_full);
+        logNode("[blockstatus] split epoch=%lld total=%s/%s — unlock (TODO)",
+                (long long)epoch, total_signer_stake.str().c_str(), network_full.str().c_str());
 
     if (!e->has_offer_hash)
     {
@@ -1897,7 +1900,7 @@ void Node::Service::broadcastCurrentBlockStatus()
     logNode("[blockstatus] periodic relay") ;
     broadcast_MsgEvent_via_broadcaster(bt.block_status.get(), mf->tree_all_nodes);
 }
-
+#ifdef KALL
 void Node::Service::relayBlockStatus(const REF_getter<MsgData::BlockAcceptedREQ> &block_cert,
                                      const REF_getter<MsgData::BlockAccepted2REQ> &diff_cert)
 {
@@ -1925,7 +1928,7 @@ void Node::Service::relayBlockStatus(const REF_getter<MsgData::BlockAcceptedREQ>
     // Broadcast штатным путём: MsgData через NodeMsg (как Ping/GetTx).
     broadcast_MsgEvent_via_broadcaster(req.get(), mf->tree_all_nodes);
 }
-
+#endif
 bool Node::Service::OfferREQ(const bcEvent::OfferREQ *e)
 {
     MUTEX_INSPECTOR;
@@ -2176,7 +2179,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     if (!uu.valid())
         throw CommonError("if(!uu.valid())");
 
-    int64_t bal0 = 0;
+    i128 bal0 = i128(0);
     {
         
         bal0 = uu->balance;
@@ -2256,7 +2259,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         
         uu->balance -= value - t.value;
     }
-    int64_t bal1 = 0;
+    i128 bal1 = i128(0);
     {  bal1 = uu->balance; }
 
     root->calc_tree_hash(db_dump);
@@ -2423,8 +2426,8 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
         if(h.container.size()!=32) throw CommonError("if(h.container.size()!=32)");
         auto w=read_uint64((uint8_t*)h.container.data());
         auto fs=x.second->get_full_stake();
-        if(fs)
-            w/=fs;
+        if(fs.v)
+            w/=fs.v;
         result[w].insert_or_assign(x.first,x.second);
     }
     for(auto& x:result)
@@ -2545,6 +2548,7 @@ bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& 
         return true;
     return false;
 }
+#ifdef KALL
 bool Node::Service::block_leader::is_PingRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db)
 {
     i128 fullstakeVal = i128(0);
@@ -2567,7 +2571,7 @@ bool Node::Service::block_leader::is_PingRSP_m_quorum(const THASH_id& h, Cellabl
         return true;
     return false;
 }
-
+#endif
 bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable*r, IDatabase* db)
 {
     i128 fullstakeVal = i128(0);

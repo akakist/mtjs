@@ -558,7 +558,7 @@ std::optional<std::string> Node::Service::execute_vote(yyjson_val *params, b_par
                 return "node not found " + z.container;
             stake += nn->get_full_stake();
         }
-        if ((stake * 100) / b.meta->fullStake() > QUORUM) {
+        if ((stake * 100) / b.meta->fullStakeAll() > QUORUM) {
             auto vv = cells::getValuesNoCreate(root.get(),db_state.get(),t.roll,t.b->validateBlockREQ->block_timestamp);
             {
                 
@@ -912,7 +912,7 @@ std::optional<std::string> Node::Service::gc_activity_apply(
             deleteGranule(u, ttt.roll, dbd, ttt.b->validateBlockREQ->block_timestamp);
             bbb.emit_cmd(ttt.tx_id, 0, "gc_address_deleted",
                 EmitObj().s("addr", base16::encode(g->getDbId()))
-                         .s("burned", std::to_string((long long)burned)).pack());
+                         .s("burned", burned.str()).pack());
             break;
         }
 
