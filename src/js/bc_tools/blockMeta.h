@@ -46,6 +46,14 @@ struct BlockMetaFull: public Refcountable
     std::set<NODE_id> committe_members;
     i128 full_stake_all;
     i128 full_stake_committe;
+    std::map<NODE_id, blst_cpp::PublicKey> bls_pks;
+    std::optional<blst_cpp::PublicKey> getBlsPk(const NODE_id& n)
+    {
+        auto it=bls_pks.find(n);
+        if(it!=bls_pks.end())
+            return it->second;
+        return std::nullopt;
+    }
     BlockMetaFull(): Refcountable("BlockMetaFull") {}
 
 };

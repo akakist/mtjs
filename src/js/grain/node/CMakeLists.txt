@@ -9,4 +9,5 @@ add_library(node-serviceS STATIC
     broadcaster.cpp
     tr_exec.cpp
     reader.cpp
+    blocks.cpp
 )

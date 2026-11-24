@@ -1677,7 +1677,26 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
     {
         l_blocks[prev_root_hash_Z()].block_status=e;
     }
+    auto mf=getMetaFull();
+    /// verify_sinle sign
+    std::map<NODE_id, int> sigs_cnt;
+    for(auto & ih: e->accepted)
+    {
+        for(auto& z: ih.second->node_validators)
+        {
+            sigs_cnt[z]++;
+        }
+    }
+    for(auto &z: sigs_cnt)
+    {
+        if(z.second>1)
+        {
+            logNode("twice signed");
+            return 1;
+        }
+    }
 
+    /// verify_sigs
     for(auto & ih: e->accepted)
     {
         if(ih.second->blockInfo->getHash()!=ih.first)
@@ -1704,7 +1723,23 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
             return true;
         }
     }
-    auto mf=getMetaFull();
+    /// полный стейк проголосовавших, не может быть больше 80%.
+    i128 voted_stake;
+    for(auto & ih: e->accepted)
+    {
+        for(auto& z: ih.second->node_validators)
+        {
+            voted_stake+=mf->getPrevStake(z);
+        }
+    }
+    if((voted_stake*100)/mf->full_stake_committe > 80)
+    {
+        logNode("voted stake cannot be greater 80%");
+        return true;
+    }
+
+
+    // auto mf=getMetaFull();
     std::map<THASH_id, i128> stakes;
     auto fs=mf->fullStakeAll();
     for(auto& ih: e->accepted)
@@ -2373,6 +2408,8 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
         if(!n.valid())
             return nullptr;
         nnn[z]=n;
+        m->bls_pks[z]=n->get_bls_pk();
+        
     }
 
     auto v=cells::getValuesNoCreateConst(root.get(),db_state.get());

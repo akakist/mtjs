@@ -3,6 +3,40 @@
 #include "md_BlockAcceptedREQ.h"
 #include "md_BlockAccepted2REQ.h"
 #include <map>
+
+
+struct SB_result
+{
+    /// это вычисляемые значения
+    bool vote_finished=false;
+    bool corrupt=false;
+    bool has_committe_quorum=false;
+    THASH_id committe_quorum_hash;
+    bool has_noncommite_quorum=false;
+    THASH_id non_committe_quorum_hash;
+
+};
+struct SubBlock
+{
+    int64_t block_timestamp=0;
+    int id; /// starts with 0, -1 - last empty block
+    THASH_id offer_hash;
+    std::map<THASH_id, REF_getter<MsgData::BlockAcceptedREQ>> accepted_by_committe;
+    std::map<THASH_id,std::pair<blst_cpp::AggregateSignature, std::set<NODE_id> > > accepted_by_noncommitte;        
+
+    /// @brief  do not pack next
+    // bool voting_stopped=false;
+
+};
+
+struct Round
+{
+    int id;
+    std::vector<SubBlock> subblocks;
+    bool finished=0;
+};
+
+
 namespace MsgData
 {
     // Единая шина статуса: мапы агрегированных сертов по вариантам.
