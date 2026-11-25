@@ -24,7 +24,6 @@ struct data_base : public Refcountable
     ~data_base()
     {
     }
-    // void setDirty(Rollback* roll, TIME_mks block_timestamp);
     void snapshot(Rollback* roll);
     ;
     size_t size_() const

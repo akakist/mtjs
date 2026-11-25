@@ -317,10 +317,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         XPASS;
     }
     i128 full_stake_val=mf->full_stake_all;
-    // for(auto& z: mf->committe_members)
-    // {
-    //     full_stake_val+=mf->getPrevStake(z);
-    // }
 
     if((stake_val*i128(100))/full_stake_val < QUORUM)
     {
@@ -425,14 +421,6 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 
         prev_block=r->blockAccepted2REQ;
         accepted_signed.clear();
-        // {
-        //     const int64_t fin = prev_block->blockAcceptedREQ->blockInfo->heart_beat->new_epoch;
-        //     for (auto it = block_status.begin(); it != block_status.end(); )
-        //     {
-        //         if (it->first <= fin) it = block_status.erase(it);
-        //         else ++it;
-        //     }
-        // }
         l_blocks.clear();
         block_meta_full.clear();
         // Шаг 3: высота уехала — сбор сертификата за неё больше не нужен,
@@ -518,62 +506,7 @@ void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
     // Достройку блока новым лидером это допускает: src_node — текущий лидер,
     // а hb->node_leader может быть предыдущим (кто изначально предложил).
     auto cl=t.meta->leader();
-    // if(cl!=src_node)
-    // {
-    //     logNode("ValidateBlockREQ: src_node=%s != current_leader=%s",
-    //             src_node.container.c_str(),
-    //             t.meta->leader.container.c_str());
-    //     return true;
-    // }
-    // resetBlockExpired(r->heart_beat->node_leader);
-
-    // if (!err && r->heart_beat->prev_root_hash_1 != prev_root_hash)
-    // {
-
-    //     if (epoch_current() != r->heart_beat->new_epoch)
-    //     {
-    //         t.emit_block_cmd("error", EmitObj().n("code", -32602).s("error", "epoch invalid").pack());
-    //         err = true;
-    //         logNode("if (epoch_current() != r->heart_beat->new_epoch)");
-    //     }
-    //     logNode("ERROR: ValidateBlock block %s, nextblock %s", r->heart_beat->prev_root_hash_1.str().c_str(), prev_root_hash_Z().str().c_str());
-    // }
-    // ЗАМОК ДО ИСПОЛНЕНИЯ: на этой высоте мы уже подписали один блок.
-    // Раньше execute_block шёл раньше проверки замка, и отклонённый блок
-    // оставлял дерево продвинутым и db_to_save_Z грязным (раскол -> мусор ->
-    // разрастание памяти/краш). Повтор того же блока отдаём идемпотентно из
-    // сохранённого RSP; другой блок — отказ без мутации состояния.
-    // if (!err && block_lock.valid() && block_lock->heart_beat.valid()
-    //     && block_lock->heart_beat->new_epoch == r->heart_beat->new_epoch)
     {
-        // auto it = my_signed_rsp.find(r->heart_beat->new_epoch);
-        // bool same_block = false;
-        // if (it != my_signed_rsp.end() && it->second.valid()
-        //     && it->second->blockInfo.valid() && it->second->blockInfo->heart_beat.valid()
-        //     && it->second->blockInfo->heart_beat->new_epoch == r->heart_beat->new_epoch
-        //     && it->second->blockInfo->heart_beat->prev_root_hash_1 == r->heart_beat->prev_root_hash_1
-        //     && it->second->blockInfo->block_timestamp.v == r->block_timestamp.v
-        //     && it->second->att_data.valid()
-        //     && it->second->att_data->tx_hashes.size() == r->transaction_bodies.size())
-        // {
-        //     same_block = true;
-        //     for (size_t i = 0; i < r->transaction_bodies.size(); i++)
-        //         if (it->second->att_data->tx_hashes[i] != r->transaction_bodies[i]->getHash())
-        //         {
-        //             same_block = false;
-        //             break;
-        //         }
-        // }
-        // if (same_block)
-        // {
-        //     logNode("ValidateBlockREQ: epoch=%lld уже подписан root=%s — повтор, отдаём сохранённый RSP",
-        //             (long long)r->heart_beat->new_epoch, block_lock->new_root_hash1.str().c_str());
-        //     pass_NodeMsgRSP(it->second.get(), route);
-        //     return true;
-        // }
-        // logNode("ValidateBlockREQ: REFUSE без исполнения — epoch=%lld уже подписан root=%s, пришёл другой блок",
-        //         (long long)r->heart_beat->new_epoch, block_lock->new_root_hash1.str().c_str());
-        // return true;
     }
     if (!err)
     {
@@ -640,9 +573,6 @@ void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
         t.att_data->diffs = diffs;
         cache[t.att_data->getHash()]=t.att_data.get();
         cacheBlockPayloads(t.att_data);
-        // if (getenv("MTJS_DATA_TRACE"))
-        //     logNode("[data] att_data hash %s (tx=%zu diffs=%zu)",
-        //             t.att_data->getHash().str().c_str(), tx_hashes.size(), diffs.size());
 
         REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo(new_root_hash,t.att_data->getHash(), offer,t.validateBlockREQ->heart_beat);
         blockInfo->offer_hash = offer;   // хеш оффера — в blockInfo
@@ -672,9 +602,7 @@ void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
         rsp->sign(my_sk_bls);
         logNode("ValidateBlockRSP: подписан epoch=%lld root=%s",
                 (long long)t.validateBlockREQ->heart_beat->new_epoch, new_root_hash.str().c_str());
-        // rememberSignedRSP(rsp);
         block_lock = blockInfo;
-        // persistCliVote(r->heart_beat->new_epoch);
 
         pass_NodeMsgRSP(rsp.get(), route);
     }

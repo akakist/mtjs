@@ -124,7 +124,6 @@ void Cellable::calc_tree_hash(_db_to_save &db_dump)
                 db_dump.add(c->getDbId(), child_buf);
                 children_hashes[cid] = ch;
                 {
-                    //DEBUG KALL
                     if (c->payload_ctor_idx == hsh::bc_contract_balance) {
                         inBuffer in(child_buf);
                         Cellable chk(nullptr, c->getDbId());
@@ -151,18 +150,6 @@ void data_base::snapshot(Rollback* roll)
     }
 }
 
-// void data_base::setDirty(Rollback* roll, TIME_mks block_timestamp)
-// {
-//     MUTEX_INSPECTOR;
-//     if (getenv("MTJS_TREE_DUMP") && parent)
-//         logErr2("[TRACE setDirty] id=%s ts=%lld roll=%d h_before=%s",
-//                 base16::encode(parent->getDbId()).substr(0,16).c_str(),
-//                 (long long)block_timestamp.v, (int)(roll != nullptr),
-//                 base16::encode(blake2b_hash(parent->getBuffer_mx()).container).substr(0,16).c_str());
-//     // снапшот уже сделан аксессором; здесь только dirty + прокинуть вверх
-//     if (parent)
-//         parent->markDirty(block_timestamp);
-// }
 #include "cells.h"
 
 

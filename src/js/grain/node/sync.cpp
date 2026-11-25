@@ -30,25 +30,6 @@ std::pair<std::string,std::string> splice(const std::string& id)
         throw CommonError("defauil switch(id.size())");
     }
 }
-// void collect_sync_req2(const std::string& id, const std::string &granule,IDatabase* db)
-// {
-//     {
-//         inBuffer in(granule);
-//         REF_getter< Cellable> c=new Cellable(NULL,id);
-//         c->unpack_mx(in);
-//         for(auto& z: c->children_hashes_mx)
-//         {
-//             std::string cid=id+z.first;
-//             std::string cbuf;
-//             auto r2=db->getGranule(cid, &cbuf);
-//             auto h=blake2b_hash(cbuf);
-//             if(h!=z.second)
-//             {
-//                 db->add_sync_out(cid);
-//             }
-//         }
-//     }
-// }
 
 void Node::Service::collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route)
 {

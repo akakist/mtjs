@@ -163,13 +163,6 @@ namespace MsgData
 
         void update(Blake2bHasher& h) const
         {
-            // h.update(std::to_string((int)has_offer_hash));
-            // if (has_offer_hash) h.update(offer_hash.container);
-            // for (auto& z : accepted)
-            // {
-            //     h.update(z.first.container);
-            //     if (z.second.valid()) z.second->update(h);
-            // }
             h.update(block_timestamp.str());
             for(auto& z: rounds)
             {

@@ -169,7 +169,6 @@ REF_getter<Cellable> getLeafNoCreate(Cellable* _cur, IDatabase* db,  const std::
                         base16::encode(it->second.container).substr(0, 16).c_str(),
                         base16::encode(h.container).substr(0, 16).c_str(),
                         result.size(),db->getDbName().c_str());
-                // db->add_sync_out(dbId);
                 return NULL;
             }
 
@@ -386,8 +385,6 @@ REF_getter<Cellable> getByPathOrCreate(Cellable* root, IDatabase* db, const std:
 
         auto act=cells::getActivityOrCreate(root,db,bc->getDbId(),{},ttl,roll,block_timestamp);
         act->update_time(block_timestamp, roll);
-        // bc->ttl = ttl;
-        // bc->update_time(create_time);
         cc->data = bc.get();
         cc->payload_ctor_idx = hsh::bc_granule;
 

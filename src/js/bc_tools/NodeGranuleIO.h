@@ -178,12 +178,6 @@ struct NodeGranuleIO : GranuleIO {
             return nullptr;   // гранула/активность удалена (тумбстоун) — «не найдено»
         }
         REF_getter<const CNodeConst_prod> ret=new CNodeConst_prod(data,act);
-        // ret->data=cells::getContractDataNoCreateConst(root,db.get(),c,cd);
-        // if(!ret->data.valid())
-        //     return nullptr; /// error not already exists
-        // ret->act=cells::getActivityNoCreateConst(root,db.get(),dbid.container,r,t);
-        // if(!ret->act.valid())
-        //     throw CommonError("if(!act.valid()) @#886");
 
         return ret.get();
     }

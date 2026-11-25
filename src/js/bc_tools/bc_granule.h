@@ -1,6 +1,5 @@
 #pragma once
 #include "cellable.h"
-// #include
 struct bc_granule:  public data_base
 {
 

@@ -383,107 +383,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         root=getRoot(db_state.get(),prev_block);
         return true;
     }
-#ifdef KALL
-    case timers::TIMER_BLOCK_EXPIRED:
-    {
-        logNode("fail leader %s",e->data->container.c_str());
-        auto & cli=cli_leader_info[prev_root_hash_Z()];
-        if(cli.node_leader.valid() && cli.node_leader->node_leader.container==e->data->container)
-        {
-            if (getenv("MTJS_LEADER_TRACE"))
-                logNode("[leader-expired] prev=%s clear cached leader=%s",
-                    prev_root_hash_Z().str().substr(0,8).c_str(), e->data->container.c_str());
-            cli.node_leader=nullptr;
-        }
-        else if (getenv("MTJS_LEADER_TRACE"))
-            logNode("[leader-expired] no cache match: cached=%s expired=%s",
-                cli.node_leader.valid() ? cli.node_leader->node_leader.container.c_str() : "(null)",
-                e->data->container.c_str());
-        // Шаг 3: таймаут — повод собрать доказательства, а не снять замок.
-        // maybeCollectCert();
-        return true;
-    }
-    case timers::ALARM_Ping:
-    {
-        // Шаг 3: если на текущей высоте уже подписан блок другим лидером —
-        // сначала собираем 2/3-сертификат, новый блок не предлагаем.
-        if (maybeCollectCert())
-            return true;
-        auto cl=current_leader();
-        if(cl.valid() && cl->getName()==this_node_name)
-        {
-            // Раунд не чаще STATUS_INTERVAL от прошлого блока: иначе каждый
-            // применённый блок сразу запускает следующий и пустые блоки идут
-            // непрерывно. Это замена sendStatus-интервала, пока статуса нет.
-            const int64_t now = getNow().v;
-            if (prev_block.valid()
-                && now - prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v < STATUS_INTERVAL_MKS)
-                return true;
-
-            auto &bt = l_blocks[prev_root_hash_Z()];
-            // Попытка живёт слот, а не prev_root: иначе при зависшей высоте
-            // после круга все лидеры «уже пинговали» и новых попыток нет.
-            const int64_t slot = current_slot();
-            if (bt.leader_slot != slot)
-            {
-                bt.leader_slot = slot;
-                bt.ping_sent = false;
-                bt.block_started = false;
-                bt.tx_deadline_mks = 0;
-                bt.alive.clear();
-            }
-            REF_getter<MsgData::HeartBeatREQ> h=new MsgData::HeartBeatREQ(prev_root_hash_Z(),
-                        epoch_current(),
-                        this_node_name);
-            bt.my_hb = h;
-            auto mf=getMetaFull();
-
-            // Раунд стартует статусом: сертов и offer_hash пока нет — ноды шлют tx.
-            if (!bt.ping_sent)
-            {
-                bt.ping_sent = true;
-                relayBlockStatus(nullptr, nullptr);
-            }
-            // Начало раунда: пул пуст — ждём дольше (но меньше интервала
-            // статуса), есть tx — короткое окно.
-            if (!bt.block_started && bt.tx_deadline_mks == 0)
-            {
-                bt.tx_deadline_mks = now + STATUS_INTERVAL_MKS;
-                const int64_t want = transaction_pool_of_leader.empty()
-                        ? TX_EMPTY_TIMEOUT_MKS : TX_SHORT_TIMEOUT_MKS;
-                armBlockStartAlarm(bt, h, (double)want / 1000000.0);
-            }
-        }
-        return true;
-    }
-
-    case timers::ALARM_do_request_for_tx:
-    {
-        if(sync_in_progress)
-        {
-            return true;
-        }
-        auto &bt = l_blocks[prev_root_hash_Z()];
-        THASH_id hb_hash;
-        hb_hash.container=e->data->container;
-        MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
-        if(!hb)
-        throw CommonError("if(!hb)");
-
-        // пинг финиширован: финализируем живой сет и переходим к GetTx
-        bt.alive.clear();
-        for (auto& z : bt.PingRSP_m[hb_hash])
-            bt.alive.insert(z.first);
-        bt.ping_done = true;
-        logNode("ping done: alive=%zu", bt.alive.size());
-
-        // стартуем GetTx: первый GetTxREQ + аларм ре-арма
-        auto mf=getMetaFull();
-        logNode("ALARM_PingRSP : done");
-        do_request_for_transactions(hb, mf);
-        return true;
-    }
-#endif
     case timers::TIMER_GetTxREQ:
     {
         if(sync_in_progress)
@@ -921,34 +820,20 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     {
         switch (msg->type)
         {
-        // case msgid::GetTxREQ:
-        //     return GetTxREQ(static_cast<const MsgData::GetTxREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::BlockStatusREQ:
             return BlockStatusREQ(static_cast<const MsgData::BlockStatusREQ *>(msg.get()), m->node_signer, m->route);
-        // case msgid::PingREQ:
-        //     return PingREQ(static_cast<const MsgData::PingREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::ValidateBlockREQ:
             // last_activity_time=iUtils->getNow().v;
             return ValidateBlockREQ(static_cast<const MsgData::ValidateBlockREQ *>(msg.get()), m->node_signer, m->route);
-        // case msgid::GetValidateBlockRSPREQ:
-        //     return GetValidateBlockRSPREQ(static_cast<const MsgData::GetValidateBlockRSPREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::UnlockRoundREQ:
             return UnlockRoundREQ(static_cast<const MsgData::UnlockRoundREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::BlockAccepted2REQ:
             // last_activity_time=iUtils->getNow().v;
             return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
-        // case msgid::ConfirmLeaderREQ:
-        //     return ConfirmLeaderREQ(static_cast<const MsgData::ConfirmLeaderREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::BlockDiffValidateREQ:
             return BlockDiffValidateREQ(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::BlockDBStore:
             return BlockDBStore(static_cast<const MsgData::BlockDBStore *>(msg.get()), m->node_signer, m->route);
-        // case msgid::LcEnvelopeREQ:
-        // {
-        //     bool nc=true;
-        //     return LcEnvelopeREQ(static_cast<const MsgData::LcEnvelopeREQ *>(msg.get()), m->node_signer, m->route,&nc);
-
-        // }
 
         default:
             throw CommonError("unjandled3 MsgData %s", msgName(msg->type));
@@ -959,8 +844,6 @@ bool Node::Service::NodeMsgREQ(const bcEvent::NodeMsgREQ *m)
     {
         switch (msg->type)
         {
-        // case msgid::BlockDiffValidateREQ:
-        //     return BlockDiffValidateREQ_sync(static_cast<const MsgData::BlockDiffValidateREQ *>(msg.get()), m->node_signer, m->route);
         case msgid::GetTxREQ:
         case msgid::ValidateBlockREQ:
         case msgid::BlockAccepted2REQ:
@@ -1429,14 +1312,6 @@ void Node::Service::armBlockStartAlarm(block_leader& bt, const REF_getter<MsgDat
                                          (double)delay / 1000000.0, this));
 }
 
-// int64_t Node::Service::current_slot()
-// {
-//     if (!prev_block.valid()) return 0;
-//     const int64_t last = prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v;
-//     const int64_t now = getNow().v;
-//     if (now < last) return -1;
-//     return (now - last) / SLOT_MKS;
-// }
 
 bool Node::Service::GetPrevBlockREQ(const bcEvent::GetPrevBlockREQ *e)
 {
@@ -1474,12 +1349,6 @@ bool Node::Service::GetPrevBlockRSP(const bcEvent::GetPrevBlockRSP *e)
 
     if (sync_in_progress)
         return true;
-    // auto cl = current_leader();
-    // if (!cl.valid())
-    // {
-    //     logNode("GetPrevBlockRSP: no leader for sync");
-    //     return true;
-    // }
     const int64_t since = (prev_block.valid() && !sync_full)
         ? prev_block->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp.v : 0;
     if (sync_full) sync_fresh_root = true;
@@ -1689,23 +1558,6 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
     return true;
 }
 
-// void Node::Service::mergeBlockStatus(const MsgData::BlockStatusREQ *e, int64_t epoch)
-// {
-//     auto& st = block_status[epoch];
-//     if (!st.valid()) st = new MsgData::BlockStatusREQ();
-//     if (e->has_offer_hash) {
-//         st->has_offer_hash = true;
-//         st->offer_hash = e->offer_hash;
-//     }
-//     for (auto& z : e->accepted)
-//     {
-//         if (!z.second.valid()) continue;
-//         auto it = st->accepted.find(z.first);
-//         if (it == st->accepted.end()
-//             || it->second->node_validators.size() < z.second->node_validators.size())
-//             st->accepted[z.first] = z.second;
-//     }
-// }
 
 void Node::Service::broadcastCurrentBlockStatus()
 {
@@ -1723,35 +1575,6 @@ void Node::Service::broadcastCurrentBlockStatus()
     logNode("[blockstatus] periodic relay") ;
     broadcast_MsgEvent_via_broadcaster(bt.block_status.get(), mf->tree_all_nodes);
 }
-#ifdef KALL
-void Node::Service::relayBlockStatus(const REF_getter<MsgData::BlockAcceptedREQ> &block_cert,
-                                     const REF_getter<MsgData::BlockAccepted2REQ> &diff_cert)
-{
-    REF_getter<BlockMetaFull> mf;
-    try { mf = getMetaFull(); } catch (...) { return; }
-    if (!mf.valid()) return;
-    REF_getter<MsgData::BlockStatusREQ> req = new MsgData::BlockStatusREQ();
-    auto itb = l_blocks.find(prev_root_hash_Z());
-    if (itb != l_blocks.end() && !itb->second.offer_hash.container.empty())
-    {
-        req->has_offer_hash = true;
-        req->offer_hash = itb->second.offer_hash;
-    }
-    if (block_cert.valid() && block_cert->blockInfo.valid()
-        && block_cert->blockInfo->heart_beat.valid())
-        req->accepted[block_cert->blockInfo->getHash()] = block_cert;
-    if (!req->accepted.empty())
-    {
-        auto& c = req->accepted.begin()->second;
-        if (c.valid() && c->blockInfo.valid() && c->blockInfo->heart_beat.valid())
-            mergeBlockStatus(req.get(), c->blockInfo->heart_beat->new_epoch);
-    }
-    logNode("[blockstatus] relay accepted=%zu offer=%d",
-            req->accepted.size(), (int)req->has_offer_hash);
-    // Broadcast штатным путём: MsgData через NodeMsg (как Ping/GetTx).
-    broadcast_MsgEvent_via_broadcaster(req.get(), mf->tree_all_nodes);
-}
-#endif
 bool Node::Service::OfferREQ(const bcEvent::OfferREQ *e)
 {
     MUTEX_INSPECTOR;
@@ -2126,48 +1949,6 @@ void Node::Service::sync_watchdog_stop()
 {
     sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(timers::ALARM_SYNC_WATCHDOG,NULL,this));
 }
-// REF_getter<const bc_node> Node::Service::current_leader()
-// {
-//     if(sync_in_progress)
-//     {
-//         logNode("current_leader: sync in progress %s %d",__FILE__,__LINE__);
-//     }
-//     auto mf=getMetaFull();
-//     if(!mf.valid() || mf->vne.empty())
-//         return nullptr;
-//     const auto& leaders = mf->committee_vne.empty() ? mf->vne : mf->committee_vne;
-
-//     int64_t lastBlockTime=0;
-//     if(prev_block.valid())
-//         lastBlockTime=prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v;
-//     const auto now=getNow().v;
-//     if(now<lastBlockTime)
-//     {
-//         if (getenv("MTJS_LEADER_TRACE"))
-//             logNode("[leader] prev=%s NULL(clock-back) last=%lld now=%lld",
-//                 prev_root_hash_Z().str().substr(0,8).c_str(), (long long)lastBlockTime, (long long)now);
-//         return nullptr;   // часы ушли назад относительно блока — слот не определён
-//     }
-
-//     const int64_t since=now-lastBlockTime;
-//     // правая граница слота — мёртвая зона: лидера нет
-//     if(since%SLOT_MKS>=SLOT_MKS-NO_LEADER_FRAME_MKS)
-//     {
-//         if (getenv("MTJS_LEADER_TRACE"))
-//             logNode("[leader] prev=%s NULL(dead-zone) since=%lld",
-//                 prev_root_hash_Z().str().substr(0,8).c_str(), (long long)since);
-//         return nullptr;
-//     }
-
-//     const int64_t slot=since/SLOT_MKS;
-//     const NODE_id& name=leaders[slot%leaders.size()].name;
-//     if (getenv("MTJS_LEADER_TRACE"))
-//         logNode("[leader] prev=%s last=%lld now=%lld since=%lld slot=%lld idx=%zu of=%zu leader=%s",
-//             prev_root_hash_Z().str().substr(0,8).c_str(),
-//             (long long)lastBlockTime, (long long)now, (long long)since, (long long)slot,
-//             (size_t)(slot%leaders.size()), leaders.size(), name.container.c_str());
-//     return cells::getNodeNoCreateConst(root.get(),db_state.get(),name);
-// }
 REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_hash)
 {
     MUTEX_INSPECTOR;
@@ -2322,16 +2103,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
         throw CommonError("if (vne_committe.empty())");
         return nullptr;
     }
-    // m->leader=vne_committe[0].name;
     m->leader_ip=vne_committe[0].ip;
-        // throw CommonError("getMetaFull: no committee (even relaxed)");
-    
-    // std::string com;
-    // for(auto &z : m->vne)
-    // {
-    //     com+=z.name.container+ " ";
-    // }
-    // logNode("vne %s",com.c_str());
 
     {
         m->tree_committe = buildTree(vne_committe);
@@ -2385,30 +2157,6 @@ bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& 
         return true;
     return false;
 }
-#ifdef KALL
-bool Node::Service::block_leader::is_PingRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db)
-{
-    i128 fullstakeVal = i128(0);
-    auto ls=cells::getAllNodesConst(r, db);
-    for (auto &z : ls)
-    {
-        if(z->isEnabled())
-            fullstakeVal += z->get_full_stake();
-    }
-    i128 stakeVal = i128(0);
-    auto &mm=PingRSP_m[h];
-    for (auto &z : mm)
-    {
-        auto n=cells::getNodeNoCreateConst(r, db,z.first);
-        if(!n.valid())
-            throw CommonError("if(!n.valid()) $p555");
-        stakeVal += n->get_full_stake();
-    }
-    if ((stakeVal * 100) / fullstakeVal > QUORUM )
-        return true;
-    return false;
-}
-#endif
 bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable*r, IDatabase* db)
 {
     i128 fullstakeVal = i128(0);

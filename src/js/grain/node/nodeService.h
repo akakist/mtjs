@@ -376,30 +376,7 @@ namespace Node
         };
         std::map<THASH_id, cert_entry> certs;
 
-        /// Запомнить свой подписанный RSP (шаг 3).
-        // void rememberSignedRSP(const REF_getter<MsgData::ValidateBlockRSP>& rsp);
-        /// Записать голоса cli в БД сразу (blockInfo+sig, ba_hash+sig).
-        // void persistCliVote(int64_t epoch);
-        /// Подгрузить голоса cli на старте.
-        // void loadCliVote();
-        /// Выкинуть RSP/hb/certs старее epoch-1 (вызывается при применении блока).
-        // void pruneRoundState(int64_t epoch_now);
-        /// Новый лидер: есть ли подписанный, но не применённый блок на текущей
-        /// высоте. true — сбор сертификата запущен/идёт, новый блок не предлагаем.
-        // bool maybeCollectCert();
-        // void startCertCollection(int64_t epoch);
-        // void broadcastCertReq();
-        // void finishCertCollection();
-        /// Шаг 4: собрать канонический BlockAcceptedREQ и запустить стадию диффа.
-        // void startCertFinalize(const cert_entry& ce);
-        /// Шаг 5: проверить сплит-пруф (>=2/3 голосов, ни один root < 2/3).
-        // bool verifySplitProof(int64_t epoch, const THASH_id& base,
-        //                       const std::vector<REF_getter<MsgData::ValidateBlockRSP>>& proof,
-        //                       int64_t& total_out, int64_t& best_out);
-        /// Шаг 5: снять замок и откатить дерево к применённому состоянию.
         void unlockRoundLocal(int64_t epoch, const THASH_id& base);
-        // int64_t certStakeFor(BlockMetaFull* mf, const NODE_id& n);
-        // bool isCurrentLeaderMe();
 
         int64_t node_start_timestamp=0;
         int64_t clock_lag_us_ = 0;              // тестовый сдвиг часов ноды (мкс, со знаком)

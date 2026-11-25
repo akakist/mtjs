@@ -449,13 +449,6 @@ void Node::Service::cleanup_stale(int64_t now)
     }
 }
 
-// bool Node::Service::get_stale(const std::string& hash, std::string& out)
-// {
-//     auto it = stale_cache.find(hash);
-//     if (it == stale_cache.end()) return false;
-//     out = it->second.body;
-//     return true;
-// }
 #include "CDatabaseLiteNode.h"
 #include "NodeGranuleIO.h"
 bool Node::Service::on_LiteSetUplinkREQ(const bcEvent::LiteSetUplinkREQ* e)
