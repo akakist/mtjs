@@ -27,6 +27,9 @@ namespace MsgData
         blst_cpp::Signature sig;
         NODE_id node_validator;
 
+        int round;
+        int subblock;
+
         void update(Blake2bHasher& h) const
         {
             blockInfo->update(h);
@@ -34,6 +37,9 @@ namespace MsgData
             h.update(node_validator.container);
 
             att_data->update(h);
+
+            h.update(std::to_string(round));
+            h.update(std::to_string(subblock));
         }
         void pack(outBuffer& b) const final
         {
@@ -43,6 +49,7 @@ namespace MsgData
             b<<blockInfo;
             b<<sig;
             b<<node_validator<<att_data;
+            b<<round<<subblock;
         }
         void unpack(inBuffer& b) final
         {
@@ -51,6 +58,7 @@ namespace MsgData
             b>>blockInfo;
             b>>sig;
             b>>node_validator>>att_data;
+            b>>round>>subblock;
         }
         void sign(const blst_cpp::SecretKey &sk)
         {

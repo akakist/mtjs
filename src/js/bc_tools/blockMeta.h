@@ -54,6 +54,12 @@ struct BlockMetaFull: public Refcountable
             return it->second;
         return std::nullopt;
     }
+    NodeElement& leader()
+    {
+        return committee_vne[0];
+    };
+    std::string leader_ip;
+    int round;
     BlockMetaFull(): Refcountable("BlockMetaFull") {}
 
 };

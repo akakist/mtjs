@@ -19,12 +19,16 @@ namespace MsgData
         blst_cpp::Signature sig34;
         NODE_id node_validator;
         THASH_id blockAcceptedHash;
+        int subblock=0;
+        int round=0;
 
         void update(Blake2bHasher& h) const
         {
             h.update(sig34.serialize());
             h.update(node_validator.container);
             h.update(blockAcceptedHash.container);
+            h.update(std::to_string(subblock));
+            h.update(std::to_string(round));
 
         }
         void pack(outBuffer& b) const final
@@ -33,6 +37,7 @@ namespace MsgData
             b<<sig34;
             b<<node_validator;
             b<<blockAcceptedHash;
+            b<<subblock<<round;
         }
         void unpack(inBuffer& b) final
         {
@@ -40,6 +45,7 @@ namespace MsgData
             b>>sig34;
             b>>node_validator;
             b>>blockAcceptedHash;
+            b>>subblock>>round;
         }
 
     };

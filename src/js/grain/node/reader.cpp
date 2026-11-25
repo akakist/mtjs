@@ -326,7 +326,7 @@ bool Node::Service::ClientMsg(const bcEvent::ClientMsg *e)
                     CONTRACT_id caller;           // внешний вызов → пустой caller
                     TIME_mks now = iUtils->getNow();  // wall-clock, сэмпл один раз
                     TIME_mks chain_ts = prev_block.valid()
-                        ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp : TIME_mks{};
+                        ? prev_block->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp : TIME_mks{};
                     JSIValue r = cc->call_query(root.get(), pp->view, params, &cs, contractHost.get(),
                         now, chain_ts);
                     if (JSI_IsException(r)) {

@@ -23,11 +23,49 @@ struct SubBlock
     // int id; /// starts with 0, -1 - last empty block
     THASH_id offer_hash;
     std::map<THASH_id, REF_getter<MsgData::BlockAcceptedREQ>> accepted_by_committe;
-    std::map<THASH_id,std::pair<blst_cpp::AggregateSignature, std::set<NODE_id> > > accepted_by_noncommitte;        
-    bool last=0;
+    std::map<THASH_id,std::pair<blst_cpp::AggregateSignature, std::vector<NODE_id> > > accepted_by_noncommitte;        
+    bool last=false;
     THASH_id result_root_hash;
     THASH_id att_hash;
 
+    void add_accepted_by_noncommitte(const THASH_id& blockAcceptedHash, const NODE_id& n, const blst_cpp::Signature& sig)
+    {
+        auto & b=accepted_by_noncommitte[blockAcceptedHash];
+        for(auto & z: b.second)
+        {
+            if(z==n)
+            {
+                logErr2("already added sig");
+                return;
+            }
+            b.first.add(sig);
+            b.second.push_back(n);
+        }
+    }
+    void add_accepted_by_committe(const REF_getter<MsgData::ValidateBlockRSP> &r)
+    {
+        auto h=r->blockInfo->getHash();
+        auto &b=accepted_by_committe[h];
+        for(auto &z:b->node_validators)
+        {
+            if(z==r->node_validator)
+            {
+                logErr2("already added validator %s",r->node_validator.container.c_str());
+                return;
+            }
+            b->node_validators.push_back(r->node_validator);
+            b->agg_sig.add(r->sig);
+
+        }
+    }
+    void pack(outBuffer& o) const
+    {
+        o<<offer_hash<<accepted_by_committe<<accepted_by_noncommitte<<last<<result_root_hash<<att_hash;
+    }
+    void unpack(inBuffer& o)
+    {
+        o>>offer_hash>>accepted_by_committe>>accepted_by_noncommitte>>last>>result_root_hash>>att_hash;
+    }
     /// @brief  do not pack next
     // bool voting_stopped=false;
     void update(Blake2bHasher& h) const
@@ -57,8 +95,10 @@ struct SubBlock
 
     }
 };
-inline outBuffer& operator<<(outBuffer& o, const SubBlock& z) { o<<z.subblocks; return o; }
-inline inBuffer& operator>>(inBuffer& o, SubBlock& z) { o>>z.subblocks; return o; }
+inline outBuffer& operator<<(outBuffer& o, const SubBlock& z) {
+     z.pack(o); return o; 
+}
+inline inBuffer& operator>>(inBuffer& o, SubBlock& z) { z.unpack(o); return o; }
 
 struct Round
 {
@@ -119,17 +159,8 @@ namespace MsgData
 
         TIME_mks block_timestamp;
         REF_getter<MsgData::HeartBeatREQ> hb;
-        std::vector<Round> rounds;
+        std::map<int,Round> rounds;
 
-        Round& current_round()
-        {
-            int roundNo=(iUtils->getNow()-block_timestamp).v/ROUND_DURATION;
-            if(rounds.size()<roundNo+1)
-            {
-                rounds.resize(roundNo+1);
-            }
-            return rounds[roundNo];
-        }
         void update(Blake2bHasher& h) const
         {
             // h.update(std::to_string((int)has_offer_hash));
@@ -142,7 +173,7 @@ namespace MsgData
             h.update(block_timestamp.str());
             for(auto& z: rounds)
             {
-                z.update(h);
+                z.second.update(h);
             }
             hb->update(h);
             h.update(block_timestamp.str());
@@ -151,15 +182,13 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<(int)has_offer_hash<<offer_hash<<accepted<<hb;
+            b<<block_timestamp<<hb<<rounds;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            int ho=0;
-            b>>ho>>offer_hash>>accepted>>hb;
-            has_offer_hash=(ho!=0);
+            b>>block_timestamp>>hb>>rounds;
         }
     };
 }

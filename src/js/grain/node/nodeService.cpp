@@ -177,10 +177,11 @@ bool Node::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
 
         // Прямой push лидеру по его IP (не ждём GetTxREQ: нода может
         // early-return'ить в GetTxREQ и не отдать свой пул).
-        auto cl = current_leader();
-        if (cl.valid() && cl->getName() != this_node_name)
+        auto mf=getMetaFull();
+        auto cl = mf->leader();
+        if (cl.name != this_node_name)
         {
-            sendEvent(cl->get_ip(), ServiceEnum::Node,
+            sendEvent(cl.ip, ServiceEnum::Node,
                       new bcEvent::ForwardTxREQ(e->tx, route_t()));
         }
     }
@@ -320,7 +321,7 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
     if (e->tid == TIMER_BLOCK_STATUS) {
-        if(isCurrentLeaderMe())
+        if(getMetaFull()->leader().name==this_node_name)
             broadcastCurrentBlockStatus();
         return true;
     }
@@ -352,8 +353,9 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 
         }
         // auto me=cells::getNodeNoCreateConst(root.get(),db_state.get(),this_node_name);
-        auto cl=current_leader();
-        if(cl.valid() && cl->getName()==this_node_name)
+        auto mf=getMetaFull();
+        auto cl=mf->leader();
+        if(cl.name==this_node_name)
         {
             sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(ALARM_Ping,NULL,NULL,0.02,this));
 
@@ -521,8 +523,8 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         throw CommonError("if(!hb)");
         if(bt.block_started)
             return true;
-        auto cl=current_leader();
-        if(!cl.valid() || cl->getName()!=this_node_name)
+        auto cl=getMetaFull()->leader().name;
+        if(cl!=this_node_name)
             return true;
         if(hb->new_epoch != epoch_current() || hb->prev_root_hash_1 != prev_root_hash_Z())
             return true;
@@ -646,7 +648,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
             cert_collecting = false;
             return true;
         }
-        if (!isCurrentLeaderMe())
+        if (getMetaFull()->leader().name!=this_node_name)
         {
             logNode("cert: not leader anymore — stop epoch=%lld", (long long)cert_collect.epoch);
             cert_collecting = false;
@@ -1427,14 +1429,14 @@ void Node::Service::armBlockStartAlarm(block_leader& bt, const REF_getter<MsgDat
                                          (double)delay / 1000000.0, this));
 }
 
-int64_t Node::Service::current_slot()
-{
-    if (!prev_block.valid()) return 0;
-    const int64_t last = prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v;
-    const int64_t now = getNow().v;
-    if (now < last) return -1;
-    return (now - last) / SLOT_MKS;
-}
+// int64_t Node::Service::current_slot()
+// {
+//     if (!prev_block.valid()) return 0;
+//     const int64_t last = prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v;
+//     const int64_t now = getNow().v;
+//     if (now < last) return -1;
+//     return (now - last) / SLOT_MKS;
+// }
 
 bool Node::Service::GetPrevBlockREQ(const bcEvent::GetPrevBlockREQ *e)
 {
@@ -1472,14 +1474,14 @@ bool Node::Service::GetPrevBlockRSP(const bcEvent::GetPrevBlockRSP *e)
 
     if (sync_in_progress)
         return true;
-    auto cl = current_leader();
-    if (!cl.valid())
-    {
-        logNode("GetPrevBlockRSP: no leader for sync");
-        return true;
-    }
+    // auto cl = current_leader();
+    // if (!cl.valid())
+    // {
+    //     logNode("GetPrevBlockRSP: no leader for sync");
+    //     return true;
+    // }
     const int64_t since = (prev_block.valid() && !sync_full)
-        ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v : 0;
+        ? prev_block->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp.v : 0;
     if (sync_full) sync_fresh_root = true;
     {
         auto st = cells::getStateNoCreateConst(root.get(), db_state.get());
@@ -1491,7 +1493,7 @@ bool Node::Service::GetPrevBlockRSP(const bcEvent::GetPrevBlockRSP *e)
     REF_getter<bcEvent::syncGetGranulesREQ> req =
         new bcEvent::syncGetGranulesREQ(since, this_node_name, getNow().v, ListenerBase::serviceId);
     req->sign(my_sk_ed);
-    sendEvent(cl->get_ip(), ServiceEnum::Node, req.get());
+    sendEvent(getMetaFull()->leader().ip, ServiceEnum::Node, req.get());
     sync_in_progress = true;
     sync_watchdog_arm();
     return true;
@@ -1671,233 +1673,19 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
         passEvent(new bcEvent::GetPrevBlockREQ(e->hb->prev_root_hash_1,
                                                poppedFrontRoute(route)));
     }
-    auto cl=current_leader();
+    auto cl=getMetaFull()->leader();
     /// освежаем block_status у себя
-    if(cl.valid() && cl->getName()==src_node)
+    if(cl.name == src_node)
     {
         l_blocks[prev_root_hash_Z()].block_status=e;
     }
     auto mf=getMetaFull();
     /// verify_sinle sign
-    std::map<NODE_id, int> sigs_cnt;
-    for(auto & ih: e->accepted)
-    {
-        for(auto& z: ih.second->node_validators)
-        {
-            sigs_cnt[z]++;
-        }
-    }
-    for(auto &z: sigs_cnt)
-    {
-        if(z.second>1)
-        {
-            logNode("twice signed");
-            return 1;
-        }
-    }
-
-    /// verify_sigs
-    for(auto & ih: e->accepted)
-    {
-        if(ih.second->blockInfo->getHash()!=ih.first)
-        {
-            logNode("if(ih.second->blockInfo->getHash()!=ih.first) - broken BlockStatusREQ");
-            return true;
-        }
-        
-        std::vector<blst_cpp::PublicKey> pks;
-        for(auto &nname: ih.second->node_validators)
-        {
-            auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(),nname);
-            if(!n.valid())
-            {
-                logNode("node not found %s",nname.container.c_str());
-                return true;
-            }
-            pks.push_back(n->get_bls_pk());
-
-        }
-        if(!ih.second->agg_sig.verify(pks,ih.first.container))
-        {
-            logNode("BlockStatusREQ: verify failed");
-            return true;
-        }
-    }
-    /// полный стейк проголосовавших, не может быть больше 80%.
-    i128 voted_stake;
-    for(auto & ih: e->accepted)
-    {
-        for(auto& z: ih.second->node_validators)
-        {
-            voted_stake+=mf->getPrevStake(z);
-        }
-    }
-    if((voted_stake*100)/mf->full_stake_committe > 80)
-    {
-        logNode("voted stake cannot be greater 80%");
-        return true;
-    }
-
-
-    // auto mf=getMetaFull();
-    std::map<THASH_id, i128> stakes;
-    auto fs=mf->fullStakeAll();
-    for(auto& ih: e->accepted)
-    {
-        for(auto& z: ih.second->node_validators)
-        {
-            stakes[ih.first]+=mf->getPrevStake(z);
-        }
-    }
     
 
 
-    auto derive = [&](const REF_getter<MsgData::BlockAcceptedREQ>& c) {
-        if (c.valid() && c->blockInfo.valid() && c->blockInfo->heart_beat.valid())
-        {
-            base_root = c->blockInfo->heart_beat->prev_root_hash_1;
-            epoch = c->blockInfo->heart_beat->new_epoch;
-            return true;
-        }
-        return false;
-    };
-    if (!e->accepted.empty()) derive(e->accepted.begin()->second);
-    // mergeBlockStatus(e, epoch);
-    // REF_getter<BlockMetaFull> mf=getMetaFull();
-    auto stake_of = [&](const NODE_id& id) -> i128 {
-        if (!mf.valid()) return i128(0);
-        auto it = mf->prev_stakes.find(id);
-        return it == mf->prev_stakes.end() ? i128(0) : it->second;
-    };
-    i128 committee_full = i128(0);
-    if (mf.valid())
-        for (auto& z : mf->committe_members) committee_full += stake_of(z);
-    i128 network_full = i128(0);
-    if (mf.valid())
-        for (auto& z : mf->vne) network_full += stake_of(z.name);
 
-    bool committee_ok = false;
-    REF_getter<MsgData::BlockAcceptedREQ> committee_cert;
-    i128 total_signer_stake = i128(0);
-    for (auto& z : e->accepted)
-    {
-        auto& cert = z.second;
-        if (!cert.valid() || !cert->blockInfo.valid()) continue;
-        std::vector<blst_cpp::PublicKey> pks;
-        bool ok = true;
-        i128 signed_committee = i128(0), signed_total = i128(0);
-        for (auto& nid : cert->node_validators)
-        {
-            auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(), nid);
-            if (!n.valid()) { ok = false; break; }
-            pks.push_back(n->get_bls_pk());
-            i128 st = stake_of(nid);
-            signed_total += st;
-            if (mf.valid() && mf->committe_members.count(nid)) signed_committee += st;
-        }
-        total_signer_stake += signed_total;
-        if (!ok || pks.empty()) continue;
-        if (!cert->agg_sig.verify(pks, cert->blockInfo->getHash().container)) continue;
 
-        const bool committee_q = committee_full > 0
-                && (signed_committee * 100) / committee_full > QUORUM;
-        const bool network_q = network_full > 0
-                && (signed_total * 100) / network_full > QUORUM;
-        if (committee_q) { committee_ok = true; if (!committee_cert.valid()) committee_cert = cert; }
-        if (network_q)
-        {
-            logNode("[blockstatus] network 2/3 hash=%s epoch=%lld — финал (RocksDB + prev_block)",
-                    z.first.str().c_str(), (long long)epoch);
-            THASH_id ah = cert->blockInfo->att_data_hash;
-            auto cached = getCachedPayload(ah);
-            auto att = REF_getter<MsgData::attachment_data>(
-                    dynamic_cast<MsgData::attachment_data*>(cached.get()));
-            if (att.valid())
-            {
-                REF_getter<MsgData::BlockAccepted2REQ> wrap = new MsgData::BlockAccepted2REQ();
-                wrap->blockAcceptedREQ = cert;
-                REF_getter<MsgData::BlockDBStore> bds = new MsgData::BlockDBStore();
-                bds->blockAccepted2REQ = wrap;
-                bds->tx_hashes = att->tx_hashes;
-                bds->diffs = att->diffs;
-                bds->att_data = att;
-                BlockDBStore(bds.get(), src_node, route_t());
-            }
-            else
-                logNode("[blockstatus] network 2/3: нет att_data %s — ждём/тянем", ah.str().c_str());
-            return true;
-        }
-    }
-
-    // Аккумуляция: если комитет 2/3, а нас в списке нет — добавляем свою подпись
-    // (если блок уже применён или мы в комитете) и рассылаем обновлённый серт.
-    if (committee_ok && committee_cert.valid()
-        && !accepted_signed.count(committee_cert->blockInfo->getHash()))
-    {
-        bool mine = false;
-        for (auto& nid : committee_cert->node_validators)
-            if (nid == this_node_name) { mine = true; break; }
-        const bool applied = prev_block.valid()
-            && prev_block->blockAcceptedREQ->blockInfo->new_root_hash1
-               == committee_cert->blockInfo->new_root_hash1;
-        const bool in_committee = mf.valid() && mf->committe_members.count(this_node_name) > 0;
-        if (!mine && (applied || in_committee))
-        {
-            blst_cpp::Signature sig;
-            sig.sign(my_sk_bls, committee_cert->blockInfo->getHash().container);
-            REF_getter<MsgData::BlockAcceptedREQ> nb = new MsgData::BlockAcceptedREQ();
-            nb->blockInfo = committee_cert->blockInfo;
-            nb->node_validators = committee_cert->node_validators;
-            nb->agg_sig = committee_cert->agg_sig;
-            nb->node_validators.insert(this_node_name);
-            nb->agg_sig.add(sig);
-            accepted_signed.insert(nb->blockInfo->getHash());
-
-            REF_getter<MsgData::BlockStatusREQ> req = new MsgData::BlockStatusREQ();
-            req->accepted[nb->blockInfo->getHash()] = nb;
-            // auto itst = block_status.find(epoch);
-            // if (itst != block_status.end() && itst->second.valid() && itst->second->has_offer_hash)
-            // {
-            //     req->has_offer_hash = true;
-            //     req->offer_hash = itst->second->offer_hash;
-            // }
-            // mergeBlockStatus(req.get(), epoch);
-            if (mf.valid())
-                broadcast_MsgEvent_via_broadcaster(req.get(), mf->tree_all_nodes);
-            logNode("[blockstatus] added my signature for %s (applied=%d committee=%d)",
-                    nb->blockInfo->getHash().str().c_str(), (int)applied, (int)in_committee);
-        }
-    }
-
-    if (committee_ok)
-        logNode("[blockstatus] committee 2/3 epoch=%lld — блок решён, ждём сеть", (long long)epoch);
-    else if (network_full > 0 && (total_signer_stake * 100) / network_full > QUORUM)
-        logNode("[blockstatus] split epoch=%lld total=%s/%s — unlock (TODO)",
-                (long long)epoch, total_signer_stake.str().c_str(), network_full.str().c_str());
-
-    if (!e->has_offer_hash)
-    {
-        REF_getter<MsgData::GetTxRSP> rsp = new MsgData::GetTxRSP();
-        for (auto& z : transaction_pool_of_leader)
-        {
-            if (tx_sent.count(z.first)) continue;
-            if (rsp->trs.size() >= (size_t)MAX_TXS_PER_BLOCK) break;
-            rsp->trs.push_back(z.second);
-            tx_sent.insert(z.first);
-            sendEvent(ServiceEnum::Timer,
-                      new timerEvent::SetAlarm(timers::ALARM_TX_SENT, toRef(z.first.container),
-                                               z.second.get(), TX_SENT_TTL_SEC, this));
-        }
-        if (!rsp->trs.empty())
-        {
-            rsp->hb = new MsgData::HeartBeatREQ(base_root, epoch, src_node);
-            pass_NodeMsgRSP(rsp.get(), route);
-            logNode("[blockstatus] offer_hash нет -> отправили %zu tx", rsp->trs.size());
-        }
-    }
-
-    logNode("[blockstatus] wait epoch=%lld (accepted=%zu offer=%d)",
-            (long long)epoch, e->accepted.size(), (int)e->has_offer_hash);
     return true;
 }
 
@@ -2338,51 +2126,58 @@ void Node::Service::sync_watchdog_stop()
 {
     sendEvent(ServiceEnum::Timer, new timerEvent::StopAlarm(timers::ALARM_SYNC_WATCHDOG,NULL,this));
 }
-REF_getter<const bc_node> Node::Service::current_leader()
-{
-    if(sync_in_progress)
-    {
-        logNode("current_leader: sync in progress %s %d",__FILE__,__LINE__);
-    }
-    auto mf=getMetaFull();
-    if(!mf.valid() || mf->vne.empty())
-        return nullptr;
-    const auto& leaders = mf->committee_vne.empty() ? mf->vne : mf->committee_vne;
+// REF_getter<const bc_node> Node::Service::current_leader()
+// {
+//     if(sync_in_progress)
+//     {
+//         logNode("current_leader: sync in progress %s %d",__FILE__,__LINE__);
+//     }
+//     auto mf=getMetaFull();
+//     if(!mf.valid() || mf->vne.empty())
+//         return nullptr;
+//     const auto& leaders = mf->committee_vne.empty() ? mf->vne : mf->committee_vne;
 
-    int64_t lastBlockTime=0;
-    if(prev_block.valid())
-        lastBlockTime=prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v;
-    const auto now=getNow().v;
-    if(now<lastBlockTime)
-    {
-        if (getenv("MTJS_LEADER_TRACE"))
-            logNode("[leader] prev=%s NULL(clock-back) last=%lld now=%lld",
-                prev_root_hash_Z().str().substr(0,8).c_str(), (long long)lastBlockTime, (long long)now);
-        return nullptr;   // часы ушли назад относительно блока — слот не определён
-    }
+//     int64_t lastBlockTime=0;
+//     if(prev_block.valid())
+//         lastBlockTime=prev_block->blockAcceptedREQ->blockInfo->block_timestamp.v;
+//     const auto now=getNow().v;
+//     if(now<lastBlockTime)
+//     {
+//         if (getenv("MTJS_LEADER_TRACE"))
+//             logNode("[leader] prev=%s NULL(clock-back) last=%lld now=%lld",
+//                 prev_root_hash_Z().str().substr(0,8).c_str(), (long long)lastBlockTime, (long long)now);
+//         return nullptr;   // часы ушли назад относительно блока — слот не определён
+//     }
 
-    const int64_t since=now-lastBlockTime;
-    // правая граница слота — мёртвая зона: лидера нет
-    if(since%SLOT_MKS>=SLOT_MKS-NO_LEADER_FRAME_MKS)
-    {
-        if (getenv("MTJS_LEADER_TRACE"))
-            logNode("[leader] prev=%s NULL(dead-zone) since=%lld",
-                prev_root_hash_Z().str().substr(0,8).c_str(), (long long)since);
-        return nullptr;
-    }
+//     const int64_t since=now-lastBlockTime;
+//     // правая граница слота — мёртвая зона: лидера нет
+//     if(since%SLOT_MKS>=SLOT_MKS-NO_LEADER_FRAME_MKS)
+//     {
+//         if (getenv("MTJS_LEADER_TRACE"))
+//             logNode("[leader] prev=%s NULL(dead-zone) since=%lld",
+//                 prev_root_hash_Z().str().substr(0,8).c_str(), (long long)since);
+//         return nullptr;
+//     }
 
-    const int64_t slot=since/SLOT_MKS;
-    const NODE_id& name=leaders[slot%leaders.size()].name;
-    if (getenv("MTJS_LEADER_TRACE"))
-        logNode("[leader] prev=%s last=%lld now=%lld since=%lld slot=%lld idx=%zu of=%zu leader=%s",
-            prev_root_hash_Z().str().substr(0,8).c_str(),
-            (long long)lastBlockTime, (long long)now, (long long)since, (long long)slot,
-            (size_t)(slot%leaders.size()), leaders.size(), name.container.c_str());
-    return cells::getNodeNoCreateConst(root.get(),db_state.get(),name);
-}
+//     const int64_t slot=since/SLOT_MKS;
+//     const NODE_id& name=leaders[slot%leaders.size()].name;
+//     if (getenv("MTJS_LEADER_TRACE"))
+//         logNode("[leader] prev=%s last=%lld now=%lld since=%lld slot=%lld idx=%zu of=%zu leader=%s",
+//             prev_root_hash_Z().str().substr(0,8).c_str(),
+//             (long long)lastBlockTime, (long long)now, (long long)since, (long long)slot,
+//             (size_t)(slot%leaders.size()), leaders.size(), name.container.c_str());
+//     return cells::getNodeNoCreateConst(root.get(),db_state.get(),name);
+// }
 REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_hash)
 {
     MUTEX_INSPECTOR;
+
+    int round=0;
+    if(prev_block.valid())
+    {
+        round=(iUtils->getNow() - prev_block->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp).v / ROUND_DURATION;
+    }
+
     // int round=hb->round;
     // корень, на котором построен блок (meta_root_hash) может отличаться от
     // нашего текущего — иначе мету для проверяемого блока не собрать.
@@ -2391,22 +2186,26 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
     auto it=block_meta_full.find(b);
     if(it!=block_meta_full.end())
     {
-        return it->second;
+        auto i2=it->second.find(round);
+        if(i2!=it->second.end())
+            return i2->second;
+        // return it->second;
     }
 
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
-    block_meta_full[b]=m;
+    block_meta_full[b][round]=m;
+    m->round=round;
     // auto an=cells::getAllNodes(root.get(),db_state.get());
     auto aan=cells::getNodeListNoCreateConst(root.get(),db_state.get());
     if(!aan.valid())
-        return nullptr;
+        throw CommonError("if(!aan.valid())");
     int live_nodes=0;
     std::map<NODE_id,REF_getter<const bc_node>> nnn;
     for(auto& z: aan->list)
     {
         auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(),z);
         if(!n.valid())
-            return nullptr;
+            throw CommonError("if(!n.valid())");
         nnn[z]=n;
         m->bls_pks[z]=n->get_bls_pk();
         
@@ -2414,7 +2213,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
 
     auto v=cells::getValuesNoCreateConst(root.get(),db_state.get());
     if(!v.valid())
-        return nullptr;
+        throw CommonError("if(!v.valid())");;
 
     auto validators_percent=v->getValue("validator_count_percent");
     auto minstake=v->getValue("validator_min_stake");
@@ -2425,7 +2224,7 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
     // иначе сравниваем отставание с TTL (детерминированно по block_timestamp прошлого блока).
     const TTL_mks NODE_TTL = TTL_mks{60 * 1000000};   // 60с
     TIME_mks now_ts = prev_block.valid()
-        ? prev_block->blockAcceptedREQ->blockInfo->block_timestamp : TIME_mks{};
+        ? prev_block->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp : TIME_mks{};
     auto node_active = [&](const bc_node* n) -> bool {
         if (n->last_update.v == 0) return true;
         return (now_ts - n->last_update) <= NODE_TTL;
@@ -2518,12 +2317,13 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
             }
         }
     }
-
     if (vne_committe.empty())
     {
-        logNode("getMetaFull: no committee ");
+        throw CommonError("if (vne_committe.empty())");
         return nullptr;
     }
+    // m->leader=vne_committe[0].name;
+    m->leader_ip=vne_committe[0].ip;
         // throw CommonError("getMetaFull: no committee (even relaxed)");
     
     // std::string com;

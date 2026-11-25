@@ -86,125 +86,23 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         logNode("ValidateBlockRSP skipped: sync in progress");
         return true;
     }
+
     auto& bt=l_blocks[prev_root_hash_Z()];
-    auto& ba_hash=r->blockAcceptedHash;
-    auto br=bt.blockDiffValidateREQ_2[ba_hash];
-    if(!br.valid())
+    if(!bt.block_status.valid())
+        throw CommonError("if(!bt.block_status.valid())");
+    auto mf=getMetaFull();
+    auto pk=mf->getBlsPk(src_node);
+    if(!pk)
     {
-        logNode("if(!bt.blockDiffValidateREQ.valid())");
-        return true;
-
-    }
-
-
-    if (br->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1 != prev_root_hash_Z())
-    {
-        logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
+        logNode("if(!pk) wdswe344");
         return true;
     }
-    auto nnn=cells::getNodeNoCreateConst(root.get(),db_state.get(),r->node_validator);
-    if(!nnn.valid())
-        throw CommonError("if(!nnn.valid()) @44");
-
-
-    // DIAG: what leader verifies
+    if(!r->sig34.verify(*pk,r->blockAcceptedHash.container))
     {
-        DBG(logNode("[DIAG BlockDiffValidateRSP verify] validator=%s pk=%s sig=%s hash=%s",
-            r->node_validator.container.c_str(),
-            base16::encode(nnn->get_bls_pk().serialize()).c_str(),
-            base16::encode(r->sig34.serialize()).c_str(),
-            br->blockAcceptedREQ->getHash().str().c_str()));
-    }
-    if(br->blockAcceptedREQ->getHash()!=r->blockAcceptedHash)
-    {
-        logNode("if(br->blockAcceptedREQ->getHash()!=r->blockAcceptedHash)");
+        logNode("BlockDiffValidateRSP verify failed");
         return true;
     }
-
-    if (!r->sig34.verify(nnn->get_bls_pk(),br->blockAcceptedREQ->blockInfo->getHash().container))
-    {
-        logNode("[BlockDiffValidateRSP] block response not validated (validator=%s, pk=%s, hash=%s)",
-            r->node_validator.container.c_str(),
-            base16::encode(nnn->get_bls_pk().serialize()).c_str(),
-            br->blockAcceptedREQ->getHash().str().c_str());
-        return true;
-    }
-    // auto h=r->blockInfoHash;
-    // logNode("[BlockDiffValidateRSP] blockInfoHash %s from %s",r->blockInfoHash.str().c_str(),src_node.container.c_str());
-    {
-        DBG(logNode("KALL BDRSP push: r->blockAcceptedHash=%s br->getHash=%s nnn_validator=%s",
-                r->blockAcceptedHash.str().c_str(),
-                br->blockAcceptedREQ->getHash().str().c_str(),
-                r->node_validator.container.c_str()));
-    }
-    bt.BlockDiffValidateRSP_m[r->blockAcceptedHash].push_back(r);
-    DBG(logNode("KALL BDRSP push done: key=%s size=%d",
-        r->blockAcceptedHash.str().c_str(),
-        (int)bt.BlockDiffValidateRSP_m[r->blockAcceptedHash].size()));
-
-
-    if(bt.is_BlockDiffValidateRSP_m_quorum(r->blockAcceptedHash,root.get(),db_state.get()))
-    {
-        MUTEX_INSPECTOR;
-        XTRY;
-        // if (getenv("MTJS_CERT_TRACE"))
-        //     logNode("[cert-trace] BDRSP quorum key=%s map=%zu alive_map=%zu",
-        //             r->blockAcceptedHash.str().c_str(),
-        //             bt.BlockDiffValidateRSP_m[r->blockAcceptedHash].size(),
-        //             bt.PingRSP_m.size());
-        // Сливаем подписи apply-стадии в тот же BlockAccepted.
-        // Подпись diff-RSP уже за blockInfo; кто уже подписал блок — не дублируем.
-        REF_getter<MsgData::BlockAcceptedREQ> merged = new MsgData::BlockAcceptedREQ();
-        merged->blockInfo = br->blockAcceptedREQ->blockInfo;
-        merged->node_validators = br->blockAcceptedREQ->node_validators;
-        merged->agg_sig = br->blockAcceptedREQ->agg_sig;
-        std::set<std::string> have;
-        std::vector<blst_cpp::PublicKey> pks;
-        for (auto& nid : merged->node_validators)
-        {
-            auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(), nid);
-            if (!n.valid()) return true;
-            pks.push_back(n->get_bls_pk());
-            have.insert(nid.container);
-        }
-        auto vds = bt.BlockDiffValidateRSP_m[r->blockAcceptedHash];
-        std::sort(vds.begin(), vds.end(),
-                  [](const REF_getter<MsgData::BlockDiffValidateRSP>& a,
-                     const REF_getter<MsgData::BlockDiffValidateRSP>& b) {
-                      return a->node_validator.container < b->node_validator.container;
-                  });
-        for (auto &z : vds)
-        {
-            if (have.count(z->node_validator.container)) continue;
-            auto n = cells::getNodeNoCreateConst(root.get(), db_state.get(), z->node_validator);
-            if (!n.valid()) return true;
-            pks.push_back(n->get_bls_pk());
-            merged->agg_sig.add(z->sig34);
-            merged->node_validators.insert(z->node_validator);
-            have.insert(z->node_validator.container);
-        }
-        if (!merged->agg_sig.verify(pks, merged->blockInfo->getHash().container))
-        {
-            logNode("merged BlockAccepted verify FAIL");
-            return true;
-        }
-        {
-            REF_getter<MsgData::BlockStatusREQ> st = new MsgData::BlockStatusREQ();
-            st->accepted[merged->blockInfo->getHash()] = merged;
-            st->has_offer_hash = true;
-            st->offer_hash = merged->blockInfo->offer_hash;
-            // mergeBlockStatus(st.get(), merged->blockInfo->heart_beat->new_epoch);
-            auto mf = getMetaFull();
-            if (mf.valid())
-                broadcast_MsgEvent_via_broadcaster(st.get(), mf->tree_all_nodes);
-            BlockStatusREQ(st.get(), this_node_name, route_t());
-        }
-
-        XPASS;
-    }
-
-
-
+    bt.block_status->rounds[r->round].subblocks[r->subblock].add_accepted_by_noncommitte(r->blockAcceptedHash,src_node,r->sig34);
     return true;
 }
 
@@ -224,29 +122,46 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         logNode("ValidateBlockRSP: validated block prev_root_hash not matching with current prev_root_hash from %s", src_node.container.c_str());
         return true;
     }
-    auto nnn=cells::getNodeNoCreateConst(root.get(), db_state.get(),r->node_validator);
-    if(!nnn.valid())
-        throw CommonError("if(!nnn.valid())");
-    if (!r->verify(nnn->get_bls_pk()))
-    {
-        logNode("[ValidateBlockRSP] block response not validated ");
-        return true;
-    }
+    // auto nnn=cells::getNodeNoCreateConst(root.get(), db_state.get(),r->node_validator);
+    // if(!nnn.valid())
+    //     throw CommonError("if(!nnn.valid())");
+    // if (!r->verify(nnn->get_bls_pk()))
+    // {
+    //     logNode("[ValidateBlockRSP] block response not validated ");
+    //     return true;
+    // }
 
     auto &bt = l_blocks[prev_root_hash_Z()];
-    auto h=r->blockInfo->getHash();
-    auto & bl=l_blocks[prev_root_hash_Z()];
-    if(!bl.block_status.valid())
-    bl.block_status=new MsgData::BlockStatusREQ;
-    if(!bl.block_status->accepted[h].valid())
+    if(!bt.block_status.valid())
+        throw CommonError("if(!bt.block_status.valid())");
+
+    auto mf=getMetaFull();
+    // auto &n=mf
+    auto pk=mf->getBlsPk(r->node_validator);
+    if(!pk)
     {
-        bl.block_status->accepted[h]=new MsgData::BlockAcceptedREQ;
+        logNode("!pk @#$#*");
+        return true;
     }
-    if(!bl.block_status->accepted[h]->node_validators.count(r->node_validator))
+    if(!r->verify(*pk))
     {
-        bl.block_status->accepted[h]->agg_sig.add(r->sig);
-        bl.block_status->accepted[h]->node_validators.insert(r->node_validator);
+        logNode("if(!r->verify(*pk))");
+        return true;
     }
+    bt.block_status->rounds[r->round].subblocks[r->subblock].add_accepted_by_committe(r);
+    // auto h=r->blockInfo->getHash();
+    // auto & bl=l_blocks[prev_root_hash_Z()];
+    // // if(!bl.block_status.valid())
+    // // bl.block_status=new MsgData::BlockStatusREQ;
+    // if(!bl.block_status->accepted[h].valid())
+    // {
+    //     bl.block_status->accepted[h]=new MsgData::BlockAcceptedREQ;
+    // }
+    // if(!bl.block_status->accepted[h]->node_validators.count(r->node_validator))
+    // {
+    //     bl.block_status->accepted[h]->agg_sig.add(r->sig);
+    //     bl.block_status->accepted[h]->node_validators.insert(r->node_validator);
+    // }
     // logNode("blockInfo->getHash() %s from node %s",h.str().c_str(),src_node.container.c_str());
     // bt.ValidateBlockRSP_m[h].push_back(r);
     // auto mf=getMetaFull();
@@ -333,11 +248,12 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
 // шаг 4), либо >=2/3 голосов, разложенных по разным рутам (доказанный сплит,
 // шаг 5), либо <2/3 — тогда доказательств нет и замок снимать нельзя.
 
-bool Node::Service::isCurrentLeaderMe()
-{
-    auto cl = current_leader();
-    return cl.valid() && cl->getName() == this_node_name;
-}
+// bool Node::Service::isCurrentLeaderMe()
+// {
+//     auto mf
+//     auto cl = current_leader();
+//     return cl.valid() && cl->getName() == this_node_name;
+// }
 
 // int64_t Node::Service::certStakeFor(BlockMetaFull* mf, const NODE_id& n)
 // {

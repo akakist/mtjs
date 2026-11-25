@@ -12,19 +12,22 @@ namespace MsgData
         {
 
         }
-        HeartBeatREQ(const THASH_id& _prev_block_hash, int64_t _newepoch, const NODE_id& _node_leader):Base(msgid::HeartBeatREQ),
-            prev_root_hash_1(_prev_block_hash), new_epoch(_newepoch), node_leader(_node_leader)
+        HeartBeatREQ(const THASH_id& _prev_block_hash, int64_t _newepoch, const NODE_id& _node_leader, TIME_mks bs):Base(msgid::HeartBeatREQ),
+            prev_root_hash_1(_prev_block_hash), new_epoch(_newepoch), node_leader(_node_leader), block_timestamp(bs)
         {
         }
         THASH_id prev_root_hash_1;
         int64_t new_epoch;
         NODE_id node_leader;
+        TIME_mks block_timestamp;
+
         bool equals(const REF_getter<HeartBeatREQ> &a)
         {
             MUTEX_INSPECTOR;
             return prev_root_hash_1 == a->prev_root_hash_1 &&
                     new_epoch == a->new_epoch &&
-                    node_leader == a->node_leader;
+                    node_leader == a->node_leader &&
+                    block_timestamp==a->block_timestamp;
         }
 
         void update(Blake2bHasher& h) const
@@ -33,6 +36,7 @@ namespace MsgData
             h.update(prev_root_hash_1.container);
             h.update(std::to_string(new_epoch));
             h.update(node_leader.container);
+            h.update(block_timestamp.str());
         }
         void pack(outBuffer& b) const final
         {
@@ -42,6 +46,7 @@ namespace MsgData
             b<<prev_root_hash_1;
             b<<node_leader;
             b<<new_epoch;
+            b<<block_timestamp;
         }
         void unpack(inBuffer& b) final
         {
@@ -50,6 +55,7 @@ namespace MsgData
             b>>prev_root_hash_1;
             b>>node_leader;
             b>>new_epoch;
+            b>>block_timestamp;
         }
         static Base* construct()
         {

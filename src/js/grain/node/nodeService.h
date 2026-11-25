@@ -199,6 +199,8 @@ namespace Node
 
         struct block_leader
         {
+
+            
             THASH_id offer_hash;   // хеш оффера текущего раунда (для статуса)
 
             // REF_getter<MsgData::BlockStatusREQ> status=nullptr;
@@ -230,7 +232,7 @@ namespace Node
         /// Перевзвести tx-аларм с короткой задержкой, но не позже дедлайна раунда.
         void armBlockStartAlarm(block_leader& bt, const REF_getter<MsgData::HeartBeatREQ>& hb, double want_secs);
         /// Текущий слот от timestamp прошлого блока (-1 — часы ушли назад).
-        int64_t current_slot();
+        // int64_t current_slot();
         _db_to_save db_to_save_Z;
 
 
@@ -308,7 +310,7 @@ namespace Node
                       std::function<void(bool)> done);
         void requestNextDlSource(dl_task& t);
         std::string self_ip();
-        std::map<THASH_id/* block */, REF_getter<BlockMetaFull>> block_meta_full;
+        std::map<THASH_id/* block */,std::map<int, REF_getter<BlockMetaFull>> >block_meta_full;
         REF_getter<BlockMetaFull> getMetaFull(const THASH_id &meta_root_hash = THASH_id());
 
         THASH_id prev_root_hash_Z()
@@ -397,7 +399,7 @@ namespace Node
         /// Шаг 5: снять замок и откатить дерево к применённому состоянию.
         void unlockRoundLocal(int64_t epoch, const THASH_id& base);
         // int64_t certStakeFor(BlockMetaFull* mf, const NODE_id& n);
-        bool isCurrentLeaderMe();
+        // bool isCurrentLeaderMe();
 
         int64_t node_start_timestamp=0;
         int64_t clock_lag_us_ = 0;              // тестовый сдвиг часов ноды (мкс, со знаком)
@@ -507,10 +509,12 @@ namespace Node
         bool on_LiteSetUplinkREQ(const bcEvent::LiteSetUplinkREQ* e);
         /// Лидер текущего слота. nullptr — лидера нет:
         /// последние NO_LEADER_FRAME_MKS слота, пустой vne, либо нет prev_block.
-        REF_getter<const bc_node> current_leader();
+        // REF_getter<const bc_node> current_leader();
         // void resetBlockExpired(const NODE_id &n);
         bool on_NodeNotResponded(const bcEvent::NodeNotRespondedREQ *e);
         void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
+        void process_offer(const THASH_id & offer, const route_t &route);
+        std::map<THASH_id,REF_getter<MsgData::Base>> cache;
 
 
     };
