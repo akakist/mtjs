@@ -54,13 +54,44 @@ void Node::Service::dump_tree(Cellable* c, IDatabase* db, const char* tag, int d
     }
 }
 
+void Node::Service::apply_diffs(const THASH_id &att_hash, const route_t& route, int round, int subblock)
+{
+
+    Rollback roll;
+    auto d=cache.find(att_hash);
+    if(d==cache.end())
+        return;
+    auto att_data=dynamic_cast<MsgData::attachment_data*>(d->second.get());
+
+    for(auto& z: att_data->diffs)
+    {
+        if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
+        THASH_id h;
+        h.container=z.first;
+        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second,true);
+    }
+    _db_to_save db_local;
+    auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(root,db_local);
+
+    REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
+    bdvrs->node_validator=this_node_name;
+    bdvrs->sig34.sign(my_sk_bls,new_root_hash.container);
+    bdvrs->blockAcceptedHash=new_root_hash;
+    bdvrs->round=round;
+    bdvrs->subblock=subblock;
+
+    auto& bt=l_blocks[prev_root_hash_Z()];
+    bt.dumps[round][subblock]={new_root_hash,db_local};
+
+    cache[blake2b_hash(att_hash.container+"result")]=bdvrs.get();
+    pass_NodeMsgRSP(bdvrs.get(),route);
+
+}
 bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
-    if(sync_in_progress)
-    {
-        return true;
-    }
+
+    cache[r->att_data->getHash()]=r->att_data.get();
     // Приём BDV больше не завязан на cli.node_leader: его рассылает не только
     // исходный лидер, но и новый — после сбора 2/3-сертификата (шаг 4).
     // Подлинность проверяется ниже: aggregate-подпись 2/3 комитета за blockInfo
@@ -68,86 +99,86 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     // База блока должна совпадать с нашим root. equals сверяет хартбиты между
     // собой, а не с локальным деревом, поэтому без этой проверки диффы ложились
     // на чужую базу и root никогда не сходился.
-    if(r->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1!=prev_root_hash_Z())
-    {
-        logNode("BlockDiffValidateREQ: stale base remote %s local %s — ignore",
-                r->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str(),
-                prev_root_hash_Z().str().c_str());
-        return true;
-    }
-    if(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch != epoch_current())
-    {
-        logNode("BlockDiffValidateREQ: epoch %lld != current %lld — ignore",
-                (long long)r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
-                (long long)epoch_current());
-        return true;
-    }
+    // if(r->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1!=prev_root_hash_Z())
+    // {
+    //     logNode("BlockDiffValidateREQ: stale base remote %s local %s — ignore",
+    //             r->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str(),
+    //             prev_root_hash_Z().str().c_str());
+    //     return true;
+    // }
+    // if(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch != epoch_current())
+    // {
+    //     logNode("BlockDiffValidateREQ: epoch %lld != current %lld — ignore",
+    //             (long long)r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
+    //             (long long)epoch_current());
+    //     return true;
+    // }
     // Мы уже исполнили и подписали ровно этот блок (наш замок этой высоты).
     // Повторно применять диффы нельзя (double apply), достаточно подтвердить
     // hash BlockAcceptedREQ — это и есть недостающая diff-подпись.
-    {
-        auto it = my_signed_rsp.find(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
-        if (it != my_signed_rsp.end() && it->second.valid()
-            && it->second->blockInfo.valid() && it->second->blockInfo->heart_beat.valid()
-            && it->second->blockInfo->getHash() == r->blockAcceptedREQ->blockInfo->getHash())
-        {
-            REF_getter<MsgData::BlockDiffValidateRSP> bdvrs = new MsgData::BlockDiffValidateRSP;
-            bdvrs->node_validator = this_node_name;
-            bdvrs->sig34.sign(my_sk_bls, r->blockAcceptedREQ->blockInfo->getHash().container);
-            bdvrs->blockAcceptedHash = r->blockAcceptedREQ->getHash();
-            my_diff_rsp[r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch] = bdvrs;
-            // persistCliVote(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
-            logNode("BlockDiffValidateREQ: блок уже исполнен epoch=%lld root=%s — подпись без повторного применения",
-                    (long long)r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
-                    it->second->blockInfo->new_root_hash1.str().c_str());
-            pass_NodeMsgRSP(bdvrs.get(), route);
-            return true;
-        }
-    }
-    std::vector<blst_cpp::PublicKey> agg_pk;
-    for (auto &z : r->blockAcceptedREQ->node_validators)
-    {
-        XTRY;
-        auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(), z);
-        if(!n.valid())
-            throw CommonError("if(!n.valid()) @09");
+    // {
+    //     auto it = my_signed_rsp.find(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
+    //     if (it != my_signed_rsp.end() && it->second.valid()
+    //         && it->second->blockInfo.valid() && it->second->blockInfo->heart_beat.valid()
+    //         && it->second->blockInfo->getHash() == r->blockAcceptedREQ->blockInfo->getHash())
+    //     {
+    //         REF_getter<MsgData::BlockDiffValidateRSP> bdvrs = new MsgData::BlockDiffValidateRSP;
+    //         bdvrs->node_validator = this_node_name;
+    //         bdvrs->sig34.sign(my_sk_bls, r->blockAcceptedREQ->blockInfo->getHash().container);
+    //         bdvrs->blockAcceptedHash = r->blockAcceptedREQ->getHash();
+    //         my_diff_rsp[r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch] = bdvrs;
+    //         // persistCliVote(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
+    //         logNode("BlockDiffValidateREQ: блок уже исполнен epoch=%lld root=%s — подпись без повторного применения",
+    //                 (long long)r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
+    //                 it->second->blockInfo->new_root_hash1.str().c_str());
+    //         pass_NodeMsgRSP(bdvrs.get(), route);
+    //         return true;
+    //     }
+    // }
+    // std::vector<blst_cpp::PublicKey> agg_pk;
+    // for (auto &z : r->blockAcceptedREQ->node_validators)
+    // {
+    //     XTRY;
+    //     auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(), z);
+    //     if(!n.valid())
+    //         throw CommonError("if(!n.valid()) @09");
 
-        agg_pk.push_back(n->get_bls_pk());
-        XPASS;
-    }
+    //     agg_pk.push_back(n->get_bls_pk());
+    //     XPASS;
+    // }
 
-    {
-        MUTEX_INSPECTOR;
-        XTRY;
-        if (!r->blockAcceptedREQ->agg_sig.verify(agg_pk, r->blockAcceptedREQ->blockInfo->getHash().container))
-        {
-            logNode("block aggsig not matched");
-            return true;
-        }
-        else
-        {
-        }
-        XPASS;
-    }
+    // {
+    //     MUTEX_INSPECTOR;
+    //     XTRY;
+    //     if (!r->blockAcceptedREQ->agg_sig.verify(agg_pk, r->blockAcceptedREQ->blockInfo->getHash().container))
+    //     {
+    //         logNode("block aggsig not matched");
+    //         return true;
+    //     }
+    //     else
+    //     {
+    //     }
+    //     XPASS;
+    // }
     /// TODO: проверка стейка
     auto mf=getMetaFull();
 
-    i128 staked=i128(0);
-    for(auto &z: r->blockAcceptedREQ->node_validators)
-    {
-        staked+=mf->getPrevStake(z);
-    }
-    i128 fullstake=i128(0);
-    for(auto &z: mf->committe_members)
-    {
-        fullstake+=mf->getPrevStake(z);
-    }
-    if((staked*100)/fullstake < QUORUM)
-    {
-        logNode("failed quorum check V");
-        return true;
-    }
-
+    // i128 staked=i128(0);
+    // for(auto &z: r->blockAcceptedREQ->node_validators)
+    // {
+    //     staked+=mf->getPrevStake(z);
+    // }
+    // i128 fullstake=i128(0);
+    // for(auto &z: mf->committe_members)
+    // {
+    //     fullstake+=mf->getPrevStake(z);
+    // }
+    // if((staked*100)/fullstake < QUORUM)
+    // {
+    //     logNode("failed quorum check V");
+    //     return true;
+    // }
+#ifdef KALL
     Rollback roll;
 
     // Порог компакции ДО применения диффов: если в этом блоке он вырос,
@@ -157,22 +188,23 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         auto st0 = cells::getStateNoCreateConst(root.get(), db_state.get());
         if (st0.valid()) old_cutoff = st0->compact_before_ts;
     }
-
+#endif
     // _db_to_save db_dump;
 /// применяем диффы
-    for(auto& z: r->deleted)
-    {
-        if(z.size()!=32) throw CommonError("if(z.first.size()!=32)");
-            THASH_id h;
-            h.container=z;
-            auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h, true, &roll, r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
-            if (!cc.valid()) { logNode("deleted: cell not found %s", base16::encode(z).c_str()); continue; }
-            if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            
-            // WriteGuard gcc(cc, &roll,r->blockAcceptedREQ->blockInfo->block_timestamp,false);
-            cc->markDirty(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
-            deleteGranule(cc->data.get(),&roll,db_to_save_Z,r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
-    }
+    // for(auto& z: r->deleted)
+    // {
+    //     if(z.size()!=32) throw CommonError("if(z.first.size()!=32)");
+    //         THASH_id h;
+    //         h.container=z;
+    //         auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h, true, &roll, r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+    //         if (!cc.valid()) { logNode("deleted: cell not found %s", base16::encode(z).c_str()); continue; }
+    //         if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            
+    //         // WriteGuard gcc(cc, &roll,r->blockAcceptedREQ->blockInfo->block_timestamp,false);
+    //         cc->markDirty(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+    //         deleteGranule(cc->data.get(),&roll,db_to_save_Z,r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
+    // }
     // for(auto &z: db_dump)
+#ifdef KALL
     for(auto& z: r->diffs)
     {
         if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
@@ -181,10 +213,11 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
         auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second,true);
         // if (leaf.valid()) leaf->parent->markDirty(r->blockAcceptedREQ->blockInfo->block_timestamp);
     }
-
+#endif
 
     // Компакция: если лидер в этом блоке поднял compact_before_ts,
     // каждый валидатор физически чистит тумбстоуны у себя — иначе root не сойдётся.
+#ifdef KALL
     {
         auto st = cells::getStateNoCreateConst(root.get(), db_state.get());
         if (st.valid() && st->compact_before_ts > old_cutoff)
@@ -199,7 +232,6 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
                     (long long)st->compact_before_ts.v, (int)pruned.size());
         }
     }
-
     // Считаем root в ЛОКАЛЬНЫЙ буфер: при несовпадении нельзя оставлять
     // в общем db_to_save_Z ячейки отравленного дерева — иначе они уедут
     // в БД следующим коммитом.
@@ -250,6 +282,7 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
     }
 
     pass_NodeMsgRSP(bdvrs.get(),route);
+#endif
     return true;
 }
 static void dump_mem(const char* label, JSIRuntime* rt) {
@@ -425,7 +458,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         block_meta_full.clear();
         // Шаг 3: высота уехала — сбор сертификата за неё больше не нужен,
         // свои RSP/hb/certs старше предыдущей высоты вычищаем.
-        cert_collecting = false;
+        // cert_collecting = false;
         // pruneRoundState(epoch_current());
         tx_sent.clear();   // sent живёт до конца блока
 
@@ -563,12 +596,6 @@ void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
         for(auto & z:t.validateBlockREQ->transaction_bodies)
             tx_hashes.push_back(z->getHash());
 
-        // Единый payload: att_data несёт диффы, список tx, эмиты/награды
-        // и оффер (hb+ts+тела tx). Её хеш и есть blockInfo.att_data_hash.
-        // REF_getter<MsgData::Offer> offer = new MsgData::Offer();
-        // offer->hb = t.validateBlockREQ->heart_beat;
-        // offer->block_timestamp = t.validateBlockREQ->block_timestamp;
-        // offer->txs = r->transaction_bodies;
         t.att_data->tx_hashes = tx_hashes;
         t.att_data->diffs = diffs;
         cache[t.att_data->getHash()]=t.att_data.get();

@@ -136,7 +136,7 @@ void Node::Service::unlockRoundLocal(int64_t epoch, const THASH_id& base)
     my_diff_rsp.erase(epoch);
     erase_cli_vote(db_state.get());
     l_blocks[prev_root_hash_Z()] = block_leader{};
-    cert_resolved_epoch = -1;
+    // cert_resolved_epoch = -1;
 }
 
 bool Node::Service::UnlockRoundREQ(const MsgData::UnlockRoundREQ *r, const NODE_id &src_node, const route_t &route)

@@ -177,13 +177,6 @@ bool Node::Service::AddTxREQ(const bcEvent::AddTxREQ *e)
 
         // Прямой push лидеру по его IP (не ждём GetTxREQ: нода может
         // early-return'ить в GetTxREQ и не отдать свой пул).
-        auto mf=getMetaFull();
-        auto cl = mf->leader();
-        if (cl.name != this_node_name)
-        {
-            sendEvent(cl.ip, ServiceEnum::Node,
-                      new bcEvent::ForwardTxREQ(e->tx, route_t()));
-        }
     }
     passEvent(new bcEvent::AddTxRSP(hash, err.has_value(), err ? *err : "transaction added to pool",
                                     poppedFrontRoute(e->route)));
@@ -278,11 +271,11 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
         vb->transaction_bodies.push_back(tx);
     }
     {
-        REF_getter<MsgData::Offer> off = new MsgData::Offer();
-        off->hb = hb;
-        off->block_timestamp = vb->block_timestamp;
-        off->txs = vb->transaction_bodies;
-        bt.offer_hash = off->getHash();   // для статуса: появился -> tx не шлём
+        // REF_getter<MsgData::Offer> off = new MsgData::Offer();
+        // off->hb = hb;
+        // off->block_timestamp = vb->block_timestamp;
+        // off->txs = vb->transaction_bodies;
+        // bt.offer_hash = off->getHash();   // для статуса: появился -> tx не шлём
     }
     // relayBlockStatus(nullptr, nullptr);   // статус с offer_hash: сбор tx закрыт
     logNode("do_start_block: broadcast ValidateBlockREQ tx_count=%zu (sorted)",
@@ -396,12 +389,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         if(!hb)
         throw CommonError("if(!hb)");
 
-        if(!bt.is_GetTransactionRSP_m_quorum(hb_hash, root.get(), db_state.get()))
-        {
-            // кворума tx нет — ре-броадкаст GetTxREQ и ре-арм
-            auto mf=getMetaFull();
-            do_request_for_transactions(hb, mf);
-        }
         // кворум есть — больше не шлём; дальше только финальное окно TIMER_GetTxRSP
         return true;
     }
@@ -410,6 +397,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         // Кворум GetTx больше не нужен: тх — это мемпул, блок валидируется позже.
         // Аларм стартует от пинга (100 мс) и перевзводится на 10 мс приходом тх,
         // но не позже дедлайна раунда.
+#ifdef KALL
         if(sync_in_progress)
         {
             return true;
@@ -431,6 +419,7 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         do_start_block(hb);
         logNode("do_start_block(); (tx alarm)");
         bt.GetTxRSP_m[hb_hash].clear();
+#endif
         return true;
     }
     case TIMER_BlockDBStore:
@@ -449,16 +438,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         hd.container=e->data->container;
     // logNode("alarm hash from data %s",hd.str().c_str());
 
-        if(bt.is_BlockDiffValidateRSP_m_quorum(h,root.get(), db_state.get()))
-        {
-
-            auto mf=getMetaFull();
-            TreeNode all_tree = mf->tree_all_nodes;  // полный vne — чтобы дифф подписывали все живые по активности
-            broadcast_MsgEvent_via_broadcaster(r, all_tree);
-            bt.BlockDiffValidateRSP_m[h].clear();
-
-
-        }
         return true;
     }
     break;
@@ -469,40 +448,40 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         if(!r)
             throw CommonError("!r BlockDiffValidateREQ");
         auto mf=getMetaFull();
-        auto h=r->blockAcceptedREQ->blockInfo->getHash();
-        if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
-        {
-            // Тестовый fault-injection: лидер собрал 2/3 подписей, но не
-            // разослал BDV (имитация падения в окне достройки). Только для
-            // отладки смены раунда, в обычном режиме env не выставлен.
-            if (getenv("MTJS_TEST_FREEZE_LEADER"))
-            {
-                const char* fe = getenv("MTJS_TEST_FREEZE_EPOCH");
-                const long long fe_min = fe ? atoll(fe) : 0;
-                const long long fe_cur = r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch;
-                // замораживаем только ИСХОДНОГО лидера блока (собрал свои
-                // подписи), а не достройщика по сертификату
-                const bool is_proposer =
-                    r->blockAcceptedREQ->blockInfo->heart_beat->node_leader == this_node_name;
-                if (fe_cur >= fe_min && is_proposer)
-                {
-                    // одноразовый триггер: маркер удаляет только тот, кто
-                    // реально замораживается (иначе его съест достройщик)
-                    const char* once = "/tmp/regress/MTJS_FREEZE_ONCE";
-                    if (access(once, F_OK) == 0 && unlink(once) == 0)
-                    {
-                        logNode("TEST: freeze before BDV epoch=%lld root=%s",
-                                fe_cur, r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
-                        fflush(stdout);
-                        raise(SIGSTOP);
-                    }
-                }
-            }
-            TreeNode all_tree = mf->tree_all_nodes;  // полный vne — чтобы дифф подписывали все живые по активности
-            broadcast_MsgEvent_via_broadcaster(r, all_tree);
-            bt.ValidateBlockRSP_m[h].clear();
+        // auto h=r->blockAcceptedREQ->blockInfo->getHash();
+        // if(bt.is_ValidateBlockRSP_m_quorum(h,mf.get()))
+        // {
+        //     // Тестовый fault-injection: лидер собрал 2/3 подписей, но не
+        //     // разослал BDV (имитация падения в окне достройки). Только для
+        //     // отладки смены раунда, в обычном режиме env не выставлен.
+        //     if (getenv("MTJS_TEST_FREEZE_LEADER"))
+        //     {
+        //         const char* fe = getenv("MTJS_TEST_FREEZE_EPOCH");
+        //         const long long fe_min = fe ? atoll(fe) : 0;
+        //         const long long fe_cur = r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch;
+        //         // замораживаем только ИСХОДНОГО лидера блока (собрал свои
+        //         // подписи), а не достройщика по сертификату
+        //         const bool is_proposer =
+        //             r->blockAcceptedREQ->blockInfo->heart_beat->node_leader == this_node_name;
+        //         if (fe_cur >= fe_min && is_proposer)
+        //         {
+        //             // одноразовый триггер: маркер удаляет только тот, кто
+        //             // реально замораживается (иначе его съест достройщик)
+        //             const char* once = "/tmp/regress/MTJS_FREEZE_ONCE";
+        //             if (access(once, F_OK) == 0 && unlink(once) == 0)
+        //             {
+        //                 logNode("TEST: freeze before BDV epoch=%lld root=%s",
+        //                         fe_cur, r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
+        //                 fflush(stdout);
+        //                 raise(SIGSTOP);
+        //             }
+        //         }
+        //     }
+        //     TreeNode all_tree = mf->tree_all_nodes;  // полный vne — чтобы дифф подписывали все живые по активности
+        //     broadcast_MsgEvent_via_broadcaster(r, all_tree);
+        //     bt.ValidateBlockRSP_m[h].clear();
 
-        }
+        // }
         return true;
     }
     break;        
@@ -533,31 +512,31 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         // Шаг 3: периодический пересчёт собранных голосов + ре-броадкаст
         // запроса. Замок не снимаем и новый блок не предлагаем, пока
         // доказательств нет.
-        if (!cert_collecting) return true;
-        if (sync_in_progress)
-        {
-            logNode("cert: sync started — stop epoch=%lld", (long long)cert_collect.epoch);
-            cert_collecting = false;
-            return true;
-        }
-        if (cert_collect.epoch != epoch_current())
-        {
-            logNode("cert: epoch moved %lld -> %lld — stop",
-                    (long long)cert_collect.epoch, (long long)epoch_current());
-            cert_collecting = false;
-            return true;
-        }
-        if (getMetaFull()->leader().name!=this_node_name)
-        {
-            logNode("cert: not leader anymore — stop epoch=%lld", (long long)cert_collect.epoch);
-            cert_collecting = false;
-            return true;
-        }
-        // broadcastCertReq();
-        // finishCertCollection();
-        if (cert_collecting)
-            sendEvent(ServiceEnum::Timer,
-                      new timerEvent::ResetAlarm(ALARM_GetValidateBlockRSP, NULL, NULL, 0.5, this));
+        // if (!cert_collecting) return true;
+        // if (sync_in_progress)
+        // {
+        //     logNode("cert: sync started — stop epoch=%lld", (long long)cert_collect.epoch);
+        //     cert_collecting = false;
+        //     return true;
+        // }
+        // if (cert_collect.epoch != epoch_current())
+        // {
+        //     logNode("cert: epoch moved %lld -> %lld — stop",
+        //             (long long)cert_collect.epoch, (long long)epoch_current());
+        //     cert_collecting = false;
+        //     return true;
+        // }
+        // if (getMetaFull()->leader().name!=this_node_name)
+        // {
+        //     logNode("cert: not leader anymore — stop epoch=%lld", (long long)cert_collect.epoch);
+        //     cert_collecting = false;
+        //     return true;
+        // }
+        // // broadcastCertReq();
+        // // finishCertCollection();
+        // if (cert_collecting)
+        //     sendEvent(ServiceEnum::Timer,
+        //               new timerEvent::ResetAlarm(ALARM_GetValidateBlockRSP, NULL, NULL, 0.5, this));
         return true;
     }
 
@@ -594,8 +573,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             return NodeMsgRSP((const bcEvent::NodeMsgRSP *)e.get());
         case bcEventEnum::NodeNotRespondedREQ:
             return on_NodeNotResponded((const bcEvent::NodeNotRespondedREQ *)e.get());
-        case bcEventEnum::ForwardTxREQ:
-            return ForwardTxREQ((const bcEvent::ForwardTxREQ *)e.get());
         case bcEventEnum::GetPrevBlockREQ:
             return GetPrevBlockREQ((const bcEvent::GetPrevBlockREQ *)e.get());
         case bcEventEnum::GetPrevBlockRSP:
@@ -604,10 +581,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
             return on_GetHashedDataREQ((const bcEvent::GetHashedDataREQ *)e.get());
         case bcEventEnum::GetHashedDataRSP:
             return on_GetHashedDataRSP((const bcEvent::GetHashedDataRSP *)e.get());
-        case bcEventEnum::OfferREQ:
-            return OfferREQ((const bcEvent::OfferREQ *)e.get());
-        case bcEventEnum::OfferRSP:
-            return OfferRSP((const bcEvent::OfferRSP *)e.get());
         case timerEventEnum::TickTimer:
             return on_timer((const timerEvent::TickTimer *)e.get());
         case timerEventEnum::TickAlarm:
@@ -635,8 +608,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return ClientMsg((const bcEvent::ClientMsg *)ev->e.get());
             case bcEventEnum::AddTxREQ:
                 return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(ev->e.get()));
-            case bcEventEnum::ForwardTxREQ:
-                return ForwardTxREQ(static_cast<const bcEvent::ForwardTxREQ *>(ev->e.get()));
             case bcEventEnum::GetPrevBlockREQ:
                 return GetPrevBlockREQ(static_cast<const bcEvent::GetPrevBlockREQ *>(ev->e.get()));
             case bcEventEnum::GetPrevBlockRSP:
@@ -645,10 +616,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return on_GetHashedDataREQ(static_cast<const bcEvent::GetHashedDataREQ *>(ev->e.get()));
             case bcEventEnum::GetHashedDataRSP:
                 return on_GetHashedDataRSP(static_cast<const bcEvent::GetHashedDataRSP *>(ev->e.get()));
-            case bcEventEnum::OfferREQ:
-                return OfferREQ(static_cast<const bcEvent::OfferREQ *>(ev->e.get()));
-            case bcEventEnum::OfferRSP:
-                return OfferRSP(static_cast<const bcEvent::OfferRSP *>(ev->e.get()));
 
             case bcEventEnum::syncGetGranulesREQ:
                 return syncGetGranulesREQ((const bcEvent::syncGetGranulesREQ *)ev->e.get());
@@ -674,8 +641,6 @@ bool Node::Service::handleEvent(const REF_getter<Event::Base> &e)
                 return ClientMsg((const bcEvent::ClientMsg *)ev->e.get());
             case bcEventEnum::AddTxREQ:
                 return AddTxREQ(static_cast<const bcEvent::AddTxREQ *>(ev->e.get()));
-            case bcEventEnum::ForwardTxREQ:
-                return ForwardTxREQ(static_cast<const bcEvent::ForwardTxREQ *>(ev->e.get()));
             case bcEventEnum::GetPrevBlockREQ:
                 return GetPrevBlockREQ(static_cast<const bcEvent::GetPrevBlockREQ *>(ev->e.get()));
             case bcEventEnum::GetPrevBlockRSP:
@@ -1043,8 +1008,8 @@ void Node::Service::do_request_for_transactions(MsgData::HeartBeatREQ* hb, const
 
     // GetTx только к живым (после стадии пинга bt.alive собран)
     auto &bt = l_blocks[prev_root_hash_Z()];
-    TreeNode tx_tree = filter_tree(meta->vne, bt.alive);
-    broadcast_MsgEvent_via_broadcaster(rt.get(), tx_tree);
+    // TreeNode tx_tree = filter_tree(meta->vne, bt.alive);
+    broadcast_MsgEvent_via_broadcaster(rt.get(), meta->tree_all_nodes);
 }
 
 THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
@@ -1274,43 +1239,7 @@ bool Node::Service::verify_block_all(const REF_getter<MsgData::BlockAccepted2REQ
     return true;
 }
 
-bool Node::Service::ForwardTxREQ(const bcEvent::ForwardTxREQ *e)
-{
-    MUTEX_INSPECTOR;
-    auto h=e->tx->getHash();
-    transaction_pool_of_leader.insert_or_assign(h,e->tx);
-    // пришла тх — продлеваем коротким алармом (в пределах дедлайна раунда)
-    auto &bt = l_blocks[prev_root_hash_Z()];
-    if (bt.ping_sent && bt.my_hb.valid())
-    {
-        if (transaction_pool_of_leader.size() >= (size_t)MAX_TXS_PER_BLOCK)
-            armBlockStartAlarm(bt, bt.my_hb, 0.0);       // лимит — оффер сразу
-        else
-            armBlockStartAlarm(bt, bt.my_hb, (double)TX_SHORT_TIMEOUT_MKS / 1000000.0);
-    }
-    return true;
-}
 
-void Node::Service::armBlockStartAlarm(block_leader& bt, const REF_getter<MsgData::HeartBeatREQ>& hb, double want_secs)
-{
-    MUTEX_INSPECTOR;
-    if (!hb.valid() || bt.block_started) return;
-    const int64_t now = getNow().v;
-    if (bt.tx_deadline_mks <= 0)
-        bt.tx_deadline_mks = now + 500000;
-    int64_t delay = (int64_t)(want_secs * 1000000.0);
-    if (now + delay > bt.tx_deadline_mks)
-        delay = bt.tx_deadline_mks - now;
-    if (delay < 0) delay = 0;
-    if (getenv("MTJS_TX_ALARM_TRACE"))
-        logNode("[txalarm] arm want=%.3f delay=%.4f started=%d hb_epoch=%lld now=%lld deadline=%lld",
-                want_secs, (double)delay / 1000000.0, (int)bt.block_started,
-                (long long)hb->new_epoch, (long long)now, (long long)bt.tx_deadline_mks);
-    sendEvent(ServiceEnum::Timer,
-              new timerEvent::ResetAlarm(timers::ALARM_START_BLOCK,
-                                         toRef(hb->getHash().container), hb.get(),
-                                         (double)delay / 1000000.0, this));
-}
 
 
 bool Node::Service::GetPrevBlockREQ(const bcEvent::GetPrevBlockREQ *e)
@@ -1563,37 +1492,16 @@ void Node::Service::broadcastCurrentBlockStatus()
 {
 
     auto & bt=l_blocks[prev_root_hash_Z()];
-    if(!bt.block_status.valid())
-        bt.block_status=new MsgData::BlockStatusREQ();
-    // const int64_t ep = epoch_current();
-    // auto it = block_status.find(ep);
-    // if (it == block_status.end() || !it->second.valid()) return;
     auto mf=getMetaFull();
-    // REF_getter<BlockMetaFull> mf;
-    // try { mf = getMetaFull(); } catch (...) { return; }
-    // if (!mf.valid()) return;
+    if(mf->leader().name!=this_node_name)
+        return;
+    if(!bt.block_status.valid())
+    {
+        bt.block_status=new MsgData::BlockStatusREQ();
+        bt.block_status->hb=new MsgData::HeartBeatREQ(prev_root_hash_Z(),epoch_current(),this_node_name,iUtils->getNow());
+    }
     logNode("[blockstatus] periodic relay") ;
     broadcast_MsgEvent_via_broadcaster(bt.block_status.get(), mf->tree_all_nodes);
-}
-bool Node::Service::OfferREQ(const bcEvent::OfferREQ *e)
-{
-    MUTEX_INSPECTOR;
-    // TODO: кеш офферов по хешу; пока not found.
-    REF_getter<MsgData::Offer> off = new MsgData::Offer();
-    logNode("[offer] REQ hash=%s -> not found", e->offer_hash.str().c_str());
-    sendEvent(e->reply_to, ServiceEnum::Node,
-              new bcEvent::OfferRSP(e->offer_hash, false, off, route_t()));
-    return true;
-}
-
-bool Node::Service::OfferRSP(const bcEvent::OfferRSP *e)
-{
-    MUTEX_INSPECTOR;
-    logNode("[offer] RSP hash=%s found=%d txs=%zu",
-            e->offer_hash.str().c_str(), (int)e->found,
-            e->offer.valid() ? e->offer->txs.size() : (size_t)0);
-    // TODO: если найден — использовать оффер (исполнить/включить в att_data).
-    return true;
 }
 
 void print_exception(JSIContext* ctx);
@@ -2116,68 +2024,6 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
     return m;
 }
 
-bool Node::Service::block_leader::is_ValidateBlockRSP_m_quorum(const THASH_id& h,  BlockMetaFull* mf)
-{
-    i128 stakeVal = i128(0);
-    for (auto &z : ValidateBlockRSP_m[h])
-    {
-        stakeVal += mf->getPrevStake(z->node_validator);;
-    }
-    i128 fullstake=i128(0);
-    for(auto &z: mf->committe_members)
-    {
-        fullstake += mf->getPrevStake(z);
-
-    }
-
-    if ((stakeVal * 100) / fullstake > QUORUM )
-        return true;
-    return false;
-
-}
-bool Node::Service::block_leader::is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable*r, IDatabase* db)
-{
-    i128 fullstakeVal = i128(0);
-    auto ls=cells::getAllNodesConst(r, db);
-    for (auto &z : ls)
-    {
-        if(z->isEnabled())
-            fullstakeVal += z->get_full_stake();
-    }
-    i128 stakeVal = i128(0);
-    auto &mm=GetTxRSP_m[h];
-    for (auto &z : mm)
-    {
-        auto n=cells::getNodeNoCreateConst(r, db,z.first);
-        if(!n.valid())
-            throw CommonError("if(!n.valid()) $555");
-        stakeVal += n->get_full_stake();
-    }
-    if ((stakeVal * 100) / fullstakeVal > QUORUM )
-        return true;
-    return false;
-}
-bool Node::Service::block_leader::is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable*r, IDatabase* db)
-{
-    i128 fullstakeVal = i128(0);
-    auto ls=cells::getAllNodesConst(r, db);
-    for (auto &z : ls)
-    {
-        if(z->isEnabled())
-            fullstakeVal += z->get_full_stake();
-    }
-    i128 stakeVal = i128(0);
-    for (auto &z : BlockDiffValidateRSP_m[h])
-    {
-        auto n=cells::getNodeNoCreateConst(r, db,z->node_validator);
-        if(!n.valid())
-            throw CommonError("if(!n.valid()) $555");
-        stakeVal += n->get_full_stake();
-    }
-    if ((stakeVal * 100) / fullstakeVal > QUORUM )
-        return true;
-    return false;
-}
 
 void Node::Service::logNode(const char *fmt, ...)
 {

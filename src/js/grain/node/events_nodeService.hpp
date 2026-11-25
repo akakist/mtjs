@@ -27,7 +27,6 @@ inline std::set<EVENT_id> getEvents_nodeService()
 	out.insert(bcEventEnum::BroadcastMessage);
 	out.insert(bcEventEnum::ClientMsg);
 	out.insert(bcEventEnum::ClientMsgReply);
-	out.insert(bcEventEnum::ForwardTxREQ);
 	out.insert(bcEventEnum::GetHashedDataREQ);
 	out.insert(bcEventEnum::GetHashedDataRSP);
 	out.insert(bcEventEnum::GetPrevBlockREQ);
@@ -36,8 +35,6 @@ inline std::set<EVENT_id> getEvents_nodeService()
 	out.insert(bcEventEnum::NodeMsgREQ);
 	out.insert(bcEventEnum::NodeMsgRSP);
 	out.insert(bcEventEnum::NodeNotRespondedREQ);
-	out.insert(bcEventEnum::OfferREQ);
-	out.insert(bcEventEnum::OfferRSP);
 	out.insert(bcEventEnum::ServiceInit);
 	out.insert(bcEventEnum::StreamBlock);
 	out.insert(bcEventEnum::syncGetGranulesREQ);
@@ -69,7 +66,6 @@ inline void regEvents_nodeService()
 	iUtils->registerEvent(bcEvent::BroadcastMessage::construct);
 	iUtils->registerEvent(bcEvent::ClientMsg::construct);
 	iUtils->registerEvent(bcEvent::ClientMsgReply::construct);
-	iUtils->registerEvent(bcEvent::ForwardTxREQ::construct);
 	iUtils->registerEvent(bcEvent::GetHashedDataREQ::construct);
 	iUtils->registerEvent(bcEvent::GetHashedDataRSP::construct);
 	iUtils->registerEvent(bcEvent::GetPrevBlockREQ::construct);
@@ -78,8 +74,6 @@ inline void regEvents_nodeService()
 	iUtils->registerEvent(bcEvent::NodeMsgREQ::construct);
 	iUtils->registerEvent(bcEvent::NodeMsgRSP::construct);
 	iUtils->registerEvent(bcEvent::NodeNotRespondedREQ::construct);
-	iUtils->registerEvent(bcEvent::OfferREQ::construct);
-	iUtils->registerEvent(bcEvent::OfferRSP::construct);
 	iUtils->registerEvent(bcEvent::ServiceInit::construct);
 	iUtils->registerEvent(bcEvent::StreamBlock::construct);
 	iUtils->registerEvent(bcEvent::syncGetGranulesREQ::construct);

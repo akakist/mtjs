@@ -157,31 +157,28 @@ namespace MsgData
         // Ключ — hash(blockInfo); пороги (комитет 2/3, сеть 2/3) считаются по нему.
         // std::map<THASH_id, REF_getter<BlockAcceptedREQ>> accepted;
 
-        TIME_mks block_timestamp;
         REF_getter<MsgData::HeartBeatREQ> hb;
         std::map<int,Round> rounds;
 
         void update(Blake2bHasher& h) const
         {
-            h.update(block_timestamp.str());
             for(auto& z: rounds)
             {
                 z.second.update(h);
             }
             hb->update(h);
-            h.update(block_timestamp.str());
         }
         void pack(outBuffer& b) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(b);
-            b<<block_timestamp<<hb<<rounds;
+            b<<hb<<rounds;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
-            b>>block_timestamp>>hb>>rounds;
+            b>>hb>>rounds;
         }
     };
 }

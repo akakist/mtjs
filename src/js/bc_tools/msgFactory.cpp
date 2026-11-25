@@ -93,6 +93,5 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::GetNodesREQ, MsgData::GetNodesREQ::construct);
     registerMsg(msgid::GetNodesRSP, MsgData::GetNodesRSP::construct);
     registerMsg(msgid::UnlockRoundREQ, MsgData::UnlockRoundREQ::construct);
-    registerMsg(msgid::Offer, MsgData::Offer::construct);
     registerMsg(msgid::BlockStatusREQ, MsgData::BlockStatusREQ::construct);
 }

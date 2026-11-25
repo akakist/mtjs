@@ -67,7 +67,6 @@ const char *msgName(int id)
     case msgid::GetGranuleREQ: return "GetGranuleREQ";
     case msgid::GetGranuleRSP: return "GetGranuleRSP";    
     case msgid::UnlockRoundREQ: return "UnlockRoundREQ";
-    case msgid::Offer: return "Offer";
     case msgid::BlockStatusREQ: return "BlockStatusREQ";
     default:
         return "unknown";

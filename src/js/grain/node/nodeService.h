@@ -139,25 +139,14 @@ namespace Node
         bool ClientMsg(const bcEvent::ClientMsg *e);
 
         bool RequestIncoming(const httpEvent::RequestIncoming* e);
-        bool ForwardTxREQ(const bcEvent::ForwardTxREQ* e);
         bool GetPrevBlockREQ(const bcEvent::GetPrevBlockREQ* e);
         bool on_GetHashedDataREQ(const bcEvent::GetHashedDataREQ* e);
         bool on_GetHashedDataRSP(const bcEvent::GetHashedDataRSP* e);
         bool BlockStatusREQ(const MsgData::BlockStatusREQ* e, const NODE_id& src_node, const route_t& route);
-        /// Ретрансляция статуса сети (block/diff cert) — лидер не решает, а рассылает.
-        // void relayBlockStatus(const REF_getter<MsgData::BlockAcceptedREQ>& block_cert,
-        //                       const REF_getter<MsgData::BlockAccepted2REQ>& diff_cert);
-        bool OfferREQ(const bcEvent::OfferREQ* e);
-        bool OfferRSP(const bcEvent::OfferRSP* e);
         bool GetPrevBlockRSP(const bcEvent::GetPrevBlockRSP* e);
 
 
-        // bool HeartBeatRSP(const MsgData::HeartBeatRSP* r, const NODE_id & src_node, const route_t& route);;
-        
-        // bool GetTxREQ(const MsgData::GetTxREQ* r, const NODE_id & src_node, const route_t& route);
         bool GetTxRSP(const MsgData::GetTxRSP* r, const NODE_id & src_node, const route_t& route);
-        // bool PingREQ(const MsgData::PingREQ* r, const NODE_id & src_node, const route_t& route);
-        // bool PingRSP(const MsgData::PingRSP* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockREQ(const MsgData::ValidateBlockREQ* r, const NODE_id & src_node, const route_t& route);
         bool ValidateBlockRSP(const MsgData::ValidateBlockRSP* r, const NODE_id & src_node, const route_t& route);
         bool BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route);
@@ -169,12 +158,8 @@ namespace Node
         // шаг 3: запрос/ответ сертификата 2/3 за высоту
         
         ///? Зачем нужен GetValidateBlockRSPREQ, GetValidateBlockRSPRSP
-        // bool GetValidateBlockRSPREQ(const MsgData::GetValidateBlockRSPREQ* r, const NODE_id & src_node, const route_t& route);
-        // bool GetValidateBlockRSPRSP(const MsgData::GetValidateBlockRSPRSP* r, const NODE_id & src_node, const route_t& route);
         bool UnlockRoundREQ(const MsgData::UnlockRoundREQ* r, const NODE_id & src_node, const route_t& route);
 
-        // bool ConfirmLeaderREQ(const MsgData::ConfirmLeaderREQ* m, const NODE_id & src_node, const route_t& route);
-        // bool ConfirmLeaderRSP(const MsgData::ConfirmLeaderRSP* m, const NODE_id & src_node, const route_t& route);
 
 
 
@@ -200,33 +185,30 @@ namespace Node
         struct block_leader
         {
 
-            
-            THASH_id offer_hash;   // хеш оффера текущего раунда (для статуса)
+            std::map<int/* round */, std::map<int /*subblock*/, std::pair<THASH_id, _db_to_save>>> dumps;           
+            // THASH_id offer_hash;   // хеш оффера текущего раунда (для статуса)
 
-            // REF_getter<MsgData::BlockStatusREQ> status=nullptr;
-            REF_getter<MsgData::ValidateBlockREQ> offer=nullptr;
+            // REF_getter<MsgData::ValidateBlockREQ> offer=nullptr;
             REF_getter<MsgData::BlockStatusREQ> block_status = nullptr;
             std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTxRSP> > >GetTxRSP_m; /// для подсчета ответивших нод
-            bool is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* mf);
-            // std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::PingRSP> > >PingRSP_m;
-            // bool is_PingRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db);
-
+            // bool is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* mf);
+        
 
             std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
-            bool is_ValidateBlockRSP_m_quorum(const THASH_id& h, BlockMetaFull* mf);
+            // bool is_ValidateBlockRSP_m_quorum(const THASH_id& h, BlockMetaFull* mf);
 
             std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
-            bool is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db);
+            // bool is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db);
 
             std::map<THASH_id, REF_getter<MsgData::BlockDiffValidateREQ> > blockDiffValidateREQ_2;
-            std::set<NODE_id> alive;   // ответившие на GetTxREQ (живой сет) — фильтр рассылки блока
-            bool ping_sent = false;   // пинг высылается один раз на блок
-            bool ping_done = false;   // пинг-стадия завершена (alive финализирован)
+            // std::set<NODE_id> alive;   // ответившие на GetTxREQ (живой сет) — фильтр рассылки блока
+            // bool ping_sent = false;   // пинг высылается один раз на блок
+            // bool ping_done = false;   // пинг-стадия завершена (alive финализирован)
             // tx-сбор: аларм старта блока не зависит от кворумов.
             REF_getter<MsgData::HeartBeatREQ> my_hb;  // hb текущего раунда
-            bool block_started = false;               // do_start_block уже вызван
-            int64_t tx_deadline_mks = 0;              // кап на продление tx-аларма
-            int64_t leader_slot = -1;                 // слот, в котором мы лидер (попытка)
+            // bool block_started = false;               // do_start_block уже вызван
+            // int64_t tx_deadline_mks = 0;              // кап на продление tx-аларма
+            // int64_t leader_slot = -1;                 // слот, в котором мы лидер (попытка)
 
         };
         /// Перевзвести tx-аларм с короткой задержкой, но не позже дедлайна раунда.
@@ -278,8 +260,7 @@ namespace Node
         // ── кеш данных (data plane): hash -> REF<MsgData::Base> ──────────
         // Диффы, att_data, список tx: контентно-адресуемы хешами из blockInfo.
         std::map<THASH_id, std::pair<int64_t,REF_getter <MsgData::Base>> > data_cache;
-        // std::map<THASH_id, int64_t> data_cache_created;
-
+        
         // задача «получить данные по хешам»; финалайз вызывается там же,
         // где пришёл последний ответ (или по таймауту).
         struct dl_task
@@ -344,38 +325,7 @@ namespace Node
         // подписан блок, даже если мы сами ValidateBlockREQ не получали.
         std::map<int64_t, REF_getter<MsgData::HeartBeatREQ>> seen_hb;
 
-        struct cert_collection
-        {
-            int64_t epoch = 0;
-            THASH_id base_root;
-            // одна нода — один голос; root берётся из её RSP
-            std::map<NODE_id, REF_getter<MsgData::ValidateBlockRSP>> votes;
-            int64_t started_mks = 0;
-            int64_t last_broadcast_mks = 0;
-        };
-        bool cert_collecting = false;
-        cert_collection cert_collect;
-        // Шаг 4: alive-сет для достройки. У нового лидера нет чужих PingRSP,
-        // поэтому он перепингывает hb достраиваемого блока и собирает их сюда
-        // (отдельно от bt.PingRSP_m, чтобы не запускать штатный GetTx).
-        REF_getter<MsgData::HeartBeatREQ> cert_alive_hb;
-        // std::map<THASH_id, std::map<NODE_id, REF_getter<MsgData::PingRSP>>> cert_alive;
-        // тестовый инжект раскола: какие высоты этот узел «пропустил» (первый блок)
-        std::set<int64_t> test_skipped_epochs;
-        // Высота, по которой сбор уже завершён (COMPLETE/SPLIT): повторно
-        // его не запускаем, иначе ALARM_Ping пересобирал бы сертификат вечно.
-        int64_t cert_resolved_epoch = -1;
-
-        struct cert_entry
-        {
-            int64_t epoch = 0;
-            THASH_id root;
-            int64_t stake = 0;
-            // детерминированный порядок — сортировка по NODE_id
-            std::vector<REF_getter<MsgData::ValidateBlockRSP>> rsps;
-        };
-        std::map<THASH_id, cert_entry> certs;
-
+        
         void unlockRoundLocal(int64_t epoch, const THASH_id& base);
 
         int64_t node_start_timestamp=0;
@@ -493,6 +443,7 @@ namespace Node
         void process_offer(const THASH_id & offer, const route_t &route);
         std::map<THASH_id,REF_getter<MsgData::Base>> cache;
 
+        void apply_diffs(const THASH_id &att_hash, const route_t& route, int round, int subblock);
 
     };
 

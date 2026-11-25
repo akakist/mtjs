@@ -93,7 +93,7 @@ namespace msgid
         GetNodesREQ=41, GetNodesRSP=42,
         // GetValidateBlockRSPREQ=43, GetValidateBlockRSPRSP=44,
         UnlockRoundREQ=45,
-        Offer=46,
+        // Offer=46,
         BlockStatusREQ=47,
     };
 
