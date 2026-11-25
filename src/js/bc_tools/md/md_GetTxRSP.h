@@ -5,7 +5,7 @@
 
 namespace MsgData
 {
-    struct GetTxRSP: public Base, public rsp_status
+    struct GetTxRSP: public Base
     {
 
         static Base* construct()
@@ -14,20 +14,16 @@ namespace MsgData
         }
         GetTxRSP():Base(msgid::GetTxRSP)
         {
-            setError(msgcode::NOT_FOUND, "not found");
-        }
-        GetTxRSP(inBuffer &in):Base(msgid::GetTxRSP)
-        {
-            unpack(in);
         }
 
         std::vector<REF_getter<MsgData::TX>>  trs;
-        REF_getter<MsgData::HeartBeatREQ> hb;
         void update(Blake2bHasher& h) const
         {
             for(auto& z:trs )
+            {
                 h.update(z->tx_body);
-            hb->update(h);
+
+            }
         }
 
         void pack(outBuffer& b) const final
@@ -36,14 +32,12 @@ namespace MsgData
 
             Base::pack(b);
             b<<trs;
-            b<< hb;
         }
         void unpack(inBuffer& b) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>trs;
-            b>> hb;
         }
 
     };

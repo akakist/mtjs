@@ -17,32 +17,15 @@ bool Node::Service::GetTxRSP(const MsgData::GetTxRSP *r, const NODE_id &src_node
 {
     XTRY;
     MUTEX_INSPECTOR;
-    if(sync_in_progress)
-    {
-        logNode("GetTransactionRSP skipped: sync in progress");
-        return true;
-    }
 
 
     for (auto &z : r->trs)
     {
         THASH_id h = z->getHash();
+        logNode("transaction_pool_of_leader.insert({h, z});");
         transaction_pool_of_leader.insert({h, z});
     }
-    auto &bt = l_blocks[prev_root_hash_Z()];
-    auto h=r->hb->getHash();
-    bt.GetTxRSP_m[h].insert_or_assign(src_node,r);
-    auto mf=getMetaFull();
-
-
-    // Кворум GetTx больше не нужен: тх просто добавляются в пул лидера.
-    // Дошли до лимита — оффер сразу; иначе короткое окно «дожать» поток.
-
-    sendEvent(ServiceEnum::Timer,
-            new timerEvent::ResetAlarm(timers::ALARM_START_BLOCK,
-                                        toRef(r->hb->getHash().container), r->hb.get(),
-                                        0.1, this));
-
+    
     XPASS;
     return true;
 }

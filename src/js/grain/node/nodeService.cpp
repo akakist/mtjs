@@ -92,7 +92,7 @@ bool Node::Service::on_startService(const systemEvent::startService *)
         for (auto& z : http_granule_addr_)
             sendEvent(ServiceEnum::HTTP, new httpEvent::DoListen(z, sec, this));
         sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(TIMER_STALE_CLEANUP, NULL, NULL, 60., this));
-        sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(TIMER_BLOCK_STATUS, NULL, NULL, 0.2, this));
+        sendEvent(ServiceEnum::Timer, new timerEvent::SetTimer(TIMER_BLOCK_STATUS, NULL, NULL, 0.5, this));
         prev_block=load_last_block(db_state.get());
         block_lock=load_signed_block(db_state.get());   // legacy-ключ
         // loadCliVote();                                   // голоса cli (приоритетнее)
@@ -313,9 +313,12 @@ void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
-    if (e->tid == TIMER_BLOCK_STATUS) {
+    if (e->tid == TIMER_BLOCK_STATUS) 
+    {
         if(getMetaFull()->leader().name==this_node_name)
+        {
             broadcastCurrentBlockStatus();
+        }
         return true;
     }
     if (e->tid == TIMER_STALE_CLEANUP) {
@@ -346,13 +349,13 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 
         }
         // auto me=cells::getNodeNoCreateConst(root.get(),db_state.get(),this_node_name);
-        auto mf=getMetaFull();
-        auto cl=mf->leader();
-        if(cl.name==this_node_name)
-        {
-            sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(ALARM_Ping,NULL,NULL,0.02,this));
+        // auto mf=getMetaFull();
+        // auto cl=mf->leader();
+        // if(cl.name==this_node_name)
+        // {
+        //     sendEvent(ServiceEnum::Timer, new timerEvent::ResetAlarm(ALARM_Ping,NULL,NULL,0.02,this));
 
-        }
+        // }
         return true;
     }
     if(e->tid==timers::TIMER_REPORT_MEM)
@@ -1460,9 +1463,10 @@ bool Node::Service::on_GetHashedDataRSP(const bcEvent::GetHashedDataRSP *r)
 bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_id& src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
-    (void)src_node; (void)route;
+    // (void)src_node; (void)route;
     // Всё выводим из сертов: высота/база не нужны отдельными полями.
     THASH_id base_root = prev_root_hash_Z();
+    auto & bt=l_blocks[base_root];
     int64_t epoch = epoch_current();
 
     if (!sync_in_progress && e->hb.valid() && e->hb->prev_root_hash_1 != prev_root_hash_Z())
@@ -1478,11 +1482,20 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
         l_blocks[prev_root_hash_Z()].block_status=e;
     }
     auto mf=getMetaFull();
-    /// verify_sinle sign
-    
+    REF_getter<MsgData::GetTxRSP> r=new MsgData::GetTxRSP();
+    for(auto& z: transaction_pool_of_leader)
+    {
+        if(!bt.sent_tx.count(z.first))
+        {
+            r->trs.push_back(z.second);
+            bt.sent_tx.insert(z.first);
+        }
 
-
-
+    }
+    if(r->trs.size())
+    {
+        pass_NodeMsgRSP(r.get(),route);
+    }
 
     return true;
 }

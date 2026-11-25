@@ -85,11 +85,11 @@ namespace Node
 
     enum timers
     {
-        TIMER_PERIODIC_CLOCK,
-        ALARM_START_BLOCK,
-        ALARM_do_request_for_tx,
-        TIMER_GetTxREQ,
-        ALARM_Ping,
+        TIMER_PERIODIC_CLOCK = 0 ,
+        ALARM_START_BLOCK = 1,
+        ALARM_do_request_for_tx  = 2,
+        TIMER_GetTxREQ = 3,
+        ALARM_Ping  = 4,
         // TIMER_GetTxFromLeader,
         ALARM_SYNC_WATCHDOG,
         TIMER_REPORT_MEM,
@@ -185,34 +185,35 @@ namespace Node
         struct block_leader
         {
 
+            std::set<THASH_id> sent_tx;
             std::map<int/* round */, std::map<int /*subblock*/, std::pair<THASH_id, _db_to_save>>> dumps;           
             // THASH_id offer_hash;   // хеш оффера текущего раунда (для статуса)
 
             // REF_getter<MsgData::ValidateBlockREQ> offer=nullptr;
             REF_getter<MsgData::BlockStatusREQ> block_status = nullptr;
-            std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTxRSP> > >GetTxRSP_m; /// для подсчета ответивших нод
+            // std::map<THASH_id /*hb hash*/, std::map<NODE_id,REF_getter<MsgData::GetTxRSP> > >GetTxRSP_m; /// для подсчета ответивших нод
             // bool is_GetTransactionRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* mf);
         
 
-            std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
+            // std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::ValidateBlockRSP> > >ValidateBlockRSP_m;
             // bool is_ValidateBlockRSP_m_quorum(const THASH_id& h, BlockMetaFull* mf);
 
-            std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
+            // std::map<THASH_id /*hb hash*/, std::vector<REF_getter<MsgData::BlockDiffValidateRSP> > >BlockDiffValidateRSP_m;
             // bool is_BlockDiffValidateRSP_m_quorum(const THASH_id& h, Cellable* r, IDatabase* db);
 
-            std::map<THASH_id, REF_getter<MsgData::BlockDiffValidateREQ> > blockDiffValidateREQ_2;
+            // std::map<THASH_id, REF_getter<MsgData::BlockDiffValidateREQ> > blockDiffValidateREQ_2;
             // std::set<NODE_id> alive;   // ответившие на GetTxREQ (живой сет) — фильтр рассылки блока
             // bool ping_sent = false;   // пинг высылается один раз на блок
             // bool ping_done = false;   // пинг-стадия завершена (alive финализирован)
             // tx-сбор: аларм старта блока не зависит от кворумов.
-            REF_getter<MsgData::HeartBeatREQ> my_hb;  // hb текущего раунда
+            // REF_getter<MsgData::HeartBeatREQ> my_hb;  // hb текущего раунда
             // bool block_started = false;               // do_start_block уже вызван
             // int64_t tx_deadline_mks = 0;              // кап на продление tx-аларма
             // int64_t leader_slot = -1;                 // слот, в котором мы лидер (попытка)
 
         };
         /// Перевзвести tx-аларм с короткой задержкой, но не позже дедлайна раунда.
-        void armBlockStartAlarm(block_leader& bt, const REF_getter<MsgData::HeartBeatREQ>& hb, double want_secs);
+        // void armBlockStartAlarm(block_leader& bt, const REF_getter<MsgData::HeartBeatREQ>& hb, double want_secs);
         /// Текущий слот от timestamp прошлого блока (-1 — часы ушли назад).
         // int64_t current_slot();
         _db_to_save db_to_save_Z;
@@ -442,6 +443,7 @@ namespace Node
         void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
         void process_offer(const THASH_id & offer, const route_t &route);
         std::map<THASH_id,REF_getter<MsgData::Base>> cache;
+        
 
         void apply_diffs(const THASH_id &att_hash, const route_t& route, int round, int subblock);
 
