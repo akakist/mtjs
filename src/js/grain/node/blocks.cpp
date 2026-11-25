@@ -132,8 +132,5 @@ SB_result verify_subblock(const  SubBlock &b, const REF_getter<BlockMetaFull>& m
             r.non_committe_quorum_hash=z.first;
         }
     }
-    
-
-
-    return r;
+     return r;
 }
