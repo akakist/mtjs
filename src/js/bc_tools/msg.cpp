@@ -68,6 +68,9 @@ const char *msgName(int id)
     case msgid::GetGranuleRSP: return "GetGranuleRSP";    
     case msgid::UnlockRoundREQ: return "UnlockRoundREQ";
     case msgid::BlockStatusREQ: return "BlockStatusREQ";
+    case msgid::SubBlock: return "SubBlock";
+    case msgid::Round: return "Round";
+    case msgid::SlashCmd: return "SlashCmd";
     default:
         return "unknown";
     }

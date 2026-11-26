@@ -12,6 +12,7 @@
 #include "md_ValidateBlockRSP.h"
 #include "ioBuffer.h"
 #include "nodeService.h"
+#include "blocks.h"
 #include "route_t.h"
 #include "s_ed.h"
 #include "t_params.h"
@@ -21,116 +22,131 @@
 #include "proceed_merkle_on_transaction_pool_hashers.h"
 #include <vector>
 
-enum ERR_BS
+namespace
 {
-    no_err,
-    twice_signed,
-    corrupt,
-};
-enum stage_BS
+/// стейк ноды из меты; false — ноды нет в enabled-составе
+bool subblock_take_stake(const REF_getter<BlockMetaFull>& mf, const NODE_id& n, i128& stake)
 {
-    allow_send_tx =  1<<0,
-    allow_validate_committe = 1<<2,
-};
+    auto it=mf->prev_stakes.find(n);
+    if(it==mf->prev_stakes.end())
+        return false;
+    stake=it->second;
+    return true;
+}
+}
 
-SB_result verify_subblock(const  SubBlock &b, const REF_getter<BlockMetaFull>& mf, Node::Service* ns)
+SB_result verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
+                               const REF_getter<MsgData::HeartBeatREQ>& hb,
+                               const REF_getter<BlockMetaFull>& mf,
+                               Node::Service* ns)
 {
     SB_result r;
 
-    std::map<NODE_id, int> sigs_cnt;
-    for(auto & ih: b.accepted_by_committe)
+    auto log=[&](const char* what, const std::string& detail)
     {
-        for(auto& z: ih.second->node_validators)
-        {
-            sigs_cnt[z]++;
-        }
-    }
-    for(auto &z: sigs_cnt)
+        if(ns)
+            ns->logNode("verify_subblock_sigs: %s [%s] offer=%s",
+                        what, detail.c_str(), b->offer_hash.str().c_str());
+    };
+    auto corrupt=[&](const char* what, const std::string& detail)
     {
-        if(z.second>1)
-        {
-            ns->logNode("twice signed");
-            r.corrupt=true;
-            return r;
-        }
-    }
-    /// verify_sigs
-    for(auto & ih: b.accepted_by_committe)
+        log(what, detail);
+        r.corrupt=true;
+        return r;
+    };
+
+    if(!mf.valid())
+        return corrupt("no meta", "");
+
+    /// подписант не должен встречаться дважды ни внутри группы, ни между группами
+    std::map<NODE_id,int> signed_cnt;
+
+    /// ── подписи комитета ────────────────────────────────────────────────
+    for(auto& ih: b->accepted_by_committe)
     {
-        if(ih.second->blockInfo->getHash()!=ih.first)
-        {
-            ns->logNode("if(ih.second->blockInfo->getHash()!=ih.first) - broken BlockStatusREQ");
-            r.corrupt=true;
-            return r;
-        }
-        
+        const THASH_id& h=ih.first;
+        auto acc=ih.second;
+        if(!acc.valid() || !acc->blockInfo.valid())
+            return corrupt("committee: empty BlockAcceptedREQ", h.str());
+        if(acc->blockInfo->getHash()!=h)
+            return corrupt("committee: key != hash(BlockInfo)", h.str());
+        if(!acc->blockInfo->offer_hash.container.empty() && acc->blockInfo->offer_hash!=b->offer_hash)
+            return corrupt("committee: offer_hash mismatch", h.str());
+        if(hb.valid() && acc->blockInfo->heart_beat.valid() && !acc->blockInfo->heart_beat->equals(hb))
+            return corrupt("committee: heart_beat mismatch", h.str());
+        if(acc->node_validators.empty())
+            return corrupt("committee: no validators", h.str());
+
         std::vector<blst_cpp::PublicKey> pks;
-        for(auto &nname: ih.second->node_validators)
+        i128 stake=(i128)0;
+        for(auto& n: acc->node_validators)
         {
-            auto pk=mf->getBlsPk(nname);
+            if(!mf->isMemberCommitte(n))
+                return corrupt("committee: signer not in committee", n.container);
+            if(++signed_cnt[n]>1)
+                return corrupt("signer voted twice", n.container);
+            auto pk=mf->getBlsPk(n);
             if(!pk)
-            {
-                r.corrupt=true;
-                return r;
-            }
+                return corrupt("committee: no bls pk", n.container);
             pks.push_back(*pk);
-
+            i128 s=(i128)0;
+            if(!subblock_take_stake(mf,n,s))
+                return corrupt("committee: no stake", n.container);
+            stake+=s;
         }
-        if(!ih.second->agg_sig.verify(pks,ih.first.container))
-        {
-            ns->logNode("BlockStatusREQ: verify failed");
-            r.corrupt=true;
-            return r;
-        }
+        if(!acc->agg_sig.initialized())
+            return corrupt("committee: empty aggregate signature", h.str());
+        if(!acc->agg_sig.verify(pks,h.container))
+            return corrupt("committee: aggregate signature invalid", h.str());
 
-    }
-
-    for(auto & i: b.accepted_by_committe)
-    {
-        i128 votes;
-        for(auto& z: i.second->node_validators)
+        if(mf->full_stake_committe>0 && (stake*100)/mf->full_stake_committe>QUORUM)
         {
-            votes+=mf->getPrevStake(z);
-        }
-        if((votes*100)/mf->full_stake_committe > QUORUM)
-        {
+            if(r.has_committe_quorum && r.committe_quorum_hash!=h)
+                return corrupt("committee: quorum for two different results", h.str());
             r.has_committe_quorum=true;
-            r.committe_quorum_hash=i.first;
+            r.committe_quorum_hash=h;
         }
-
     }
 
-    for(auto& z: b.accepted_by_noncommitte)
+    /// ── подписи не-комитета ─────────────────────────────────────────────
+    for(auto& z: b->accepted_by_noncommitte)
     {
-        std::vector< blst_cpp::PublicKey> pks;
-        for(auto&  x: z.second.second)   
+        const THASH_id& h=z.first;
+        const auto& agg=z.second.first;
+        const auto& nodes=z.second.second;
+        if(nodes.empty())
+            return corrupt("non-committee: no validators", h.str());
+
+        std::vector<blst_cpp::PublicKey> pks;
+        i128 stake=(i128)0;
+        for(auto& n: nodes)
         {
-            auto pk=mf->getBlsPk(x);
+            if(!mf->isMemberNonCommitte(n))
+                return corrupt("non-committee: signer not in non-committee", n.container);
+            if(++signed_cnt[n]>1)
+                return corrupt("signer voted twice", n.container);
+            auto pk=mf->getBlsPk(n);
             if(!pk)
-            {
-                r.corrupt=true;
-            }
+                return corrupt("non-committee: no bls pk", n.container);
             pks.push_back(*pk);
+            i128 s=(i128)0;
+            if(!subblock_take_stake(mf,n,s))
+                return corrupt("non-committee: no stake", n.container);
+            stake+=s;
         }
-        if(!z.second.first.verify(pks,z.first.container))
-        {
-            r.corrupt=true;
-        }
-    }
-    /// calc quorum
+        if(!agg.initialized())
+            return corrupt("non-committee: empty aggregate signature", h.str());
+        if(!agg.verify(pks,h.container))
+            return corrupt("non-committee: aggregate signature invalid", h.str());
 
-    for(auto& z: b.accepted_by_noncommitte)
-    {
-        i128 voted;
-        for(auto w: z.second.second)
+        if(mf->full_stake_all>0 && (stake*100)/mf->full_stake_all>QUORUM)
         {
-            voted+=mf->getPrevStake(w);
-        }
-        if((voted*100)/mf->full_stake_all > QUORUM)
-        {
+            if(r.has_noncommite_quorum && r.non_committe_quorum_hash!=h)
+                return corrupt("non-committee: quorum for two different results", h.str());
             r.has_noncommite_quorum=true;
-            r.non_committe_quorum_hash=z.first;
+            r.non_committe_quorum_hash=h;
         }
     }
-     return r;
+
+    return r;
 }

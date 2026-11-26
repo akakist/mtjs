@@ -56,6 +56,12 @@ void Node::Service::dump_tree(Cellable* c, IDatabase* db, const char* tag, int d
 
 void Node::Service::apply_diffs(const THASH_id &att_hash, const route_t& route, int round, int subblock)
 {
+    MUTEX_INSPECTOR;
+    // Результат применения att_data пишется/ищется под ключом
+    // blake2b_hash(att_data_hash+"result") — двойного применения нет.
+    auto result_hash=blake2b_hash(att_hash.container+"result");
+    if(data_cache_get(result_hash).valid())
+        return;
 
     Rollback roll;
     auto d=data_cache_get(att_hash);
@@ -85,7 +91,7 @@ void Node::Service::apply_diffs(const THASH_id &att_hash, const route_t& route, 
     auto& bt=l_blocks[prev_root_hash_Z()];
     bt.dumps[round][subblock]={new_root_hash,db_local};
 
-    data_cache_add(blake2b_hash(att_hash.container+"result"),bdvrs.get());
+    data_cache_add(result_hash,bdvrs.get());
     pass_NodeMsgRSP(bdvrs.get(),route);
 
 }
@@ -111,6 +117,81 @@ static void dump_mem(const char* label, JSIRuntime* rt) {
     printf("  array_count      = %lld\n", (long long)s.array_count);
     printf("  shape_count      = %lld\n", (long long)s.shape_count);
 }
+void Node::Service::commitFinalBlock(const REF_getter<MsgData::BlockAccepted2REQ>& ba2,
+                                     const std::vector<THASH_id>& tx_hashes,
+                                     const std::map<std::string,std::string>& diffs,
+                                     const REF_getter<MsgData::attachment_data>& att)
+{
+    MUTEX_INSPECTOR;
+    auto info=ba2->blockAcceptedREQ->blockInfo;
+
+    if(this_node_name==info->heart_beat->node_leader)
+    {
+        size_t sz=0;
+        for(auto& z:db_to_save_Z.cells)
+        {
+            sz+=z.second.size();
+        }
+        logNode("db_state->write_granules_batch %d granules, total size %d",(int)db_to_save_Z.cells.size(),(int)sz);
+    }
+
+    db_to_save_Z.add("...last_block...",ba2->getBuffer());
+
+    // stale: читаем старые гранулы ПЕРЕД записью → евент в GrainReader
+    std::vector<std::pair<std::string,std::string>> stale;
+    for (auto& z : db_to_save_Z.cells) {
+        std::string old_body;
+        if (db_state->getGranule(z.first, &old_body) == 0 && !old_body.empty() && old_body != z.second)
+            stale.push_back({blake2b_hash(old_body).container, old_body});
+    }
+
+    int64_t now = getNow().v;
+    for (auto& z : stale)
+        stale_cache[z.first] = { z.second, now };
+
+    db_state->write_granules_batch(db_to_save_Z);
+    if (!local_deletes.empty()) {
+        int skipped = 0;
+        for (auto& id : local_deletes) {
+            // Ячейку могли пересоздать в этом же блоке (удаление -> создание):
+            // если она есть в батче, удалять её из БД нельзя — иначе живая
+            // запись пропадёт и получим "hash not matched".
+            if (db_to_save_Z.cells.count(id)) { skipped++; continue; }
+            db_state->eraseGranule(id);
+        }
+        logNode("compact: physically deleted %d cells (skipped rewritten: %d)",
+                (int)local_deletes.size() - skipped, skipped);
+        local_deletes.clear();
+    }
+    db_to_save_Z.clear();
+
+    sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(ba2, tx_hashes, diffs, att, this));
+
+    prev_block=ba2;
+    accepted_signed.clear();
+    l_blocks.clear();
+    block_meta_full.clear();
+    tx_sent.clear();   // sent живёт до конца блока
+
+    for (auto &z : tx_hashes)
+    {
+        MUTEX_INSPECTOR;
+        auto it = transaction_pool_of_leader.find(z);
+        if (it != transaction_pool_of_leader.end())
+        {
+            transaction_pool_of_leader.erase(it);
+            DBG(logNode("removed tx %s", base16::encode(z.container).c_str()));
+        }
+    }
+    {
+        contractHost->contract_cache.clear();
+        root=getRoot(db_state.get(),prev_block);
+    }
+
+    // лидер раунда — из заголовка блока (cli.node_leader больше не нужен)
+    sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BLOCK_EXPIRED,toRef(info->heart_beat->node_leader.container),this));
+}
+
 bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route)
 {
     MUTEX_INSPECTOR;
@@ -220,90 +301,12 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         }
     }
 
-    if(this_node_name==r->blockAccepted2REQ->blockAcceptedREQ->blockInfo->heart_beat->node_leader)
-    {
-        size_t sz=0;
-        for(auto& z:db_to_save_Z.cells)
-        {
-            sz+=z.second.size();
-        }
-        logNode("db_state->write_granules_batch %d granules, total size %d",db_to_save_Z.cells.size(),sz);
-    }
-
-    db_to_save_Z.add("...last_block...",r->blockAccepted2REQ->getBuffer());
-
-
-    // stale: читаем старые гранулы ПЕРЕД записью → евент в GrainReader
-    std::vector<std::pair<std::string,std::string>> stale;
-    for (auto& z : db_to_save_Z.cells) {
-        std::string old_body;
-        if (db_state->getGranule(z.first, &old_body) == 0 && !old_body.empty() && old_body != z.second)
-            stale.push_back({blake2b_hash(old_body).container, old_body});
-    }
-
-    int64_t now = getNow().v;
-    for (auto& z : stale)
-        stale_cache[z.first] = { z.second, now };
-
-
-    db_state->write_granules_batch(db_to_save_Z);
-    if (!local_deletes.empty()) {
-        int skipped = 0;
-        for (auto& id : local_deletes) {
-            // Ячейку могли пересоздать в этом же блоке (удаление -> создание):
-            // если она есть в батче, удалять её из БД нельзя — иначе живая
-            // запись пропадёт и получим "hash not matched".
-            if (db_to_save_Z.cells.count(id)) { skipped++; continue; }
-            db_state->eraseGranule(id);
-        }
-        logNode("compact: physically deleted %d cells (skipped rewritten: %d)",
-                (int)local_deletes.size() - skipped, skipped);
-        local_deletes.clear();
-    }
-    db_to_save_Z.clear();
-
-        sendEvent(ServiceEnum::BlockStreamer, new bcEvent::StreamBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data,   this));
-
-        prev_block=r->blockAccepted2REQ;
-        accepted_signed.clear();
-        l_blocks.clear();
-        block_meta_full.clear();
-        // Шаг 3: высота уехала — сбор сертификата за неё больше не нужен,
-        // свои RSP/hb/certs старше предыдущей высоты вычищаем.
-        // cert_collecting = false;
-        // pruneRoundState(epoch_current());
-        tx_sent.clear();   // sent живёт до конца блока
-
-        for (auto &z : r->tx_hashes)
-        {
-
-            MUTEX_INSPECTOR;
-            XTRY;
-            auto it = transaction_pool_of_leader.find(z);
-            if (it != transaction_pool_of_leader.end())
-            {
-                transaction_pool_of_leader.erase(it);
-                DBG(logNode("removed tx %s", base16::encode(z.container).c_str()));
-            }
-            XPASS;
-        }
-        auto v=cells::getValuesNoCreateConst(root.get(), db_state.get());
-        auto ttl_cache=v->getValue("ttl_cache");
-        {
-    #ifdef DEBUG
-            for(auto& z: contractHost->contract_cache)
-            {
-                dump_mem("ccc",z.second->rt);
-            }
-    #endif
-            contractHost->contract_cache.clear();
-            root=getRoot(db_state.get(),prev_block);
-        }
+    commitFinalBlock(r->blockAccepted2REQ, r->tx_hashes, r->diffs, r->att_data);
 
 
     // лидер раунда — из заголовка блока (cli.node_leader больше не нужен)
     sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BLOCK_EXPIRED,toRef(info->heart_beat->node_leader.container),this));
-    cli_leader_info[prev_root_hash_Z()].node_leader=nullptr;
+    // cli_leader_info[prev_root_hash_Z()].node_leader=nullptr;
     // pruneRoundState(epoch_current());
     XPASS;
     return true;
@@ -314,7 +317,11 @@ void Node::Service::pass_NodeMsgRSP(const MsgData::Base *e, const route_t &r)
     MUTEX_INSPECTOR;
     auto buffer = e->getBuffer();
     auto signature = sign_ed(my_sk_ed, blake2b_hash(buffer).container);
-    passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, poppedFrontRoute(r)));
+    // Пустой маршрут = мы и есть конечный получатель (лидер сам себе):
+    // poppedFrontRoute на пустом route_t кидает — не трогаем его.
+    route_t rt=r;
+    if(rt.size()) rt.pop_back();
+    passEvent(new bcEvent::NodeMsgRSP(this_node_name, signature, buffer, rt));
 }
 void Node::Service::mark_activity(const std::set<NODE_id>& alive_set, Rollback* roll, TIME_mks block_timestamp)
 {
@@ -335,11 +342,17 @@ void Node::Service::mark_activity(const std::set<NODE_id>& alive_set, Rollback* 
 
 int get_global_refcount();
 
-void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
+void Node::Service::process_offer(const THASH_id & offer, const REF_getter<MsgData::BlockStatusREQ>& status, const route_t &route, int round, int subblock)
 {
     auto prev_root_hash=prev_root_hash_Z();
     b_params t(db_state.get());
     t.meta=getMetaFull();
+
+    auto result_hash=blake2b_hash(offer.container+"result");
+    if(data_cache_get(result_hash).valid())
+        return;
+
+    t.blockStatusREQ=status;
     auto &bt=l_blocks[prev_root_hash];
     // bt.cache[r->getHash()]=r;
 
@@ -438,11 +451,16 @@ void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
             return;
         }
         rsp->node_validator = this_node_name;
+        rsp->round = round;
+        rsp->subblock = subblock;
         rsp->sign(my_sk_bls);
         logNode("ValidateBlockRSP: подписан epoch=%lld root=%s",
                 (long long)t.blockStatusREQ->hb->new_epoch, new_root_hash.str().c_str());
         block_lock = blockInfo;
 
+        // Результат кладём в кеш под тем же ключом, который проверяет
+        // BlockStatusREQ, иначе повторная рассылка статуса переисполнит оффер.
+        data_cache_add(result_hash,rsp.get());
         pass_NodeMsgRSP(rsp.get(), route);
     }
 #ifdef MEMLEAK_CHECK

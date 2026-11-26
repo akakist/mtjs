@@ -29,6 +29,7 @@
 #include <vector>
 #include "token2gas.h"
 #include "nodeService.h"
+#include "blocks.h"
 #include "epoll_socket_info.h"
 #include "event_mt.h"
 #include "events_nodeService.hpp"
@@ -928,6 +929,18 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         }
     }
     DBG(logNode("execute_block: tx_count=%zu", (size_t)txs->transaction_bodies.size()));
+
+    // Слэш-субблок: детерминированное списание стейка эквивокаторов.
+    if(txs->subblock_type==MsgData::SUBBLOCK_SLASH)
+    {
+        for(auto& sc: txs->slashes)
+        {
+            auto serr=execute_slash(b, sc);
+            if(serr)
+                logNode("execute_block: slash failed for %s: %s", sc->node.container.c_str(), serr->c_str());
+        }
+    }
+
     // Nonce повышаем после всех tx: внутри цикла u взят до execute_transaction,
     // а откат (unpack_mx) заменяет data-объект — и incNonce уходит в отвязанный объект.
     std::vector<ADDRESS_id> nonce_bumps;
@@ -1037,6 +1050,61 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
     auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
     return rh;
 }
+
+std::optional<std::string> Node::Service::execute_slash(b_params &b, const REF_getter<MsgData::SlashCmd>& sc)
+{
+    MUTEX_INSPECTOR;
+    if(!sc.valid()) return "empty slash";
+    auto mf=b.meta;
+    if(!mf.valid()) return "no meta";
+    auto pk=mf->getBlsPk(sc->node);
+    if(!pk) return "no bls pk";
+    if(sc->hash1==sc->hash2) return "same hash";
+    if(!sc->sig1.verify(*pk, sc->hash1.container)) return "sig1 invalid";
+    if(!sc->sig2.verify(*pk, sc->hash2.container)) return "sig2 invalid";
+
+    auto ts=b.blockStatusREQ->hb->block_timestamp;
+    auto n=cells::getNodeNoCreate(root.get(), db_state.get(), sc->node, NULL, ts);
+    if(!n.valid()) return "node not found";
+
+    // Полное сжигание: стейкерам ничего не возвращаем, их staked_in чистим,
+    // активность адресов и ноды обновляем (как в execute_unstake_node).
+    auto stakers=n->getStakes();
+    for(auto& z: stakers)
+    {
+        auto u=cells::getAddressStateNoCreate(root.get(), db_state.get(), z.first, NULL, ts);
+        if(u.valid())
+        {
+            u->staked_in.erase(sc->node);
+            auto actu=cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId(), NULL, ts);
+            if(actu.valid()) actu->update_time(ts, NULL);
+        }
+    }
+    {
+        auto actn=cells::getActivityNoCreate(root.get(), db_state.get(), n->getDbId(), NULL, ts);
+        if(actn.valid()) actn->update_time(ts, NULL);
+    }
+    i128 burned=n->burn_all_stake();
+    {
+        auto st=cells::getStateNoCreate(root.get(), db_state.get(), NULL, ts);
+        if(st.valid())
+        {
+            st->total_stake-=burned;
+            // Сожжённый стейк уходит из обращения целиком (стейкерам не возвращается).
+            st->total_supply-=burned;
+        }
+    }
+
+    b.emit_block_cmd("slash",
+        EmitObj().s("node", sc->node.container)
+                 .s("burned", burned.str())
+                 .s("hash1", sc->hash1.str())
+                 .s("hash2", sc->hash2.str())
+                 .pack());
+    logNode("slash: %s сжёг %s", sc->node.container.c_str(), burned.str().c_str());
+    return std::nullopt;
+}
+
 void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData::HeartBeatREQ> &lc)
 {
     MUTEX_INSPECTOR;
@@ -1356,6 +1424,298 @@ bool Node::Service::on_GetHashedDataRSP(const bcEvent::GetHashedDataRSP *r)
 }
 
 
+namespace
+{
+/// есть ли уже подпись ноды в субблоке (в любой из групп)
+bool subblock_signed_by(const REF_getter<MsgData::SubBlock>& s, const NODE_id& n)
+{
+    for(auto& a: s->accepted_by_committe)
+    {
+        if(!a.second.valid()) continue;
+        for(auto& v: a.second->node_validators)
+            if(v==n) return true;
+    }
+    for(auto& a: s->accepted_by_noncommitte)
+    {
+        for(auto& v: a.second.second)
+            if(v==n) return true;
+    }
+    return false;
+}
+}
+
+std::vector<std::string> Node::Service::subblock_data_sources(const REF_getter<MsgData::SubBlock>& s, const REF_getter<BlockMetaFull>& mf)
+{
+    std::vector<std::string> out;
+    auto add=[&](const std::string& ip)
+    {
+        if(ip.empty()) return;
+        for(auto& z: out) if(z==ip) return;
+        out.push_back(ip);
+    };
+    // ip подписавших субблок: данные у них точно есть
+    std::set<NODE_id> signers;
+    for(auto& a: s->accepted_by_committe)
+    {
+        if(!a.second.valid()) continue;
+        for(auto& n: a.second->node_validators) signers.insert(n);
+    }
+    for(auto& a: s->accepted_by_noncommitte)
+        for(auto& n: a.second.second) signers.insert(n);
+    for(auto& e: mf->vne)
+        if(signers.count(e.name)) add(e.ip);
+    for(auto& e: mf->committee_vne)
+        if(signers.count(e.name)) add(e.ip);
+    // подписант мог выпасть из vne — берём ip из ячейки ноды
+    for(auto& n: signers)
+    {
+        if(mf->position_of_node.count(n)) continue;
+        auto cn=cells::getNodeNoCreateConst(root.get(),db_state.get(),n);
+        if(cn.valid()) add(cn->get_ip());
+    }
+    // запасной источник — автор оффера (у него точно есть сам оффер)
+    if(out.empty())
+        add(mf->leader_ip);
+
+    const std::string me=self_ip();
+    std::vector<std::string> r;
+    for(auto& ip: out)
+        if(ip!=me) r.push_back(ip);
+    return r;
+}
+
+void Node::Service::process_status_subblock(const THASH_id& offer_hash, int round, const route_t& route, int attempt)
+{
+    MUTEX_INSPECTOR;
+    auto& bt=l_blocks[prev_root_hash_Z()];
+    if(!bt.block_status.valid() || !bt.block_status->hb.valid())
+        return;
+    auto rit=bt.block_status->rounds.find(round);
+    if(rit==bt.block_status->rounds.end())
+        return;
+    REF_getter<MsgData::SubBlock> sp=nullptr;
+    int idx=-1;
+    for(size_t i=0;i<rit->second->subblocks.size();i++)
+    {
+        if(rit->second->subblocks[i]->offer_hash==offer_hash)
+        {
+            sp=rit->second->subblocks[i];
+            idx=(int)i;
+            break;
+        }
+    }
+    if(!sp.valid())
+        return;     // субблок уже не в актуальном статусе
+
+    auto mf=getMetaFull();
+    SB_result vr=verify_subblock_sigs(sp,bt.block_status->hb,mf,this);
+    if(vr.corrupt)
+    {
+        logNode("BlockStatusREQ: subblock offer=%s: подписи не сходятся — пропуск",
+                sp->offer_hash.str().c_str());
+        return;
+    }
+
+    // att_hash берём из субблока, иначе — из BlockInfo варианта с кворумом комитета
+    REF_getter<MsgData::BlockInfo> win_info=nullptr;
+    if(vr.has_committe_quorum)
+    {
+        auto it=sp->accepted_by_committe.find(vr.committe_quorum_hash);
+        if(it!=sp->accepted_by_committe.end() && it->second.valid())
+            win_info=it->second->blockInfo;
+    }
+    THASH_id att_hash=sp->att_hash;
+    if(att_hash.container.empty() && win_info.valid())
+        att_hash=win_info->att_data_hash;
+
+    const bool in_committee=mf->isMemberCommitte(this_node_name);
+    const bool in_noncommittee=mf->isMemberNonCommitte(this_node_name);
+
+    // Действие для этого субблока:
+    //   Vote      — кворума комитета нет: комитет исполняет оффер (process_offer);
+    //   ApplyDiffs— кворум комитета есть: не-комитет применяет диффы (apply_diffs).
+    // Комитет не голосует в accepted_by_noncommitte (verify_subblock_sigs это отклонит).
+    enum { ACT_NONE, ACT_VOTE, ACT_APPLY } act=ACT_NONE;
+    THASH_id need;
+    if(!vr.has_committe_quorum)
+    {
+        if(in_committee && !subblock_signed_by(sp,this_node_name))
+        {
+            auto rh=blake2b_hash(sp->offer_hash.container+"result");
+            if(!data_cache_get(rh).valid())
+            {
+                act=ACT_VOTE;
+                need=sp->offer_hash;
+            }
+        }
+    }
+    else
+    {
+        if(in_noncommittee && !att_hash.container.empty())
+        {
+            auto rh=blake2b_hash(att_hash.container+"result");
+            if(!data_cache_get(rh).valid())
+            {
+                act=ACT_APPLY;
+                need=att_hash;
+            }
+        }
+    }
+
+    if(act!=ACT_NONE)
+    {
+        if(data_cache_get(need).valid())
+        {
+            if(act==ACT_VOTE)
+                process_offer(sp->offer_hash,bt.block_status,route,round,idx);
+            else
+                apply_diffs(att_hash,route,round,idx);
+        }
+        else
+        {
+            // async_dl — резервный механизм: сам проверяет локальный кеш и
+            // выполняет callback сразу, если данные уже есть.
+            if(attempt>2)
+            {
+                logNode("BlockStatusREQ: subblock offer=%s: данные %s так и не пришли",
+                        sp->offer_hash.str().c_str(),need.str().c_str());
+            }
+            else
+            {
+                auto sources=subblock_data_sources(sp,mf);
+                if(sources.empty())
+                {
+                    logNode("BlockStatusREQ: subblock offer=%s: нет источников для %s",
+                            sp->offer_hash.str().c_str(),need.str().c_str());
+                }
+                else
+                {
+                    logNode("BlockStatusREQ: subblock offer=%s: нет данных %s, подгружаю (sources=%zu)",
+                            sp->offer_hash.str().c_str(),need.str().c_str(),sources.size());
+                    async_dl({need},sources,[this,offer_hash,round,route,attempt](bool ok)
+                    {
+                        if(!ok)
+                        {
+                            logNode("BlockStatusREQ: subblock offer=%s: данные не получены",
+                                    offer_hash.str().c_str());
+                            return;
+                        }
+                        process_status_subblock(offer_hash,round,route,attempt+1);
+                    });
+                    return;
+                }
+            }
+        }
+    }
+
+    // Раунд завершён (finished): субблоков больше не будет — пробуем финализировать.
+    if(rit->second->finished)
+        finalize_round(round,route);
+}
+
+void Node::Service::finalize_round(int round, const route_t& route)
+{
+    MUTEX_INSPECTOR;
+    auto& bt=l_blocks[prev_root_hash_Z()];
+    if(!bt.block_status.valid() || !bt.block_status->hb.valid())
+        return;
+    auto rit=bt.block_status->rounds.find(round);
+    if(rit==bt.block_status->rounds.end())
+        return;
+    auto& rd=rit->second;
+    if(!rd->finished)
+        return;     // субблоков ещё может прибавиться — рано финализировать
+    if(sync_in_progress)
+    {
+        logNode("finalize_round: sync in progress — пропуск");
+        return;
+    }
+
+    auto mf=getMetaFull();
+
+    // Сливаем дампы всех субблоков в один батч: поздние гранулы перезаписывают ранние.
+    _db_to_save merged;
+    REF_getter<MsgData::BlockAcceptedREQ> last_acc=nullptr;
+    std::vector<NODE_id> last_diff_validators;
+    blst_cpp::AggregateSignature last_agg_diff;
+    REF_getter<MsgData::BlockInfo> last_info=nullptr;
+
+    for(size_t i=0;i<rd->subblocks.size();i++)
+    {
+        auto& s=rd->subblocks[i];
+        SB_result vr=verify_subblock_sigs(s,bt.block_status->hb,mf,this);
+        if(vr.corrupt)
+        {
+            logNode("finalize_round: subblock %zu offer=%s: битые подписи — ждём",
+                    i,s->offer_hash.str().c_str());
+            return;
+        }
+        if(!vr.has_committe_quorum || !vr.has_noncommite_quorum)
+        {
+            logNode("finalize_round: subblock %zu offer=%s: не собран (c=%d d=%d) — ждём",
+                    i,s->offer_hash.str().c_str(),(int)vr.has_committe_quorum,(int)vr.has_noncommite_quorum);
+            return;
+        }
+        auto cit=s->accepted_by_committe.find(vr.committe_quorum_hash);
+        auto dit=s->accepted_by_noncommitte.find(vr.non_committe_quorum_hash);
+        if(cit==s->accepted_by_committe.end() || dit==s->accepted_by_noncommitte.end())
+            return;
+        last_acc=cit->second;
+        last_info=last_acc->blockInfo;
+        last_diff_validators=dit->second.second;
+        last_agg_diff=dit->second.first;
+
+        if(bt.dumps.count(round) && bt.dumps[round].count((int)i))
+            merged.add(bt.dumps[round][(int)i].second);   // поздние перезаписывают
+    }
+
+    if(!last_info.valid() || !last_acc.valid())
+        return;
+
+    if(last_info->heart_beat->prev_root_hash_1!=prev_root_hash_Z())
+    {
+        logNode("finalize_round: stale base %s != local %s — ignore",
+                last_info->heart_beat->prev_root_hash_1.str().c_str(),prev_root_hash_Z().str().c_str());
+        return;
+    }
+    if(prev_block.valid() && prev_block->blockAcceptedREQ->blockInfo->new_root_hash1==last_info->new_root_hash1)
+    {
+        logNode("finalize_round: block %s уже применён — ignore",last_info->new_root_hash1.str().c_str());
+        return;
+    }
+
+    // применяем собранный батч как в BlockStore
+    db_to_save_Z.add(merged);
+    auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
+    if(rh!=last_info->new_root_hash1)
+    {
+        logNode("finalize_round: local root %s != block %s — ignore (нужен sync)",
+                rh.str().c_str(),last_info->new_root_hash1.str().c_str());
+        db_to_save_Z.clear();
+        return;
+    }
+
+    // BA2: серт комитета за BlockInfo + серт сети за корень результата (последний субблок)
+    REF_getter<MsgData::BlockAccepted2REQ> ba2=new MsgData::BlockAccepted2REQ;
+    ba2->blockAcceptedREQ=last_acc;
+    ba2->node_diff_validators=last_diff_validators;
+    ba2->agg_diff_sig=last_agg_diff;
+
+    REF_getter<MsgData::attachment_data> att=nullptr;
+    {
+        auto d=data_cache_get(last_info->att_data_hash);
+        att=dynamic_cast<MsgData::attachment_data*>(d.get());
+    }
+
+    logNode("finalize_round: round=%d субблоков=%zu — сбрасываю диффы в базу, block=%s epoch=%lld",
+            round,rd->subblocks.size(),last_info->new_root_hash1.str().c_str(),
+            (long long)last_info->heart_beat->new_epoch);
+    commitFinalBlock(ba2,
+                     att.valid()?att->tx_hashes:std::vector<THASH_id>(),
+                     att.valid()?att->diffs:std::map<std::string,std::string>(),
+                     att);
+}
+
 // ── единая шина статуса блока ──────────────────────────────────────────
 bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_id& src_node, const route_t& route)
 {
@@ -1366,19 +1726,29 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
     auto & bt=l_blocks[base_root];
     int64_t epoch = epoch_current();
 
+    auto mf=getMetaFull();
+
+    auto cl=mf->leader();
+    if(cl.name != src_node)
+        return true;
+    if(!e || !e->hb.valid())
+        return true;
+    if(bt.block_status.valid() && !bt.block_status->hb->equals(e->hb))
+    {
+        return true;
+    }
+    // Содержимое освежаем на каждом статусе: лидер добавляет серты в
+    // rounds[round].subblocks по мере голосования (hb при этом тот же).
+    bt.block_status=e;
+
+
     if (!sync_in_progress && e->hb.valid() && e->hb->prev_root_hash_1 != prev_root_hash_Z())
     {
         logNode("BlockStatusREQ: prev_root mismatch remote=%s local=%s, asking prev-block", e->hb->prev_root_hash_1.str().c_str(), prev_root_hash_Z().str().c_str());
         passEvent(new bcEvent::GetPrevBlockREQ(e->hb->prev_root_hash_1,
                                                poppedFrontRoute(route)));
     }
-    auto cl=getMetaFull()->leader();
     /// освежаем block_status у себя
-    if(cl.name == src_node)
-    {
-        l_blocks[prev_root_hash_Z()].block_status=e;
-    }
-    auto mf=getMetaFull();
     REF_getter<MsgData::GetTxRSP> r=new MsgData::GetTxRSP();
     for(auto& z: transaction_pool_of_leader)
     {
@@ -1393,7 +1763,20 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
     {
         pass_NodeMsgRSP(r.get(),route);
     }
-
+    // ── субблоки текущего раунда: подписи, догрузка данных, действие ────
+    // Данные, которых нет в кеше, тянем через async_dl и возвращаемся сюда же.
+    {
+        auto round_it=bt.block_status->rounds.find(mf->round);
+        if(round_it!=bt.block_status->rounds.end())
+        {
+            std::vector<THASH_id> offers;
+            offers.reserve(round_it->second->subblocks.size());
+            for(auto& s: round_it->second->subblocks)
+                offers.push_back(s->offer_hash);
+            for(auto& h: offers)
+                process_status_subblock(h,mf->round,route);
+        }
+    }
     return true;
 }
 
@@ -1411,17 +1794,120 @@ void Node::Service::broadcastCurrentBlockStatus()
         bt.block_status->hb=new MsgData::HeartBeatREQ(prev_root_hash_Z(),epoch_current(),this_node_name,iUtils->getNow());
     }
 
+    auto& round=bt.block_status->rounds[mf->round];
+    if(!round.valid()) round=new MsgData::Round;
 
-    REF_getter<MsgData::ValidateBlockREQ> r=new MsgData::ValidateBlockREQ;
-    for(auto& t: transaction_pool_of_leader)
+    // Рассылка новых субблоков — только до половины слота.
+    if(!round->finished)
     {
-        if(!tx_sent.count(t.first))
+        const TIME_mks now=iUtils->getNow();
+
+        // оффер из ещё не разосланных tx
+        REF_getter<MsgData::ValidateBlockREQ> offer=new MsgData::ValidateBlockREQ;
+        for(auto& t: transaction_pool_of_leader)
         {
-            r->transaction_bodies.push_back(t.second);
-            tx_sent.insert(t.first);
+            if(!tx_sent.count(t.first))
+            {
+                offer->transaction_bodies.push_back(t.second);
+                tx_sent.insert(t.first);
+            }
+        }
+
+        if(!offer->transaction_bodies.empty())
+        {
+            // лидер тоже валидатор: оффер кладём себе в кеш и рассылаем всем
+            data_cache_add(offer->getHash(), offer.get());
+            broadcast_MsgEvent_via_broadcaster(offer.get(), mf->tree_all_nodes);
+
+            REF_getter<MsgData::SubBlock> sb=new MsgData::SubBlock;
+            sb->offer_hash=offer->getHash();
+            round->subblocks.push_back(sb);
+            logNode("[blockstatus] offer %s txs=%zu subblocks=%zu",
+                    sb->offer_hash.str().c_str(), offer->transaction_bodies.size(), round->subblocks.size());
+        }
+
+        // Слэш: эвиденс двойной подписи оформляем отдельным субблоком (один раз на раунд).
+        if(!bt.pending_slashes.empty())
+        {
+            auto slash_flag=blake2b_hash(std::to_string(mf->round)+"slash_sent");
+            if(data_cache.find(slash_flag)==data_cache.end())
+            {
+                REF_getter<MsgData::ValidateBlockREQ> so=new MsgData::ValidateBlockREQ;
+                so->subblock_type=MsgData::SUBBLOCK_SLASH;
+                so->slashes=bt.pending_slashes;
+                data_cache_add(so->getHash(), so.get());
+                broadcast_MsgEvent_via_broadcaster(so.get(), mf->tree_all_nodes);
+
+                REF_getter<MsgData::SubBlock> sb=new MsgData::SubBlock;
+                sb->offer_hash=so->getHash();
+                round->subblocks.push_back(sb);
+                data_cache[slash_flag]={getNow().v,nullptr};
+                logNode("[blockstatus] slash subblock %s (evidence=%zu)",
+                        sb->offer_hash.str().c_str(), bt.pending_slashes.size());
+            }
+        }
+
+        // Субблоков больше не будет:
+        //   * вышли за половину слота (обычный дедлайн);
+        //   * tx так и не появились — заканчиваем по короткому пустому дедлайну (1с).
+        if(now>=mf->subblock_deadline())
+        {
+            round->finished=true;
+            logNode("[blockstatus] round %d finished (за половину слота)",mf->round);
+        }
+        else if(transaction_pool_of_leader.empty() && now>=mf->empty_round_deadline())
+        {
+            round->finished=true;
+            logNode("[blockstatus] round %d finished (пул пуст, короткий дедлайн)",mf->round);
         }
     }
-    logNode("[blockstatus] periodic relay") ;
+
+    // Лидер тоже валидатор: обрабатываем собственный статус (голос/apply/finalize).
+    {
+        auto round_it=bt.block_status->rounds.find(mf->round);
+        if(round_it!=bt.block_status->rounds.end())
+        {
+            std::vector<THASH_id> offers;
+            offers.reserve(round_it->second->subblocks.size());
+            for(auto& s: round_it->second->subblocks)
+                offers.push_back(s->offer_hash);
+            for(auto& h: offers)
+                process_status_subblock(h,mf->round,route_t());
+        }
+    }
+
+    // Кворум комитета по субблоку → бродкастим диффы (ValidateDiffs) с att_data.
+    // Отправка — один раз; флаг в кеше: blake2b_hash(offer+"att_data_sent").
+    {
+        auto round_it=bt.block_status->rounds.find(mf->round);
+        if(round_it!=bt.block_status->rounds.end())
+        {
+            for(auto& s: round_it->second->subblocks)
+            {
+                auto sent_flag=blake2b_hash(s->offer_hash.container+"att_data_sent");
+                if(data_cache.find(sent_flag)!=data_cache.end())
+                    continue;   // уже рассылали
+
+                SB_result vr=verify_subblock_sigs(s,bt.block_status->hb,mf,this);
+                if(vr.corrupt || !vr.has_committe_quorum)
+                    continue;
+                auto it=s->accepted_by_committe.find(vr.committe_quorum_hash);
+                if(it==s->accepted_by_committe.end() || !it->second.valid() || !it->second->blockInfo.valid())
+                    continue;
+                auto att_hash=it->second->blockInfo->att_data_hash;
+                auto d=data_cache_get(att_hash);
+                auto att=dynamic_cast<MsgData::attachment_data*>(d.get());
+                if(!att)
+                    continue;   // нет att_data — резерв async_dl на принимающей стороне
+
+                REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(att);
+                broadcast_MsgEvent_via_broadcaster(bdv.get(), mf->tree_all_nodes);
+                data_cache[sent_flag]={getNow().v,nullptr};   // флаг «отправлено»
+                logNode("[blockstatus] кворум комитета — бродкаст диффов att=%s",att_hash.str().c_str());
+            }
+        }
+    }
+
     broadcast_MsgEvent_via_broadcaster(bt.block_status.get(), mf->tree_all_nodes);
 }
 
@@ -1805,6 +2291,9 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
     REF_getter<BlockMetaFull> m=new BlockMetaFull();
     block_meta_full[b][round]=m;
     m->round=round;
+    m->round_start = prev_block.valid()
+        ? TIME_mks{prev_block->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp.v + (int64_t)round * ROUND_DURATION}
+        : iUtils->getNow();
     // auto an=cells::getAllNodes(root.get(),db_state.get());
     auto aan=cells::getNodeListNoCreateConst(root.get(),db_state.get());
     if(!aan.valid())
@@ -1926,6 +2415,14 @@ REF_getter<BlockMetaFull> Node::Service::getMetaFull(const THASH_id &meta_root_h
                 m->committe_members.insert(n);
             }
         }
+    }
+    // Не-комитет: enabled-ноды, не попавшие в комитет. Нужен для проверки
+    // подписей субблоков (accepted_by_noncommitte) и кворума по full_stake_all.
+    m->noncommitte_members.clear();
+    for(auto& n: m->all_nodes_enabled)
+    {
+        if(!m->committe_members.count(n))
+            m->noncommitte_members.insert(n);
     }
     if (vne_committe.empty())
     {

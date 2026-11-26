@@ -54,7 +54,35 @@ bool Node::Service::BlockDiffValidateRSP(const MsgData::BlockDiffValidateRSP* r,
         logNode("BlockDiffValidateRSP verify failed");
         return true;
     }
-    bt.block_status->rounds[r->round].subblocks[r->subblock].add_accepted_by_noncommitte(r->blockAcceptedHash,src_node,r->sig34);
+    {
+        // двойная подпись (не-комитет): та же нода подписала другой корень результата
+        bool equivocation=false;
+        {
+            auto h=r->blockAcceptedHash;
+            auto it=bt.first_noncommitte_sig.find(src_node);
+            if(it==bt.first_noncommitte_sig.end())
+            {
+                bt.first_noncommitte_sig[src_node]={h,r->sig34};
+            }
+            else if(it->second.first!=h)
+            {
+                REF_getter<MsgData::SlashCmd> sc=new MsgData::SlashCmd;
+                sc->node=src_node;
+                sc->hash1=it->second.first;
+                sc->sig1=it->second.second;
+                sc->hash2=h;
+                sc->sig2=r->sig34;
+                bt.pending_slashes.push_back(sc);
+                logNode("equivocation (non-committee): %s",src_node.container.c_str());
+                equivocation=true;
+            }
+        }
+        auto& round_ref=bt.block_status->rounds[r->round];
+        if(!round_ref.valid()) round_ref=new MsgData::Round;
+        auto sb=round_ref->getOrCreateSubblock(r->subblock);
+        if(!equivocation)
+            sb->add_accepted_by_noncommitte(r->blockAcceptedHash,src_node,r->sig34);
+    }
     return true;
 }
 
@@ -91,7 +119,38 @@ bool Node::Service::ValidateBlockRSP(const MsgData::ValidateBlockRSP *r, const N
         logNode("if(!r->verify(*pk))");
         return true;
     }
-    bt.block_status->rounds[r->round].subblocks[r->subblock].add_accepted_by_committe(r);
+    {
+        // двойная подпись (комитет): та же нода подписала другой результат блока
+        bool equivocation=false;
+        {
+            auto h=r->blockInfo->getHash();
+            auto it=bt.first_committe_sig.find(r->node_validator);
+            if(it==bt.first_committe_sig.end())
+            {
+                bt.first_committe_sig[r->node_validator]={h,r->sig};
+            }
+            else if(it->second.first!=h)
+            {
+                REF_getter<MsgData::SlashCmd> sc=new MsgData::SlashCmd;
+                sc->node=r->node_validator;
+                sc->hash1=it->second.first;
+                sc->sig1=it->second.second;
+                sc->hash2=h;
+                sc->sig2=r->sig;
+                bt.pending_slashes.push_back(sc);
+                logNode("equivocation (committee): %s",r->node_validator.container.c_str());
+                equivocation=true;
+            }
+        }
+        auto& round_ref=bt.block_status->rounds[r->round];
+        if(!round_ref.valid()) round_ref=new MsgData::Round;
+        auto sb=round_ref->getOrCreateSubblock(r->subblock);
+        if(!equivocation)
+            sb->add_accepted_by_committe(r);
+        // att_data подписанта нужна для финализации (сброса диффов в базу)
+        if(r->att_data.valid())
+            data_cache_add(r->att_data->getHash(),r->att_data.get());
+    }
     XPASS;
     return true;
 }

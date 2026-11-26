@@ -187,6 +187,11 @@ namespace Node
 
             std::set<THASH_id> sent_tx;
             std::map<int/* round */, std::map<int /*subblock*/, std::pair<THASH_id, _db_to_save>>> dumps;           
+            // Слэш (лидер, in-memory): первая индивидуальная подпись каждого валидатора
+            // (для доказательства двойной подписи) и собранный эвиденс на слэш-субблок.
+            std::map<NODE_id, std::pair<THASH_id, blst_cpp::Signature>> first_committe_sig;
+            std::map<NODE_id, std::pair<THASH_id, blst_cpp::Signature>> first_noncommitte_sig;
+            std::vector<REF_getter<MsgData::SlashCmd>> pending_slashes;
             // THASH_id offer_hash;   // хеш оффера текущего раунда (для статуса)
 
             // REF_getter<MsgData::ValidateBlockREQ> offer=nullptr;
@@ -222,12 +227,12 @@ namespace Node
 
         void do_request_for_transactions(MsgData::HeartBeatREQ* hb, const REF_getter<BlockMetaFull>& meta);
 
-        struct client_leader_info
-        {
-            REF_getter<MsgData::HeartBeatREQ> node_leader=nullptr;
-            route_t leader_route;      // маршрут обратно к лидеру (из GetTxREQ)
-            bool leader_route_valid=false;
-        };
+        // struct client_leader_info
+        // {
+        //     REF_getter<MsgData::HeartBeatREQ> node_leader=nullptr;
+        //     route_t leader_route;      // маршрут обратно к лидеру (из GetTxREQ)
+        //     bool leader_route_valid=false;
+        // };
 
         /// Синк идёт: гейт для всех обработчиков консенсуса.
         std::atomic<bool> sync_in_progress{false};
@@ -247,7 +252,7 @@ namespace Node
         void sync_watchdog_stop();
 
         std::map<THASH_id,block_leader> l_blocks;
-        std::map<THASH_id, client_leader_info> cli_leader_info;
+        // std::map<THASH_id, client_leader_info> cli_leader_info;
         std::map<NODE_id,std::map<int64_t,std::set<int64_t> > > filter_NodeMsgREQ;
         /// anti-replay для syncGetGranulesREQ: последний принятый current_time (mks) на узел
         std::map<NODE_id,int64_t> last_sync_req_time;
@@ -292,6 +297,22 @@ namespace Node
                       std::function<void(bool)> done);
         void requestNextDlSource(dl_task& t);
         std::string self_ip();
+        /// Источники для подгрузки данных субблоков (лидер + enabled-ноды), ip без дублей.
+        /// Источники для async_dl — ip подписавших субблок: данные у них точно есть.
+        std::vector<std::string> subblock_data_sources(const REF_getter<MsgData::SubBlock>& s, const REF_getter<BlockMetaFull>& mf);
+        /// Обработка одного субблока текущего статуса: проверка подписей, стадии
+        /// (голос за оффер → кворум комитета → apply диффов → кворум диффов → финал),
+        /// догрузка отсутствующих данных через async_dl.
+        /// Ищет субблок по offer_hash в актуальном block_status; attempt — защита от зацикливания.
+        void process_status_subblock(const THASH_id& offer_hash, int round, const route_t& route, int attempt=1);
+        /// Записать финальный блок в БД и переключить prev_block (общий хвост с BlockDBStore).
+        void commitFinalBlock(const REF_getter<MsgData::BlockAccepted2REQ>& ba2,
+                              const std::vector<THASH_id>& tx_hashes,
+                              const std::map<std::string,std::string>& diffs,
+                              const REF_getter<MsgData::attachment_data>& att);
+        /// Раунд завершён (finished) и все субблоки собраны: слить их дампы в один
+        /// батч (поздние гранулы перезаписывают ранние) и сбросить в базу как в BlockStore.
+        void finalize_round(int round, const route_t& route);
         std::map<THASH_id/* block */,std::map<int, REF_getter<BlockMetaFull>> >block_meta_full;
         REF_getter<BlockMetaFull> getMetaFull(const THASH_id &meta_root_hash = THASH_id());
 
@@ -348,6 +369,8 @@ namespace Node
 
         std::vector<REF_getter<MsgData::TX>>  collectTx();
         THASH_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc, MsgData::ValidateBlockREQ* txs);
+        /// Детерминированный слэш: проверить эвиденс двойной подписи и сжечь стейк.
+        std::optional<std::string> execute_slash(b_params &b, const REF_getter<MsgData::SlashCmd>& sc);
 
 
         void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::HeartBeatREQ> &lc);
@@ -441,7 +464,7 @@ namespace Node
         // void resetBlockExpired(const NODE_id &n);
         bool on_NodeNotResponded(const bcEvent::NodeNotRespondedREQ *e);
         void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
-        void process_offer(const THASH_id & offer, const route_t &route);
+        void process_offer(const THASH_id & offer, const REF_getter<MsgData::BlockStatusREQ>& status, const route_t &route, int round, int subblock);
         // std::map<THASH_id,REF_getter<MsgData::Base>> cache;
         
 

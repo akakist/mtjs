@@ -142,6 +142,14 @@ public:
         
         stakes[user]-=amount;
     }
+    /// Слэш: полностью сжечь стейк ноды (не возвращая стейкерам).
+    /// Возвращает сожжённую сумму, чтобы вычесть её из total_stake.
+    i128 burn_all_stake()
+    {
+        i128 total=get_full_stake();
+        stakes.clear();
+        return total;
+    }
 
 
     void pack(outBuffer& o)  const final

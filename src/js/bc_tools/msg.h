@@ -95,6 +95,9 @@ namespace msgid
         UnlockRoundREQ=45,
         // Offer=46,
         BlockStatusREQ=47,
+        SubBlock=48,
+        Round=49,
+        SlashCmd=50,
     };
 
 }

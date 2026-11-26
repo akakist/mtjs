@@ -3,6 +3,14 @@
 #include "NODE_id.h"
 #include "bc_node.h"
 #include "tree.h"
+#include "time_types.h"
+
+/// Половина слота: лидер рассылает новые субблоки только до этой границы
+/// (ROUND_DURATION = 5с в md_BlockStatusREQ.h → 2.5с).
+static constexpr int64_t SUBBLOCK_WINDOW_MKS = 2500000;
+/// Если tx нет, раунд завершаем раньше — отдельный короткий дедлайн (1с).
+static constexpr int64_t EMPTY_ROUND_WINDOW_MKS = 1000000;
+
 struct BlockMetaFull: public Refcountable
 {
     std::map<NODE_id, i128> prev_stakes;
@@ -43,11 +51,14 @@ struct BlockMetaFull: public Refcountable
     TreeNode tree_all_nodes;
     TreeNode tree_committe;
     std::map<NODE_id, size_t> position_of_node;
+    /// состав групп для проверки подписей субблоков
     std::set<NODE_id> committe_members;
+    /// enabled-ноды вне комитета: подписывают результат применения диффов
+    std::set<NODE_id> noncommitte_members;
     i128 full_stake_all;
     i128 full_stake_committe;
     std::map<NODE_id, blst_cpp::PublicKey> bls_pks;
-    std::optional<blst_cpp::PublicKey> getBlsPk(const NODE_id& n)
+    std::optional<blst_cpp::PublicKey> getBlsPk(const NODE_id& n) const
     {
         auto it=bls_pks.find(n);
         if(it!=bls_pks.end())
@@ -60,6 +71,34 @@ struct BlockMetaFull: public Refcountable
     };
     std::string leader_ip;
     int round;
+    /// Начало текущего раунда: prev_block_ts + round*ROUND_DURATION (заполняется в getMetaFull).
+    TIME_mks round_start;
+
+    /// Граница, до которой лидер рассылает новые субблоки (половина слота = 2.5с).
+    TIME_mks subblock_deadline() const
+    {
+        return TIME_mks{round_start.v + SUBBLOCK_WINDOW_MKS};
+    }
+    /// Дедлайн пустого раунда (нет tx): завершаем раньше, чем половина слота.
+    TIME_mks empty_round_deadline() const
+    {
+        return TIME_mks{round_start.v + EMPTY_ROUND_WINDOW_MKS};
+    }
+    /// true — ещё можно рассылать субблоки.
+    bool can_broadcast_subblock(TIME_mks now) const
+    {
+        return now < subblock_deadline();
+    }
+
     BlockMetaFull(): Refcountable("BlockMetaFull") {}
+
+    bool isMemberCommitte(const NODE_id&n) const
+    {
+        return committe_members.count(n)!=0;
+    }
+    bool isMemberNonCommitte(const NODE_id&n) const
+    {
+        return noncommitte_members.count(n)!=0;
+    }
 
 };
