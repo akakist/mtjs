@@ -231,85 +231,6 @@ static TreeNode filter_tree(const std::vector<NodeElement>& vne, const std::set<
         filtered = vne;   // все мертвы — buildTree требует непустой
     return buildTree(filtered);
 }
-
-void Node::Service::do_start_block(MsgData::HeartBeatREQ* hb)
-{
-    MUTEX_INSPECTOR;
-
-    // Компакция исполняется в рамках блока: удаления, собранные в этом блоке,
-    // применяются после успешной записи. Новый блок — список сбрасывается.
-    local_deletes.clear();
-
-    if (!db_state.valid()) {
-        logNode("do_start_block: db_state invalid");
-        return;
-    }
-    if (sync_in_progress) {
-        logNode("do_start_block: sync in progress");
-        return;
-    }
-
-    const auto prev = prev_root_hash_Z();
-
-
-    auto mf = getMetaFull();
-    if (!mf.valid()) {
-        logNode("do_start_block: meta invalid");
-        return;
-    }
-
-    REF_getter<MsgData::ValidateBlockREQ> vb = new MsgData::ValidateBlockREQ();
-    vb->heart_beat = hb;
-    vb->block_timestamp=getNow();
-    // vb->lc = makeLeaderCert(hb, mf.get());
-
-    auto &bt = l_blocks[prev];
-
-    // ▼▼▼ collectTransactions возвращает отсортированный vector
-    auto txs = collectTx();
-    for (auto &tx : txs) {
-        vb->transaction_bodies.push_back(tx);
-    }
-    {
-        // REF_getter<MsgData::Offer> off = new MsgData::Offer();
-        // off->hb = hb;
-        // off->block_timestamp = vb->block_timestamp;
-        // off->txs = vb->transaction_bodies;
-        // bt.offer_hash = off->getHash();   // для статуса: появился -> tx не шлём
-    }
-    // relayBlockStatus(nullptr, nullptr);   // статус с offer_hash: сбор tx закрыт
-    logNode("do_start_block: broadcast ValidateBlockREQ tx_count=%zu (sorted)",
-            vb->transaction_bodies.size());
-    // ▲▲▲
-    if(vb->transaction_bodies.empty())
-    {
-        // return;
-    }
-    // Оффер идёт всему комитету, а не только ответившим на пинг: иначе при
-    // пустом/позднем alive-сете предложение не доходит ни до кого.
-    TreeNode comm_tree = mf->tree_committe;
-    broadcast_MsgEvent_via_broadcaster(vb.get(), comm_tree);
-
-    // Тестовый fault-injection для сплита: заморозить автора сразу после
-    // частичной рассылки (маркер MTJS_BCAST_ONCE, задержка в мкс).
-    // Так на блоке остаётся часть подписей, а остальные лидеры на той же
-    // высоте предлагают другой блок — получается доказанный раскол.
-    if (const char* us_env = getenv("MTJS_TEST_FREEZE_AFTER_BROADCAST_US"))
-    {
-        const char* fe = getenv("MTJS_TEST_FREEZE_AFTER_BROADCAST_EPOCH");
-        const long long minE = fe ? atoll(fe) : 0;
-        const char* once = "/tmp/regress/MTJS_BCAST_ONCE";
-        if (hb->new_epoch >= minE && access(once, F_OK) == 0 && unlink(once) == 0)
-        {
-            usleep(atoi(us_env));
-            logNode("TEST: freeze after broadcast epoch=%lld txs=%zu",
-                    (long long)hb->new_epoch, vb->transaction_bodies.size());
-            fflush(stdout);
-            raise(SIGSTOP);
-        }
-    }
-}
-
 bool Node::Service::on_timer(const timerEvent::TickTimer *e)
 {
     MUTEX_INSPECTOR;
@@ -400,29 +321,6 @@ bool Node::Service::on_alarm(const timerEvent::TickAlarm *e)
         // Кворум GetTx больше не нужен: тх — это мемпул, блок валидируется позже.
         // Аларм стартует от пинга (100 мс) и перевзводится на 10 мс приходом тх,
         // но не позже дедлайна раунда.
-#ifdef KALL
-        if(sync_in_progress)
-        {
-            return true;
-        }
-        auto &bt = l_blocks[prev_root_hash_Z()];
-        THASH_id hb_hash;
-        hb_hash.container=e->data->container;
-        MsgData::HeartBeatREQ* hb=dynamic_cast<MsgData::HeartBeatREQ*> (e->cookie.get());
-        if(!hb)
-        throw CommonError("if(!hb)");
-        if(bt.block_started)
-            return true;
-        auto cl=getMetaFull()->leader().name;
-        if(cl!=this_node_name)
-            return true;
-        if(hb->new_epoch != epoch_current() || hb->prev_root_hash_1 != prev_root_hash_Z())
-            return true;
-        bt.block_started = true;
-        do_start_block(hb);
-        logNode("do_start_block(); (tx alarm)");
-        bt.GetTxRSP_m[hb_hash].clear();
-#endif
         return true;
     }
     case TIMER_BlockDBStore:
@@ -1015,33 +913,33 @@ void Node::Service::do_request_for_transactions(MsgData::HeartBeatREQ* hb, const
     broadcast_MsgEvent_via_broadcaster(rt.get(), meta->tree_all_nodes);
 }
 
-THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc)
+THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc, MsgData::ValidateBlockREQ* txs)
 {
     MUTEX_INSPECTOR;
     if (getenv("MTJS_TREE_DUMP"))
-        logNode("[TRACE execute_block] begin txs=%zu", (size_t)b.validateBlockREQ->transaction_bodies.size());
+        logNode("[TRACE execute_block] begin txs=%zu", (size_t)txs->transaction_bodies.size());
     // logNode("[execute_block] sender %s",b.)
     {
-        auto st = cells::getStateNoCreate(root.get(), db_state.get(), NULL, b.validateBlockREQ->block_timestamp);
+        auto st = cells::getStateNoCreate(root.get(), db_state.get(), NULL, b.blockStatusREQ->hb->block_timestamp);
         auto bh=lc->new_epoch;
         if (st.valid()) {
             
             st->block_height=bh;
         }
     }
-    DBG(logNode("execute_block: tx_count=%zu", (size_t)b.validateBlockREQ->transaction_bodies.size()));
+    DBG(logNode("execute_block: tx_count=%zu", (size_t)txs->transaction_bodies.size()));
     // Nonce повышаем после всех tx: внутри цикла u взят до execute_transaction,
     // а откат (unpack_mx) заменяет data-объект — и incNonce уходит в отвязанный объект.
     std::vector<ADDRESS_id> nonce_bumps;
     // nonce из блока применяется после цикла, поэтому в пределах блока
     // второй tx того же сендера должен видеть уже учтённый nonce.
     std::map<ADDRESS_id,int64_t> pending_nonce;
-    for (int ti = 0; ti < b.validateBlockREQ->transaction_bodies.size(); ti++)
+    for (int ti = 0; ti < txs->transaction_bodies.size(); ti++)
     {
         MUTEX_INSPECTOR;
         // resetBlockExpired(b.validateBlockREQ->heart_beat->node_leader);
         std::optional<std::string> t_err;
-        auto tt=b.validateBlockREQ->transaction_bodies[ti];
+        auto tt=txs->transaction_bodies[ti];
         auto tx_hash=tt->getHash();
         auto &tj = tt->tx_body;
         yyjson_val *jroot2 = yyjson_doc_get_root(tt->doc);
@@ -1117,7 +1015,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
     // Фаза block-level изменений — вне tx: nonce, затем награды.
     for (auto& a : nonce_bumps)
     {
-        auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), a, NULL, b.validateBlockREQ->block_timestamp);
+        auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(), a, NULL, b.blockStatusREQ->hb->block_timestamp);
         if (!u.valid()) { logNode("execute_block: nonce bump: address not found"); continue; }
         u->incNonce();
     }
@@ -1133,7 +1031,7 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
         if (prev_block.valid()) {
             std::set<NODE_id> alive_set(prev_block->node_diff_validators.begin(),
                                         prev_block->node_diff_validators.end());
-            mark_activity(alive_set, NULL, b.validateBlockREQ->block_timestamp);
+            mark_activity(alive_set, NULL, b.blockStatusREQ->hb->block_timestamp);
         }
     }
     auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
@@ -1165,7 +1063,7 @@ void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData
                 throw CommonError("if(!n.valid())00@@");
 
             auto portion=n->get_full_stake()*b.node_rewards/total_staked;
-            auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),n->get_owner(), NULL, b.validateBlockREQ->block_timestamp);
+            auto u = cells::getAddressStateNoCreate(root.get(), db_state.get(),n->get_owner(), NULL, b.blockStatusREQ->hb->block_timestamp);
             if (u.valid()) {
                 {
                     
@@ -1309,29 +1207,28 @@ std::string Node::Service::self_ip()
     return std::string();
 }
 
-void Node::Service::cachePayloadAdd(const REF_getter<MsgData::Base> &p)
+void Node::Service::data_cache_add(const THASH_id &h, const REF_getter<MsgData::Base> &p)
 {
     if (!p.valid()) return;
-    THASH_id h = p->getHash();
     data_cache[h] = {getNow().v, p};
     // data_cache_created[h] = getNow().v;
     if (getenv("MTJS_DATA_TRACE"))
         logNode("[data] cached %s type=%s", h.str().c_str(), msgName(p->type));
 }
 
-REF_getter<MsgData::Base> Node::Service::getCachedPayload(const THASH_id &h)
+REF_getter<MsgData::Base> Node::Service::data_cache_get(const THASH_id &h)
 {
     auto it = data_cache.find(h);
     if (it == data_cache.end()) return nullptr;
     return it->second.second;
 }
 
-void Node::Service::cacheBlockPayloads(const REF_getter<MsgData::attachment_data> &att)
-{
-    // att_data — единый payload (эмиты, награды, диффы, tx_hashes).
-    if (att.valid())
-        cachePayloadAdd(REF_getter<MsgData::Base>(att.get()));
-}
+// void Node::Service::cacheBlockPayloads(const REF_getter<MsgData::attachment_data> &att)
+// {
+//     // att_data — единый payload (эмиты, награды, диффы, tx_hashes).
+//     if (att.valid())
+//         data_cache_add(REF_getter<MsgData::Base>(att.get()));
+// }
 
 void Node::Service::async_dl(const std::vector<THASH_id> &hashes,
                              const std::vector<std::string> &sources,
@@ -1342,7 +1239,7 @@ void Node::Service::async_dl(const std::vector<THASH_id> &hashes,
     for (auto& h : hashes) need.insert(h);
     std::set<THASH_id> have;
     for (auto& h : need)
-        if (getCachedPayload(h).valid()) have.insert(h);
+        if (data_cache_get(h).valid()) have.insert(h);
 
     if (have.size() == need.size())
     {
@@ -1399,7 +1296,7 @@ bool Node::Service::on_GetHashedDataREQ(const bcEvent::GetHashedDataREQ *e)
     std::vector<REF_getter<MsgData::Base>> data;
     for (auto& h : e->hashes)
     {
-        auto p = getCachedPayload(h);
+        auto p = data_cache_get(h);
         if (p.valid())
         {
             statuses.push_back(HashedData::OK);
@@ -1440,7 +1337,7 @@ bool Node::Service::on_GetHashedDataRSP(const bcEvent::GetHashedDataRSP *r)
                     (long long)r->task_id, r->hashes[i].str().c_str());
             continue;
         }
-        cachePayloadAdd(p);
+        data_cache_add(p->getHash(),p.get());
         t.have.insert(r->hashes[i]);
     }
 
@@ -1512,6 +1409,17 @@ void Node::Service::broadcastCurrentBlockStatus()
     {
         bt.block_status=new MsgData::BlockStatusREQ();
         bt.block_status->hb=new MsgData::HeartBeatREQ(prev_root_hash_Z(),epoch_current(),this_node_name,iUtils->getNow());
+    }
+
+
+    REF_getter<MsgData::ValidateBlockREQ> r=new MsgData::ValidateBlockREQ;
+    for(auto& t: transaction_pool_of_leader)
+    {
+        if(!tx_sent.count(t.first))
+        {
+            r->transaction_bodies.push_back(t.second);
+            tx_sent.insert(t.first);
+        }
     }
     logNode("[blockstatus] periodic relay") ;
     broadcast_MsgEvent_via_broadcaster(bt.block_status.get(), mf->tree_all_nodes);
@@ -1604,7 +1512,7 @@ std::optional<std::string> Node::Service::execute_tx_commands(b_params &b, t_par
                 NodeMsgSource src(&t);
                 CONTRACT_id caller;
                 JSIValue result = cc->call_method(root.get(), method_str, params_packed, &src, 
-                                                           &call_stack, contractHost.get(), t.roll, caller, & b.fees, deleted_granules,b.validateBlockREQ->block_timestamp);
+                                                           &call_stack, contractHost.get(), t.roll, caller, & b.fees, deleted_granules,b.blockStatusREQ->hb->block_timestamp);
 
                 JSI_SetContextOpaque(cc->ctx, prev_ctx);
 
@@ -1690,7 +1598,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     {
         // OrCreate: ячейка попадает в children_ptrs дерева, иначе мутация
         // остаётся на детачнутой копии и calc_tree_hash её не сохранит.
-        auto st = cells::getStateNoCreate(root.get(), db_state.get(), &roll, b.validateBlockREQ->block_timestamp);
+        auto st = cells::getStateNoCreate(root.get(), db_state.get(), &roll, b.blockStatusREQ->hb->block_timestamp);
         if (!st.valid()) 
             throw CommonError("if (!st.valid()) ");
         st->tx_count++;
@@ -1742,7 +1650,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     }
     t.tx_index = 0; // TBD
 
-    auto uu = cells::getAddressStateNoCreate(root.get(), db_state.get(),senderAddress, t.roll,b.validateBlockREQ->block_timestamp);
+    auto uu = cells::getAddressStateNoCreate(root.get(), db_state.get(),senderAddress, t.roll,b.blockStatusREQ->hb->block_timestamp);
     if (!uu.valid())
         throw CommonError("if(!uu.valid())");
 
@@ -1776,7 +1684,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
         t.rollback();
         // uu указывал на data_base до отката; rollback (unpack_mx) заменил объект,
         // поэтому перечитываем сендера ЗАНОВО — иначе газ спишется в отвязанный объект.
-        uu = cells::getAddressStateNoCreate(root.get(), db_state.get(), senderAddress, t.roll, b.validateBlockREQ->block_timestamp);
+        uu = cells::getAddressStateNoCreate(root.get(), db_state.get(), senderAddress, t.roll, b.blockStatusREQ->hb->block_timestamp);
         // b.emit_tx(t.tx_id, "error", R"({"error":"%s"})", msg.c_str());
         int64_t spent = 0;
         if (auto e = charge_gas(gas_charged, spent))
@@ -1810,7 +1718,7 @@ std::optional<std::string> Node::Service::execute_transaction(const THASH_id &tx
     _db_to_save db_dump;
     for(auto& z: deleted_granules)
     {
-        deleteGranule(z.get(),&roll,db_dump,t.b->validateBlockREQ->block_timestamp);
+        deleteGranule(z.get(),&roll,db_dump,t.b->blockStatusREQ->hb->block_timestamp);
     }
     root->calc_tree_hash(db_dump);
     // t.gasUsed += db_dump.size();

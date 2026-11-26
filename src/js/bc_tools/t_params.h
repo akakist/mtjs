@@ -9,11 +9,13 @@
 #include <cstdint>
 #include "FeesSnapshot.h"
 #include "emit_pack.h"
+#include "md_BlockStatusREQ.h"
 struct b_params
 {
     b_params(IDatabase* _db): att_data(new MsgData::attachment_data()),db(_db) {}
     IDatabase* db;
-    REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
+    REF_getter<MsgData::BlockStatusREQ> blockStatusREQ;
+    // REF_getter<MsgData::ValidateBlockREQ> validateBlockREQ;
     REF_getter<MsgData::attachment_data> att_data;
     int64_t node_rewards=0;
     REF_getter<BlockMetaFull> meta;

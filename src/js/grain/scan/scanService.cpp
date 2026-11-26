@@ -38,8 +38,8 @@ bool Scan::Service::ClientMsg(const bcEvent::ClientMsg *e)
         auto* pp = (MsgData::ScanREQ*)b.get();
         REF_getter<MsgData::ScanRSP> rsp = new MsgData::ScanRSP;
         // буфер 10 сек: scan_expired должен быть консервативным,
-        // gc перепроверит на момент блока (t.b->validateBlockREQ->block_timestamp)
-        // `gc` перепроверит на t.b->validateBlockREQ->block_timestamp — `-10` не нужен (clock skew нода/лидер)
+        // gc перепроверит на момент блока (t.b->blockStatusREQ->hb->block_timestamp)
+        // `gc` перепроверит на t.b->blockStatusREQ->hb->block_timestamp — `-10` не нужен (clock skew нода/лидер)
         // ВАЖНО: _update_time у активности — это block_timestamp в микросекундах.
         // time(NULL) даёт секунды, и сравнение _update_time + ttl < now никогда
         // не выполнялось (сканер всегда возвращал пустой список).

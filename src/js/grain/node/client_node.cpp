@@ -58,10 +58,12 @@ void Node::Service::apply_diffs(const THASH_id &att_hash, const route_t& route, 
 {
 
     Rollback roll;
-    auto d=cache.find(att_hash);
-    if(d==cache.end())
+    auto d=data_cache_get(att_hash);
+    if(!d.valid())
         return;
-    auto att_data=dynamic_cast<MsgData::attachment_data*>(d->second.get());
+    auto att_data=dynamic_cast<MsgData::attachment_data*>(d.get());
+    if(!att_data)
+        return;
 
     for(auto& z: att_data->diffs)
     {
@@ -83,7 +85,7 @@ void Node::Service::apply_diffs(const THASH_id &att_hash, const route_t& route, 
     auto& bt=l_blocks[prev_root_hash_Z()];
     bt.dumps[round][subblock]={new_root_hash,db_local};
 
-    cache[blake2b_hash(att_hash.container+"result")]=bdvrs.get();
+    data_cache_add(blake2b_hash(att_hash.container+"result"),bdvrs.get());
     pass_NodeMsgRSP(bdvrs.get(),route);
 
 }
@@ -91,198 +93,8 @@ bool Node::Service::BlockDiffValidateREQ(const MsgData::BlockDiffValidateREQ* r,
 {
     MUTEX_INSPECTOR;
 
-    cache[r->att_data->getHash()]=r->att_data.get();
-    // Приём BDV больше не завязан на cli.node_leader: его рассылает не только
-    // исходный лидер, но и новый — после сбора 2/3-сертификата (шаг 4).
-    // Подлинность проверяется ниже: aggregate-подпись 2/3 комитета за blockInfo
-    // и стейк-кворум. Достаточно проверить базу и высоту.
-    // База блока должна совпадать с нашим root. equals сверяет хартбиты между
-    // собой, а не с локальным деревом, поэтому без этой проверки диффы ложились
-    // на чужую базу и root никогда не сходился.
-    // if(r->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1!=prev_root_hash_Z())
-    // {
-    //     logNode("BlockDiffValidateREQ: stale base remote %s local %s — ignore",
-    //             r->blockAcceptedREQ->blockInfo->heart_beat->prev_root_hash_1.str().c_str(),
-    //             prev_root_hash_Z().str().c_str());
-    //     return true;
-    // }
-    // if(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch != epoch_current())
-    // {
-    //     logNode("BlockDiffValidateREQ: epoch %lld != current %lld — ignore",
-    //             (long long)r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
-    //             (long long)epoch_current());
-    //     return true;
-    // }
-    // Мы уже исполнили и подписали ровно этот блок (наш замок этой высоты).
-    // Повторно применять диффы нельзя (double apply), достаточно подтвердить
-    // hash BlockAcceptedREQ — это и есть недостающая diff-подпись.
-    // {
-    //     auto it = my_signed_rsp.find(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
-    //     if (it != my_signed_rsp.end() && it->second.valid()
-    //         && it->second->blockInfo.valid() && it->second->blockInfo->heart_beat.valid()
-    //         && it->second->blockInfo->getHash() == r->blockAcceptedREQ->blockInfo->getHash())
-    //     {
-    //         REF_getter<MsgData::BlockDiffValidateRSP> bdvrs = new MsgData::BlockDiffValidateRSP;
-    //         bdvrs->node_validator = this_node_name;
-    //         bdvrs->sig34.sign(my_sk_bls, r->blockAcceptedREQ->blockInfo->getHash().container);
-    //         bdvrs->blockAcceptedHash = r->blockAcceptedREQ->getHash();
-    //         my_diff_rsp[r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch] = bdvrs;
-    //         // persistCliVote(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
-    //         logNode("BlockDiffValidateREQ: блок уже исполнен epoch=%lld root=%s — подпись без повторного применения",
-    //                 (long long)r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
-    //                 it->second->blockInfo->new_root_hash1.str().c_str());
-    //         pass_NodeMsgRSP(bdvrs.get(), route);
-    //         return true;
-    //     }
-    // }
-    // std::vector<blst_cpp::PublicKey> agg_pk;
-    // for (auto &z : r->blockAcceptedREQ->node_validators)
-    // {
-    //     XTRY;
-    //     auto n=cells::getNodeNoCreateConst(root.get(),db_state.get(), z);
-    //     if(!n.valid())
-    //         throw CommonError("if(!n.valid()) @09");
+    data_cache_add(r->att_data->getHash(),r->att_data.get());
 
-    //     agg_pk.push_back(n->get_bls_pk());
-    //     XPASS;
-    // }
-
-    // {
-    //     MUTEX_INSPECTOR;
-    //     XTRY;
-    //     if (!r->blockAcceptedREQ->agg_sig.verify(agg_pk, r->blockAcceptedREQ->blockInfo->getHash().container))
-    //     {
-    //         logNode("block aggsig not matched");
-    //         return true;
-    //     }
-    //     else
-    //     {
-    //     }
-    //     XPASS;
-    // }
-    /// TODO: проверка стейка
-    auto mf=getMetaFull();
-
-    // i128 staked=i128(0);
-    // for(auto &z: r->blockAcceptedREQ->node_validators)
-    // {
-    //     staked+=mf->getPrevStake(z);
-    // }
-    // i128 fullstake=i128(0);
-    // for(auto &z: mf->committe_members)
-    // {
-    //     fullstake+=mf->getPrevStake(z);
-    // }
-    // if((staked*100)/fullstake < QUORUM)
-    // {
-    //     logNode("failed quorum check V");
-    //     return true;
-    // }
-#ifdef KALL
-    Rollback roll;
-
-    // Порог компакции ДО применения диффов: если в этом блоке он вырос,
-    // валидатор обязан применить то же правило чистки, что и лидер.
-    TIME_mks old_cutoff;
-    {
-        auto st0 = cells::getStateNoCreateConst(root.get(), db_state.get());
-        if (st0.valid()) old_cutoff = st0->compact_before_ts;
-    }
-#endif
-    // _db_to_save db_dump;
-/// применяем диффы
-    // for(auto& z: r->deleted)
-    // {
-    //     if(z.size()!=32) throw CommonError("if(z.first.size()!=32)");
-    //         THASH_id h;
-    //         h.container=z;
-    //         auto cc = cells::getByDbIdNoCreate(root.get(),db_state.get(), h, true, &roll, r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
-    //         if (!cc.valid()) { logNode("deleted: cell not found %s", base16::encode(z).c_str()); continue; }
-    //         if (!cc->data.valid()) { logNode("deleted: no data %s", base16::encode(z).c_str()); continue; }            
-    //         // WriteGuard gcc(cc, &roll,r->blockAcceptedREQ->blockInfo->block_timestamp,false);
-    //         cc->markDirty(r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
-    //         deleteGranule(cc->data.get(),&roll,db_to_save_Z,r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp);
-    // }
-    // for(auto &z: db_dump)
-#ifdef KALL
-    for(auto& z: r->diffs)
-    {
-        if(z.first.size()!=32) throw CommonError("if(z.first.size()!=32)");
-        THASH_id h;
-        h.container=z.first;
-        auto leaf=cells::replaceLeaf(root.get(),db_state.get(), h, &roll,z.second,true);
-        // if (leaf.valid()) leaf->parent->markDirty(r->blockAcceptedREQ->blockInfo->block_timestamp);
-    }
-#endif
-
-    // Компакция: если лидер в этом блоке поднял compact_before_ts,
-    // каждый валидатор физически чистит тумбстоуны у себя — иначе root не сойдётся.
-#ifdef KALL
-    {
-        auto st = cells::getStateNoCreateConst(root.get(), db_state.get());
-        if (st.valid() && st->compact_before_ts > old_cutoff)
-        {
-            int64_t unlimited = INT64_MAX;
-            std::vector<std::string> pruned;
-            prune_tombstones(root.get(), db_state.get(), st->compact_before_ts,
-                             unlimited, pruned,
-                             r->blockAcceptedREQ->blockInfo->heart_beat->block_timestamp, &roll);
-            for (auto& id : pruned) local_deletes.push_back(id);
-            logNode("BlockDiffValidateREQ: prune by compact_before_ts=%lld removed=%d",
-                    (long long)st->compact_before_ts.v, (int)pruned.size());
-        }
-    }
-    // Считаем root в ЛОКАЛЬНЫЙ буфер: при несовпадении нельзя оставлять
-    // в общем db_to_save_Z ячейки отравленного дерева — иначе они уедут
-    // в БД следующим коммитом.
-    _db_to_save db_local;
-    auto new_root_hash=proceed_merkle_on_transaction_pool_hashers(root,db_local);
-    if(r->blockAcceptedREQ->blockInfo->new_root_hash1!=new_root_hash)
-    {
-        logNode("@@ BlockDiffValidateREQ not matched root hash remote %s local %s",
-                r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str(),new_root_hash.str().c_str());
-        if (getenv("MTJS_TREE_DUMP")) {
-            logNode("[TREE validator] epoch=%d local=%s remote=%s",
-                    (int)r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch,
-                    new_root_hash.str().c_str(),
-                    r->blockAcceptedREQ->blockInfo->new_root_hash1.str().c_str());
-            dump_tree(root.get(), db_state.get(), "validator", 0, 6);
-        }
-        if (getenv("MTJS_TREE_DUMP")) {
-            std::string dbg;
-            for (auto& z : r->diffs)
-                dbg += base16::encode(z.first).substr(0,12) + ":" +
-                       base16::encode(blake2b_hash(z.second).container).substr(0,12) + " ";
-            logNode("[DIAG validator diff] n=%zu %s", r->diffs.size(), dbg.c_str());
-        }
-        // Откат по roll.data небезопасен: там СЫРЫЕ Cellable*, а детачнутая
-        // ячейка могла быть уже освобождена -> SIGSEGV. Вместо отката
-        // перечитываем дерево из БД (db_local не коммитим).
-        (void)roll;
-        root = getRoot(db_state.get(), prev_block);
-        return true;
-    }
-    db_to_save_Z.add(db_local);   // только после успешной сверки
-    cacheBlockPayloads(r->att_data);
-    REF_getter<MsgData::BlockDiffValidateRSP> bdvrs=new MsgData::BlockDiffValidateRSP;
-    bdvrs->node_validator=this_node_name;
-    bdvrs->sig34.sign(my_sk_bls,r->blockAcceptedREQ->blockInfo->getHash().container);
-    bdvrs->blockAcceptedHash=r->blockAcceptedREQ->getHash();
-    my_diff_rsp[r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch] = bdvrs;
-    // persistCliVote(r->blockAcceptedREQ->blockInfo->heart_beat->new_epoch);
-
-    // DIAG: what validator signs
-    {
-        blst_cpp::PublicKey my_pk(my_sk_bls);
-        DBG(logNode("[DIAG BlockDiffValidateRSP sign] validator=%s pk=%s sig=%s hash=%s",
-            this_node_name.container.c_str(),
-            base16::encode(my_pk.serialize()).c_str(),
-            base16::encode(bdvrs->sig34.serialize()).c_str(),
-            r->blockAcceptedREQ->getHash().str().c_str()));
-    }
-
-    pass_NodeMsgRSP(bdvrs.get(),route);
-#endif
     return true;
 }
 static void dump_mem(const char* label, JSIRuntime* rt) {
@@ -382,7 +194,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
         }
     }
 
-    cacheBlockPayloads(r->att_data);
+    // cacheBlockPayloads(r->att_data);
 
     // Тест-хук: один раз выкинуть att_data из кеша и дотянуть её у подписанта
     // (проверка async_dl: запрос по хешу, ответ, кеш, финалайз).
@@ -546,14 +358,14 @@ void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
 
         MUTEX_INSPECTOR;
         // auto new_root_hash =
-        auto d=cache.find(offer);
-        if(d==cache.end())
+        auto d=data_cache_get(offer);
+        if(!d.valid())
         {
             logNode("cannot find offer");
             return;
         }
-        t.validateBlockREQ = dynamic_cast<MsgData::ValidateBlockREQ*>(d->second.get());
-        if(!t.validateBlockREQ.valid())
+        auto validateBlockREQ = dynamic_cast<MsgData::ValidateBlockREQ*>(d.get());
+        if(!validateBlockREQ)
         {
             logNode("if(!t.validateBlockREQ.valid())");
             return;
@@ -577,11 +389,11 @@ void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
             .ttl_seconds_per_gas  = v->getValue("ttl_seconds_per_gas"),
             .gas_create_address   = v->getValue("gas_create_address"),
         };
-        auto new_root_hash = execute_block(t, t.validateBlockREQ->heart_beat);
-        if (getenv("MTJS_TREE_DUMP") && !t.validateBlockREQ->transaction_bodies.empty()) {
-            logNode("[TREE leader] epoch=%d root=%s", (int)t.validateBlockREQ->heart_beat->new_epoch, new_root_hash.str().c_str());
-            dump_tree(root.get(), db_state.get(), "leader", 0, 6);
-        }
+        auto new_root_hash = execute_block(t, t.blockStatusREQ->hb,validateBlockREQ);
+        // if (getenv("MTJS_TREE_DUMP") && !t.blvalidateBlockREQ->transaction_bodies.empty()) {
+        //     logNode("[TREE leader] epoch=%d root=%s", (int)t.validateBlockREQ->heart_beat->new_epoch, new_root_hash.str().c_str());
+        //     dump_tree(root.get(), db_state.get(), "leader", 0, 6);
+        // }
                 
         std::map<std::string, std::string> diffs;
         for(auto& z:db_to_save_Z.cells)
@@ -593,15 +405,15 @@ void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
             
         }
         std::vector<THASH_id> tx_hashes;
-        for(auto & z:t.validateBlockREQ->transaction_bodies)
+        for(auto & z:validateBlockREQ->transaction_bodies)
             tx_hashes.push_back(z->getHash());
 
         t.att_data->tx_hashes = tx_hashes;
         t.att_data->diffs = diffs;
-        cache[t.att_data->getHash()]=t.att_data.get();
-        cacheBlockPayloads(t.att_data);
+        data_cache_add(t.att_data->getHash(),t.att_data.get());
+        // cacheBlockPayloads(t.att_data);
 
-        REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo(new_root_hash,t.att_data->getHash(), offer,t.validateBlockREQ->heart_beat);
+        REF_getter<MsgData::BlockInfo> blockInfo = new MsgData::BlockInfo(new_root_hash,t.att_data->getHash(), offer,t.blockStatusREQ->hb);
         blockInfo->offer_hash = offer;   // хеш оффера — в blockInfo
         REF_getter<MsgData::ValidateBlockRSP> rsp = new MsgData::ValidateBlockRSP();
 
@@ -617,7 +429,7 @@ void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
 
         // ЗАМОК: не подписываем второй блок на той же высоте.
         if (block_lock.valid() && block_lock->heart_beat.valid()
-            && block_lock->heart_beat->new_epoch == t.validateBlockREQ->heart_beat->new_epoch
+            && block_lock->heart_beat->new_epoch == t.blockStatusREQ->hb->new_epoch
             && block_lock->new_root_hash1 != new_root_hash)
         {
             logNode("ValidateBlockRSP: REFUSE — уже подписан другой блок на высоте %lld (lock=%s new=%s)",
@@ -628,7 +440,7 @@ void Node::Service::process_offer(const THASH_id & offer, const route_t &route)
         rsp->node_validator = this_node_name;
         rsp->sign(my_sk_bls);
         logNode("ValidateBlockRSP: подписан epoch=%lld root=%s",
-                (long long)t.validateBlockREQ->heart_beat->new_epoch, new_root_hash.str().c_str());
+                (long long)t.blockStatusREQ->hb->new_epoch, new_root_hash.str().c_str());
         block_lock = blockInfo;
 
         pass_NodeMsgRSP(rsp.get(), route);
@@ -650,15 +462,7 @@ bool Node::Service::ValidateBlockREQ(const MsgData::ValidateBlockREQ *r, const N
 {
     MUTEX_INSPECTOR;
 
-    // logNode("ValidateBlockREQ from %s",src_node.container.c_str());
-    auto mf=getMetaFull();
-    auto cl=mf->leader();
-    if(cl.name!=src_node)
-    {
-        logNode("if(mf->leader!=src_node) @@873");
-        return true;
-    }
-    cache[r->getHash()]=r;
+    data_cache_add(r->getHash(),r);
     return true;
 }
 

@@ -282,10 +282,10 @@ namespace Node
         void broadcastCurrentBlockStatus();
         bool dl_test_done = false;   // тест-хук MTJS_TEST_DL_FETCH — один раз
 
-        void cachePayloadAdd(const REF_getter<MsgData::Base>& p);
-        REF_getter<MsgData::Base> getCachedPayload(const THASH_id& h);
+        void data_cache_add(const THASH_id &h, const REF_getter<MsgData::Base>& p);
+        REF_getter<MsgData::Base> data_cache_get(const THASH_id& h);
         /// Закинуть в кеш диффы/att_data/список tx (их getHash — ключи).
-        void cacheBlockPayloads(const REF_getter<MsgData::attachment_data>& att);
+        // void cacheBlockPayloads(const REF_getter<MsgData::attachment_data>& att);
         /// Асинхронно получить данные по хешам из sources; done(true/false).
         void async_dl(const std::vector<THASH_id>& hashes,
                       const std::vector<std::string>& sources,
@@ -347,7 +347,7 @@ namespace Node
 
 
         std::vector<REF_getter<MsgData::TX>>  collectTx();
-        THASH_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc);
+        THASH_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc, MsgData::ValidateBlockREQ* txs);
 
 
         void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::HeartBeatREQ> &lc);
@@ -442,7 +442,7 @@ namespace Node
         bool on_NodeNotResponded(const bcEvent::NodeNotRespondedREQ *e);
         void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
         void process_offer(const THASH_id & offer, const route_t &route);
-        std::map<THASH_id,REF_getter<MsgData::Base>> cache;
+        // std::map<THASH_id,REF_getter<MsgData::Base>> cache;
         
 
         void apply_diffs(const THASH_id &att_hash, const route_t& route, int round, int subblock);
