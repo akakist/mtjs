@@ -12,13 +12,12 @@ namespace MsgData
         {
 
         }
-        HeartBeatREQ(const THASH_id& _prev_block_hash, int64_t _newepoch, const NODE_id& _node_leader, TIME_mks bs):Base(msgid::HeartBeatREQ),
-            prev_root_hash_1(_prev_block_hash), new_epoch(_newepoch), node_leader(_node_leader), block_timestamp(bs)
+        HeartBeatREQ(const THASH_id& _prev_block_hash, int64_t _newepoch,  TIME_mks bs):Base(msgid::HeartBeatREQ),
+            prev_root_hash_1(_prev_block_hash), new_epoch(_newepoch),  block_timestamp(bs)
         {
         }
         THASH_id prev_root_hash_1;
         int64_t new_epoch;
-        NODE_id node_leader;
         TIME_mks block_timestamp;
 
         bool equals(const REF_getter<HeartBeatREQ> &a)
@@ -26,7 +25,6 @@ namespace MsgData
             MUTEX_INSPECTOR;
             return prev_root_hash_1 == a->prev_root_hash_1 &&
                     new_epoch == a->new_epoch &&
-                    node_leader == a->node_leader &&
                     block_timestamp==a->block_timestamp;
         }
 
@@ -35,7 +33,6 @@ namespace MsgData
             MUTEX_INSPECTOR;
             h.update(prev_root_hash_1.container);
             h.update(std::to_string(new_epoch));
-            h.update(node_leader.container);
             h.update(block_timestamp.str());
         }
         void pack(outBuffer& b) const final
@@ -44,7 +41,6 @@ namespace MsgData
 
             Base::pack(b);
             b<<prev_root_hash_1;
-            b<<node_leader;
             b<<new_epoch;
             b<<block_timestamp;
         }
@@ -53,7 +49,6 @@ namespace MsgData
             MUTEX_INSPECTOR;
             Base::unpack(b);
             b>>prev_root_hash_1;
-            b>>node_leader;
             b>>new_epoch;
             b>>block_timestamp;
         }

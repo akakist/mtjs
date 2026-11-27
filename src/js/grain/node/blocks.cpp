@@ -35,17 +35,15 @@ bool subblock_take_stake(const REF_getter<BlockMetaFull>& mf, const NODE_id& n, 
 }
 }
 
-SB_result verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
+SB_result Node::Service::verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
                                const REF_getter<MsgData::HeartBeatREQ>& hb,
-                               const REF_getter<BlockMetaFull>& mf,
-                               Node::Service* ns)
+                               const REF_getter<BlockMetaFull>& mf, std::set<NODE_id>& slashed)
 {
     SB_result r;
 
-    auto log=[&](const char* what, const std::string& detail)
+    auto log=[&,b](const char* what, const std::string& detail)
     {
-        if(ns)
-            ns->logNode("verify_subblock_sigs: %s [%s] offer=%s",
+            logNode("verify_subblock_sigs: %s [%s] offer=%s",
                         what, detail.c_str(), b->offer_hash.str().c_str());
     };
     auto corrupt=[&](const char* what, const std::string& detail)
@@ -59,7 +57,8 @@ SB_result verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
         return corrupt("no meta", "");
 
     /// подписант не должен встречаться дважды ни внутри группы, ни между группами
-    std::map<NODE_id,int> signed_cnt;
+    // std::map<NODE_id,int> signed_cnt_committe;
+    // std::map<NODE_id,int> signed_cnt_noncommitte;
 
     /// ── подписи комитета ────────────────────────────────────────────────
     for(auto& ih: b->accepted_by_committe)
@@ -83,8 +82,8 @@ SB_result verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
         {
             if(!mf->isMemberCommitte(n))
                 return corrupt("committee: signer not in committee", n.container);
-            if(++signed_cnt[n]>1)
-                return corrupt("signer voted twice", n.container);
+            // if(++signed_cnt_committe[n]>1)
+            //     return corrupt("signer voted twice", n.container);
             auto pk=mf->getBlsPk(n);
             if(!pk)
                 return corrupt("committee: no bls pk", n.container);
@@ -107,6 +106,38 @@ SB_result verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
             r.committe_quorum_hash=h;
         }
     }
+    for(auto& z:b->double_signed_by_committe)
+    {
+        std::vector<blst_cpp::PublicKey> pks;
+        for(auto& n: z.second->node_validators)
+        {
+            bool inPrev=false;
+            for(auto& z: b->accepted_by_committe)
+            {
+                for(auto& x: z.second->node_validators)
+                {
+                    if(x==n)
+                        inPrev=true;
+                    if(inPrev) break;
+                }
+                if(inPrev) break;
+            }
+            if(!inPrev)
+            {
+                return corrupt("double_signed_by_committe: signer not exists in in accepted_by_committe", n.container);
+            }
+            if(!mf->isMemberCommitte(n))
+                return corrupt("double_signed_by_committe: signer not in double_signed_by_committe", n.container);
+            // if(++signed_cnt_committe[n]>1)
+            //     return corrupt("signer voted twice", n.container);
+            auto pk=mf->getBlsPk(n);
+            if(!pk)
+                return corrupt("double_signed_by_committe: no bls pk", n.container);
+            pks.push_back(*pk);
+        }
+        if(!z.second->agg_sig.verify(pks,z.first.container))
+            return corrupt("double_signed_by_committe: aggregate signature invalid", z.first.str());
+    }
 
     /// ── подписи не-комитета ─────────────────────────────────────────────
     for(auto& z: b->accepted_by_noncommitte)
@@ -123,8 +154,9 @@ SB_result verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
         {
             if(!mf->isMemberNonCommitte(n))
                 return corrupt("non-committee: signer not in non-committee", n.container);
-            if(++signed_cnt[n]>1)
-                return corrupt("signer voted twice", n.container);
+
+            // if(++signed_cnt_noncommitte[n]>1)
+            //     return corrupt("signer voted twice", n.container);
             auto pk=mf->getBlsPk(n);
             if(!pk)
                 return corrupt("non-committee: no bls pk", n.container);
@@ -146,6 +178,40 @@ SB_result verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
             r.has_noncommite_quorum=true;
             r.non_committe_quorum_hash=h;
         }
+    }
+    for(auto& z: b->double_signed_by_noncommitte)
+    {
+        const THASH_id& h=z.first;
+        const auto& agg=z.second.first;
+        const auto& nodes=z.second.second;
+        if(nodes.empty())
+            return corrupt("double_signed_by_noncommitte: no validators", h.str());
+
+        std::vector<blst_cpp::PublicKey> pks;
+        for(auto& n: nodes)
+        {
+            bool inPrev=false;
+            for(auto& zz: b->accepted_by_noncommitte)
+            {
+                for(auto& x: zz.second.second)
+                {
+                    if(x==n)
+                        inPrev=true;
+                    if(inPrev)
+                        break;
+                }
+                if(inPrev)
+                    break;
+            }
+            if(!mf->isMemberNonCommitte(n))
+                return corrupt("double_signed_by_noncommitte: signer not in non-committee", n.container);
+            auto pk=mf->getBlsPk(n);
+            if(!pk)
+                return corrupt("double_signed_by_noncommitte: no bls pk", n.container);
+            pks.push_back(*pk);
+        }
+        if(!agg.verify(pks,h.container))
+            return corrupt("double_signed_by_noncommitte: aggregate signature invalid", h.str());
     }
 
     return r;

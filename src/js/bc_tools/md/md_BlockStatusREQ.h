@@ -28,7 +28,9 @@ namespace MsgData
 
         THASH_id offer_hash;
         std::map<THASH_id, REF_getter<MsgData::BlockAcceptedREQ>> accepted_by_committe;
+        std::map<THASH_id, REF_getter<MsgData::BlockAcceptedREQ>> double_signed_by_committe;
         std::map<THASH_id,std::pair<blst_cpp::AggregateSignature, std::vector<NODE_id> > > accepted_by_noncommitte;
+        std::map<THASH_id,std::pair<blst_cpp::AggregateSignature, std::vector<NODE_id> > > double_signed_by_noncommitte;
         bool last=false;
         THASH_id result_root_hash;
         THASH_id att_hash;
@@ -36,16 +38,26 @@ namespace MsgData
         void add_accepted_by_noncommitte(const THASH_id& blockAcceptedHash, const NODE_id& n, const blst_cpp::Signature& sig)
         {
             auto & b=accepted_by_noncommitte[blockAcceptedHash];
+            int n_sigs=0;
             for(auto & z: b.second)
             {
                 if(z==n)
                 {
+                    n_sigs++;
                     logErr2("already added sig");
                     return;
                 }
             }
-            b.first.add(sig);
-            b.second.push_back(n);
+            if(n_sigs==0)
+            {
+                b.first.add(sig);
+                b.second.push_back(n);
+            }
+            else{
+                auto & d=double_signed_by_noncommitte[blockAcceptedHash];
+                d.first.add(sig);
+                d.second.push_back(n);
+            }
         }
         void add_accepted_by_committe(const REF_getter<MsgData::ValidateBlockRSP> &r)
         {
@@ -109,6 +121,8 @@ namespace MsgData
         /// true — субблоков больше не будет: лидер вышел за половину слота либо пул пуст.
         /// Клиент, увидев finished, понимает, что можно переходить к финализации.
         bool finished=false;
+        NODE_id leader;
+        TIME_mks round_timestamp;
 
         /// Достать/создать субблок по индексу (REF_getter: вектор хранит указатели).
         REF_getter<SubBlock> getOrCreateSubblock(int idx)
@@ -125,13 +139,13 @@ namespace MsgData
         {
             MUTEX_INSPECTOR;
             Base::pack(o);
-            o<<subblocks<<finished;
+            o<<subblocks<<finished<<leader<<round_timestamp;
         }
         void unpack(inBuffer& o) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(o);
-            o>>subblocks>>finished;
+            o>>subblocks>>finished>>leader>>round_timestamp;
         }
         void update(Blake2bHasher& h) const
         {
@@ -140,6 +154,8 @@ namespace MsgData
                 z->update(h);
             }
             h.update(std::to_string(finished));
+            h.update(leader.container);
+            h.update(round_timestamp.str());
         }
     };
 

@@ -1508,7 +1508,8 @@ void Node::Service::process_status_subblock(const THASH_id& offer_hash, int roun
         return;     // субблок уже не в актуальном статусе
 
     auto mf=getMetaFull();
-    SB_result vr=verify_subblock_sigs(sp,bt.block_status->hb,mf,this);
+    std::set<NODE_id> slashed;
+    SB_result vr=verify_subblock_sigs(sp,bt.block_status->hb,mf, slashed);
     if(vr.corrupt)
     {
         logNode("BlockStatusREQ: subblock offer=%s: подписи не сходятся — пропуск",
@@ -1643,7 +1644,8 @@ void Node::Service::finalize_round(int round, const route_t& route)
     for(size_t i=0;i<rd->subblocks.size();i++)
     {
         auto& s=rd->subblocks[i];
-        SB_result vr=verify_subblock_sigs(s,bt.block_status->hb,mf,this);
+        std::set<NODE_id> slashed;
+        SB_result vr=verify_subblock_sigs(s,bt.block_status->hb,mf, slashed);
         if(vr.corrupt)
         {
             logNode("finalize_round: subblock %zu offer=%s: битые подписи — ждём",
@@ -1791,11 +1793,16 @@ void Node::Service::broadcastCurrentBlockStatus()
     if(!bt.block_status.valid())
     {
         bt.block_status=new MsgData::BlockStatusREQ();
-        bt.block_status->hb=new MsgData::HeartBeatREQ(prev_root_hash_Z(),epoch_current(),this_node_name,iUtils->getNow());
+        bt.block_status->hb=new MsgData::HeartBeatREQ(prev_root_hash_Z(),epoch_current(),iUtils->getNow());
     }
 
     auto& round=bt.block_status->rounds[mf->round];
-    if(!round.valid()) round=new MsgData::Round;
+    if(!round.valid())
+    {
+        round=new MsgData::Round;
+        round->leader=this_node_name;
+        round->round_timestamp=getNow();
+    }
 
     // Рассылка новых субблоков — только до половины слота.
     if(!round->finished)
@@ -1816,11 +1823,12 @@ void Node::Service::broadcastCurrentBlockStatus()
         if(!offer->transaction_bodies.empty())
         {
             // лидер тоже валидатор: оффер кладём себе в кеш и рассылаем всем
-            data_cache_add(offer->getHash(), offer.get());
+            auto oh=offer->getHash();
+            data_cache_add(oh, offer.get());
             broadcast_MsgEvent_via_broadcaster(offer.get(), mf->tree_all_nodes);
 
             REF_getter<MsgData::SubBlock> sb=new MsgData::SubBlock;
-            sb->offer_hash=offer->getHash();
+            sb->offer_hash=oh;
             round->subblocks.push_back(sb);
             logNode("[blockstatus] offer %s txs=%zu subblocks=%zu",
                     sb->offer_hash.str().c_str(), offer->transaction_bodies.size(), round->subblocks.size());
@@ -1887,8 +1895,8 @@ void Node::Service::broadcastCurrentBlockStatus()
                 auto sent_flag=blake2b_hash(s->offer_hash.container+"att_data_sent");
                 if(data_cache.find(sent_flag)!=data_cache.end())
                     continue;   // уже рассылали
-
-                SB_result vr=verify_subblock_sigs(s,bt.block_status->hb,mf,this);
+                std::set<NODE_id> slashed;
+                SB_result vr=verify_subblock_sigs(s,bt.block_status->hb,mf, slashed);
                 if(vr.corrupt || !vr.has_committe_quorum)
                     continue;
                 auto it=s->accepted_by_committe.find(vr.committe_quorum_hash);

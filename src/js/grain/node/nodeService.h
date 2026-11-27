@@ -97,7 +97,7 @@ namespace Node
         TIMER_BlockDBStore,
         TIMER_STALE_CLEANUP,
         TIMER_BLOCK_STATUS,   // периодическая рассылка статуса лидером (200 мс)
-        TIMER_BLOCK_EXPIRED,
+        // TIMER_BLOCK_EXPIRED,
         ALARM_GetValidateBlockRSP,
         ALARM_DL_TIMEOUT,   // шаг 3: повтор сбора сертификата 2/3
         ALARM_TX_SENT,               // страховка: вернуть tx из sent в пул
@@ -469,6 +469,9 @@ namespace Node
         
 
         void apply_diffs(const THASH_id &att_hash, const route_t& route, int round, int subblock);
+        SB_result verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
+                               const REF_getter<MsgData::HeartBeatREQ>& hb,
+                               const REF_getter<BlockMetaFull>& mf, std::set<NODE_id>& slashed);
 
     };
 

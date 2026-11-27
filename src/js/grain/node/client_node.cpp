@@ -123,9 +123,10 @@ void Node::Service::commitFinalBlock(const REF_getter<MsgData::BlockAccepted2REQ
                                      const REF_getter<MsgData::attachment_data>& att)
 {
     MUTEX_INSPECTOR;
+    auto mf=getMetaFull();
     auto info=ba2->blockAcceptedREQ->blockInfo;
 
-    if(this_node_name==info->heart_beat->node_leader)
+    if(this_node_name==mf->leader().name)
     {
         size_t sz=0;
         for(auto& z:db_to_save_Z.cells)
@@ -189,7 +190,7 @@ void Node::Service::commitFinalBlock(const REF_getter<MsgData::BlockAccepted2REQ
     }
 
     // лидер раунда — из заголовка блока (cli.node_leader больше не нужен)
-    sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BLOCK_EXPIRED,toRef(info->heart_beat->node_leader.container),this));
+    // sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BLOCK_EXPIRED,toRef(info->heart_beat->node_leader.container),this));
 }
 
 bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id & src_node, const route_t& route)
@@ -305,7 +306,7 @@ bool Node::Service::BlockDBStore(const MsgData::BlockDBStore* r, const NODE_id &
 
 
     // лидер раунда — из заголовка блока (cli.node_leader больше не нужен)
-    sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BLOCK_EXPIRED,toRef(info->heart_beat->node_leader.container),this));
+    // sendEvent(ServiceEnum::Timer,new timerEvent::StopAlarm(TIMER_BLOCK_EXPIRED,toRef(info->heart_beat->node_leader.container),this));
     // cli_leader_info[prev_root_hash_Z()].node_leader=nullptr;
     // pruneRoundState(epoch_current());
     XPASS;
