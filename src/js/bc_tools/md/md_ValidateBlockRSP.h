@@ -29,6 +29,9 @@ namespace MsgData
 
         int round;
         int subblock;
+        /// куда лидеру положить голос: false — accept (состояние ДО слэша),
+        /// true — slash (состояние ПОСЛЕ слэша).
+        bool slash=false;
 
         void update(Blake2bHasher& h) const
         {
@@ -40,6 +43,7 @@ namespace MsgData
 
             h.update(std::to_string(round));
             h.update(std::to_string(subblock));
+            h.update(slash ? "1" : "0");
         }
         void pack(outBuffer& b) const final
         {
@@ -49,7 +53,7 @@ namespace MsgData
             b<<blockInfo;
             b<<sig;
             b<<node_validator<<att_data;
-            b<<round<<subblock;
+            b<<round<<subblock<<slash;
         }
         void unpack(inBuffer& b) final
         {
@@ -58,7 +62,7 @@ namespace MsgData
             b>>blockInfo;
             b>>sig;
             b>>node_validator>>att_data;
-            b>>round>>subblock;
+            b>>round>>subblock>>slash;
         }
         void sign(const blst_cpp::SecretKey &sk)
         {

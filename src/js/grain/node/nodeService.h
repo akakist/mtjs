@@ -187,11 +187,6 @@ namespace Node
 
             std::set<THASH_id> sent_tx;
             std::map<int/* round */, std::map<int /*subblock*/, std::pair<THASH_id, _db_to_save>>> dumps;           
-            // Слэш (лидер, in-memory): первая индивидуальная подпись каждого валидатора
-            // (для доказательства двойной подписи) и собранный эвиденс на слэш-субблок.
-            std::map<NODE_id, std::pair<THASH_id, blst_cpp::Signature>> first_committe_sig;
-            std::map<NODE_id, std::pair<THASH_id, blst_cpp::Signature>> first_noncommitte_sig;
-            std::vector<REF_getter<MsgData::SlashCmd>> pending_slashes;
             // THASH_id offer_hash;   // хеш оффера текущего раунда (для статуса)
 
             // REF_getter<MsgData::ValidateBlockREQ> offer=nullptr;
@@ -284,7 +279,7 @@ namespace Node
         // Статус по высотам: лидер хранит/ретранслирует, ноды подхватывают.
         // std::map<int64_t, REF_getter<MsgData::BlockStatusREQ>> block_status;
         // void mergeBlockStatus(const MsgData::BlockStatusREQ* e, int64_t epoch);
-        void broadcastCurrentBlockStatus();
+        void broadcastCurrentBlockStatus(bool round_finished);
         bool dl_test_done = false;   // тест-хук MTJS_TEST_DL_FETCH — один раз
 
         void data_cache_add(const THASH_id &h, const REF_getter<MsgData::Base>& p);
@@ -370,7 +365,6 @@ namespace Node
         std::vector<REF_getter<MsgData::TX>>  collectTx();
         THASH_id execute_block(b_params &b,  const REF_getter<MsgData::HeartBeatREQ> &lc, MsgData::ValidateBlockREQ* txs);
         /// Детерминированный слэш: проверить эвиденс двойной подписи и сжечь стейк.
-        std::optional<std::string> execute_slash(b_params &b, const REF_getter<MsgData::SlashCmd>& sc);
 
 
         void calc_fee_rewards_nodes(b_params& t, const REF_getter<MsgData::HeartBeatREQ> &lc);
@@ -464,14 +458,14 @@ namespace Node
         // void resetBlockExpired(const NODE_id &n);
         bool on_NodeNotResponded(const bcEvent::NodeNotRespondedREQ *e);
         void collect_granules_since_blocktimestamp(Cellable *c, IDatabase *db, TIME_mks block_timestamp, std::vector<std::pair<std::string,std::string>>&dbdump, int64_t& cnt, const route_t &route);
-        void process_offer(const THASH_id & offer, const REF_getter<MsgData::BlockStatusREQ>& status, const route_t &route, int round, int subblock);
+        void process_offer(const THASH_id & offer, const REF_getter<MsgData::SubBlock>& status, const route_t &route, int round, int subblock);
         // std::map<THASH_id,REF_getter<MsgData::Base>> cache;
         
 
         void apply_diffs(const THASH_id &att_hash, const route_t& route, int round, int subblock);
-        SB_result verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
+        SB_result verify_subblock_sigs(int round, int subblock, const route_t& route, const REF_getter<MsgData::SubBlock>& b,
                                const REF_getter<MsgData::HeartBeatREQ>& hb,
-                               const REF_getter<BlockMetaFull>& mf, std::set<NODE_id>& slashed);
+                               const REF_getter<BlockMetaFull>& mf);
 
     };
 

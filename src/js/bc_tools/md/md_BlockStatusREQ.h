@@ -25,69 +25,103 @@ namespace MsgData
     {
         SubBlock():Base(msgid::SubBlock) {}
         static Base* construct() { return new SubBlock(); }
-
+        int round=0;
+        int subblock=0;
         THASH_id offer_hash;
         std::map<THASH_id, REF_getter<MsgData::BlockAcceptedREQ>> accepted_by_committe;
         std::map<THASH_id, REF_getter<MsgData::BlockAcceptedREQ>> double_signed_by_committe;
-        std::map<THASH_id,std::pair<blst_cpp::AggregateSignature, std::vector<NODE_id> > > accepted_by_noncommitte;
-        std::map<THASH_id,std::pair<blst_cpp::AggregateSignature, std::vector<NODE_id> > > double_signed_by_noncommitte;
+        /// состояние ПОСЛЕ слэша (тот же BlockInfo, но post-slash корень)
+        std::map<THASH_id, REF_getter<MsgData::BlockAcceptedREQ>> slash;
+        std::map<THASH_id, REF_getter<MsgData::BlockAcceptedREQ>> double_signed_slash;
+        std::map<THASH_id,std::pair<blst_cpp::AggregateSignature, std::set<NODE_id> > > accepted_by_noncommitte;
+        std::map<THASH_id,std::pair<blst_cpp::AggregateSignature, std::set<NODE_id> > > double_signed_by_noncommitte;
         bool last=false;
         THASH_id result_root_hash;
         THASH_id att_hash;
 
         void add_accepted_by_noncommitte(const THASH_id& blockAcceptedHash, const NODE_id& n, const blst_cpp::Signature& sig)
         {
-            auto & b=accepted_by_noncommitte[blockAcceptedHash];
-            int n_sigs=0;
-            for(auto & z: b.second)
-            {
-                if(z==n)
+            // тот же вариант — это дубль, а не эквивокация
+            auto it=accepted_by_noncommitte.find(blockAcceptedHash);
+            if(it!=accepted_by_noncommitte.end() && it->second.second.count(n))
+                return;
+            // нода уже подписала ДРУГОЙ вариант — эквивокация
+            for(auto & z: accepted_by_noncommitte)
+                if(z.first!=blockAcceptedHash && z.second.second.count(n))
                 {
-                    n_sigs++;
-                    logErr2("already added sig");
+                    auto & d=double_signed_by_noncommitte[blockAcceptedHash];
+                    if(d.second.count(n))
+                        return;   // дубль второй подписи
+                    d.first.add(sig);
+                    d.second.insert(n);
                     return;
                 }
-            }
-            if(n_sigs==0)
-            {
-                b.first.add(sig);
-                b.second.push_back(n);
-            }
-            else{
-                auto & d=double_signed_by_noncommitte[blockAcceptedHash];
-                d.first.add(sig);
-                d.second.push_back(n);
-            }
+            auto & b=accepted_by_noncommitte[blockAcceptedHash];
+            b.first.add(sig);
+            b.second.insert(n);
         }
-        void add_accepted_by_committe(const REF_getter<MsgData::ValidateBlockRSP> &r)
+        // Эквивокация детектится ТОЛЬКО внутри одной мапы (acc/dbl).
+        // accept и slash — разные мапы, поэтому нода, подписавшая и A, и B,
+        // эквивокатором не считается.
+        void add_accepted_generic(std::map<THASH_id, REF_getter<MsgData::BlockAcceptedREQ>>& acc,
+                                  std::map<THASH_id, REF_getter<MsgData::BlockAcceptedREQ>>& dbl,
+                                  const REF_getter<MsgData::ValidateBlockRSP> &r,
+                                  const THASH_id& winner)
         {
             auto h=r->blockInfo->getHash();
-            auto &b=accepted_by_committe[h];
+            // кворум уже набран: принимаем только подписи победившего хеша
+            if(!winner.container.empty() && winner != h)
+                return;
+            // тот же BlockInfo — это дубль, а не эквивокация
+            auto it=acc.find(h);
+            if(it!=acc.end() && it->second.valid() && it->second->node_validators.count(r->node_validator))
+                return;
+            // нода уже подписала ДРУГОЙ BlockInfo в этой же мапе — эквивокация
+            for(auto & z: acc)
+                if(z.first!=h && z.second.valid() && z.second->node_validators.count(r->node_validator))
+                {
+                    auto &d=dbl[h];
+                    if(!d.valid())
+                    {
+                        d=new MsgData::BlockAcceptedREQ();
+                        d->blockInfo=r->blockInfo;
+                    }
+                    if(d->node_validators.count(r->node_validator))
+                        return;   // дубль второй подписи
+                    d->node_validators.insert(r->node_validator);
+                    d->agg_sig.add(r->sig);
+                    return;
+                }
+            auto & b=acc[h];
             if(!b.valid())
                 b=new MsgData::BlockAcceptedREQ();
             b->blockInfo=r->blockInfo;
-            for(auto &z:b->node_validators)
-            {
-                if(z==r->node_validator)
-                {
-                    logErr2("already added validator %s",r->node_validator.container.c_str());
-                    return;
-                }
-            }
-            b->node_validators.push_back(r->node_validator);
+            b->node_validators.insert(r->node_validator);
             b->agg_sig.add(r->sig);
+        }
+        void add_accepted_by_committe(const REF_getter<MsgData::ValidateBlockRSP> &r, const THASH_id& winner)
+        {
+            add_accepted_generic(accepted_by_committe, double_signed_by_committe, r, winner);
+        }
+        void add_slash(const REF_getter<MsgData::ValidateBlockRSP> &r)
+        {
+            add_accepted_generic(slash, double_signed_slash, r, THASH_id());
         }
         void pack(outBuffer& o) const final
         {
             MUTEX_INSPECTOR;
             Base::pack(o);
-            o<<offer_hash<<accepted_by_committe<<accepted_by_noncommitte<<last<<result_root_hash<<att_hash;
+            o<<offer_hash<<accepted_by_committe<<double_signed_by_committe
+             <<slash<<double_signed_slash
+             <<accepted_by_noncommitte<<double_signed_by_noncommitte<<last<<result_root_hash<<att_hash;
         }
         void unpack(inBuffer& o) final
         {
             MUTEX_INSPECTOR;
             Base::unpack(o);
-            o>>offer_hash>>accepted_by_committe>>accepted_by_noncommitte>>last>>result_root_hash>>att_hash;
+            o>>offer_hash>>accepted_by_committe>>double_signed_by_committe
+             >>slash>>double_signed_slash
+             >>accepted_by_noncommitte>>double_signed_by_noncommitte>>last>>result_root_hash>>att_hash;
         }
         void update(Blake2bHasher& h) const
         {
@@ -97,7 +131,31 @@ namespace MsgData
                 h.update(z.first.container);
                 z.second->update(h);
             }
+            for(auto& z: double_signed_by_committe)
+            {
+                h.update(z.first.container);
+                z.second->update(h);
+            }
+            for(auto& z: slash)
+            {
+                h.update(z.first.container);
+                z.second->update(h);
+            }
+            for(auto& z: double_signed_slash)
+            {
+                h.update(z.first.container);
+                z.second->update(h);
+            }
             for(auto& z: accepted_by_noncommitte)
+            {
+                h.update(z.first.container);
+                h.update(z.second.first.serialize());
+                for(auto& xx: z.second.second)
+                {
+                    h.update(xx.container);
+                }
+            }
+            for(auto& z: double_signed_by_noncommitte)
             {
                 h.update(z.first.container);
                 h.update(z.second.first.serialize());

@@ -35,11 +35,12 @@ bool subblock_take_stake(const REF_getter<BlockMetaFull>& mf, const NODE_id& n, 
 }
 }
 
-SB_result Node::Service::verify_subblock_sigs(const REF_getter<MsgData::SubBlock>& b,
+SB_result Node::Service::verify_subblock_sigs(int round, int subblock, const route_t& route, const REF_getter<MsgData::SubBlock>& b,
                                const REF_getter<MsgData::HeartBeatREQ>& hb,
-                               const REF_getter<BlockMetaFull>& mf, std::set<NODE_id>& slashed)
+                               const REF_getter<BlockMetaFull>& mf)
 {
     SB_result r;
+    std::set<NODE_id> slashed;
 
     auto log=[&,b](const char* what, const std::string& detail)
     {
@@ -61,6 +62,8 @@ SB_result Node::Service::verify_subblock_sigs(const REF_getter<MsgData::SubBlock
     // std::map<NODE_id,int> signed_cnt_noncommitte;
 
     /// ── подписи комитета ────────────────────────────────────────────────
+    bool sign_by_me_committe_reqired=false;
+    bool is_in_committe_me=mf->isMemberCommitte(this_node_name);
     for(auto& ih: b->accepted_by_committe)
     {
         const THASH_id& h=ih.first;
@@ -76,8 +79,12 @@ SB_result Node::Service::verify_subblock_sigs(const REF_getter<MsgData::SubBlock
         if(acc->node_validators.empty())
             return corrupt("committee: no validators", h.str());
 
+        if(!acc->node_validators.count(this_node_name) && is_in_committe_me)
+            sign_by_me_committe_reqired=true;
+
         std::vector<blst_cpp::PublicKey> pks;
         i128 stake=(i128)0;
+
         for(auto& n: acc->node_validators)
         {
             if(!mf->isMemberCommitte(n))
@@ -106,37 +113,46 @@ SB_result Node::Service::verify_subblock_sigs(const REF_getter<MsgData::SubBlock
             r.committe_quorum_hash=h;
         }
     }
+    if(sign_by_me_committe_reqired)
+    {
+        process_offer( b->offer_hash,b, route,round, subblock);
+    }
     for(auto& z:b->double_signed_by_committe)
     {
+        const THASH_id& h=z.first;
+        auto acc=z.second;
+        if(!acc.valid() || !acc->blockInfo.valid())
+            return corrupt("double_signed_by_committe: empty BlockAcceptedREQ", h.str());
+        if(acc->blockInfo->getHash()!=h)
+            return corrupt("double_signed_by_committe: key != hash(BlockInfo)", h.str());
+        if(!acc->blockInfo->offer_hash.container.empty() && acc->blockInfo->offer_hash!=b->offer_hash)
+            return corrupt("double_signed_by_committe: offer_hash mismatch", h.str());
+        if(hb.valid() && acc->blockInfo->heart_beat.valid() && !acc->blockInfo->heart_beat->equals(hb))
+            return corrupt("double_signed_by_committe: heart_beat mismatch", h.str());
+        if(acc->node_validators.empty())
+            return corrupt("double_signed_by_committe: no validators", h.str());
+
         std::vector<blst_cpp::PublicKey> pks;
-        for(auto& n: z.second->node_validators)
+        for(auto& n: acc->node_validators)
         {
+            // эквивокация: у подписанта обязана быть и первая подпись в accepted
             bool inPrev=false;
-            for(auto& z: b->accepted_by_committe)
-            {
-                for(auto& x: z.second->node_validators)
-                {
-                    if(x==n)
-                        inPrev=true;
-                    if(inPrev) break;
-                }
-                if(inPrev) break;
-            }
+            for(auto& a: b->accepted_by_committe)
+                if(a.second.valid() && a.second->node_validators.count(n)) { inPrev=true; break; }
             if(!inPrev)
-            {
-                return corrupt("double_signed_by_committe: signer not exists in in accepted_by_committe", n.container);
-            }
+                return corrupt("double_signed_by_committe: signer not exists in accepted_by_committe", n.container);
             if(!mf->isMemberCommitte(n))
-                return corrupt("double_signed_by_committe: signer not in double_signed_by_committe", n.container);
-            // if(++signed_cnt_committe[n]>1)
-            //     return corrupt("signer voted twice", n.container);
+                return corrupt("double_signed_by_committe: signer not in committee", n.container);
             auto pk=mf->getBlsPk(n);
             if(!pk)
                 return corrupt("double_signed_by_committe: no bls pk", n.container);
             pks.push_back(*pk);
+            slashed.insert(n);   // эквивокатор — на слэш
         }
-        if(!z.second->agg_sig.verify(pks,z.first.container))
-            return corrupt("double_signed_by_committe: aggregate signature invalid", z.first.str());
+        if(!acc->agg_sig.initialized())
+            return corrupt("double_signed_by_committe: empty aggregate signature", h.str());
+        if(!acc->agg_sig.verify(pks,h.container))
+            return corrupt("double_signed_by_committe: aggregate signature invalid", h.str());
     }
 
     /// ── подписи не-комитета ─────────────────────────────────────────────
@@ -190,29 +206,26 @@ SB_result Node::Service::verify_subblock_sigs(const REF_getter<MsgData::SubBlock
         std::vector<blst_cpp::PublicKey> pks;
         for(auto& n: nodes)
         {
+            // эквивокация: у подписанта обязана быть и первая подпись в accepted
             bool inPrev=false;
             for(auto& zz: b->accepted_by_noncommitte)
-            {
-                for(auto& x: zz.second.second)
-                {
-                    if(x==n)
-                        inPrev=true;
-                    if(inPrev)
-                        break;
-                }
-                if(inPrev)
-                    break;
-            }
+                if(zz.second.second.count(n)) { inPrev=true; break; }
+            if(!inPrev)
+                return corrupt("double_signed_by_noncommitte: signer not exists in accepted_by_noncommitte", n.container);
             if(!mf->isMemberNonCommitte(n))
                 return corrupt("double_signed_by_noncommitte: signer not in non-committee", n.container);
             auto pk=mf->getBlsPk(n);
             if(!pk)
                 return corrupt("double_signed_by_noncommitte: no bls pk", n.container);
             pks.push_back(*pk);
+            slashed.insert(n);   // эквивокатор — на слэш
         }
+        if(!agg.initialized())
+            return corrupt("double_signed_by_noncommitte: empty aggregate signature", h.str());
         if(!agg.verify(pks,h.container))
             return corrupt("double_signed_by_noncommitte: aggregate signature invalid", h.str());
     }
+
 
     return r;
 }

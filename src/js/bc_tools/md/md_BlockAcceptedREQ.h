@@ -2,6 +2,7 @@
 #include "md_Base.h"
 
 #include "md_BlockInfo.h"
+#include <set>
 #include "blst_cp.h"
 namespace MsgData
 {
@@ -19,7 +20,7 @@ namespace MsgData
             return new BlockAcceptedREQ();
         }
         REF_getter<BlockInfo> blockInfo;
-        std::vector<NODE_id> node_validators;
+        std::set<NODE_id> node_validators;
         blst_cpp::AggregateSignature agg_sig;
         void update(Blake2bHasher& h) const;
         void pack(outBuffer& b) const final;

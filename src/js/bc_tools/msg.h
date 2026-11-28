@@ -97,7 +97,6 @@ namespace msgid
         BlockStatusREQ=47,
         SubBlock=48,
         Round=49,
-        SlashCmd=50,
     };
 
 }

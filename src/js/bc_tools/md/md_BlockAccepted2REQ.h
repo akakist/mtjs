@@ -1,4 +1,5 @@
 #pragma once
+#include <set>
 #include "md_Base.h"
 
 #include "md_BlockInfo.h"
@@ -18,7 +19,7 @@ namespace MsgData
             return new BlockAccepted2REQ();
         }
         REF_getter<BlockAcceptedREQ> blockAcceptedREQ;
-        std::vector<NODE_id> node_diff_validators;
+        std::set<NODE_id> node_diff_validators;
         blst_cpp::AggregateSignature agg_diff_sig;
         void update(Blake2bHasher& h) const
         {

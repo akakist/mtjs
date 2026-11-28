@@ -237,9 +237,12 @@ bool Node::Service::on_timer(const timerEvent::TickTimer *e)
     MUTEX_INSPECTOR;
     if (e->tid == TIMER_BLOCK_STATUS) 
     {
-        if(getMetaFull()->leader().name==this_node_name)
+        auto mf=getMetaFull();
+        if(mf->leader().name==this_node_name)
         {
-            broadcastCurrentBlockStatus();
+            bool fin = getNow() > mf->subblock_deadline()
+                    || (transaction_pool_of_leader.empty() && getNow() > mf->empty_round_deadline());
+            broadcastCurrentBlockStatus(fin);
         }
         return true;
     }
@@ -930,17 +933,6 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
     }
     DBG(logNode("execute_block: tx_count=%zu", (size_t)txs->transaction_bodies.size()));
 
-    // Слэш-субблок: детерминированное списание стейка эквивокаторов.
-    if(txs->subblock_type==MsgData::SUBBLOCK_SLASH)
-    {
-        for(auto& sc: txs->slashes)
-        {
-            auto serr=execute_slash(b, sc);
-            if(serr)
-                logNode("execute_block: slash failed for %s: %s", sc->node.container.c_str(), serr->c_str());
-        }
-    }
-
     // Nonce повышаем после всех tx: внутри цикла u взят до execute_transaction,
     // а откат (unpack_mx) заменяет data-объект — и incNonce уходит в отвязанный объект.
     std::vector<ADDRESS_id> nonce_bumps;
@@ -1049,60 +1041,6 @@ THASH_id Node::Service::execute_block(b_params &b,  const REF_getter<MsgData::He
     }
     auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
     return rh;
-}
-
-std::optional<std::string> Node::Service::execute_slash(b_params &b, const REF_getter<MsgData::SlashCmd>& sc)
-{
-    MUTEX_INSPECTOR;
-    if(!sc.valid()) return "empty slash";
-    auto mf=b.meta;
-    if(!mf.valid()) return "no meta";
-    auto pk=mf->getBlsPk(sc->node);
-    if(!pk) return "no bls pk";
-    if(sc->hash1==sc->hash2) return "same hash";
-    if(!sc->sig1.verify(*pk, sc->hash1.container)) return "sig1 invalid";
-    if(!sc->sig2.verify(*pk, sc->hash2.container)) return "sig2 invalid";
-
-    auto ts=b.blockStatusREQ->hb->block_timestamp;
-    auto n=cells::getNodeNoCreate(root.get(), db_state.get(), sc->node, NULL, ts);
-    if(!n.valid()) return "node not found";
-
-    // Полное сжигание: стейкерам ничего не возвращаем, их staked_in чистим,
-    // активность адресов и ноды обновляем (как в execute_unstake_node).
-    auto stakers=n->getStakes();
-    for(auto& z: stakers)
-    {
-        auto u=cells::getAddressStateNoCreate(root.get(), db_state.get(), z.first, NULL, ts);
-        if(u.valid())
-        {
-            u->staked_in.erase(sc->node);
-            auto actu=cells::getActivityNoCreate(root.get(), db_state.get(), u->getDbId(), NULL, ts);
-            if(actu.valid()) actu->update_time(ts, NULL);
-        }
-    }
-    {
-        auto actn=cells::getActivityNoCreate(root.get(), db_state.get(), n->getDbId(), NULL, ts);
-        if(actn.valid()) actn->update_time(ts, NULL);
-    }
-    i128 burned=n->burn_all_stake();
-    {
-        auto st=cells::getStateNoCreate(root.get(), db_state.get(), NULL, ts);
-        if(st.valid())
-        {
-            st->total_stake-=burned;
-            // Сожжённый стейк уходит из обращения целиком (стейкерам не возвращается).
-            st->total_supply-=burned;
-        }
-    }
-
-    b.emit_block_cmd("slash",
-        EmitObj().s("node", sc->node.container)
-                 .s("burned", burned.str())
-                 .s("hash1", sc->hash1.str())
-                 .s("hash2", sc->hash2.str())
-                 .pack());
-    logNode("slash: %s сжёг %s", sc->node.container.c_str(), burned.str().c_str());
-    return std::nullopt;
 }
 
 void Node::Service::calc_fee_rewards_nodes(b_params &b, const REF_getter<MsgData::HeartBeatREQ> &lc)
@@ -1483,7 +1421,6 @@ std::vector<std::string> Node::Service::subblock_data_sources(const REF_getter<M
         if(ip!=me) r.push_back(ip);
     return r;
 }
-
 void Node::Service::process_status_subblock(const THASH_id& offer_hash, int round, const route_t& route, int attempt)
 {
     MUTEX_INSPECTOR;
@@ -1508,8 +1445,7 @@ void Node::Service::process_status_subblock(const THASH_id& offer_hash, int roun
         return;     // субблок уже не в актуальном статусе
 
     auto mf=getMetaFull();
-    std::set<NODE_id> slashed;
-    SB_result vr=verify_subblock_sigs(sp,bt.block_status->hb,mf, slashed);
+    SB_result vr=verify_subblock_sigs(round,idx,route,sp,bt.block_status->hb,mf);
     if(vr.corrupt)
     {
         logNode("BlockStatusREQ: subblock offer=%s: подписи не сходятся — пропуск",
@@ -1568,7 +1504,7 @@ void Node::Service::process_status_subblock(const THASH_id& offer_hash, int roun
         if(data_cache_get(need).valid())
         {
             if(act==ACT_VOTE)
-                process_offer(sp->offer_hash,bt.block_status,route,round,idx);
+                process_offer(sp->offer_hash,sp,route,round,idx);
             else
                 apply_diffs(att_hash,route,round,idx);
         }
@@ -1637,15 +1573,14 @@ void Node::Service::finalize_round(int round, const route_t& route)
     // Сливаем дампы всех субблоков в один батч: поздние гранулы перезаписывают ранние.
     _db_to_save merged;
     REF_getter<MsgData::BlockAcceptedREQ> last_acc=nullptr;
-    std::vector<NODE_id> last_diff_validators;
+    std::set<NODE_id> last_diff_validators;
     blst_cpp::AggregateSignature last_agg_diff;
     REF_getter<MsgData::BlockInfo> last_info=nullptr;
 
     for(size_t i=0;i<rd->subblocks.size();i++)
     {
         auto& s=rd->subblocks[i];
-        std::set<NODE_id> slashed;
-        SB_result vr=verify_subblock_sigs(s,bt.block_status->hb,mf, slashed);
+        SB_result vr=verify_subblock_sigs(round,(int)i,route,s,bt.block_status->hb,mf);
         if(vr.corrupt)
         {
             logNode("finalize_round: subblock %zu offer=%s: битые подписи — ждём",
@@ -1688,6 +1623,8 @@ void Node::Service::finalize_round(int round, const route_t& route)
 
     // применяем собранный батч как в BlockStore
     db_to_save_Z.add(merged);
+
+    // db_to_save_Z.add(merged);
     auto rh=proceed_merkle_on_transaction_pool_hashers(root,db_to_save_Z);
     if(rh!=last_info->new_root_hash1)
     {
@@ -1783,7 +1720,7 @@ bool Node::Service::BlockStatusREQ(const MsgData::BlockStatusREQ *e, const NODE_
 }
 
 
-void Node::Service::broadcastCurrentBlockStatus()
+void Node::Service::broadcastCurrentBlockStatus(bool round_finished)
 {
 
     auto & bt=l_blocks[prev_root_hash_Z()];
@@ -1805,18 +1742,24 @@ void Node::Service::broadcastCurrentBlockStatus()
     }
 
     // Рассылка новых субблоков — только до половины слота.
+    round->finished=round_finished;
     if(!round->finished)
     {
         const TIME_mks now=iUtils->getNow();
 
         // оффер из ещё не разосланных tx
         REF_getter<MsgData::ValidateBlockREQ> offer=new MsgData::ValidateBlockREQ;
-        for(auto& t: transaction_pool_of_leader)
+        offer->heart_beat=bt.block_status->hb;   // хеш оффера уникален за счёт hb раунда (важно для пустого)
+
+        // TODOZ(1): сделано — оффер собирается collectTx() (упорядочено по nonce).
+        // tx_sent оставлен сетом; флаг через data_cache (hash(tx+"sent")) — опционально.
+        auto txs=collectTx();
+        for(auto& t: txs)
         {
-            if(!tx_sent.count(t.first))
+            if(!tx_sent.count(t->getHash()))
             {
-                offer->transaction_bodies.push_back(t.second);
-                tx_sent.insert(t.first);
+                offer->transaction_bodies.push_back(t);
+                tx_sent.insert(t->getHash());
             }
         }
 
@@ -1834,69 +1777,40 @@ void Node::Service::broadcastCurrentBlockStatus()
                     sb->offer_hash.str().c_str(), offer->transaction_bodies.size(), round->subblocks.size());
         }
 
-        // Слэш: эвиденс двойной подписи оформляем отдельным субблоком (один раз на раунд).
-        if(!bt.pending_slashes.empty())
-        {
-            auto slash_flag=blake2b_hash(std::to_string(mf->round)+"slash_sent");
-            if(data_cache.find(slash_flag)==data_cache.end())
-            {
-                REF_getter<MsgData::ValidateBlockREQ> so=new MsgData::ValidateBlockREQ;
-                so->subblock_type=MsgData::SUBBLOCK_SLASH;
-                so->slashes=bt.pending_slashes;
-                data_cache_add(so->getHash(), so.get());
-                broadcast_MsgEvent_via_broadcaster(so.get(), mf->tree_all_nodes);
-
-                REF_getter<MsgData::SubBlock> sb=new MsgData::SubBlock;
-                sb->offer_hash=so->getHash();
-                round->subblocks.push_back(sb);
-                data_cache[slash_flag]={getNow().v,nullptr};
-                logNode("[blockstatus] slash subblock %s (evidence=%zu)",
-                        sb->offer_hash.str().c_str(), bt.pending_slashes.size());
-            }
-        }
+        // TODOZ(2): сделано — слэш-субблок (SUBBLOCK_SLASH) убран.
+        // Нода сама решает кого слэшнуть, слэшит локально и голосует в slash-контейнер
+        // (ValidateBlockRSP.slash=true).
 
         // Субблоков больше не будет:
         //   * вышли за половину слота (обычный дедлайн);
         //   * tx так и не появились — заканчиваем по короткому пустому дедлайну (1с).
-        if(now>=mf->subblock_deadline())
-        {
-            round->finished=true;
-            logNode("[blockstatus] round %d finished (за половину слота)",mf->round);
-        }
-        else if(transaction_pool_of_leader.empty() && now>=mf->empty_round_deadline())
-        {
-            round->finished=true;
-            logNode("[blockstatus] round %d finished (пул пуст, короткий дедлайн)",mf->round);
-        }
+
+        // TODOZ(3): сделано — finished приходит параметром; расчёт дедлайна унесён в caller (on_timer).
     }
 
-    // Лидер тоже валидатор: обрабатываем собственный статус (голос/apply/finalize).
-    {
-        auto round_it=bt.block_status->rounds.find(mf->round);
-        if(round_it!=bt.block_status->rounds.end())
-        {
-            std::vector<THASH_id> offers;
-            offers.reserve(round_it->second->subblocks.size());
-            for(auto& s: round_it->second->subblocks)
-                offers.push_back(s->offer_hash);
-            for(auto& h: offers)
-                process_status_subblock(h,mf->round,route_t());
-        }
-    }
+    // TODOZ(4): сделано — ручная обработка собственного статуса убрана.
+    // Лидер получает свой статус как обычный валидатор: он в дереве рассылки tree_all_nodes.
+
 
     // Кворум комитета по субблоку → бродкастим диффы (ValidateDiffs) с att_data.
     // Отправка — один раз; флаг в кеше: blake2b_hash(offer+"att_data_sent").
+
+    // TODOZ(5): сделано — кворум считается в ValidateBlockRSP при добавлении подписи;
+    // если набран, принимаются только подписи победившего хеша (см. leader_node.cpp).
+    
     {
         auto round_it=bt.block_status->rounds.find(mf->round);
         if(round_it!=bt.block_status->rounds.end())
         {
-            for(auto& s: round_it->second->subblocks)
+            for(size_t si=0;si<round_it->second->subblocks.size();si++)
             {
+                auto& s=round_it->second->subblocks[si];
                 auto sent_flag=blake2b_hash(s->offer_hash.container+"att_data_sent");
                 if(data_cache.find(sent_flag)!=data_cache.end())
                     continue;   // уже рассылали
-                std::set<NODE_id> slashed;
-                SB_result vr=verify_subblock_sigs(s,bt.block_status->hb,mf, slashed);
+                /// TODOY: смотри - мы вызываем verify_subblock_sigs , которая вызывает функции ноды.
+                /// предлагаю сделать параметр фильтр - не вызывать функции, check_оnly
+                SB_result vr=verify_subblock_sigs(mf->round,(int)si,route_t(),s,bt.block_status->hb,mf);
                 if(vr.corrupt || !vr.has_committe_quorum)
                     continue;
                 auto it=s->accepted_by_committe.find(vr.committe_quorum_hash);
@@ -1910,6 +1824,7 @@ void Node::Service::broadcastCurrentBlockStatus()
 
                 REF_getter<MsgData::BlockDiffValidateREQ> bdv=new MsgData::BlockDiffValidateREQ(att);
                 broadcast_MsgEvent_via_broadcaster(bdv.get(), mf->tree_all_nodes);
+                /// TODOY: есть функция data_cache_add для этого.
                 data_cache[sent_flag]={getNow().v,nullptr};   // флаг «отправлено»
                 logNode("[blockstatus] кворум комитета — бродкаст диффов att=%s",att_hash.str().c_str());
             }

@@ -343,7 +343,7 @@ void Node::Service::mark_activity(const std::set<NODE_id>& alive_set, Rollback* 
 
 int get_global_refcount();
 
-void Node::Service::process_offer(const THASH_id & offer, const REF_getter<MsgData::BlockStatusREQ>& status, const route_t &route, int round, int subblock)
+void Node::Service::process_offer(const THASH_id & offer, const REF_getter<MsgData::SubBlock>& status, const route_t &route, int round, int subblock)
 {
     auto prev_root_hash=prev_root_hash_Z();
     b_params t(db_state.get());
@@ -353,8 +353,8 @@ void Node::Service::process_offer(const THASH_id & offer, const REF_getter<MsgDa
     if(data_cache_get(result_hash).valid())
         return;
 
-    t.blockStatusREQ=status;
-    auto &bt=l_blocks[prev_root_hash];
+    // t.blockStatusREQ=status;
+    // auto &bt=l_blocks[prev_root_hash];
     // bt.cache[r->getHash()]=r;
 
     bool err = false;
@@ -364,9 +364,9 @@ void Node::Service::process_offer(const THASH_id & offer, const REF_getter<MsgDa
     // пропустившая GetTxREQ (например, после синка), выпадает из раунда.
     // Достройку блока новым лидером это допускает: src_node — текущий лидер,
     // а hb->node_leader может быть предыдущим (кто изначально предложил).
-    auto cl=t.meta->leader();
-    {
-    }
+    // auto cl=t.meta->leader();
+    // {
+    // }
     if (!err)
     {
 

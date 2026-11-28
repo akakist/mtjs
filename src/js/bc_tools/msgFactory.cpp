@@ -47,7 +47,6 @@
 #include "md/md_UnlockRoundREQ.h"
 #include "md/md_Offer.h"
 #include "md/md_BlockStatusREQ.h"
-#include "md/md_SlashCmd.h"
 
 
 
@@ -97,5 +96,4 @@ MsgFactory::MsgFactory()
     registerMsg(msgid::BlockStatusREQ, MsgData::BlockStatusREQ::construct);
     registerMsg(msgid::SubBlock, MsgData::SubBlock::construct);
     registerMsg(msgid::Round, MsgData::Round::construct);
-    registerMsg(msgid::SlashCmd, MsgData::SlashCmd::construct);
 }

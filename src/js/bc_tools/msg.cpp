@@ -70,7 +70,6 @@ const char *msgName(int id)
     case msgid::BlockStatusREQ: return "BlockStatusREQ";
     case msgid::SubBlock: return "SubBlock";
     case msgid::Round: return "Round";
-    case msgid::SlashCmd: return "SlashCmd";
     default:
         return "unknown";
     }
